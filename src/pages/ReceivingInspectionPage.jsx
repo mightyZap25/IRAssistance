@@ -174,50 +174,52 @@ export default function ReceivingInspectionPage() {
             <div className="grid grid-cols-4 gap-4 mb-4 shrink-0">
                 
                 {/* 1. Monthly Status & Inspection Rate */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+                <div className="bg-gradient-to-br from-white to-teal-50/10 rounded-2xl p-5 border border-slate-200 hover:border-teal-200/50 shadow-sm hover:shadow-md hover:shadow-teal-500/5 hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-between">
                     <div>
-                        <p className="text-xs font-black text-slate-400 mb-1 uppercase tracking-wider">월간 검사 진척률</p>
-                        <div className="flex items-end gap-1 mt-2">
-                            <span className="text-3xl font-black text-slate-800">{stats.inspectionRate.toFixed(1)}</span>
-                            <span className="text-lg font-bold text-slate-400 mb-0.5">%</span>
+                        <p className="text-[10px] font-black text-slate-400 mb-1 uppercase tracking-wider">월간 검사 진척률</p>
+                        <div className="flex items-end gap-1 mt-1.5">
+                            <span className="text-3xl font-black text-slate-900 tracking-tight">{stats.inspectionRate.toFixed(1)}</span>
+                            <span className="text-sm font-extrabold text-slate-400 mb-1">%</span>
                         </div>
-                        <p className="text-xs font-bold text-slate-500 mt-2">대기: <span className="text-rose-500 font-black">{stats.pendingCount}건</span> / 완료: <span className="text-teal-600 font-black">{stats.completeCount}건</span></p>
+                        <p className="text-xs font-bold text-slate-500 mt-2">대기: <span className="text-rose-500 font-extrabold">{stats.pendingCount}건</span> / 완료: <span className="text-teal-600 font-extrabold">{stats.completeCount}건</span></p>
                     </div>
-                    {/* Simulated Gauge for Inspection Rate */}
-                    <div className="relative w-16 h-16">
-                        <svg viewBox="0 0 36 36" className="w-full h-full">
-                            <path className="text-slate-100" strokeWidth="4" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                            <path className="text-teal-500" strokeWidth="4" strokeDasharray={`${stats.inspectionRate}, 100`} stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    {/* Circular Gauge for Inspection Rate */}
+                    <div className="relative w-16 h-16 flex items-center justify-center shrink-0">
+                        <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+                            <path className="text-slate-100" strokeWidth="4.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            <path className="text-teal-500 drop-shadow-[0_0_1.5px_rgba(20,184,166,0.3)]" strokeWidth="4.5" strokeLinecap="round" strokeDasharray={`${stats.inspectionRate}, 100`} stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                         </svg>
+                        <div className="absolute text-[11px] font-black text-slate-800">{stats.inspectionRate.toFixed(0)}%</div>
                     </div>
                 </div>
 
                 {/* 2. Quality Yield (Pass / Defect) */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+                <div className="bg-gradient-to-br from-white to-emerald-50/10 rounded-2xl p-5 border border-slate-200 hover:border-emerald-200/50 shadow-sm hover:shadow-md hover:shadow-emerald-500/5 hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-between">
                     <div>
-                        <p className="text-xs font-black text-slate-400 mb-1 uppercase tracking-wider">합격률 / 불량률</p>
-                        <div className="flex items-end gap-1 mt-2">
-                            <span className={`text-3xl font-black ${stats.passRateColor}`}>{stats.passRate.toFixed(1)}</span>
-                            <span className="text-lg font-bold text-slate-400 mb-0.5">%</span>
+                        <p className="text-[10px] font-black text-slate-400 mb-1 uppercase tracking-wider">합격률 / 불량률</p>
+                        <div className="flex items-end gap-1 mt-1.5">
+                            <span className={`text-3xl font-black tracking-tight ${stats.passRateColor}`}>{stats.passRate.toFixed(1)}</span>
+                            <span className="text-sm font-extrabold text-slate-400 mb-1">%</span>
                         </div>
-                        <p className="text-xs font-bold text-slate-500 mt-2">불량률: <span className="text-rose-500 font-black">{stats.defectRate.toFixed(1)}%</span></p>
+                        <p className="text-xs font-bold text-slate-500 mt-2">불량률: <span className="text-rose-500 font-extrabold">{stats.defectRate.toFixed(1)}%</span></p>
                     </div>
-                    {/* Simulated Gauge with SVG */}
-                    <div className="relative w-16 h-16">
-                        <svg viewBox="0 0 36 36" className="w-full h-full">
-                            <path className="text-rose-100" strokeWidth="4" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                            <path className={stats.passRateColor} strokeWidth="4" strokeDasharray={`${stats.passRate}, 100`} stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    {/* Circular Gauge with SVG */}
+                    <div className="relative w-16 h-16 flex items-center justify-center shrink-0">
+                        <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+                            <path className="text-rose-100" strokeWidth="4.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            <path className={`${stats.passRateColor} drop-shadow-[0_0_1.5px_rgba(16,185,129,0.3)]`} strokeWidth="4.5" strokeLinecap="round" strokeDasharray={`${stats.passRate}, 100`} stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                         </svg>
+                        <div className="absolute text-[11px] font-black text-slate-800">{stats.passRate.toFixed(0)}%</div>
                     </div>
                 </div>
 
                 {/* 3. Defect Types (Donut) */}
-                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center gap-4">
+                <div className="bg-gradient-to-br from-white to-blue-50/10 rounded-2xl p-4 border border-slate-200 hover:border-blue-200/50 shadow-sm hover:shadow-md hover:shadow-blue-500/5 hover:-translate-y-0.5 transition-all duration-300 flex items-center gap-4">
                     <div className="w-20 h-20 shrink-0">
                         {stats.topDefects.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
-                                    <Pie data={stats.topDefects} innerRadius={25} outerRadius={35} paddingAngle={2} dataKey="value" stroke="none">
+                                    <Pie data={stats.topDefects} innerRadius={26} outerRadius={36} paddingAngle={2} dataKey="value" stroke="none">
                                         {stats.topDefects.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                                     </Pie>
                                     <Tooltip contentStyle={{ fontSize: '10px', borderRadius: '8px', padding: '4px 8px' }} />
@@ -229,14 +231,14 @@ export default function ReceivingInspectionPage() {
                             </div>
                         )}
                     </div>
-                    <div className="flex-1">
-                        <p className="text-xs font-black text-slate-400 mb-1.5 uppercase tracking-wider">주요 불량 사유</p>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-wider">주요 불량 사유</p>
                         {stats.topDefects.length > 0 ? (
                             <div className="space-y-1">
                                 {stats.topDefects.slice(0, 2).map((d, i) => (
                                     <div key={i} className="flex justify-between items-center text-xs">
-                                        <span className="font-bold text-slate-600 truncate">{d.name}</span>
-                                        <span className="font-black text-slate-800">{d.value}건</span>
+                                        <span className="font-bold text-slate-600 truncate mr-2">{d.name}</span>
+                                        <span className="font-black text-slate-800 shrink-0">{d.value}건</span>
                                     </div>
                                 ))}
                             </div>
@@ -247,12 +249,12 @@ export default function ReceivingInspectionPage() {
                 </div>
 
                 {/* 4. Vendor Defects (Donut) */}
-                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center gap-4">
+                <div className="bg-gradient-to-br from-white to-indigo-50/10 rounded-2xl p-4 border border-slate-200 hover:border-indigo-200/50 shadow-sm hover:shadow-md hover:shadow-indigo-500/5 hover:-translate-y-0.5 transition-all duration-300 flex items-center gap-4">
                     <div className="w-20 h-20 shrink-0">
                         {stats.topVendors.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
-                                    <Pie data={stats.topVendors} innerRadius={25} outerRadius={35} paddingAngle={2} dataKey="value" stroke="none">
+                                    <Pie data={stats.topVendors} innerRadius={26} outerRadius={36} paddingAngle={2} dataKey="value" stroke="none">
                                         {stats.topVendors.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[(index + 2) % COLORS.length]} />)}
                                     </Pie>
                                     <Tooltip contentStyle={{ fontSize: '10px', borderRadius: '8px', padding: '4px 8px' }} />
@@ -264,14 +266,14 @@ export default function ReceivingInspectionPage() {
                             </div>
                         )}
                     </div>
-                    <div className="flex-1">
-                        <p className="text-xs font-black text-slate-400 mb-1.5 uppercase tracking-wider">공급사 불량 (수량)</p>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-wider">공급사 불량 (수량)</p>
                         {stats.topVendors.length > 0 ? (
                             <div className="space-y-1">
                                 {stats.topVendors.slice(0, 2).map((v, i) => (
                                     <div key={i} className="flex justify-between items-center text-xs">
-                                        <span className="font-bold text-slate-600 truncate w-20">{v.name}</span>
-                                        <span className="font-black text-rose-500">{v.value}개</span>
+                                        <span className="font-bold text-slate-600 truncate mr-2">{v.name}</span>
+                                        <span className="font-black text-rose-500 shrink-0">{v.value}개</span>
                                     </div>
                                 ))}
                             </div>
@@ -285,17 +287,17 @@ export default function ReceivingInspectionPage() {
 
             {/* Tabs & Search */}
             <div className="flex items-center justify-between mb-4 shrink-0">
-                <div className="flex bg-slate-200/50 p-1 rounded-xl">
+                <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200/60 shadow-inner">
                     <button 
                         onClick={() => setActiveTab('PENDING')}
-                        className={`px-6 py-2 rounded-lg text-sm font-black transition-all ${activeTab === 'PENDING' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200'}`}
+                        className={`px-6 py-2 rounded-xl text-xs font-black transition-all duration-300 ${activeTab === 'PENDING' ? 'bg-white text-teal-600 shadow-md shadow-slate-200/80 border border-slate-200/30' : 'text-slate-500 hover:text-slate-800'}`}
                     >
                         검수 대기 (Pending)
-                        {stats.pendingCount > 0 && <span className="ml-2 bg-rose-500 text-white px-2 py-0.5 rounded-full text-[10px]">{stats.pendingCount}</span>}
+                        {stats.pendingCount > 0 && <span className="ml-2 bg-rose-500 text-white px-2 py-0.5 rounded-full text-[9px] font-extrabold shadow-sm animate-pulse">{stats.pendingCount}</span>}
                     </button>
                     <button 
                         onClick={() => setActiveTab('HISTORY')}
-                        className={`px-6 py-2 rounded-lg text-sm font-black transition-all ${activeTab === 'HISTORY' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200'}`}
+                        className={`px-6 py-2 rounded-xl text-xs font-black transition-all duration-300 ${activeTab === 'HISTORY' ? 'bg-white text-slate-800 shadow-md shadow-slate-200/80 border border-slate-200/30' : 'text-slate-500 hover:text-slate-800'}`}
                     >
                         검수 히스토리 (History)
                     </button>
@@ -309,19 +311,19 @@ export default function ReceivingInspectionPage() {
                             placeholder="PO, 품목명, 공급사 검색..." 
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 w-64"
+                            className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 focus:shadow-sm focus:shadow-teal-100 transition-all duration-300 w-64"
                         />
                     </div>
                     {activeTab === 'HISTORY' && (
-                        <button onClick={() => setIsReportModalOpen(true)} className="px-4 py-2 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-900 shadow-sm flex items-center gap-2">
-                            <FileText size={16} /> QA 리포트 생성
+                        <button onClick={() => setIsReportModalOpen(true)} className="px-4 py-2 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-xl text-xs font-black hover:from-slate-900 hover:to-black active:scale-[0.98] transition-all duration-200 shadow-sm shadow-slate-200 flex items-center gap-2">
+                            <FileText size={14} /> QA 리포트 생성
                         </button>
                     )}
                 </div>
             </div>
 
             {/* List */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex-1 overflow-hidden relative z-20">
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-md shadow-slate-100/50 flex-1 overflow-hidden relative z-20">
                 {loading ? (
                     <div className="flex h-full items-center justify-center text-slate-400 font-bold">데이터를 로드하는 중...</div>
                 ) : (
