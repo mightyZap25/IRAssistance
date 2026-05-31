@@ -131,6 +131,45 @@ export default function WorkspaceFilesPage() {
         }
     };
 
+    // 구글 토큰 만료 여부 확인
+    const isTokenExpired = () => {
+        const token = localStorage.getItem('google_access_token');
+        if (!token) return true;
+        const expiresAt = localStorage.getItem('google_access_token_expires_at');
+        if (!expiresAt) return true;
+        return Date.now() > Number(expiresAt);
+    };
+
+    // 토큰이 만료되었거나 없을 시 사용자 제스처 컨텍스트 내에서 팝업을 띄워 갱신 처리
+    const ensureValidToken = async () => {
+        const token = localStorage.getItem('google_access_token');
+        const expiresAt = localStorage.getItem('google_access_token_expires_at');
+        const isExpired = !token || !expiresAt || Date.now() > Number(expiresAt);
+        
+        if (!isExpired) {
+            return token;
+        }
+        
+        try {
+            setDriveLoading(true);
+            const result = await signInWithPopup(firebaseAuth, googleProvider);
+            const credential = GoogleAuthProvider.credentialFromResult(result);
+            if (credential && credential.accessToken) {
+                localStorage.setItem('google_access_token', credential.accessToken);
+                localStorage.setItem('google_access_token_expires_at', Date.now() + 3500 * 1000);
+                setDriveError(null);
+                const activeId = folderId || DEFAULT_FOLDER_ID;
+                fetchGoogleDriveFiles(activeId);
+                return credential.accessToken;
+            }
+        } catch (error) {
+            console.error('구글 토큰 갱신 실패:', error);
+        } finally {
+            setDriveLoading(false);
+        }
+        return null;
+    };
+
     // 실시간 Google Drive API 연동 파일 조회
     const fetchGoogleDriveFiles = async (targetId) => {
         if (!targetId) {
@@ -141,9 +180,11 @@ export default function WorkspaceFilesPage() {
         setDriveError(null);
 
         const accessToken = localStorage.getItem('google_access_token');
+        const expiresAt = localStorage.getItem('google_access_token_expires_at');
+        const isExpired = !accessToken || !expiresAt || Date.now() > Number(expiresAt);
         
         // 액세스 토큰이 없는 상태 -> 알림함으로 알림 전송 후 가상 데이터 노출
-        if (!accessToken) {
+        if (isExpired) {
             const virtualData = INITIAL_DRIVE_DATA[targetId] || [];
             const sortedVirtual = [...virtualData].sort((a, b) => {
                 if (a.type === 'folder' && b.type !== 'folder') return -1;
@@ -152,8 +193,13 @@ export default function WorkspaceFilesPage() {
             });
             setDriveFiles(sortedVirtual);
             setDriveLoading(false);
-            setDriveError('구글 Workspace 인증이 만료되었습니다. 우측 상단의 [구글 연동 인증] 버튼을 누르시면 즉시 연동됩니다.');
-            triggerWarningNotification('구글 Workspace 연동 권한 인증 정보가 유효하지 않습니다. [구글 연동 인증]을 다시 승인해 주세요.');
+            
+            if (!accessToken) {
+                setDriveError('구글 Workspace 인증 정보가 없습니다. 우측 상단의 [구글 연동 인증] 버튼을 누르시면 실시간 드라이브가 연동됩니다.');
+            } else {
+                setDriveError('구글 Workspace 인증이 만료되었습니다. 파일/폴더를 더블클릭하거나 우측 상단의 [구글 연동 인증] 버튼을 누르시면 자동으로 인증이 갱신됩니다.');
+                triggerWarningNotification('구글 Workspace 연동 권한 인증 정보가 만료되었습니다. 재인증을 진행해 주세요.');
+            }
             return;
         }
 
@@ -228,6 +274,7 @@ export default function WorkspaceFilesPage() {
             const credential = GoogleAuthProvider.credentialFromResult(result);
             if (credential && credential.accessToken) {
                 localStorage.setItem('google_access_token', credential.accessToken);
+                localStorage.setItem('google_access_token_expires_at', Date.now() + 3500 * 1000);
                 setDriveError(null);
                 const activeId = folderId || DEFAULT_FOLDER_ID;
                 fetchGoogleDriveFiles(activeId);
@@ -306,7 +353,9 @@ export default function WorkspaceFilesPage() {
     // 템플릿 폴더(template) 및 하위 폴더 조회 로직
     const fetchTemplatesFromGoogleDrive = async () => {
         const accessToken = localStorage.getItem('google_access_token');
-        if (!accessToken) return;
+        const expiresAt = localStorage.getItem('google_access_token_expires_at');
+        const isExpired = !accessToken || !expiresAt || Date.now() > Number(expiresAt);
+        if (isExpired) return;
         
         setIsFetchTemplatesLoading(true);
         try {
@@ -393,7 +442,7 @@ export default function WorkspaceFilesPage() {
             }
         } else {
             // 구글 드라이브 템플릿 복제 저장 프로세스
-            const accessToken = localStorage.getItem('google_access_token');
+            const accessToken = await ensureValidToken();
             if (!accessToken) {
                 alert('구글 연동 인증이 만료되었습니다. 인증을 완료해 주세요.');
                 return;
@@ -478,14 +527,18 @@ export default function WorkspaceFilesPage() {
     };
 
     // 폴더 클릭 시 진입 및 실시간 갱신
-    const handleFolderClick = (folderItem) => {
+    const handleFolderClick = async (folderItem) => {
+        const token = await ensureValidToken();
+        if (!token) return;
         setCurrentFolderId(folderItem.id);
         setPathHistory(prev => [...prev, { id: folderItem.id, name: folderItem.name }]);
         fetchGoogleDriveFiles(folderItem.id);
     };
 
     // Breadcrumb 히스토리 이동
-    const handleNavigatePath = (pathIdx) => {
+    const handleNavigatePath = async (pathIdx) => {
+        const token = await ensureValidToken();
+        if (!token) return;
         const targetPath = pathHistory[pathIdx];
         setCurrentFolderId(targetPath.id);
         setPathHistory(prev => prev.slice(0, pathIdx + 1));
@@ -508,6 +561,32 @@ export default function WorkspaceFilesPage() {
 
                 <div className="flex items-center gap-3">
                     <button
+                        onClick={handleGoogleTokenRequest}
+                        className="flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all"
+                    >
+                        <Key size={14} className="text-amber-500" />
+                        구글 연동 인증
+                    </button>
+                    <button
+                        onClick={() => {
+                            setTempFolderId(folderId);
+                            setIsConfigOpen(true);
+                        }}
+                        className="flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all"
+                    >
+                        <Folder size={14} className="text-sky-500" />
+                        폴더 연동 설정
+                    </button>
+                    {folderId !== DEFAULT_FOLDER_ID && (
+                        <button
+                            onClick={handleDisconnectFolder}
+                            className="flex items-center gap-1.5 bg-white hover:bg-rose-50 text-rose-600 border border-rose-150 px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all"
+                        >
+                            <X size={14} />
+                            연동 초기화
+                        </button>
+                    )}
+                    <button
                         onClick={() => {
                             setFileCategory('local');
                             setSelectedTemplate('');
@@ -520,9 +599,9 @@ export default function WorkspaceFilesPage() {
                             setModalPathHistory([{ id: startFolderId, name: '지정 공유 폴더' }]);
                             setIsCreateModalOpen(true);
                         }}
-                        className="flex items-center gap-2 bg-sky-500 hover:bg-sky-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all"
+                        className="flex items-center gap-2 bg-sky-500 hover:bg-sky-600 text-white px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all"
                     >
-                        <Plus size={16} />
+                        <Plus size={14} />
                         신규 문서 작성 (템플릿)
                     </button>
                 </div>
@@ -699,10 +778,12 @@ export default function WorkspaceFilesPage() {
                                     {driveFiles.map((item) => (
                                         <tr 
                                             key={item.id}
-                                            onClick={() => {
+                                            onClick={async () => {
                                                 if (item.type === 'folder') {
                                                     handleFolderClick(item);
                                                 } else {
+                                                    const token = await ensureValidToken();
+                                                    if (!token) return;
                                                     setActiveViewFile(item);
                                                     setEditContent(item.content || '');
                                                     setIsEditing(false);
@@ -924,9 +1005,15 @@ export default function WorkspaceFilesPage() {
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => {
-                                            setFileCategory('drive');
-                                            setSelectedTemplate('');
+                                        onClick={async () => {
+                                            const token = await ensureValidToken();
+                                            if (token) {
+                                                setFileCategory('drive');
+                                                setSelectedTemplate('');
+                                                fetchTemplatesFromGoogleDrive();
+                                            } else {
+                                                alert('구글 Workspace 연동을 승인하셔야 구글 드라이브 저장이 가능합니다.');
+                                            }
                                         }}
                                         className={`py-2 px-3 text-xs font-bold rounded-lg border transition-all ${
                                             fileCategory === 'drive'

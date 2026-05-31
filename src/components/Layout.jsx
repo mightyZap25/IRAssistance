@@ -1,8 +1,13 @@
 import React from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header'; // Will create next
+import { useAuth } from '../contexts/AuthContext';
+import { useTaskAlarm } from '../hooks/useTaskAlarm';
 
 export default function Layout({ children }) {
+    const { currentUser } = useAuth();
+    useTaskAlarm(currentUser);
+
     return (
         <div className="flex min-h-screen bg-slate-50 dark:bg-slate-900">
             <Sidebar />

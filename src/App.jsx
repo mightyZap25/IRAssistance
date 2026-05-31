@@ -24,6 +24,11 @@ import WorkspaceFilesPage from './pages/WorkspaceFilesPage'
 import LeaveManagementPage from './pages/LeaveManagementPage'
 import QAConfigPage from './pages/QAConfigPage'
 import QAProcessPage from './pages/QAProcessPage'
+import ProjectDashboardPage from './pages/ProjectDashboardPage'
+import ProjectIssuesPage from './pages/ProjectIssuesPage'
+import TasksPage from './pages/TasksPage'
+import TaskCalendarPage from './pages/TaskCalendarPage'
+import ProjectManagementPage from './pages/ProjectManagementPage'
 
 function PrivateRoute({ children }) {
     const { currentUser } = useAuth();
@@ -168,7 +173,7 @@ function AppContent() {
             <Route path="/transactions" element={
                 <PrivateRoute>
                     <Layout>
-                        <WarehousePlacementPage />
+                        <TransactionsPage />
                     </Layout>
                 </PrivateRoute>
             } />
@@ -193,6 +198,46 @@ function AppContent() {
                 <PrivateRoute>
                     <Layout>
                         <LeaveManagementPage />
+                    </Layout>
+                </PrivateRoute>
+            } />
+
+            <Route path="/project/dashboard" element={
+                <PrivateRoute>
+                    <Layout>
+                        <ProjectDashboardPage />
+                    </Layout>
+                </PrivateRoute>
+            } />
+
+            <Route path="/project/issues" element={
+                <PrivateRoute>
+                    <Layout>
+                        <ProjectIssuesPage />
+                    </Layout>
+                </PrivateRoute>
+            } />
+
+            <Route path="/project/tasks" element={
+                <PrivateRoute>
+                    <Layout>
+                        <TasksPage />
+                    </Layout>
+                </PrivateRoute>
+            } />
+
+            <Route path="/project/task-calendar" element={
+                <PrivateRoute>
+                    <Layout>
+                        <TaskCalendarPage />
+                    </Layout>
+                </PrivateRoute>
+            } />
+
+            <Route path="/project/management" element={
+                <PrivateRoute>
+                    <Layout>
+                        <ProjectManagementPage />
                     </Layout>
                 </PrivateRoute>
             } />

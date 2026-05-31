@@ -12,13 +12,13 @@ import {
 } from 'lucide-react';
 
 const ROLE_MENU_MAP = {
-    admin: ['/', '/parts', '/bom', '/customers', '/prod-requests', '/prod-execution', '/purchasing', '/outsourcing', '/inventory', '/receiving/inspection', '/qa/config', '/qa/process', '/transactions', '/manufacturers', '/vendors', '/ecn', '/hr/attendance', '/hr/leave', '/project/dashboard', '/project/issues', '/project/tasks', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
-    engineer: ['/', '/parts', '/bom', '/ecn', '/inventory', '/transactions', '/hr/attendance', '/hr/leave', '/project/dashboard', '/project/issues', '/project/tasks', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
-    sales: ['/', '/customers', '/prod-requests', '/inventory', '/hr/attendance', '/hr/leave', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
-    qa: ['/', '/receiving/inspection', '/qa/config', '/qa/process', '/inventory', '/transactions', '/hr/attendance', '/hr/leave', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
-    production: ['/', '/prod-execution', '/prod-requests', '/inventory', '/outsourcing', '/transactions', '/hr/attendance', '/hr/leave', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
-    manager: ['/', '/customers', '/prod-requests', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/transactions', '/manufacturers', '/vendors', '/hr/attendance', '/hr/leave', '/project/dashboard', '/project/issues', '/project/tasks', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
-    viewer: ['/', '/hr/attendance', '/hr/leave', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
+    admin: ['/', '/parts', '/bom', '/customers', '/prod-requests', '/prod-execution', '/purchasing', '/outsourcing', '/inventory', '/receiving/inspection', '/qa/config', '/qa/process', '/transactions', '/manufacturers', '/vendors', '/ecn', '/hr/attendance', '/hr/leave', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
+    engineer: ['/', '/parts', '/bom', '/ecn', '/inventory', '/transactions', '/hr/attendance', '/hr/leave', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
+    sales: ['/', '/customers', '/prod-requests', '/inventory', '/hr/attendance', '/hr/leave', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
+    qa: ['/', '/receiving/inspection', '/qa/config', '/qa/process', '/inventory', '/transactions', '/hr/attendance', '/hr/leave', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
+    production: ['/', '/prod-execution', '/prod-requests', '/inventory', '/outsourcing', '/transactions', '/hr/attendance', '/hr/leave', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
+    manager: ['/', '/customers', '/prod-requests', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/transactions', '/manufacturers', '/vendors', '/hr/attendance', '/hr/leave', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
+    viewer: ['/', '/hr/attendance', '/hr/leave', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
 };
 
 export default function Sidebar() {
@@ -61,7 +61,7 @@ export default function Sidebar() {
     ];
 
     const HR_MENU_GROUPS = [ { title: 'HR 및 근태', items: [ { name: '근태 관리', path: '/hr/attendance', icon: UserCheck }, { name: '휴가 관리', path: '/hr/leave', icon: CalendarDays, badge: pendingApprovalCount > 0 ? pendingApprovalCount : null } ] } ];
-    const PROJECT_MENU_GROUPS = [ { title: '프로젝트', items: [ { name: '대시보드', path: '/project/dashboard', icon: Briefcase }, { name: '이슈 관리', path: '/project/issues', icon: AlertCircle }, { name: 'Task 관리', path: '/project/tasks', icon: ListTodo } ] } ];
+    const PROJECT_MENU_GROUPS = [ { title: '프로젝트', items: [ { name: '프로젝트 현황', path: '/project/dashboard', icon: Briefcase }, { name: '프로젝트 관리', path: '/project/management', icon: Layers }, { name: '이슈 관리', path: '/project/issues', icon: AlertCircle }, { name: 'Task 관리', path: '/project/tasks', icon: ListTodo }, { name: 'Task 캘린더', path: '/project/task-calendar', icon: CalendarDays } ] } ];
     const WORKSPACE_MENU_GROUPS = [ { title: '오피스', items: [ { name: '일정 관리', path: '/workspace/calendar', icon: CalendarDays }, { name: '파일 연동', path: '/workspace/files', icon: Cloud }, { name: '통합 메일', path: '/workspace/mail', icon: Mail } ] } ];
 
     const fErp = filterGroups(ALL_MENU_GROUPS);
@@ -99,7 +99,7 @@ export default function Sidebar() {
             <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-5 custom-scrollbar">
                 {isAllowed('/') && (
                     <NavLink to="/" className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive ? 'bg-sky-50 text-sky-700 border border-sky-100 font-bold' : 'hover:bg-slate-50 text-slate-600 font-bold'}`}>
-                        <LayoutDashboard size={18} /> <span className="text-sm">대시보드</span>
+                        <LayoutDashboard size={18} /> <span className="text-sm">통합 현황판</span>
                     </NavLink>
                 )}
 
