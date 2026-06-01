@@ -161,15 +161,16 @@ export default function WorkspaceCalendarPage() {
                     Object.entries(p.schedules).forEach(([stageId, sched]) => {
                         const pColor = getProjectColor(p.id);
                         if (sched.start && sched.end) {
-                            if (dateStr >= sched.start && dateStr <= sched.end) {
-                                const isStart = dateStr === sched.start;
-                                const isEnd = dateStr === sched.end;
+                            const isStart = dateStr === sched.start;
+                            const isEnd = dateStr === sched.end;
+
+                            if (isStart || isEnd) {
                                 dayEvents.push({
-                                    id: `${p.id}-${stageId}`,
-                                    title: `[프로젝트] ${p.name.slice(0, 6)}...: ${stageId}`,
+                                    id: `${p.id}-${stageId}-${isStart ? 'start' : 'end'}`,
+                                    title: `[프로젝트] ${p.name.slice(0, 6)}...: ${stageId} ${isStart ? '(시작)' : '(종료)'}`,
                                     type: 'project',
-                                    isStart,
-                                    isEnd,
+                                    isStart: true, // 각각 독립된 블록으로 표시하기 위해 둘 다 true
+                                    isEnd: true,
                                     color: pColor,
                                     colorClass: `bg-${pColor}-500 text-white border-0 font-bold hover:bg-${pColor}-600 shadow-sm`,
                                     raw: { ...sched, projectName: p.name, stageId, progress: p.progress }
