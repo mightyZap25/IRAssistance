@@ -3,6 +3,8 @@ import { db } from '../firebase';
 import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, query, where, orderBy, Timestamp } from 'firebase/firestore';
 import { Plus, Trash2, Mail, Phone, User, X, Building2, Pencil, History, Package, ExternalLink, ChevronRight } from 'lucide-react';
 import MasterDataGrid from '../components/common/MasterDataGrid';
+import MasterDetailLayout from '../components/common/MasterDetailLayout';
+import CustomerDetailPanel from '../components/CustomerDetailPanel';
 
 export default function CustomersPage() {
     const [customers, setCustomers] = useState([]);
@@ -115,92 +117,120 @@ export default function CustomersPage() {
             </div>
 
             {/* Main Content Area with Integrated MasterDataGrid */}
-            <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200/50 dark:border-slate-800/80 rounded-[1.8rem] shadow-sm flex flex-col flex-1 min-h-0 relative z-20 overflow-hidden">
+            <div className="flex flex-col flex-1 min-h-0 relative z-20 overflow-hidden">
                 {loading ? (
-                    <div className="flex-1 flex items-center justify-center">
+                    <div className="flex-1 flex items-center justify-center bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200/50 dark:border-slate-800/80 rounded-[1.8rem]">
                         <div className="flex flex-col items-center gap-3">
                             <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                             <span className="text-slate-450 font-black text-sm uppercase tracking-widest">Loading Customers...</span>
                         </div>
                     </div>
                 ) : (
-                    <MasterDataGrid
-                        data={customers}
-                        columnDefs={COLUMN_DEFS}
-                        onRowClick={handleRowClick}
-                        rowKey="id"
-                        
-                        // Integrated MasterDataGrid Features
-                        enableSearch={true}
-                        searchTerm={searchTerm}
-                        onSearchChange={setSearchTerm}
-                        searchPlaceholder="고객사명, 담당자 검색..."
-                        
-                        enableFilter={true}
-                        enableViewModeToggle={true}
-                        viewMode={viewMode}
-                        onViewModeChange={setViewMode}
-                        
-                        cardRenderer={(c) => (
-                            <div 
-                                key={c.id} 
-                                onClick={() => handleRowClick(c)}
-                                className="bg-white/70 dark:bg-slate-900/60 backdrop-blur-sm rounded-[1.8rem] p-3 border border-slate-200/50 dark:border-slate-800/80 shadow-md hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[220px]"
-                            >
-                                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500/0 via-blue-500/40 to-indigo-500/0 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                
-                                <div className="flex justify-between items-start mb-4">
-                                    <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
-                                        c.Category === '해외' ? 'bg-purple-100 dark:bg-purple-950/20 text-purple-700 dark:text-purple-500' : 'bg-blue-100 dark:bg-blue-950/20 text-blue-700 dark:text-blue-500'
-                                    }`}>
-                                        {c.Category || '국내'}
-                                    </span>
-                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleEdit(c); }}
-                                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-xl transition-all"
+                    <MasterDetailLayout 
+                        showDetail={!!selectedCustomer}
+                        onCloseDetail={() => {
+                            setSelectedCustomer(null);
+                            setIsDetailOpen(false);
+                        }}
+                        initialListWidth="45%"
+                        list={
+                            <div className="h-full bg-white/60 dark:bg-slate-900/60 backdrop-blur-md">
+                                <MasterDataGrid
+                                    data={customers}
+                                    columnDefs={COLUMN_DEFS}
+                                    onRowClick={handleRowClick}
+                                    rowKey="id"
+                                    
+                                    // Integrated MasterDataGrid Features
+                                    enableSearch={true}
+                                    searchTerm={searchTerm}
+                                    onSearchChange={setSearchTerm}
+                                    searchPlaceholder="고객사명, 담당자 검색..."
+                                    
+                                    enableFilter={true}
+                                    enableViewModeToggle={true}
+                                    viewMode={viewMode}
+                                    onViewModeChange={setViewMode}
+                                    
+                                    cardRenderer={(c) => (
+                                        <div 
+                                            key={c.id} 
+                                            onClick={() => handleRowClick(c)}
+                                            className={`bg-white/70 dark:bg-slate-900/60 backdrop-blur-sm rounded-[1.8rem] p-3 border shadow-md hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[220px] ${selectedCustomer?.id === c.id ? 'border-blue-500 shadow-blue-200/50' : 'border-slate-200/50 dark:border-slate-800/80'}`}
                                         >
-                                            <Pencil size={14} />
-                                        </button>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}
-                                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-slate-800 rounded-xl transition-all"
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    </div>
-                                </div>
+                                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500/0 via-blue-500/40 to-indigo-500/0 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                            
+                                            <div className="flex justify-between items-start mb-4">
+                                                <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                                                    c.Category === '해외' ? 'bg-purple-100 dark:bg-purple-950/20 text-purple-700 dark:text-purple-500' : 'bg-blue-100 dark:bg-blue-950/20 text-blue-700 dark:text-blue-500'
+                                                }`}>
+                                                    {c.Category || '국내'}
+                                                </span>
+                                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleEdit(c); }}
+                                                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-xl transition-all"
+                                                    >
+                                                        <Pencil size={14} />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}
+                                                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-slate-800 rounded-xl transition-all"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            </div>
 
-                                <div className="flex items-center gap-4 mb-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform text-lg">
-                                        <Building2 size={24} />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <h3 className="font-extrabold text-slate-850 dark:text-slate-200 text-lg leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">{c.Name}</h3>
-                                        <div className="text-[10px] font-mono font-bold text-slate-400 mt-1 uppercase tracking-widest">{c.id.substring(0, 8)}</div>
-                                    </div>
-                                </div>
+                                            <div className="flex items-center gap-4 mb-4">
+                                                <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform text-lg">
+                                                    <Building2 size={24} />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <h3 className="font-extrabold text-slate-850 dark:text-slate-200 text-lg leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">{c.Name}</h3>
+                                                    <div className="text-[10px] font-mono font-bold text-slate-400 mt-1 uppercase tracking-widest">{c.id.substring(0, 8)}</div>
+                                                </div>
+                                            </div>
 
-                                <div className="space-y-2.5 pt-4 border-t border-slate-100 dark:border-slate-800/60 flex-grow">
-                                    <div className="flex items-center gap-3 text-xs font-bold text-slate-600 dark:text-slate-400">
-                                        <User size={14} className="text-slate-400 shrink-0" />
-                                        <span className="truncate">{c.ContactPerson || '-'}</span>
-                                    </div>
-                                    <div className="flex items-center gap-3 text-xs font-bold text-slate-600 dark:text-slate-400">
-                                        <Mail size={14} className="text-slate-400 shrink-0" />
-                                        <span className="truncate">{c.Email || '-'}</span>
-                                    </div>
-                                </div>
-                                
-                                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                                    <span className="text-[9px] font-black text-slate-350 dark:text-slate-500 uppercase tracking-widest">History & Details</span>
-                                    <ChevronRight size={16} className="text-slate-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
-                                </div>
+                                            <div className="space-y-2.5 pt-4 border-t border-slate-100 dark:border-slate-800/60 flex-grow">
+                                                <div className="flex items-center gap-3 text-xs font-bold text-slate-600 dark:text-slate-400">
+                                                    <User size={14} className="text-slate-400 shrink-0" />
+                                                    <span className="truncate">{c.ContactPerson || '-'}</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-xs font-bold text-slate-600 dark:text-slate-400">
+                                                    <Mail size={14} className="text-slate-400 shrink-0" />
+                                                    <span className="truncate">{c.Email || '-'}</span>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                                                <span className="text-[9px] font-black text-slate-350 dark:text-slate-500 uppercase tracking-widest">History & Details</span>
+                                                <ChevronRight size={16} className="text-slate-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
+                                            </div>
+                                        </div>
+                                    )}
+                                    cellRenderer={cellRenderer}
+                                    onEdit={handleEdit}
+                                    onDelete={(row) => handleDelete(row.id)}
+                                />
                             </div>
-                        )}
-                        cellRenderer={cellRenderer}
-                        onEdit={handleEdit}
-                        onDelete={(row) => handleDelete(row.id)}
+                        }
+                        detail={
+                            selectedCustomer && (
+                                <CustomerDetailPanel
+                                    inline={true}
+                                    customer={selectedCustomer}
+                                    onClose={() => {
+                                        setSelectedCustomer(null);
+                                        setIsDetailOpen(false);
+                                    }}
+                                    onEdit={(c) => {
+                                        setEditingCustomer(c);
+                                        setIsModalOpen(true);
+                                    }}
+                                />
+                            )
+                        }
                     />
                 )}
             </div>
@@ -220,25 +250,13 @@ export default function CustomersPage() {
                     }}
                 />
             )}
-
-            {/* Slide-over/Overlay for Detail View */}
-            {isDetailOpen && selectedCustomer && (
-                <CustomerDetailView 
-                    customer={selectedCustomer} 
-                    onClose={() => setIsDetailOpen(false)} 
-                    onEdit={(customer) => {
-                        setIsDetailOpen(false);
-                        setEditingCustomer(customer);
-                        setIsModalOpen(true);
-                    }}
-                />
-            )}
         </div>
     );
 }
 
 /**
  * Customer Detail View Component
+ * @deprecated Replaced by CustomerDetailPanel in MasterDetailLayout
  */
 function CustomerDetailView({ customer, onClose, onEdit }) {
     const [activeTab, setActiveTab] = useState('history');

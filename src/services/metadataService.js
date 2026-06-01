@@ -33,7 +33,7 @@ export async function getCustomFields(moduleName) {
 
 /**
  * 신규 커스텀 필드 추가
- * fieldType: 'text', 'number', 'checkbox', 'date', 'link', 'memo'
+ * fieldType: 'text', 'number', 'checkbox', 'date', 'link', 'memo', 'select'
  */
 export async function createCustomField(moduleName, fieldData) {
     try {
@@ -43,12 +43,33 @@ export async function createCustomField(moduleName, fieldData) {
             fieldType: fieldData.fieldType || 'text',
             description: fieldData.description || '',
             isActive: true,
+            isVisible: fieldData.isVisible !== undefined ? fieldData.isVisible : true,
+            order: fieldData.order || 0,
+            group: fieldData.group || 'General',
+            isRequired: fieldData.isRequired || false,
+            options: fieldData.options || [], // For 'select' type
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
         });
         return docRef.id;
     } catch (error) {
         console.error("Error creating custom field:", error);
+        throw error;
+    }
+}
+
+/**
+ * 커스텀 필드 정보 업데이트
+ */
+export async function updateCustomField(fieldId, updateData) {
+    try {
+        const ref = doc(db, COLLECTION_NAME, fieldId);
+        await updateDoc(ref, {
+            ...updateData,
+            updatedAt: serverTimestamp()
+        });
+    } catch (error) {
+        console.error("Error updating custom field:", error);
         throw error;
     }
 }

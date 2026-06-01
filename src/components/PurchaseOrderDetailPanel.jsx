@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ShoppingCart, Calendar, MapPin, DollarSign, PackageCheck, Truck, ChevronRight, CheckCircle2, Clock, AlertCircle, FileText, Edit } from 'lucide-react';
+import { X, ShoppingCart, Calendar, MapPin, DollarSign, PackageCheck, Truck, ChevronRight, CheckCircle2, Clock, AlertCircle, FileText, Edit, Mail } from 'lucide-react';
 import { updateDoc, doc, writeBatch, serverTimestamp, collection, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -132,6 +132,33 @@ export default function PurchaseOrderDetailPanel({ po, isOpen, onClose, onRefres
     const statusInfo = PO_STATUS_INFO[po.Status] || PO_STATUS_INFO.RECEIVED;
     const paymentInfo = PAYMENT_STATUS_INFO[po.PaymentStatus] || PAYMENT_STATUS_INFO.PENDING;
 
+    // Email 발송 핸들러
+    const handleSendEmail = () => {
+        const subject = encodeURIComponent(`[발주서] ${po.PONumber} - IR Assistant (주)`);
+        const body = encodeURIComponent(`
+수신: ${po.VendorName} 담당자님
+
+안녕하십니까, IR Assistant (주)입니다.
+아래와 같이 발주서를 송부드리오니 확인 후 납기 내 납품을 부탁드립니다.
+
+--------------------------------------------------
+[발주 정보]
+- 발주 번호: ${po.PONumber}
+- 품목명: ${po.PartName}
+- 품목 ID: ${actualPartID || po.PartID}
+- 수량: ${po.Qty?.toLocaleString() || 0} 개
+- 단가: ₩ ${po.UnitPrice?.toLocaleString() || 0}
+- 총액: ₩ ${po.TotalPrice?.toLocaleString() || 0}
+- 납기 요청일: ${po.DueDate}
+${po.Urgent ? '- 특이사항: 긴급 발주 건' : ''}
+--------------------------------------------------
+
+감사합니다.
+IR Assistant (주) 드림
+        `);
+        window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    };
+
     // Default receive input to remaining qty when opening
     if (receiveQty === '' && remainingQty > 0) {
         setReceiveQty(remainingQty.toString());
@@ -249,10 +276,15 @@ export default function PurchaseOrderDetailPanel({ po, isOpen, onClose, onRefres
                 {/* 4. Action Area */}
                 {po.Status === 'ORDERING' && (
                     <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 text-center shadow-sm">
-                        <p className="text-sm font-bold text-indigo-800 mb-3">공급사로 발주서 전송이 완료되었습니까?</p>
-                        <button onClick={handleUpdateStatus} className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-md">
-                            발주 확정 및 입고 대기 전환
-                        </button>
+                        <p className="text-sm font-bold text-indigo-800 mb-4">발주서 전송 및 확정 절차를 진행해주세요.</p>
+                        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                            <button onClick={handleSendEmail} className="bg-white text-indigo-600 border border-indigo-200 px-6 py-2.5 rounded-xl text-sm font-black hover:bg-indigo-50 transition-all shadow-sm flex items-center justify-center gap-2">
+                                <Mail size={16} /> 공급사로 발주서 이메일 전송
+                            </button>
+                            <button onClick={handleUpdateStatus} className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl text-sm font-black hover:bg-indigo-700 transition-all shadow-md flex items-center justify-center gap-2">
+                                <CheckCircle2 size={16} /> 발주 확정 및 입고 대기 전환
+                            </button>
+                        </div>
                     </div>
                 )}
 

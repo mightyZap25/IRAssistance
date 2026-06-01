@@ -8,6 +8,7 @@ import RoleGuard from '../components/common/RoleGuard';
 import { USER_ROLES, hasPermission } from '../services/userService';
 import { useAuth } from '../contexts/AuthContext';
 import MasterDataGrid from '../components/common/MasterDataGrid';
+import MasterDetailLayout from '../components/common/MasterDetailLayout';
 
 const ALL_COLUMN_DEFS = {
     PartID: { label: 'Part ID', default: true },
@@ -170,114 +171,124 @@ export default function PartsPage() {
             </div>
 
             {/* Main Combined Content Area: Filter + List */}
-            <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200/50 dark:border-slate-800/80 rounded-[1.8rem] shadow-sm flex flex-col flex-1 min-h-0 relative z-20 overflow-hidden">
+            <div className="flex-1 min-h-0 relative z-20 overflow-hidden">
                 {loading ? (
-                    <div className="flex-1 flex items-center justify-center text-slate-450 font-bold">데이터를 로드하고 있습니다...</div>
+                    <div className="flex-1 flex items-center justify-center text-slate-450 font-bold bg-white/60 dark:bg-slate-900/60 backdrop-blur-md rounded-[1.8rem]">데이터를 로드하고 있습니다...</div>
                 ) : (
-                    <MasterDataGrid
-                        data={latestParts}
-                        columnDefs={ALL_COLUMN_DEFS}
-                        sortConfig={sortConfig}
-                        onSort={handleSort}
-                        onRowClick={(row) => setSelectedPartId(row.PartID)}
-                        rowKey="id"
-                        sortableColumns={['PartID', 'Name', 'Spec', 'UnitPrice']}
-                        
-                        // 공통화 속성 적용
-                        enableSearch={true}
-                        searchTerm={searchTerm}
-                        onSearchChange={setSearchTerm}
-                        searchPlaceholder="부품명, Part ID 검색..."
-                        
-                        enableFilter={true}
-                        onFilteredDataChange={setFilteredParts}
-                        
-                        enableViewModeToggle={true}
-                        viewMode={viewMode}
-                        onViewModeChange={setViewMode}
-                        cardRenderer={(part) => (
-                            <div
-                                key={part.id}
-                                onClick={() => setSelectedPartId(part.PartID)}
-                                className="bg-white/70 dark:bg-slate-900/60 backdrop-blur-sm rounded-[1.8rem] p-3 border border-slate-200/50 dark:border-slate-800/80 shadow-md hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[220px]"
-                            >
-                                {/* Category Gradient tag */}
-                                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500/0 via-indigo-500/40 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="flex gap-1.5">
-                                        <span className="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[9px] font-black uppercase tracking-wider">{part.Category?.split(' ')[0] || '기구'}</span>
-                                        {part.Lifecycle === 'Draft' ? (
-                                            <span className="px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-orange-100 animate-pulse">대기/개발중</span>
-                                        ) : (part.Lifecycle === 'ECN' || part.Lifecycle === 'ECN Pending') ? (
-                                            <span className="px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-blue-100 animate-pulse">설계변경/수정중</span>
-                                        ) : part.Lifecycle === 'Obsolete' ? (
-                                            <span className="px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-rose-500 to-red-600 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-rose-100">폐기/단종</span>
-                                        ) : (
-                                            <span className="px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-emerald-100">승인완료/양산</span>
-                                        )}
-                                    </div>
-                                </div>
+                    <MasterDetailLayout 
+                        showDetail={!!selectedPartId}
+                        onCloseDetail={() => setSelectedPartId(null)}
+                        initialListWidth="50%"
+                        list={
+                            <div className="h-full bg-white/60 dark:bg-slate-900/60 backdrop-blur-md">
+                                <MasterDataGrid
+                                    data={latestParts}
+                                    columnDefs={ALL_COLUMN_DEFS}
+                                    sortConfig={sortConfig}
+                                    onSort={handleSort}
+                                    onRowClick={(row) => setSelectedPartId(row.PartID)}
+                                    rowKey="id"
+                                    sortableColumns={['PartID', 'Name', 'Spec', 'UnitPrice']}
+                                    
+                                    // 공통화 속성 적용
+                                    enableSearch={true}
+                                    searchTerm={searchTerm}
+                                    onSearchChange={setSearchTerm}
+                                    searchPlaceholder="부품명, Part ID 검색..."
+                                    
+                                    enableFilter={true}
+                                    onFilteredDataChange={setFilteredParts}
+                                    
+                                    enableViewModeToggle={true}
+                                    viewMode={viewMode}
+                                    onViewModeChange={setViewMode}
+                                    cardRenderer={(part) => (
+                                        <div
+                                            key={part.id}
+                                            onClick={() => setSelectedPartId(part.PartID)}
+                                            className={`bg-white/70 dark:bg-slate-900/60 backdrop-blur-sm rounded-[1.8rem] p-3 border shadow-md hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[220px] ${selectedPartId === part.PartID ? 'border-indigo-500 shadow-indigo-200/50' : 'border-slate-200/50 dark:border-slate-800/80'}`}
+                                        >
+                                            {/* Category Gradient tag */}
+                                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500/0 via-indigo-500/40 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                            
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div className="flex gap-1.5">
+                                                    <span className="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[9px] font-black uppercase tracking-wider">{part.Category?.split(' ')[0] || '기구'}</span>
+                                                    {part.Lifecycle === 'Draft' ? (
+                                                        <span className="px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-orange-100 animate-pulse">대기/개발중</span>
+                                                    ) : (part.Lifecycle === 'ECN' || part.Lifecycle === 'ECN Pending') ? (
+                                                        <span className="px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-blue-100 animate-pulse">설계변경/수정중</span>
+                                                    ) : part.Lifecycle === 'Obsolete' ? (
+                                                        <span className="px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-rose-500 to-red-600 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-rose-100">폐기/단종</span>
+                                                    ) : (
+                                                        <span className="px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-emerald-100">승인완료/양산</span>
+                                                    )}
+                                                </div>
+                                            </div>
 
-                                <div className="space-y-2 flex-grow">
-                                    <div className="text-[10px] font-mono font-bold text-slate-400">{part.PartID}</div>
-                                    <div>
-                                        <div className="text-[9px] font-black text-slate-450 uppercase tracking-wider">부품명</div>
-                                        <h3 className="font-extrabold text-slate-850 dark:text-slate-200 text-sm leading-tight group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors mt-0.5">{part.Name}</h3>
-                                    </div>
-                                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800/60">
-                                        <div className="text-[9px] font-black text-purple-400 dark:text-purple-500 uppercase tracking-wider">규격 (Spec)</div>
-                                        <div className="text-xs font-bold text-slate-600 dark:text-slate-350 mt-0.5">{part.Spec || '-'}</div>
-                                    </div>
-                                </div>
+                                            <div className="space-y-2 flex-grow">
+                                                <div className="text-[10px] font-mono font-bold text-slate-400">{part.PartID}</div>
+                                                <div>
+                                                    <div className="text-[9px] font-black text-slate-450 uppercase tracking-wider">부품명</div>
+                                                    <h3 className="font-extrabold text-slate-850 dark:text-slate-200 text-sm leading-tight group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors mt-0.5">{part.Name}</h3>
+                                                </div>
+                                                <div className="pt-2 border-t border-slate-100 dark:border-slate-800/60">
+                                                    <div className="text-[9px] font-black text-purple-400 dark:text-purple-500 uppercase tracking-wider">규격 (Spec)</div>
+                                                    <div className="text-xs font-bold text-slate-600 dark:text-slate-350 mt-0.5">{part.Spec || '-'}</div>
+                                                </div>
+                                            </div>
 
-                                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2 text-[10px] text-slate-500 dark:text-slate-400">
-                                    <div className="flex flex-col">
-                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">보관위치</span>
-                                        <span className="font-extrabold text-emerald-600 dark:text-emerald-500 mt-0.5">{part.DefaultLocation || '-'}</span>
-                                    </div>
-                                    <div className="flex flex-col text-right">
-                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">부품단가</span>
-                                        <span className="font-black text-slate-800 dark:text-slate-100 mt-0.5">{part.UnitPrice ? `$${Number(part.UnitPrice).toLocaleString()}` : '-'}</span>
-                                    </div>
-                                </div>
+                                            <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2 text-[10px] text-slate-500 dark:text-slate-400">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">보관위치</span>
+                                                    <span className="font-extrabold text-emerald-600 dark:text-emerald-500 mt-0.5">{part.DefaultLocation || '-'}</span>
+                                                </div>
+                                                <div className="flex flex-col text-right">
+                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">부품단가</span>
+                                                    <span className="font-black text-slate-800 dark:text-slate-100 mt-0.5">{part.UnitPrice ? `$${Number(part.UnitPrice).toLocaleString()}` : '-'}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    cellRenderer={{
+                                        Category: (val) => <span className="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-black uppercase tracking-wider">{val?.split(' ')[0] || val}</span>,
+                                        Lifecycle: (val) => (
+                                            val === 'Obsolete' ? (
+                                                <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-rose-500 to-red-600 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-rose-100">폐기/단종</span>
+                                            ) : val === 'Draft' ? (
+                                                <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-orange-100 animate-pulse">대기/개발중</span>
+                                            ) : val === 'Active' ? (
+                                                <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-emerald-100">승인완료/양산</span>
+                                            ) : (
+                                                <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-blue-100 animate-pulse">설계변경/수정중</span>
+                                            )
+                                        ),
+                                        UnitPrice: (val) => val ? `$${Number(val).toLocaleString()}` : '-',
+                                        Description: (val) => <div className="max-w-xs truncate" title={val}>{val || '-'}</div>
+                                    }}
+                                />
                             </div>
-                        )}
-                        cellRenderer={{
-                            Category: (val) => <span className="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-black uppercase tracking-wider">{val?.split(' ')[0] || val}</span>,
-                            Lifecycle: (val) => (
-                                val === 'Obsolete' ? (
-                                    <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-rose-500 to-red-600 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-rose-100">폐기/단종</span>
-                                ) : val === 'Draft' ? (
-                                    <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-orange-100 animate-pulse">대기/개발중</span>
-                                ) : val === 'Active' ? (
-                                    <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-emerald-100">승인완료/양산</span>
-                                ) : (
-                                    <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-blue-100 animate-pulse">설계변경/수정중</span>
-                                )
-                            ),
-                            UnitPrice: (val) => val ? `$${Number(val).toLocaleString()}` : '-',
-                            Description: (val) => <div className="max-w-xs truncate" title={val}>{val || '-'}</div>
-                        }}
+                        }
+                        detail={
+                            selectedPartId && (
+                                <PartsDetailPanel
+                                    inline={true}
+                                    partId={selectedPartId}
+                                    parts={parts}
+                                    filteredParts={filteredParts}
+                                    onPartSelect={setSelectedPartId}
+                                    allBoms={allBoms}
+                                    onClose={() => setSelectedPartId(null)}
+                                    onEdit={openEditModal}
+                                    onStatusChange={() => {
+                                        setIsModifying(!isModifying);
+                                    }}
+                                />
+                            )
+                        }
                     />
                 )}
             </div> {/* End of Main Combined Area */}
-
-            {/* Imported Single Component for detail modal panel */}
-            {selectedPartId && (
-                <PartsDetailPanel
-                    partId={selectedPartId}
-                    parts={parts}
-                    filteredParts={filteredParts}
-                    onPartSelect={setSelectedPartId}
-                    allBoms={allBoms}
-                    onClose={() => setSelectedPartId(null)}
-                    onEdit={openEditModal}
-                    onStatusChange={() => {
-                        setIsModifying(!isModifying);
-                    }}
-                />
-            )}
 
             {/* Form Modal */}
             {isFormModalOpen && (

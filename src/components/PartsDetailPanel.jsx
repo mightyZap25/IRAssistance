@@ -53,7 +53,7 @@ function ImpactTreeNode({ node }) {
     );
 }
 
-export default function PartsDetailPanel({ partId, parts, filteredParts = [], onPartSelect = () => {}, allBoms, onClose, onEdit, onStatusChange }) {
+export default function PartsDetailPanel({ partId, parts, filteredParts = [], onPartSelect = () => {}, allBoms, onClose, onEdit, onStatusChange, inline = false }) {
     const { userProfile } = useAuth();
     const [activeTab, setActiveTab] = useState('substitutes');
     const [detailData, setDetailData] = useState({ usedIn: [], transactions: [], history: [], revisions: [], substitutes: [], impactTree: [] });
@@ -204,89 +204,83 @@ export default function PartsDetailPanel({ partId, parts, filteredParts = [], on
 
     if (!currentViewingPart) return null;
 
-    return createPortal(
-        (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
-            {/* Glass Backdrop */}
-            <div 
-                className="absolute inset-0 bg-slate-900/50 backdrop-blur-md transition-opacity"
-                onClick={onClose}
-            ></div>
-
-            {/* Premium Glassmorphic Container */}
-            <div className="relative bg-white/90 dark:bg-slate-950/90 backdrop-blur-lg rounded-[2rem] shadow-2xl w-full max-w-7xl max-h-[90vh] overflow-hidden border border-white/20 dark:border-slate-800/80 flex flex-col transform transition-all duration-300 animate-in zoom-in-95">
-                
-                {/* Header */}
-                <div className="px-8 py-5 border-b border-slate-150/40 dark:border-slate-800/80 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/30 flex-shrink-0">
-                    <div className="flex items-center gap-4">
-                        <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-500 text-white flex items-center justify-center shadow-lg shadow-indigo-200 dark:shadow-none">
-                            <Sparkles size={20} />
-                        </div>
-                        <div>
-                            <div className="flex items-center gap-3">
-                                <h2 className="text-xl font-black text-slate-800 dark:text-slate-100 tracking-tight">부품 세부 마스터 뷰</h2>
-                                {currentViewingPart.Lifecycle === 'Draft' && (
-                                    <span className="px-3 py-1.5 rounded-xl bg-gradient-to-br from-orange-400 via-orange-500 to-amber-600 text-white text-[10px] font-black uppercase tracking-wider shadow-lg shadow-orange-200/50 dark:shadow-none border border-orange-300/30 animate-pulse flex items-center gap-1.5 ring-1 ring-white/20">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-white shadow-sm"></div>
-                                        대기/개발중 (Draft)
-                                    </span>
-                                )}
-                                {(currentViewingPart.Lifecycle === 'ECN' || currentViewingPart.Lifecycle === 'ECN Pending') && (
-                                    <span className="px-3 py-1.5 rounded-xl bg-gradient-to-br from-blue-400 via-indigo-500 to-violet-600 text-white text-[10px] font-black uppercase tracking-wider shadow-lg shadow-blue-200/50 dark:shadow-none border border-blue-300/30 animate-pulse flex items-center gap-1.5 ring-1 ring-white/20">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-white shadow-sm"></div>
-                                        설계변경/수정중 (ECN)
-                                    </span>
-                                )}
-                                {currentViewingPart.Lifecycle === 'Obsolete' && (
-                                    <span className="px-3 py-1.5 rounded-xl bg-gradient-to-br from-slate-500 via-slate-600 to-slate-800 text-white text-[10px] font-black uppercase tracking-wider shadow-lg shadow-slate-200/50 dark:shadow-none border border-slate-400/30 flex items-center gap-1.5 ring-1 ring-white/20">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-slate-300 shadow-sm"></div>
-                                        폐기/단종 (Obsolete)
-                                    </span>
-                                )}
-                                {currentViewingPart.Lifecycle === 'Active' && (
-                                    <span className="px-3 py-1.5 rounded-xl bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 text-white text-[10px] font-black uppercase tracking-wider shadow-lg shadow-emerald-200/50 dark:shadow-none border border-emerald-300/30 flex items-center gap-1.5 ring-1 ring-white/20">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-white shadow-sm"></div>
-                                        승인완료/양산 (Active)
-                                    </span>
-                                )}
-                            </div>
-                            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">Single Object Control Center</p>
-                        </div>
+    const content = (
+        <div className={`flex flex-col transform transition-all duration-300 ${inline ? 'h-full w-full' : 'relative bg-white/90 dark:bg-slate-950/90 backdrop-blur-lg rounded-[2rem] shadow-2xl w-full max-w-7xl max-h-[90vh] overflow-hidden border border-white/20 dark:border-slate-800/80 animate-in zoom-in-95'}`}>
+            
+            {/* Header */}
+            <div className="px-8 py-5 border-b border-slate-150/40 dark:border-slate-800/80 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/30 flex-shrink-0">
+                <div className="flex items-center gap-4">
+                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-500 text-white flex items-center justify-center shadow-lg shadow-indigo-200 dark:shadow-none">
+                        <Sparkles size={20} />
                     </div>
+                    <div>
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-xl font-black text-slate-800 dark:text-slate-100 tracking-tight">부품 세부 마스터 뷰</h2>
+                            {currentViewingPart.Lifecycle === 'Draft' && (
+                                <span className="px-3 py-1.5 rounded-xl bg-gradient-to-br from-orange-400 via-orange-500 to-amber-600 text-white text-[10px] font-black uppercase tracking-wider shadow-lg shadow-orange-200/50 dark:shadow-none border border-orange-300/30 animate-pulse flex items-center gap-1.5 ring-1 ring-white/20">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-white shadow-sm"></div>
+                                    대기/개발중 (Draft)
+                                </span>
+                            )}
+                            {(currentViewingPart.Lifecycle === 'ECN' || currentViewingPart.Lifecycle === 'ECN Pending') && (
+                                <span className="px-3 py-1.5 rounded-xl bg-gradient-to-br from-blue-400 via-indigo-500 to-violet-600 text-white text-[10px] font-black uppercase tracking-wider shadow-lg shadow-blue-200/50 dark:shadow-none border border-blue-300/30 animate-pulse flex items-center gap-1.5 ring-1 ring-white/20">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-white shadow-sm"></div>
+                                    설계변경/수정중 (ECN)
+                                </span>
+                            )}
+                            {currentViewingPart.Lifecycle === 'Obsolete' && (
+                                <span className="px-3 py-1.5 rounded-xl bg-gradient-to-br from-slate-500 via-slate-600 to-slate-800 text-white text-[10px] font-black uppercase tracking-wider shadow-lg shadow-slate-200/50 dark:shadow-none border border-slate-400/30 flex items-center gap-1.5 ring-1 ring-white/20">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 shadow-sm"></div>
+                                    폐기/단종 (Obsolete)
+                                </span>
+                            )}
+                            {currentViewingPart.Lifecycle === 'Active' && (
+                                <span className="px-3 py-1.5 rounded-xl bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 text-white text-[10px] font-black uppercase tracking-wider shadow-lg shadow-emerald-200/50 dark:shadow-none border border-emerald-300/30 flex items-center gap-1.5 ring-1 ring-white/20">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-white shadow-sm"></div>
+                                    승인완료/양산 (Active)
+                                </span>
+                            )}
+                        </div>
+                        <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">Single Object Control Center</p>
+                    </div>
+                </div>
 
-                    <div className="flex gap-2.5 items-center">
-                        {(currentViewingPart.Lifecycle === 'Draft' || currentViewingPart.Lifecycle === 'ECN' || currentViewingPart.Lifecycle === 'ECN Pending') && (
-                            <RoleGuard requiredRole={USER_ROLES.MANAGER}>
-                                <button
-                                    onClick={() => handleApprove(currentViewingPart.id)}
-                                    className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:scale-[1.02] active:scale-[0.98] text-white font-black rounded-xl transition-all text-xs flex items-center gap-2 shadow-xl shadow-emerald-200/40 dark:shadow-none border border-emerald-400/30"
-                                >
-                                    <ShieldCheck size={16} /> 승인(Approve)
-                                </button>
-                            </RoleGuard>
-                        )}
-                        <RoleGuard requiredRole={USER_ROLES.ENGINEER}>
+                <div className="flex gap-2.5 items-center">
+                    {(currentViewingPart.Lifecycle === 'Draft' || currentViewingPart.Lifecycle === 'ECN' || currentViewingPart.Lifecycle === 'ECN Pending') && (
+                        <RoleGuard requiredRole={USER_ROLES.MANAGER}>
                             <button
-                                onClick={() => { onEdit(currentViewingPart); }}
-                                className="px-4.5 py-2.5 bg-white dark:bg-slate-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-slate-200 dark:border-indigo-900/50 font-black rounded-xl transition-all text-xs flex items-center gap-1.5 shadow-sm hover:shadow-md hover:border-indigo-300"
+                                onClick={() => handleApprove(currentViewingPart.id)}
+                                className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:scale-[1.02] active:scale-[0.98] text-white font-black rounded-xl transition-all text-xs flex items-center gap-2 shadow-xl shadow-emerald-200/40 dark:shadow-none border border-emerald-400/30"
                             >
-                                <PenTool size={14} />
-                                <span>수정</span>
+                                <ShieldCheck size={16} /> 승인(Approve)
                             </button>
                         </RoleGuard>
+                    )}
+                    <RoleGuard requiredRole={USER_ROLES.ENGINEER}>
+                        <button
+                            onClick={() => { onEdit(currentViewingPart); }}
+                            className="px-4.5 py-2.5 bg-white dark:bg-slate-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-slate-200 dark:border-indigo-900/50 font-black rounded-xl transition-all text-xs flex items-center gap-1.5 shadow-sm hover:shadow-md hover:border-indigo-300"
+                        >
+                            <PenTool size={14} />
+                            <span>수정</span>
+                        </button>
+                    </RoleGuard>
+                    {!inline && (
                         <button
                             onClick={onClose}
                             className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-full transition-all"
                         >
                             <X size={22} />
                         </button>
-                    </div>
+                    )}
                 </div>
+            </div>
 
-                {/* Content Body */}
-                <div className="p-8 overflow-hidden flex-1 grid grid-cols-1 lg:grid-cols-12 gap-8">
-                    
-                    {/* 1단: 좌측 부품 DB 리스트 영역 */}
+            {/* Content Body */}
+            <div className={`p-6 overflow-hidden flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 ${inline ? 'h-full' : ''}`}>
+                
+                {/* 1단: 좌측 부품 DB 리스트 영역 (인라인 모드일 때는 숨김) */}
+                {!inline && (
                     <div className="lg:col-span-3 flex flex-col gap-4 border-r border-slate-150/40 dark:border-slate-800/80 pr-6 h-[calc(90vh-10rem)] overflow-hidden">
                         <div className="flex-shrink-0">
                             <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 px-1">부품 DB 목록</h3>
@@ -348,9 +342,10 @@ export default function PartsDetailPanel({ partId, parts, filteredParts = [], on
                             })()}
                         </div>
                     </div>
+                )}
 
-                    {/* 2단: 중앙 상세 스펙 정보 영역 */}
-                    <div className="lg:col-span-5 space-y-6 h-[calc(90vh-10rem)] overflow-y-auto pr-3 custom-scrollbar">
+                {/* 2단: 중앙 상세 스펙 정보 영역 */}
+                <div className={`${inline ? 'lg:col-span-7' : 'lg:col-span-5'} space-y-6 ${inline ? 'h-full' : 'h-[calc(90vh-10rem)]'} overflow-y-auto pr-3 custom-scrollbar`}>
                         
                         {/* Title and Revision Selector */}
                         <div className="bg-gradient-to-br from-white via-slate-50/50 to-indigo-50/30 dark:from-slate-900 dark:via-slate-900/80 dark:to-indigo-950/20 p-6 rounded-[2rem] border border-slate-200/60 dark:border-slate-800/80 flex flex-col justify-between items-start gap-5 shadow-sm w-full relative overflow-hidden group">
@@ -688,7 +683,22 @@ export default function PartsDetailPanel({ partId, parts, filteredParts = [], on
                     </div>
                 </div>
             </div>
-        </div>
+    );
+
+    if (inline) {
+        return content;
+    }
+
+    return createPortal(
+        (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
+                {/* Glass Backdrop */}
+                <div 
+                    className="absolute inset-0 bg-slate-900/50 backdrop-blur-md transition-opacity"
+                    onClick={onClose}
+                ></div>
+                {content}
+            </div>
         ),
         document.body
     );
