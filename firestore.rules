@@ -93,5 +93,10 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isManagerOrAbove() || hasRole('engineer');
     }
+
+    // User Settings (Dashboard Layout, etc.)
+    match /user_settings/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
   }
 }

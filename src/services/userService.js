@@ -68,3 +68,28 @@ export function hasPermission(userRole, requiredRole) {
 
     return userLevel >= requiredLevel;
 }
+
+/**
+ * Fetch user dashboard layout configuration
+ */
+export async function getUserDashboardLayout(uid) {
+    if (!uid) return null;
+    const ref = doc(db, 'user_settings', uid);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+        return snap.data().dashboardLayout || null;
+    }
+    return null;
+}
+
+/**
+ * Save user dashboard layout configuration
+ */
+export async function saveUserDashboardLayout(uid, layout) {
+    if (!uid) return;
+    const ref = doc(db, 'user_settings', uid);
+    await setDoc(ref, {
+        dashboardLayout: layout,
+        updatedAt: serverTimestamp()
+    }, { merge: true });
+}
