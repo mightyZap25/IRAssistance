@@ -256,80 +256,80 @@ export default function WorkspaceCalendarPage() {
     const MAX_VISIBLE_EVENTS = 3;
 
     return (
-        <div className="h-full flex flex-col space-y-6">
+        <div className="h-full flex flex-col space-y-4">
             <style>{`
                 .no-scrollbar::-webkit-scrollbar { display: none; }
                 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
 
             {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm gap-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-3 rounded-xl border border-slate-200/80 shadow-sm gap-2">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2.5">
-                        <CalendarIcon className="text-indigo-600" size={26} /> 통합 일정 관리
+                    <h1 className="text-xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
+                        <CalendarIcon className="text-indigo-600" size={20} /> 통합 일정 관리
                     </h1>
-                    <p className="text-slate-400 text-xs mt-1 font-medium">날짜를 클릭하여 새로운 할 일을 빠르게 추가하고, 전사 공정 및 근태 현황을 확인하세요.</p>
+                    <p className="text-slate-400 text-[10px] mt-0.5 font-medium">날짜를 클릭하여 새로운 할 일을 빠르게 추가하고, 전사 공정 및 근태 현황을 확인하세요.</p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <button onClick={goToToday} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all">오늘</button>
-                    <div className="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200">
-                        <button onClick={prevMonth} className="p-1.5 hover:bg-white hover:shadow-sm rounded-lg transition-all text-slate-600"><ChevronLeft size={16} /></button>
-                        <span className="px-4 text-xs font-black text-slate-800 min-w-[110px] text-center">{currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월</span>
-                        <button onClick={nextMonth} className="p-1.5 hover:bg-white hover:shadow-sm rounded-lg transition-all text-slate-600"><ChevronRight size={16} /></button>
+                <div className="flex items-center gap-2">
+                    <button onClick={goToToday} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold transition-all">오늘</button>
+                    <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
+                        <button onClick={prevMonth} className="p-1 hover:bg-white hover:shadow-sm rounded transition-all text-slate-600"><ChevronLeft size={14} /></button>
+                        <span className="px-2 text-[10px] font-black text-slate-800 min-w-[90px] text-center">{currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월</span>
+                        <button onClick={nextMonth} className="p-1 hover:bg-white hover:shadow-sm rounded transition-all text-slate-600"><ChevronRight size={14} /></button>
                     </div>
                 </div>
             </div>
 
-            <div className="flex-1 flex flex-col md:flex-row gap-6 min-h-0">
+            <div className="flex-1 flex flex-col md:flex-row gap-4 min-h-0">
                 {/* Left Sidebar Filter Panel */}
-                <div className="w-full md:w-60 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-5 shrink-0">
+                <div className="w-full md:w-52 bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-4 shrink-0">
                     <div>
-                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 mb-3">
-                            <Filter size={12} /> 일정 필터 설정
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 mb-2.5">
+                            <Filter size={10} /> 일정 필터 설정
                         </h3>
-                        <div className="space-y-2.5">
-                            <label className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 hover:bg-slate-50 transition-all cursor-pointer">
+                        <div className="space-y-1.5">
+                            <label className="flex items-center justify-between p-2 rounded-lg border border-slate-100 hover:bg-slate-50 transition-all cursor-pointer">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                                    <span className="text-xs font-bold text-slate-600">근태 및 휴가</span>
+                                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                    <span className="text-[10px] font-bold text-slate-600">근태 및 휴가</span>
                                 </div>
-                                <input type="checkbox" checked={showAttendance} onChange={(e) => setShowAttendance(e.target.checked)} className="w-4 h-4 text-emerald-600 border-slate-350 rounded focus:ring-emerald-500 cursor-pointer" />
+                                <input type="checkbox" checked={showAttendance} onChange={(e) => setShowAttendance(e.target.checked)} className="w-3.5 h-3.5 text-emerald-600 border-slate-350 rounded focus:ring-emerald-500 cursor-pointer" />
                             </label>
-                            <label className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 hover:bg-slate-50 transition-all cursor-pointer">
+                            <label className="flex items-center justify-between p-2 rounded-lg border border-slate-100 hover:bg-slate-50 transition-all cursor-pointer">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                                    <span className="text-xs font-bold text-slate-600">프로젝트 마감일</span>
+                                    <div className="w-2 h-2 rounded-full bg-amber-500" />
+                                    <span className="text-[10px] font-bold text-slate-600">프로젝트 마감일</span>
                                 </div>
-                                <input type="checkbox" checked={showProjects} onChange={(e) => setShowProjects(e.target.checked)} className="w-4 h-4 text-amber-600 border-slate-350 rounded focus:ring-amber-500 cursor-pointer" />
+                                <input type="checkbox" checked={showProjects} onChange={(e) => setShowProjects(e.target.checked)} className="w-3.5 h-3.5 text-amber-600 border-slate-350 rounded focus:ring-amber-500 cursor-pointer" />
                             </label>
-                            <label className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 hover:bg-slate-50 transition-all cursor-pointer">
+                            <label className="flex items-center justify-between p-2 rounded-lg border border-slate-100 hover:bg-slate-50 transition-all cursor-pointer">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
-                                    <span className="text-xs font-bold text-slate-600">개인 할 일 (Task)</span>
+                                    <div className="w-2 h-2 rounded-full bg-indigo-500" />
+                                    <span className="text-[10px] font-bold text-slate-600">개인 할 일 (Task)</span>
                                 </div>
-                                <input type="checkbox" checked={showTasks} onChange={(e) => setShowTasks(e.target.checked)} className="w-4 h-4 text-indigo-600 border-slate-350 rounded focus:ring-indigo-500 cursor-pointer" />
+                                <input type="checkbox" checked={showTasks} onChange={(e) => setShowTasks(e.target.checked)} className="w-3.5 h-3.5 text-indigo-600 border-slate-350 rounded focus:ring-indigo-500 cursor-pointer" />
                             </label>
-                            <label className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 hover:bg-slate-50 transition-all cursor-pointer">
+                            <label className="flex items-center justify-between p-2 rounded-lg border border-slate-100 hover:bg-slate-50 transition-all cursor-pointer">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                                    <span className="text-xs font-bold text-slate-600">할당된 이슈</span>
+                                    <div className="w-2 h-2 rounded-full bg-rose-500" />
+                                    <span className="text-[10px] font-bold text-slate-600">할당된 이슈</span>
                                 </div>
-                                <input type="checkbox" checked={showIssues} onChange={(e) => setShowIssues(e.target.checked)} className="w-4 h-4 text-rose-600 border-slate-350 rounded focus:ring-rose-500 cursor-pointer" />
+                                <input type="checkbox" checked={showIssues} onChange={(e) => setShowIssues(e.target.checked)} className="w-3.5 h-3.5 text-rose-600 border-slate-350 rounded focus:ring-rose-500 cursor-pointer" />
                             </label>
                         </div>
                     </div>
-                    <div className="mt-auto p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                        <p className="text-[10px] font-medium text-slate-500 leading-relaxed">
+                    <div className="mt-auto p-3 bg-slate-50 rounded-xl border border-slate-100">
+                        <p className="text-[9px] font-medium text-slate-500 leading-relaxed">
                             💡 **Tip**: 달력의 빈 날짜를 클릭하면 해당 날짜에 할 일을 바로 추가할 수 있습니다.
                         </p>
                     </div>
                 </div>
 
                 {/* Calendar Component */}
-                <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden min-h-[400px]">
+                <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden min-h-[300px]">
                     <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/50">
                         {['일', '월', '화', '수', '목', '금', '토'].map((day, idx) => (
-                            <div key={day} className={`py-2 text-center text-[10px] font-black uppercase tracking-widest ${idx === 0 ? 'text-rose-500' : idx === 6 ? 'text-sky-500' : 'text-slate-400'}`}>
+                            <div key={day} className={`py-1.5 text-center text-[9px] font-black uppercase tracking-widest ${idx === 0 ? 'text-rose-500' : idx === 6 ? 'text-sky-500' : 'text-slate-400'}`}>
                                 {day}
                             </div>
                         ))}
@@ -344,15 +344,15 @@ export default function WorkspaceCalendarPage() {
                             const hasMore = dateEvents.length > MAX_VISIBLE_EVENTS;
 
                             return (
-                                <div key={idx} onClick={() => handleDateClick(day.date)} className={`min-h-[110px] flex flex-col p-1 transition-colors cursor-pointer ${day.currentMonth ? 'bg-white' : 'bg-slate-50/30'} hover:bg-slate-50/80 group`}>
-                                    <div className="flex justify-between items-start mb-1">
+                                <div key={idx} onClick={() => handleDateClick(day.date)} className={`min-h-[70px] flex flex-col p-0.5 transition-colors cursor-pointer ${day.currentMonth ? 'bg-white' : 'bg-slate-50/30'} hover:bg-slate-50/80 group`}>
+                                    <div className="flex justify-between items-start mb-0.5">
                                         <div className="flex flex-col">
-                                            <span className={`text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-lg transition-all ${isTodayCell ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100' : day.currentMonth ? (day.date.getDay() === 0 || holidayName ? 'text-rose-500' : day.date.getDay() === 6 ? 'text-sky-500' : 'text-slate-600') : 'text-slate-300'}`}>
+                                            <span className={`text-[9px] font-black w-4 h-4 flex items-center justify-center rounded transition-all ${isTodayCell ? 'bg-indigo-600 text-white shadow shadow-indigo-100' : day.currentMonth ? (day.date.getDay() === 0 || holidayName ? 'text-rose-500' : day.date.getDay() === 6 ? 'text-sky-500' : 'text-slate-600') : 'text-slate-300'}`}>
                                                 {day.date.getDate()}
                                             </span>
-                                            {holidayName && <span className="text-[8px] font-bold text-rose-400 truncate max-w-[60px] mt-0.5">{holidayName}</span>}
+                                            {holidayName && <span className="text-[7px] font-bold text-rose-400 truncate max-w-[50px] mt-0">{holidayName}</span>}
                                         </div>
-                                        <Plus className="text-slate-200 group-hover:text-indigo-400 opacity-0 group-hover:opacity-100 transition-all" size={14} />
+                                        <Plus className="text-slate-200 group-hover:text-indigo-400 opacity-0 group-hover:opacity-100 transition-all" size={10} />
                                     </div>
                                     <div className="flex-1 space-y-0.5 no-scrollbar overflow-hidden">
                                         {visibleEvents.map((ev, i) => {
@@ -362,24 +362,24 @@ export default function WorkspaceCalendarPage() {
                                                 const progressVal = isProject ? (ev.raw?.progress || 0) : 100;
                                                 const baseBg = `bg-${ev.color || 'slate'}-100 text-${ev.color || 'slate'}-700`;
                                                 const fillBg = `bg-${ev.color || 'slate'}-500`;
-                                                const containerMargin = `${ev.isStart ? 'ml-0 rounded-l-md' : 'ml-[-8px]'} ${ev.isEnd ? 'mr-0 rounded-r-md' : 'mr-[-8px]'}`;
+                                                const containerMargin = `${ev.isStart ? 'ml-0 rounded-l' : 'ml-[-4px]'} ${ev.isEnd ? 'mr-0 rounded-r' : 'mr-[-4px]'}`;
                                                 let displayTitle = ev.title;
                                                 if (isProject && ev.isStart) displayTitle = `${ev.title} (${progressVal}%)`;
                                                 return (
-                                                    <div key={i} onClick={(e) => { e.stopPropagation(); setSelectedEvent(ev); }} className={`relative w-[calc(100%+16px)] h-[18px] flex items-center select-none cursor-pointer overflow-hidden transition-all hover:brightness-95 ${baseBg} ${containerMargin}`}>
+                                                    <div key={i} onClick={(e) => { e.stopPropagation(); setSelectedEvent(ev); }} className={`relative w-[calc(100%+8px)] h-[15px] flex items-center select-none cursor-pointer overflow-hidden transition-all hover:brightness-95 ${baseBg} ${containerMargin}`}>
                                                         {isProject && <div className={`absolute left-0 top-0 bottom-0 ${fillBg} opacity-20 transition-all`} style={{ width: `${progressVal}%` }} />}
-                                                        {ev.isStart && <div className="relative z-10 px-1.5 text-[9px] font-black leading-none truncate w-full">{displayTitle}</div>}
+                                                        {ev.isStart && <div className="relative z-10 px-1 text-[8px] font-black leading-none truncate w-full">{displayTitle}</div>}
                                                     </div>
                                                 );
                                             }
                                             return (
-                                                <div key={i} onClick={(e) => { e.stopPropagation(); setSelectedEvent(ev); }} className={`h-[18px] flex items-center px-1.5 rounded text-[9px] font-black leading-none truncate border-0 select-none cursor-pointer transition-all hover:brightness-95 ${ev.colorClass}`}>
+                                                <div key={i} onClick={(e) => { e.stopPropagation(); setSelectedEvent(ev); }} className={`h-[15px] flex items-center px-1 rounded text-[8px] font-black leading-none truncate border-0 select-none cursor-pointer transition-all hover:brightness-95 ${ev.colorClass}`}>
                                                     <div className="truncate">{ev.title}</div>
                                                 </div>
                                             );
                                         })}
                                         {hasMore && (
-                                            <button onClick={(e) => { e.stopPropagation(); setSelectedDayAgenda({ date: day.date, events: dateEvents }); }} className="w-full py-0.5 text-[9px] font-black text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-all text-center">
+                                            <button onClick={(e) => { e.stopPropagation(); setSelectedDayAgenda({ date: day.date, events: dateEvents }); }} className="w-full py-0 text-[7px] font-black text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-all text-center">
                                                 + {dateEvents.length - MAX_VISIBLE_EVENTS}개 더보기
                                             </button>
                                         )}

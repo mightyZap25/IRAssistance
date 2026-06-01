@@ -277,7 +277,7 @@ export default function TaskCalendarPage() {
     const goToToday = () => setCurrentDate(new Date());
 
     return (
-        <div className="h-full flex flex-col space-y-6">
+        <div className="h-full flex flex-col space-y-4">
             <style>{`
                 .no-scrollbar::-webkit-scrollbar {
                     display: none;
@@ -288,33 +288,33 @@ export default function TaskCalendarPage() {
                 }
             `}</style>
 
-            <div className="flex justify-between items-end bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+            <div className="flex justify-between items-end bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">통합 업무 캘린더</h1>
-                    <p className="text-slate-500 text-sm mt-1.5 font-medium">개인 Task, 프로젝트 마일스톤, 할당된 이슈, 전사 근태/휴가를 통합 관리합니다.</p>
+                    <h1 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">통합 업무 캘린더</h1>
+                    <p className="text-slate-500 text-[10px] mt-1 font-medium">개인 Task, 프로젝트 마일스톤, 할당된 이슈, 전사 근태/휴가를 통합 관리합니다.</p>
                 </div>
-                <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-2xl border border-slate-100">
-                        <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-indigo-500"/> <span className="text-[10px] font-black text-slate-500">TASK</span></div>
-                        <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-amber-500"/> <span className="text-[10px] font-black text-slate-500">PROJECT</span></div>
-                        <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-rose-500"/> <span className="text-[10px] font-black text-slate-500">ISSUE</span></div>
-                        <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500"/> <span className="text-[10px] font-black text-slate-500">ATTENDANCE</span></div>
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-100">
+                        <div className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500"/> <span className="text-[8px] font-black text-slate-500 uppercase">Task</span></div>
+                        <div className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-amber-500"/> <span className="text-[8px] font-black text-slate-500 uppercase">Project</span></div>
+                        <div className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-rose-500"/> <span className="text-[8px] font-black text-slate-500 uppercase">Issue</span></div>
+                        <div className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500"/> <span className="text-[8px] font-black text-slate-500 uppercase">Att</span></div>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <button onClick={goToToday} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black transition-all">오늘</button>
-                        <div className="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200">
-                            <button onClick={prevMonth} className="p-1.5 hover:bg-white hover:shadow-sm rounded-lg transition-all text-slate-600"><ChevronLeft size={18} /></button>
-                            <span className="px-4 text-sm font-black text-slate-800 min-w-[120px] text-center">{currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월</span>
-                            <button onClick={nextMonth} className="p-1.5 hover:bg-white hover:shadow-sm rounded-lg transition-all text-slate-600"><ChevronRight size={18} /></button>
+                    <div className="flex items-center gap-2">
+                        <button onClick={goToToday} className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-black transition-all">오늘</button>
+                        <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
+                            <button onClick={prevMonth} className="p-1 hover:bg-white hover:shadow-sm rounded transition-all text-slate-600"><ChevronLeft size={14} /></button>
+                            <span className="px-2 text-[10px] font-black text-slate-800 min-w-[90px] text-center">{currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월</span>
+                            <button onClick={nextMonth} className="p-1 hover:bg-white hover:shadow-sm rounded transition-all text-slate-600"><ChevronRight size={14} /></button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm flex-1 flex flex-col overflow-hidden min-h-[400px]">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex-1 flex flex-col overflow-hidden min-h-[300px]">
                 <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/50">
                     {['일', '월', '화', '수', '목', '금', '토'].map((day, idx) => (
-                        <div key={day} className={`py-2 text-center text-[10px] font-black uppercase tracking-widest ${idx === 0 ? 'text-rose-500' : idx === 6 ? 'text-sky-500' : 'text-slate-400'}`}>{day}</div>
+                        <div key={day} className={`py-1.5 text-center text-[9px] font-black uppercase tracking-widest ${idx === 0 ? 'text-rose-500' : idx === 6 ? 'text-sky-500' : 'text-slate-400'}`}>{day}</div>
                     ))}
                 </div>
                 <div className="flex-1 grid grid-cols-7 overflow-y-auto min-h-0 divide-x divide-y divide-slate-100">
@@ -340,19 +340,19 @@ export default function TaskCalendarPage() {
 
                         const issuesList = dateEvents.filter(e => e.type === 'issue');
 
-                        // Distribute to fixed rows/slots (All slots now have uniform h-[16px] height)
+                        // Distribute to fixed rows/slots (All slots now have uniform h-[14px] height)
                         const slots = [
-                            { event: attendances[0], heightClass: 'h-[16px]', type: 'attendance' },
-                            { event: attendances[1], heightClass: 'h-[16px]', type: 'attendance' },
-                            { event: tasksList[0], heightClass: 'h-[16px]', type: 'task_summary' },
-                            { event: projectsList[0], heightClass: 'h-[16px]', type: 'project' },
-                            { event: projectsList[1], heightClass: 'h-[16px]', type: 'project' },
-                            { event: issuesList[0], heightClass: 'h-[16px]', type: 'issue' }
+                            { event: attendances[0], heightClass: 'h-[14px]', type: 'attendance' },
+                            { event: attendances[1], heightClass: 'h-[14px]', type: 'attendance' },
+                            { event: tasksList[0], heightClass: 'h-[14px]', type: 'task_summary' },
+                            { event: projectsList[0], heightClass: 'h-[14px]', type: 'project' },
+                            { event: projectsList[1], heightClass: 'h-[14px]', type: 'project' },
+                            { event: issuesList[0], heightClass: 'h-[14px]', type: 'issue' }
                         ];
 
                         return (
-                            <div key={idx} className={`min-h-[80px] flex flex-col p-1 transition-colors ${day.currentMonth ? 'bg-white' : 'bg-slate-50/30'} hover:bg-indigo-50/20`}>
-                                <div className="flex justify-between items-start mb-0.5"><span className={`text-[10px] font-black w-4 h-4 flex items-center justify-center rounded-lg ${isTodayCell ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100' : day.currentMonth ? (day.date.getDay() === 0 ? 'text-rose-500' : day.date.getDay() === 6 ? 'text-sky-500' : 'text-slate-600') : 'text-slate-300'}`}>{day.date.getDate()}</span></div>
+                            <div key={idx} className={`min-h-[70px] flex flex-col p-0.5 transition-colors ${day.currentMonth ? 'bg-white' : 'bg-slate-50/30'} hover:bg-indigo-50/20`}>
+                                <div className="flex justify-between items-start mb-0.5"><span className={`text-[9px] font-black w-4 h-4 flex items-center justify-center rounded transition-all ${isTodayCell ? 'bg-indigo-600 text-white shadow shadow-indigo-100' : day.currentMonth ? (day.date.getDay() === 0 ? 'text-rose-500' : day.date.getDay() === 6 ? 'text-sky-500' : 'text-slate-600') : 'text-slate-300'}`}>{day.date.getDate()}</span></div>
                                 <div className="flex-1 overflow-y-auto space-y-0.5 no-scrollbar">
                                     {slots.map((slot, i) => {
                                         const ev = slot.event;
@@ -364,20 +364,20 @@ export default function TaskCalendarPage() {
                                         const eventKey = `${ev.type}-${ev.id}`;
                                         const dateStr = `${day.date.getFullYear()}-${String(day.date.getMonth() + 1).padStart(2, '0')}-${String(day.date.getDate()).padStart(2, '0')}`;
                                         const isFirstVisible = firstVisibleEventDates[eventKey] === dateStr;
-                                        
+
                                         const todayStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
                                         const isToday = dateStr === todayStr;
                                         const showTitle = isFirstVisible || isToday;
 
                                         const isMultiDay = ev.type === 'milestone' || ev.type === 'attendance';
-                                        
+
                                         if (isMultiDay) {
                                             const isProject = ev.type === 'milestone';
                                             const progressVal = isProject ? (ev.raw?.progress || 0) : 100;
                                             const baseBg = `bg-${ev.color || 'slate'}-100 text-${ev.color || 'slate'}-700`;
                                             const fillBg = `bg-${ev.color || 'slate'}-500`;
-                                            const containerMargin = `${ev.isStart ? 'ml-0 rounded-l-md' : 'ml-[-8px]'} ${ev.isEnd ? 'mr-0 rounded-r-md' : 'mr-[-8px]'}`;
-                                            
+                                            const containerMargin = `${ev.isStart ? 'ml-0 rounded-l' : 'ml-[-4px]'} ${ev.isEnd ? 'mr-0 rounded-r' : 'mr-[-4px]'}`;
+
                                             // Title composition
                                             let displayTitle = ev.title;
                                             const showTitle = ev.isStart;
@@ -389,7 +389,7 @@ export default function TaskCalendarPage() {
                                                 <div 
                                                     key={i} 
                                                     onClick={() => setSelectedEvent(ev)} 
-                                                    className={`relative w-[calc(100%+16px)] h-[16px] flex items-center select-none cursor-pointer overflow-hidden transition-all hover:scale-[1.01] ${baseBg} ${containerMargin}`}
+                                                    className={`relative w-[calc(100%+8px)] h-[14px] flex items-center select-none cursor-pointer overflow-hidden transition-all hover:scale-[1.01] ${baseBg} ${containerMargin}`}
                                                 >
                                                     {/* MS Project Gantt Progress Fill */}
                                                     {isProject && (
@@ -398,10 +398,10 @@ export default function TaskCalendarPage() {
                                                             style={{ width: `${progressVal}%` }}
                                                         />
                                                     )}
-                                                    
-                                                    {/* Label (Larger font size [10px]) */}
+
+                                                    {/* Label (Smaller font size [8px]) */}
                                                     {showTitle && (
-                                                        <div className="relative z-10 px-2 text-[10px] font-black leading-none truncate max-w-[90%]">
+                                                        <div className="relative z-10 px-1 text-[8px] font-black leading-none truncate max-w-[90%]">
                                                             {displayTitle}
                                                         </div>
                                                     )}
@@ -409,8 +409,8 @@ export default function TaskCalendarPage() {
                                             );
                                         }
 
-                                        // Single day events (Larger font size [10px])
-                                        const itemClass = `h-[14px] flex items-center px-1.5 rounded text-[10px] font-bold leading-none truncate border-0 select-none cursor-pointer transition-all hover:scale-[1.01] ${ev.colorClass}`;
+                                        // Single day events (Smaller font size [8px])
+                                        const itemClass = `h-[12px] flex items-center px-1 rounded text-[8px] font-bold leading-none truncate border-0 select-none cursor-pointer transition-all hover:scale-[1.01] ${ev.colorClass}`;
                                         return (
                                             <div 
                                                 key={i} 
@@ -427,6 +427,7 @@ export default function TaskCalendarPage() {
                     })}
                 </div>
             </div>
+
 
             {selectedEvent && (selectedEvent.type === 'task_summary' || selectedEvent.type === 'attendance') ? (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
