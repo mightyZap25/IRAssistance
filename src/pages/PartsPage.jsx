@@ -124,17 +124,19 @@ export default function PartsPage() {
         setSortConfig({ key, direction });
     };
 
-    const sortedParts = [...parts].sort((a, b) => {
-        const aVal = a[sortConfig.key] || '';
-        const bVal = b[sortConfig.key] || '';
-        
-        if (typeof aVal === 'number' && typeof bVal === 'number') {
-            return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
-        }
-        return sortConfig.direction === 'asc' 
-            ? String(aVal).localeCompare(String(bVal)) 
-            : String(bVal).localeCompare(String(aVal));
-    });
+    const sortedParts = React.useMemo(() => {
+        return [...parts].sort((a, b) => {
+            const aVal = a[sortConfig.key] || '';
+            const bVal = b[sortConfig.key] || '';
+            
+            if (typeof aVal === 'number' && typeof bVal === 'number') {
+                return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
+            }
+            return sortConfig.direction === 'asc' 
+                ? String(aVal).localeCompare(String(bVal)) 
+                : String(bVal).localeCompare(String(aVal));
+        });
+    }, [parts, sortConfig]);
 
     const latestParts = React.useMemo(() => {
         return sortedParts.filter(p => p.IsLatestRevision !== false);

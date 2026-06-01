@@ -12,13 +12,13 @@ import {
 } from 'lucide-react';
 
 const ROLE_MENU_MAP = {
-    admin: ['/', '/parts', '/bom', '/customers', '/prod-requests', '/prod-execution', '/purchasing', '/outsourcing', '/inventory', '/receiving/inspection', '/qa/config', '/qa/process', '/transactions', '/manufacturers', '/vendors', '/ecn', '/hr/attendance', '/hr/leave', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
-    engineer: ['/', '/parts', '/bom', '/ecn', '/inventory', '/transactions', '/hr/attendance', '/hr/leave', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
-    sales: ['/', '/customers', '/prod-requests', '/inventory', '/hr/attendance', '/hr/leave', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
-    qa: ['/', '/receiving/inspection', '/qa/config', '/qa/process', '/inventory', '/transactions', '/hr/attendance', '/hr/leave', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
-    production: ['/', '/prod-execution', '/prod-requests', '/inventory', '/outsourcing', '/transactions', '/hr/attendance', '/hr/leave', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
-    manager: ['/', '/customers', '/prod-requests', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/transactions', '/manufacturers', '/vendors', '/hr/attendance', '/hr/leave', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
-    viewer: ['/', '/hr/attendance', '/hr/leave', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
+    admin: ['/', '/parts', '/bom', '/customers', '/prod-requests', '/prod-execution', '/purchasing', '/outsourcing', '/inventory', '/receiving/inspection', '/qa/config', '/qa/process', '/transactions', '/manufacturers', '/vendors', '/ecn', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
+    engineer: ['/', '/parts', '/bom', '/ecn', '/inventory', '/transactions', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
+    sales: ['/', '/customers', '/prod-requests', '/inventory', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
+    qa: ['/', '/receiving/inspection', '/qa/config', '/qa/process', '/inventory', '/transactions', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
+    production: ['/', '/prod-execution', '/prod-requests', '/inventory', '/outsourcing', '/transactions', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
+    manager: ['/', '/customers', '/prod-requests', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/transactions', '/manufacturers', '/vendors', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
+    viewer: ['/', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
 };
 
 export default function Sidebar() {
@@ -60,14 +60,34 @@ export default function Sidebar() {
         { title: '마스터 데이터', items: [ { name: '제조사 관리', path: '/manufacturers', icon: Factory }, { name: '공급사 관리', path: '/vendors', icon: Users }, { name: 'ECN 승인', path: '/ecn', icon: AlertCircle, badge: pendingEcnCount > 0 ? pendingEcnCount : null } ] }
     ];
 
-    const HR_MENU_GROUPS = [ { title: 'HR 및 근태', items: [ { name: '근태 관리', path: '/hr/attendance', icon: UserCheck }, { name: '휴가 관리', path: '/hr/leave', icon: CalendarDays, badge: pendingApprovalCount > 0 ? pendingApprovalCount : null } ] } ];
-    const PROJECT_MENU_GROUPS = [ { title: '프로젝트', items: [ { name: '프로젝트 현황', path: '/project/dashboard', icon: Briefcase }, { name: '프로젝트 관리', path: '/project/management', icon: Layers }, { name: '이슈 관리', path: '/project/issues', icon: AlertCircle }, { name: 'Task 관리', path: '/project/tasks', icon: ListTodo }, { name: 'Task 캘린더', path: '/project/task-calendar', icon: CalendarDays } ] } ];
-    const WORKSPACE_MENU_GROUPS = [ { title: '오피스', items: [ { name: '일정 관리', path: '/workspace/calendar', icon: CalendarDays }, { name: '파일 연동', path: '/workspace/files', icon: Cloud }, { name: '통합 메일', path: '/workspace/mail', icon: Mail } ] } ];
+    const PROJECT_MENU_GROUPS = [
+        {
+            title: '프로젝트 제어',
+            items: [
+                { name: '프로젝트 현황판', path: '/project/dashboard', icon: LayoutDashboard },
+                { name: '개발 프로젝트', path: '/project/management', icon: Briefcase },
+                { name: '이슈 트랙커', path: '/project/issues', icon: AlertCircle },
+                { name: 'TASK', path: '/project/tasks', icon: ListTodo },
+                { name: '업무 캘린더', path: '/project/task-calendar', icon: CalendarDays }
+            ]
+        }
+    ];
+
+    const COLLAB_MENU_GROUPS = [
+        {
+            title: '근무 및 오피스',
+            items: [
+                { name: '근태 관리', path: '/hr/attendance', icon: UserCheck, badge: pendingApprovalCount > 0 ? pendingApprovalCount : null },
+                { name: '통합 일정', path: '/workspace/calendar', icon: CalendarDays },
+                { name: '통합 메일', path: '/workspace/mail', icon: Mail },
+                { name: '파일 공유', path: '/workspace/files', icon: Cloud }
+            ]
+        }
+    ];
 
     const fErp = filterGroups(ALL_MENU_GROUPS);
-    const fHr = filterGroups(HR_MENU_GROUPS);
     const fProj = filterGroups(PROJECT_MENU_GROUPS);
-    const fWork = filterGroups(WORKSPACE_MENU_GROUPS);
+    const fCollab = filterGroups(COLLAB_MENU_GROUPS);
 
     const roleInfo = {
         admin: { label: 'Admin', color: 'bg-rose-500' },
@@ -103,7 +123,7 @@ export default function Sidebar() {
                     </NavLink>
                 )}
 
-                {[ { g: fErp, t: 'ERP' }, { g: fHr, t: 'HR' }, { g: fProj, t: 'PROJ' }, { g: fWork, t: 'OFFICE' } ].map(sec => sec.g.length > 0 && (
+                {[ { g: fErp, t: 'ERP' }, { g: fProj, t: 'PROJ' }, { g: fCollab, t: 'COLLAB' } ].map(sec => sec.g.length > 0 && (
                     <div key={sec.t} className="space-y-2">
                         <div className="px-3 text-[11px] font-black text-slate-400 uppercase tracking-wider">{sec.t}</div>
                         <div className="space-y-1 pl-2 border-l border-slate-100 ml-2">

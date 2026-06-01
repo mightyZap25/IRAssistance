@@ -339,9 +339,19 @@ export default function MasterDataGrid({
         });
     }, [data, searchTerm, activeFilters, enableSearch]);
 
+    const prevFilteredDataRef = React.useRef();
+
     React.useEffect(() => {
         if (typeof onFilteredDataChange === 'function') {
-            onFilteredDataChange(finalFilteredData);
+            // 무한 루프 방지: 데이터의 내용이 실제로 변경되었을 때만 호출
+            const isSame = prevFilteredDataRef.current && 
+                          prevFilteredDataRef.current.length === finalFilteredData.length &&
+                          prevFilteredDataRef.current.every((val, i) => val === finalFilteredData[i]);
+            
+            if (!isSame) {
+                prevFilteredDataRef.current = finalFilteredData;
+                onFilteredDataChange(finalFilteredData);
+            }
         }
     }, [finalFilteredData, onFilteredDataChange]);
 

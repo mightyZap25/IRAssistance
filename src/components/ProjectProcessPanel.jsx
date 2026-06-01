@@ -24,6 +24,7 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
     
     const [projectIssues, setProjectIssues] = useState([]);
     const [loadingIssues, setLoadingIssues] = useState(false);
+    const [editingTest, setEditingTest] = useState(null); // The test task object currently opened in details
 
     useEffect(() => {
         if (isOpen && project) {
@@ -57,6 +58,7 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
         setViewMode('stage_detail');
     };
 
+
     const handleStageChange = async (stageId) => {
         if (!window.confirm(`프로젝트 단계를 [${stages.find(s => s.id === stageId).label}]로 변경하시겠습니까?`)) return;
         const newIdx = stages.findIndex(s => s.id === stageId);
@@ -79,7 +81,20 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
         if (!newTest.parent || !newTest.child) return;
         const updatedTests = { ...(project.tests || {}) };
         if (!updatedTests[stageId]) updatedTests[stageId] = [];
-        updatedTests[stageId].push({ id: Date.now(), parent: newTest.parent, child: newTest.child, completed: false, updatedAt: new Date().toISOString() });
+        updatedTests[stageId].push({ 
+            id: Date.now(), 
+            parent: newTest.parent, 
+            child: newTest.child, 
+            completed: false, 
+            updatedAt: new Date().toISOString(),
+            startDate: project.schedules?.[stageId]?.start || '',
+            endDate: project.schedules?.[stageId]?.end || '',
+            assigneeUid: '',
+            assigneeName: '',
+            priority: 'Medium', // High, Medium, Low
+            difficulty: 'Medium', // High, Medium, Low
+            notes: ''
+        });
         await onUpdate(project.id, { tests: updatedTests });
         setNewTest({ ...newTest, child: '' }); 
     };
@@ -88,12 +103,45 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
         const updatedTests = { ...project.tests };
         updatedTests[stageId] = updatedTests[stageId].map(t => t.id === testId ? { ...t, completed: !t.completed, updatedAt: new Date().toISOString() } : t);
         await onUpdate(project.id, { tests: updatedTests });
+        // sync details state if open
+        if (editingTest && editingTest.id === testId) {
+            setEditingTest(prev => ({ ...prev, completed: !prev.completed }));
+        }
     };
 
     const removeTest = async (stageId, testId) => {
         const updatedTests = { ...project.tests };
         updatedTests[stageId] = updatedTests[stageId].filter(t => t.id !== testId);
         await onUpdate(project.id, { tests: updatedTests });
+        if (editingTest && editingTest.id === testId) {
+            setEditingTest(null);
+        }
+    };
+
+    const handleUpdateTestDetail = async (stageId, testId, fields) => {
+        const updatedTests = { ...project.tests };
+        updatedTests[stageId] = updatedTests[stageId].map(t => {
+            if (t.id === testId) {
+                const updated = { ...t, ...fields, updatedAt: new Date().toISOString() };
+                if (fields.assigneeUid !== undefined) {
+                    const matchedUser = (users || []).find(u => u.uid === fields.assigneeUid);
+                    updated.assigneeName = matchedUser ? matchedUser.displayName : '';
+                }
+                return updated;
+            }
+            return t;
+        });
+        await onUpdate(project.id, { tests: updatedTests });
+        if (editingTest && editingTest.id === testId) {
+            setEditingTest(prev => {
+                const nextVal = { ...prev, ...fields };
+                if (fields.assigneeUid !== undefined) {
+                    const matchedUser = (users || []).find(u => u.uid === fields.assigneeUid);
+                    nextVal.assigneeName = matchedUser ? matchedUser.displayName : '';
+                }
+                return nextVal;
+            });
+        }
     };
 
     const addDocumentLink = async (stageId, docName) => {
@@ -259,19 +307,34 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                             </div>
 
                             <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
-                                <h3 className="text-xs font-black text-slate-800 border-b pb-2 flex justify-between items-center"><span className="flex items-center gap-1.5"><CheckCircle2 size={14} className="text-emerald-500"/> 검증 체크시트</span><span className="text-[9px] font-black text-slate-400">{project.tests?.[activeStageId]?.filter(t => t.completed).length || 0}/{project.tests?.[activeStageId]?.length || 0} 완료</span></h3>
+                                <h3 className="text-xs font-black text-slate-800 border-b pb-2 flex justify-between items-center"><span className="flex items-center gap-1.5"><CheckCircle2 size={14} className="text-emerald-500"/> TASK</span><span className="text-[9px] font-black text-slate-400">{project.tests?.[activeStageId]?.filter(t => t.completed).length || 0}/{project.tests?.[activeStageId]?.length || 0} 완료</span></h3>
                                 <div className="space-y-2">
                                     <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 space-y-2">
                                         <div className="flex items-center justify-between"><label className="text-[8px] font-black text-slate-400 uppercase">분류 선택/등록</label><button type="button" onClick={() => { setIsAddingNewParent(!isAddingNewParent); setNewTest({ ...newTest, parent: '' }); }} className="text-[8px] font-black text-indigo-600">{isAddingNewParent ? '목록보기' : '+ 새 분류'}</button></div>
-                                        {isAddingNewParent ? <input type="text" placeholder="새 카테고리" value={newTest.parent} onChange={(e) => setNewTest({...newTest, parent: e.target.value})} className="w-full bg-white border border-indigo-100 rounded-lg px-3 py-1.5 text-[10px] font-black" /> : <select value={newTest.parent} onChange={(e) => setNewTest({...newTest, parent: e.target.value})} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[10px] font-bold"><option value="">선택</option>{[...new Set((project.tests?.[activeStageId] || []).map(t => t.parent))].sort().map(p => <option key={p} value={p}>{p}</option>)}</select>}
-                                        <div className="flex gap-2"><input type="text" placeholder="검증 항목" value={newTest.child} onChange={(e) => setNewTest({...newTest, child: e.target.value})} onKeyPress={(e) => e.key === 'Enter' && handleAddTest(activeStageId)} className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[10px]" /><button type="button" onClick={() => handleAddTest(activeStageId)} disabled={!newTest.parent || !newTest.child} className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-[10px] font-black">추가</button></div>
+                                        {isAddingNewParent ? <input type="text" placeholder="새 분류 (예: 기능검증)" value={newTest.parent} onChange={(e) => setNewTest({...newTest, parent: e.target.value})} className="w-full bg-white border border-indigo-100 rounded-lg px-3 py-1.5 text-[10px] font-black" /> : <select value={newTest.parent} onChange={(e) => setNewTest({...newTest, parent: e.target.value})} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[10px] font-bold"><option value="">분류 선택</option>{[...new Set((project.tests?.[activeStageId] || []).map(t => t.parent))].sort().map(p => <option key={p} value={p}>{p}</option>)}</select>}
+                                        <div className="flex gap-2"><input type="text" placeholder="TASK 명칭" value={newTest.child} onChange={(e) => setNewTest({...newTest, child: e.target.value})} onKeyPress={(e) => e.key === 'Enter' && handleAddTest(activeStageId)} className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[10px]" /><button type="button" onClick={() => handleAddTest(activeStageId)} disabled={!newTest.parent || !newTest.child} className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-[10px] font-black">추가</button></div>
                                     </div>
                                     <div className="space-y-3 pt-1">
                                         {(() => {
                                             const grouped = {};
                                             project.tests?.[activeStageId]?.forEach(t => { if (!grouped[t.parent]) grouped[t.parent] = []; grouped[t.parent].push(t); });
                                             return Object.keys(grouped).sort().map(parent => (
-                                                <div key={parent} className="space-y-1"><div className="flex items-center gap-1.5 px-1"><div className="w-1 h-1 rounded bg-indigo-500" /><span className="text-[9px] font-black text-slate-800">{parent}</span></div><div className="ml-2 pl-2 border-l-2 border-slate-100 space-y-0.5">{grouped[parent].map(test => <div key={test.id} className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-50 group"><button onClick={() => toggleTest(activeStageId, test.id)} className={test.completed ? 'text-emerald-500' : 'text-slate-300'}>{test.completed ? <CheckCircle2 size={16} /> : <Circle size={16} />}</button><span className={`text-[10px] font-bold flex-1 ${test.completed ? 'line-through text-slate-300' : 'text-slate-700'}`}>{test.child}</span><button onClick={() => removeTest(activeStageId, test.id)} className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-rose-500"><X size={12} /></button></div>)}</div></div>
+                                                <div key={parent} className="space-y-1">
+                                                    <div className="flex items-center gap-1.5 px-1"><div className="w-1 h-1 rounded bg-indigo-500" /><span className="text-[9px] font-black text-slate-800">{parent}</span></div>
+                                                    <div className="ml-2 pl-2 border-l-2 border-slate-100 space-y-0.5">
+                                                        {grouped[parent].map(test => (
+                                                            <div key={test.id} className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-50 group">
+                                                                <button onClick={() => toggleTest(activeStageId, test.id)} className={test.completed ? 'text-emerald-500 animate-in zoom-in-50' : 'text-slate-300'}>{test.completed ? <CheckCircle2 size={16} /> : <Circle size={16} />}</button>
+                                                                <span className={`text-[10px] font-bold flex-1 cursor-pointer hover:text-indigo-600 ${test.completed ? 'line-through text-slate-300' : 'text-slate-700'}`} onClick={() => setEditingTest(test)}>
+                                                                    {test.child}
+                                                                    {test.assigneeName && <span className="ml-2 text-[8px] font-black px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">{test.assigneeName}</span>}
+                                                                </span>
+                                                                <button onClick={() => setEditingTest(test)} className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-indigo-600" title="상세 정보"><MessageSquare size={12} /></button>
+                                                                <button onClick={() => removeTest(activeStageId, test.id)} className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-rose-500"><X size={12} /></button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
                                             ));
                                         })()}
                                     </div>
@@ -307,6 +370,120 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                     <button onClick={() => { if(window.confirm("프로젝트를 삭제하시겠습니까?")) { /* delete logic */ onClose(); } }} className="text-rose-400 text-[8px] font-black hover:text-rose-600 uppercase tracking-widest flex items-center gap-1.5"><Trash2 size={12}/> Delete</button>
                     <div className="text-[8px] font-black text-slate-200 uppercase">Sync: {project.updatedAt?.toDate ? project.updatedAt.toDate().toLocaleTimeString() : 'N/A'}</div>
                 </div>
+
+                {/* 5. Task Detail Modal (Popup inside portal) */}
+                {editingTest && (
+                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+                        <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+                            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                                <div>
+                                    <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest">TASK DETAILS</span>
+                                    <h3 className="text-sm font-black text-slate-800 leading-tight">[{editingTest.parent}] {editingTest.child}</h3>
+                                </div>
+                                <button type="button" onClick={() => setEditingTest(null)} className="p-1.5 text-slate-400 hover:text-slate-700 bg-slate-100 rounded-xl"><X size={16}/></button>
+                            </div>
+                            
+                            <div className="p-5 space-y-4 flex-1 overflow-y-auto max-h-[60vh] text-xs">
+                                {/* Completed Status */}
+                                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                                    <span className="font-black text-slate-700">진행 상태</span>
+                                    <button 
+                                        type="button"
+                                        onClick={() => toggleTest(activeStageId, editingTest.id)} 
+                                        className={`flex items-center gap-1.5 px-3 py-1 rounded-xl font-black text-[10px] transition-all shadow-sm ${
+                                            editingTest.completed ? 'bg-emerald-500 text-white' : 'bg-white text-slate-600 border border-slate-250'
+                                        }`}
+                                    >
+                                        {editingTest.completed ? <CheckCircle2 size={12} /> : <Circle size={12} />}
+                                        {editingTest.completed ? '완료' : '진행 대기'}
+                                    </button>
+                                </div>
+
+                                {/* Date Range */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">시작일</label>
+                                        <input 
+                                            type="date" 
+                                            value={editingTest.startDate || ''} 
+                                            onChange={(e) => handleUpdateTestDetail(activeStageId, editingTest.id, { startDate: e.target.value })}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold" 
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">완료일</label>
+                                        <input 
+                                            type="date" 
+                                            value={editingTest.endDate || ''} 
+                                            onChange={(e) => handleUpdateTestDetail(activeStageId, editingTest.id, { endDate: e.target.value })}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold" 
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Assignee & Priority & Difficulty */}
+                                <div className="space-y-3">
+                                    <div className="space-y-1">
+                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">담당자 지정</label>
+                                        <select 
+                                            value={editingTest.assigneeUid || ''} 
+                                            onChange={(e) => handleUpdateTestDetail(activeStageId, editingTest.id, { assigneeUid: e.target.value })}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold"
+                                        >
+                                            <option value="">담당자 없음</option>
+                                            {(users || []).map(u => (
+                                                <option key={u.uid} value={u.uid}>{u.displayName} ({u.department || '부서 미설정'})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">우선순위</label>
+                                            <select 
+                                                value={editingTest.priority || 'Medium'} 
+                                                onChange={(e) => handleUpdateTestDetail(activeStageId, editingTest.id, { priority: e.target.value })}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold"
+                                            >
+                                                <option value="High">높음 (상)</option>
+                                                <option value="Medium">보통 (중)</option>
+                                                <option value="Low">낮음 (하)</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">난이도</label>
+                                            <select 
+                                                value={editingTest.difficulty || 'Medium'} 
+                                                onChange={(e) => handleUpdateTestDetail(activeStageId, editingTest.id, { difficulty: e.target.value })}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold"
+                                            >
+                                                <option value="High">어려움 (상)</option>
+                                                <option value="Medium">보통 (중)</option>
+                                                <option value="Low">쉬움 (하)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Notepad / Memo style description */}
+                                <div className="space-y-1.5 pt-1">
+                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">메모 및 업무 상세내역 (메모장)</label>
+                                    <textarea 
+                                        rows="6" 
+                                        value={editingTest.notes || ''} 
+                                        onChange={(e) => handleUpdateTestDetail(activeStageId, editingTest.id, { notes: e.target.value })}
+                                        placeholder="이 TASK의 상세 지침, 실행 로그, 참고 사항 등을 메모장처럼 자유롭게 기록해 보세요..." 
+                                        className="w-full bg-amber-50/30 border border-amber-200/80 rounded-2xl p-4 text-[11px] font-medium resize-none shadow-inner text-slate-800 placeholder-slate-400/80 font-sans focus:outline-none focus:ring-1 focus:ring-amber-300" 
+                                    />
+                                </div>
+                            </div>
+                            <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3.5 shrink-0">
+                                <button type="button" onClick={() => removeTest(activeStageId, editingTest.id)} className="px-4 py-2 bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all font-black text-[10px] rounded-xl flex items-center gap-1.5"><Trash2 size={12}/> 삭제</button>
+                                <button type="button" onClick={() => setEditingTest(null)} className="flex-1 py-2 bg-indigo-600 text-white hover:bg-indigo-700 transition-all font-black text-[10px] rounded-xl text-center shadow-md shadow-indigo-100">닫기</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>,
         document.body

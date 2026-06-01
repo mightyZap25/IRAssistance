@@ -21,6 +21,7 @@ import OutsourcingPage from './pages/OutsourcingPage'
 import WarehousePlacementPage from './pages/WarehousePlacementPage'
 import ReturnProcessingPage from './pages/ReturnProcessingPage'
 import WorkspaceFilesPage from './pages/WorkspaceFilesPage'
+import WorkspaceCalendarPage from './pages/WorkspaceCalendarPage'
 import LeaveManagementPage from './pages/LeaveManagementPage'
 import QAConfigPage from './pages/QAConfigPage'
 import QAProcessPage from './pages/QAProcessPage'
@@ -194,7 +195,15 @@ function AppContent() {
                 </PrivateRoute>
             } />
 
-            <Route path="/hr/leave" element={
+            <Route path="/workspace/calendar" element={
+                <PrivateRoute>
+                    <Layout>
+                        <WorkspaceCalendarPage />
+                    </Layout>
+                </PrivateRoute>
+            } />
+
+            <Route path="/hr/attendance" element={
                 <PrivateRoute>
                     <Layout>
                         <LeaveManagementPage />

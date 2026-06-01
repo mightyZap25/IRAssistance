@@ -24,8 +24,6 @@ const PROCESS_STAGES = [
 export default function ProjectManagementPage() {
     const { currentUser, userProfile } = useAuth();
     const [projects, setProjects] = useState([]);
-    const [allIssues, setAllIssues] = useState([]);
-    const [allTasks, setAllTasks] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -35,9 +33,25 @@ export default function ProjectManagementPage() {
     const [activeTab, setActiveTab] = useState('ALL'); // ALL | ACTIVE | COMPLETED
     const [viewMode, setViewMode] = useState('pipeline'); // pipeline | gantt
 
+    const [users, setUsers] = useState([]);
+
     useEffect(() => {
         fetchProjects();
+        fetchUsers();
     }, []);
+
+    const fetchUsers = async () => {
+        try {
+            const snap = await getDocs(collection(db, 'users'));
+            const list = snap.docs.map(doc => ({
+                uid: doc.id,
+                ...doc.data()
+            }));
+            setUsers(list);
+        } catch (err) {
+            console.error("Failed to fetch users:", err);
+        }
+    };
 
     const fetchProjects = async () => {
         setLoading(true);
@@ -56,14 +70,6 @@ export default function ProjectManagementPage() {
                 };
             });
             setProjects(list);
-
-            // 2. Issues
-            const issueSnap = await getDocs(collection(db, 'issues'));
-            setAllIssues(issueSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-            // 3. Tasks
-            const taskSnap = await getDocs(query(collection(db, 'personal_tasks'), where('ownerUid', '==', currentUser.uid)));
-            setAllTasks(taskSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
         } catch (err) {
             console.error("Failed to fetch data:", err);
@@ -155,13 +161,12 @@ export default function ProjectManagementPage() {
     return (
         <div className="h-full flex flex-col space-y-6">
             {/* Header */}
-            <div className="flex justify-between items-end bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+            <div className="flex justify-between items-center bg-white py-5 px-6 rounded-2xl border border-slate-200/80 shadow-sm">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                        <Briefcase className="text-indigo-600" size={32} />
-                        전사 개발 프로젝트 관리
+                    <h1 className="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2.5">
+                        <Briefcase className="text-indigo-600" size={26} /> 전사 개발 프로젝트 관리
                     </h1>
-                    <p className="text-slate-500 text-sm mt-1.5 font-medium">
+                    <p className="text-slate-400 text-xs mt-1 font-medium">
                         제품 개발 전 공정(Planning to Mass Production) 진척도 및 문서 관리
                     </p>
                 </div>
@@ -234,88 +239,6 @@ export default function ProjectManagementPage() {
                 {/* Main Content Area */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/30">
                     
-                    {/* 1. Unified Dashboard Overview */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
-                        {/* Summary KPI Card */}
-                        <div className="lg:col-span-1 bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-6">
-                            <h3 className="text-sm font-black text-slate-800 flex items-center gap-2 border-b pb-3">
-                                <TrendingUp className="text-indigo-600" size={18}/> 운영 요약 (Portfolio KPI)
-                            </h3>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-100">
-                                    <div className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Active Proj.</div>
-                                    <div className="text-2xl font-black text-indigo-700">{projects.filter(p => p.currentStage !== 'mp_transfer').length}</div>
-                                </div>
-                                <div className="p-4 rounded-2xl bg-rose-50 border border-rose-100">
-                                    <div className="text-[10px] font-black text-rose-400 uppercase tracking-widest">Open Issues</div>
-                                    <div className="text-2xl font-black text-rose-700">{allIssues.filter(i => i.columnId !== 'done').length}</div>
-                                </div>
-                                <div className="p-4 rounded-2xl bg-blue-50 border border-blue-100">
-                                    <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest">To-Dos</div>
-                                    <div className="text-2xl font-black text-blue-700">{allTasks.filter(t => t.status !== 'completed').length}</div>
-                                </div>
-                                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-100">
-                                    <div className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Completed</div>
-                                    <div className="text-2xl font-black text-emerald-700">{projects.filter(p => p.currentStage === 'mp_transfer').length}</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Recent Urgent Issues Hub */}
-                        <div className="lg:col-span-1 bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col">
-                            <h3 className="text-sm font-black text-slate-800 flex items-center gap-2 border-b pb-3 mb-4">
-                                <AlertCircle className="text-rose-500" size={18}/> 긴급 대응 이슈 (Urgent Issues)
-                            </h3>
-                            <div className="flex-1 space-y-3 overflow-y-auto max-h-[180px] pr-1 custom-scrollbar">
-                                {allIssues.filter(i => i.priority === 'urgent' && i.columnId !== 'done').length === 0 ? (
-                                    <div className="h-full flex flex-col items-center justify-center text-slate-300">
-                                        <CheckCircle size={32} className="opacity-10 mb-2"/>
-                                        <p className="text-[10px] font-bold uppercase italic tracking-widest">Clear: No Urgent Issues</p>
-                                    </div>
-                                ) : (
-                                    allIssues.filter(i => i.priority === 'urgent' && i.columnId !== 'done').map(issue => (
-                                        <div key={issue.id} className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex items-center gap-3 group hover:border-rose-200 transition-all">
-                                            <div className="w-1 h-6 rounded-full bg-rose-500 animate-pulse" />
-                                            <div className="flex-1 min-w-0">
-                                                <div className="text-[11px] font-black text-slate-800 truncate">{issue.title}</div>
-                                                <div className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
-                                                    {projects.find(p => p.id === issue.projectId)?.name || 'General Issue'}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Weekly Personal Tasks */}
-                        <div className="lg:col-span-1 bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col">
-                            <h3 className="text-sm font-black text-slate-800 flex items-center gap-2 border-b pb-3 mb-4">
-                                <ListChecks className="text-blue-500" size={18}/> 이번 주 할 일 (Tasks)
-                            </h3>
-                            <div className="flex-1 space-y-2 overflow-y-auto max-h-[180px] pr-1 custom-scrollbar">
-                                {allTasks.filter(t => t.status !== 'completed').length === 0 ? (
-                                    <div className="h-full flex flex-col items-center justify-center text-slate-300">
-                                        <CheckCircle size={32} className="opacity-10 mb-2"/>
-                                        <p className="text-[10px] font-bold uppercase italic tracking-widest">All tasks done</p>
-                                    </div>
-                                ) : (
-                                    allTasks.filter(t => t.status !== 'completed').slice(0, 4).map(task => (
-                                        <div key={task.id} className="flex items-center gap-3 p-2.5 hover:bg-slate-50 rounded-xl transition-all border border-transparent hover:border-slate-100">
-                                            <Circle size={14} className="text-slate-300" />
-                                            <div className="flex-1 min-w-0">
-                                                <div className="text-[11px] font-bold text-slate-700 truncate">{task.title}</div>
-                                                <div className="text-[8px] font-black text-blue-400 uppercase">{task.dueDate?.toLocaleDateString() || 'No Deadline'}</div>
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="h-px bg-slate-200/50" />
-
                     {/* 2. Pipeline / Gantt View Sections */}
                     <div className="space-y-4">
                         <div className="flex justify-between items-center px-1">
@@ -331,14 +254,39 @@ export default function ProjectManagementPage() {
                                 <Layers size={48} className="mb-4 opacity-20" /><p className="font-bold">검색 결과가 없습니다.</p>
                             </div>
                         ) : viewMode === 'pipeline' ? (
-                            <div className="space-y-4">
-                                {filteredProjects.map(project => (
-                                    <ProjectRow 
-                                        key={project.id} 
-                                        project={project} 
-                                        onClick={() => setSelectedProject(project)}
-                                    />
-                                ))}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 overflow-x-auto pb-4 custom-scrollbar">
+                                {PROCESS_STAGES.map(stage => {
+                                    const stageProjects = filteredProjects.filter(p => p.currentStage === stage.id);
+                                    return (
+                                        <div key={stage.id} className="bg-slate-50/50 border border-slate-200/60 rounded-2xl p-3 flex flex-col min-w-[200px] min-h-[450px]">
+                                            {/* Column Header */}
+                                            <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+                                                <div className="flex items-center gap-1.5">
+                                                    <stage.icon className={`${stage.color}`} size={16} />
+                                                    <span className="text-xs font-black text-slate-700">{stage.label}</span>
+                                                </div>
+                                                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">{stageProjects.length}</span>
+                                            </div>
+                                            
+                                            {/* Cards List */}
+                                            <div className="flex-1 space-y-2.5 overflow-y-auto no-scrollbar">
+                                                {stageProjects.map(project => (
+                                                    <ProjectCard 
+                                                        key={project.id} 
+                                                        project={project} 
+                                                        onClick={() => setSelectedProject(project)}
+                                                        onMoveStage={(newStage) => handleUpdateProject(project.id, { currentStage: newStage })}
+                                                    />
+                                                ))}
+                                                {stageProjects.length === 0 && (
+                                                    <div className="h-full flex flex-col items-center justify-center text-slate-300 py-16">
+                                                        <span className="text-[10px] font-bold">프로젝트 없음</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         ) : (
                             <ProjectGanttChart 
@@ -393,75 +341,70 @@ export default function ProjectManagementPage() {
                 project={selectedProject}
                 stages={PROCESS_STAGES}
                 onUpdate={handleUpdateProject}
+                users={users}
             />
         </div>
     );
 }
 
-function ProjectRow({ project, onClick }) {
-    const currentStageIdx = PROCESS_STAGES.findIndex(s => s.id === project.currentStage);
-    
+function ProjectCard({ project, onClick, onMoveStage }) {
+    const currentIdx = PROCESS_STAGES.findIndex(s => s.id === project.currentStage);
+
+    const handlePrev = (e) => {
+        e.stopPropagation();
+        if (currentIdx > 0) {
+            onMoveStage(PROCESS_STAGES[currentIdx - 1].id);
+        }
+    };
+
+    const handleNext = (e) => {
+        e.stopPropagation();
+        if (currentIdx < PROCESS_STAGES.length - 1) {
+            onMoveStage(PROCESS_STAGES[currentIdx + 1].id);
+        }
+    };
+
     return (
         <div 
             onClick={onClick}
-            className="bg-white border border-slate-200 rounded-2xl p-5 hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer group"
+            className="bg-white border border-slate-200/80 rounded-xl p-3.5 hover:border-indigo-400 hover:shadow-md transition-all cursor-pointer group flex flex-col space-y-3"
         >
-            <div className="flex justify-between items-start mb-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                        <Briefcase size={20} />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-black text-slate-400 font-mono tracking-tighter uppercase">{project.code || 'NO-CODE'}</span>
-                            <h3 className="text-sm font-black text-slate-800">{project.name}</h3>
-                        </div>
-                        <p className="text-[11px] text-slate-500 font-medium">{project.ownerName} · {project.createdAt?.toLocaleDateString()}</p>
-                    </div>
+            <div>
+                <div className="flex justify-between items-start gap-1">
+                    <span className="text-[9px] font-black text-slate-400 font-mono tracking-tighter uppercase truncate">{project.code || 'NO-CODE'}</span>
+                    <span className="text-[10px] font-black text-indigo-600">{project.progress || 0}%</span>
                 </div>
-                <div className="text-right">
-                    <div className="text-[10px] font-black text-slate-400 mb-1">TOTAL PROGRESS</div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-32 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${project.progress || 0}%` }} />
-                        </div>
-                        <span className="text-xs font-black text-indigo-600">{project.progress || 0}%</span>
-                    </div>
-                </div>
+                <h4 className="text-xs font-black text-slate-800 line-clamp-2 mt-0.5 group-hover:text-indigo-600 transition-colors">
+                    {project.name}
+                </h4>
+                <p className="text-[10px] text-slate-400 font-bold mt-1">담당: {project.ownerName || '미지정'}</p>
             </div>
 
-            {/* Pipeline Visual */}
-            <div className="flex items-center w-full">
-                {PROCESS_STAGES.map((stage, idx) => {
-                    const isCompleted = idx < currentStageIdx;
-                    const isCurrent = idx === currentStageIdx;
-
-                    return (
-                        <React.Fragment key={stage.id}>
-                            <div className="flex flex-col items-center relative flex-1">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all ${
-                                    isCompleted ? 'bg-emerald-50 border-emerald-500 text-emerald-600' :
-                                    isCurrent ? 'bg-indigo-600 border-indigo-600 text-white ring-4 ring-indigo-50' :
-                                    'bg-white border-slate-200 text-slate-300'
-                                }`}>
-                                    {isCompleted ? <CheckCircle2 size={16} /> : <stage.icon size={14} />}
-                                </div>
-                                <span className={`absolute top-full mt-2 text-[9px] font-black truncate w-full text-center ${
-                                    isCurrent ? 'text-indigo-600' : 'text-slate-400'
-                                }`}>
-                                    {stage.label}
-                                </span>
-                            </div>
-                            {idx < PROCESS_STAGES.length - 1 && (
-                                <div className="flex-1 px-1">
-                                    <div className={`h-0.5 w-full rounded-full ${isCompleted ? 'bg-emerald-500' : 'bg-slate-100'}`} />
-                                </div>
-                            )}
-                        </React.Fragment>
-                    );
-                })}
+            {/* Progress Bar */}
+            <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${project.progress || 0}%` }} />
             </div>
-            <div className="h-6" /> {/* Spacer for labels */}
+
+            {/* Actions for Step Shift */}
+            <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+                <button 
+                    onClick={handlePrev}
+                    disabled={currentIdx === 0}
+                    className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                    title="이전 단계로 이동"
+                >
+                    <ChevronRight className="rotate-180" size={14} />
+                </button>
+                <span className="text-[9px] font-black text-slate-400">단계 이동</span>
+                <button 
+                    onClick={handleNext}
+                    disabled={currentIdx === PROCESS_STAGES.length - 1}
+                    className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                    title="다음 단계로 이동"
+                >
+                    <ChevronRight size={14} />
+                </button>
+            </div>
         </div>
     );
 }
