@@ -1,5 +1,5 @@
 import { db } from '../firebase';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, collection, getDocs, orderBy, query } from 'firebase/firestore';
 
 export const USER_ROLES = {
     ADMIN: 'admin',
@@ -10,6 +10,20 @@ export const USER_ROLES = {
     PRODUCTION: 'production',
     VIEWER: 'viewer'
 };
+
+/**
+ * 모든 사용자 목록을 가져옵니다.
+ */
+export async function getAllUsers() {
+    try {
+        const q = query(collection(db, 'users'), orderBy('displayName', 'asc'));
+        const snap = await getDocs(q);
+        return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+        console.error("Error fetching all users:", error);
+        return [];
+    }
+}
 
 /**
  * Creates or updates a user profile in Firestore on login.

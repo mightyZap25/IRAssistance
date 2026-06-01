@@ -5,7 +5,8 @@ import { getUserDashboardLayout, saveUserDashboardLayout } from '../services/use
 import { 
     Settings, LayoutGrid, Plus, RefreshCw, Save, X, Edit3, 
     Trash2, ChevronRight, Grid3X3, Monitor, Smartphone,
-    Palette, Type, Bold, AlignLeft, AlignCenter, AlignRight, Check
+    Palette, Type, Bold, AlignLeft, AlignCenter, AlignRight, Check,
+    Database, Filter, List
 } from 'lucide-react';
 
 // RGL 필수 스타일 임포트
@@ -21,6 +22,7 @@ import LowInventoryWidget from '../components/dashboard/widgets/LowInventoryWidg
 import PendingPOWidget from '../components/dashboard/widgets/PendingPOWidget';
 import AttendanceWidget from '../components/dashboard/widgets/AttendanceWidget';
 import TextWidget from '../components/dashboard/widgets/TextWidget';
+import DynamicListWidget from '../components/dashboard/widgets/DynamicListWidget';
 
 // Responsive Width Provider 생성
 const ResponsiveGridLayout = WidthProvider(Responsive);
@@ -32,7 +34,8 @@ const WIDGET_MAP = {
     'inventory': { component: LowInventoryWidget, title: '재고 부족 알림', defaultSize: { w: 4, h: 10 } },
     'purchase': { component: PendingPOWidget, title: '발주/입고 대기 현황', defaultSize: { w: 4, h: 10 } },
     'attendance': { component: AttendanceWidget, title: '오늘의 근태 현황', defaultSize: { w: 4, h: 8 } },
-    'text': { component: TextWidget, title: '텍스트 메모', defaultSize: { w: 4, h: 4 } }
+    'text': { component: TextWidget, title: '텍스트 메모', defaultSize: { w: 4, h: 4 } },
+    'dynamic-list': { component: DynamicListWidget, title: '사용자 정의 리스트', defaultSize: { w: 4, h: 8 } }
 };
 
 const DEFAULT_LAYOUT = [
@@ -130,7 +133,11 @@ export default function DashboardPage() {
                 fontFamily: 'sans-serif',
                 fontWeight: 'normal',
                 textAlign: 'left'
-            } : {}
+            } : (type === 'dynamic-list' ? {
+                title: '사용자 정의 리스트',
+                collectionName: 'parts',
+                filters: []
+            } : {})
         };
         setLayout([...layout, newWidget]);
         setSelectedWidgetId(newId);
@@ -233,7 +240,7 @@ export default function DashboardPage() {
                                 return (
                                     <div key={item.i}>
                                         <WidgetContainer
-                                            title={widgetInfo.title}
+                                            title={item.customSettings?.title || widgetInfo.title}
                                             isEditMode={isEditMode}
                                             onRemove={() => setLayout(layout.filter(l => l.i !== item.i))}
                                             viewType={item.viewType}
@@ -347,6 +354,114 @@ export default function DashboardPage() {
                                     </div>
                                     </div>
                                     </div>
+
+                            {selectedWidget.type === 'dynamic-list' && (
+                                <div className="space-y-6 pt-6 border-t border-slate-100 dark:border-slate-800">
+                                    <div className="space-y-4">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5"><Database size={12}/> 데이터 구성</label>
+                                        
+                                        <div className="space-y-3">
+                                            <span className="text-[11px] font-bold text-slate-600">위젯 제목</span>
+                                            <input 
+                                                placeholder="예: 긴급 부품 리스트"
+                                                value={selectedWidget.customSettings.title || ''}
+                                                onChange={(e) => updateWidgetData(selectedWidget.i, { 
+                                                    customSettings: { ...selectedWidget.customSettings, title: e.target.value } 
+                                                })} 
+                                                className="w-full bg-slate-50 dark:bg-slate-800 text-[11px] font-bold px-3 py-2 rounded-xl outline-none border border-slate-100 dark:border-slate-700"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <span className="text-[11px] font-bold text-slate-600">데이터 소스</span>
+                                            <select 
+                                                value={selectedWidget.customSettings.collectionName || 'parts'} 
+                                                onChange={(e) => updateWidgetData(selectedWidget.i, { 
+                                                    customSettings: { ...selectedWidget.customSettings, collectionName: e.target.value } 
+                                                })} 
+                                                className="w-full bg-slate-50 dark:bg-slate-800 text-[11px] font-bold px-3 py-2 rounded-xl outline-none border border-slate-100 dark:border-slate-700"
+                                            >
+                                                <option value="parts">부품 (Parts)</option>
+                                                <option value="boms">BOM</option>
+                                                <option value="ecns">ECN</option>
+                                                <option value="purchaseOrders">발주 (Purchase Orders)</option>
+                                                <option value="productionRequests">생산의뢰</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[11px] font-bold text-slate-600">필터 조건</span>
+                                                <button 
+                                                    onClick={() => {
+                                                        const currentFilters = selectedWidget.customSettings.filters || [];
+                                                        updateWidgetData(selectedWidget.i, {
+                                                            customSettings: {
+                                                                ...selectedWidget.customSettings,
+                                                                filters: [...currentFilters, { field: '', operator: '==', value: '' }]
+                                                            }
+                                                        });
+                                                    }}
+                                                    className="p-1 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                                >
+                                                    <Plus size={14} />
+                                                </button>
+                                            </div>
+                                            
+                                            <div className="space-y-2">
+                                                {(selectedWidget.customSettings.filters || []).map((filter, idx) => (
+                                                    <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-100 dark:border-slate-800 space-y-2">
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-[9px] font-black text-slate-400 uppercase">필터 #{idx + 1}</span>
+                                                            <button 
+                                                                onClick={() => {
+                                                                    const newFilters = [...selectedWidget.customSettings.filters];
+                                                                    newFilters.splice(idx, 1);
+                                                                    updateWidgetData(selectedWidget.i, {
+                                                                        customSettings: { ...selectedWidget.customSettings, filters: newFilters }
+                                                                    });
+                                                                }}
+                                                                className="text-rose-400 hover:text-rose-600"
+                                                            >
+                                                                <Trash2 size={12} />
+                                                            </button>
+                                                        </div>
+                                                        <input 
+                                                            placeholder="필드명 (예: Lifecycle)"
+                                                            value={filter.field}
+                                                            onChange={(e) => {
+                                                                const newFilters = [...selectedWidget.customSettings.filters];
+                                                                newFilters[idx].field = e.target.value;
+                                                                updateWidgetData(selectedWidget.i, {
+                                                                    customSettings: { ...selectedWidget.customSettings, filters: newFilters }
+                                                                });
+                                                            }}
+                                                            className="w-full bg-white dark:bg-slate-900 text-[10px] px-2 py-1.5 rounded-lg border border-slate-100 dark:border-slate-700 outline-none"
+                                                        />
+                                                        <input 
+                                                            placeholder="값 (예: Obsolete)"
+                                                            value={filter.value}
+                                                            onChange={(e) => {
+                                                                const newFilters = [...selectedWidget.customSettings.filters];
+                                                                newFilters[idx].value = e.target.value;
+                                                                updateWidgetData(selectedWidget.i, {
+                                                                    customSettings: { ...selectedWidget.customSettings, filters: newFilters }
+                                                                });
+                                                            }}
+                                                            className="w-full bg-white dark:bg-slate-900 text-[10px] px-2 py-1.5 rounded-lg border border-slate-100 dark:border-slate-700 outline-none"
+                                                        />
+                                                    </div>
+                                                ))}
+                                                {(selectedWidget.customSettings.filters || []).length === 0 && (
+                                                    <div className="text-center py-4 border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-xl">
+                                                        <span className="text-[10px] font-bold text-slate-300">설정된 필터가 없습니다</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {selectedWidget.type === 'text' && (
                                 <div className="space-y-6 pt-6 border-t border-slate-100 dark:border-slate-800">

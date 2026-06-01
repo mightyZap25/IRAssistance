@@ -208,32 +208,14 @@ export default function PartsPage() {
                                     <div className="flex gap-1.5">
                                         <span className="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[9px] font-black uppercase tracking-wider">{part.Category?.split(' ')[0] || '기구'}</span>
                                         {part.Lifecycle === 'Draft' ? (
-                                            <span className="px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/20 text-amber-700 dark:text-amber-500 text-[9px] font-black uppercase tracking-wider">임시/대기</span>
-                                        ) : part.Lifecycle === 'ECN' ? (
-                                            <span className="px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/20 text-blue-700 dark:text-blue-500 text-[9px] font-black uppercase tracking-wider">설계변경</span>
+                                            <span className="px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-orange-100 animate-pulse">대기/개발중</span>
+                                        ) : (part.Lifecycle === 'ECN' || part.Lifecycle === 'ECN Pending') ? (
+                                            <span className="px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-blue-100 animate-pulse">설계변경/수정중</span>
                                         ) : part.Lifecycle === 'Obsolete' ? (
-                                            <span className="px-2.5 py-0.5 rounded-full bg-red-100 dark:bg-red-950/20 text-red-700 dark:text-red-500 text-[9px] font-black uppercase tracking-wider">단종</span>
+                                            <span className="px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-rose-500 to-red-600 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-rose-100">폐기/단종</span>
                                         ) : (
-                                            <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-500 text-[9px] font-black uppercase tracking-wider">양산</span>
+                                            <span className="px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-emerald-100">승인완료/양산</span>
                                         )}
-                                    </div>
-                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                                        <RoleGuard requiredRole={USER_ROLES.ENGINEER}>
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); openEditModal(part); }}
-                                                className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 rounded-xl transition-all"
-                                            >
-                                                <PenTool size={14} />
-                                            </button>
-                                        </RoleGuard>
-                                        <RoleGuard requiredRole={USER_ROLES.MANAGER}>
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); handleDelete(part.id); }}
-                                                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-slate-800 rounded-xl transition-all"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
-                                        </RoleGuard>
                                     </div>
                                 </div>
 
@@ -264,15 +246,19 @@ export default function PartsPage() {
                         cellRenderer={{
                             Category: (val) => <span className="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-black uppercase tracking-wider">{val?.split(' ')[0] || val}</span>,
                             Lifecycle: (val) => (
-                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${val === 'Draft' ? 'bg-orange-100 text-orange-700' : val === 'ECN' ? 'bg-blue-100 text-blue-700' : val === 'Obsolete' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                                    {val === 'Draft' ? '대기/임시' : val === 'ECN' ? '설계변경' : val === 'Obsolete' ? '단종' : '양산'}
-                                </span>
+                                val === 'Obsolete' ? (
+                                    <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-rose-500 to-red-600 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-rose-100">폐기/단종</span>
+                                ) : val === 'Draft' ? (
+                                    <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-orange-100 animate-pulse">대기/개발중</span>
+                                ) : val === 'Active' ? (
+                                    <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-emerald-100">승인완료/양산</span>
+                                ) : (
+                                    <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-blue-100 animate-pulse">설계변경/수정중</span>
+                                )
                             ),
                             UnitPrice: (val) => val ? `$${Number(val).toLocaleString()}` : '-',
                             Description: (val) => <div className="max-w-xs truncate" title={val}>{val || '-'}</div>
                         }}
-                        onEdit={hasEngineerRole ? openEditModal : null}
-                        onDelete={hasManagerRole ? (row) => handleDelete(row.id) : null}
                     />
                 )}
             </div> {/* End of Main Combined Area */}

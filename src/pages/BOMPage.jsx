@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
     Layers, Package, ChevronRight, ChevronDown, 
-    Search, Edit3, Download, Save, X, Plus, Trash2, ArrowLeft, Home, Ban, CheckCircle2 
+    Search, Edit3, Download, Save, X, Plus, Trash2, ArrowLeft, Home, Ban, CheckCircle2,
+    DollarSign, Clock, GitCompare
 } from 'lucide-react';
-import { collection, query, where, getDocs, orderBy, doc, getDoc, addDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, doc, getDoc, addDoc, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
-import { getBOMStructure } from '../services/bomService';
+import { getBOMStructure, getPreviousRevision, compareBOMs } from '../services/bomService';
 import BOMStructurePanel from '../components/BOMStructurePanel';
 import PartsDetailPanel from '../components/PartsDetailPanel';
 import BOMSaveModal from '../components/BOMSaveModal';
@@ -22,6 +23,7 @@ const BOMPage = () => {
     
     const [selectedMaster, setSelectedMaster] = useState(null);
     const [bomData, setBomData] = useState(null);
+    const [originalStructure, setOriginalStructure] = useState(null);
     const [loading, setLoading] = useState(false);
     
     // Navigation & Drill-down State
@@ -43,6 +45,10 @@ const BOMPage = () => {
     const [selectedPartIdForDetail, setSelectedPartIdForDetail] = useState(null);
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+
+    // Diff/Comparison State
+    const [diffData, setDiffData] = useState(null);
+    const [isComparing, setIsComparing] = useState(false);
 
     // Spec Management State
     const [specLabels, setSpecLabels] = useState([]);
@@ -111,6 +117,8 @@ const BOMPage = () => {
             setNavStack([{ PartID: selectedMaster.PartID, Name: selectedMaster.Name }]);
             setIsNewCreating(false);
             setIsEditMode(false);
+            setDiffData(null);
+            setIsComparing(false);
         } else if (!isCreatingNew) {
             setNavStack([]);
             setBomData(null);
@@ -171,15 +179,19 @@ const BOMPage = () => {
     useEffect(() => {
         if (navStack.length > 0 && !isCreatingNew) {
             const currentRoot = navStack[navStack.length - 1];
-            fetchBOM(currentRoot.PartID);
+            fetchBOM(currentRoot.PartID, navStack.length === 1);
         }
     }, [navStack, isCreatingNew]);
 
-    const fetchBOM = async (partId) => {
+    const fetchBOM = async (partId, isRoot = false) => {
         setLoading(true);
         try {
             const structure = await getBOMStructure(partId);
             setBomData(structure);
+            if (isRoot) {
+                // Store initial structure for later comparison
+                setOriginalStructure(JSON.parse(JSON.stringify(structure)));
+            }
             setExpandAllTrigger(prev => prev + 1);
         } catch (error) {
             console.error("Error fetching BOM structure:", error);
@@ -216,6 +228,31 @@ const BOMPage = () => {
 
     const handleBreadcrumbClick = (idx) => {
         setNavStack(prev => prev.slice(0, idx + 1));
+    };
+
+    // --- Revision Comparison ---
+    const handleComparePrevious = async () => {
+        if (!bomData) return;
+        setLoading(true);
+        try {
+            console.log("Comparing current BOM:", bomData.PartID);
+            const prevPart = await getPreviousRevision(bomData.PartID);
+            if (!prevPart) {
+                alert('이전 리비전 데이터가 없습니다.');
+                return;
+            }
+            console.log("Found previous revision:", prevPart.PartID);
+            const prevStructure = await getBOMStructure(prevPart.PartID);
+            const diffs = compareBOMs(prevStructure, bomData);
+            setDiffData(diffs);
+            setIsComparing(true);
+            setExpandAllTrigger(prev => prev + 1);
+        } catch (err) {
+            console.error("비교 실패 상세 에러:", err);
+            alert(`비교 중 오류가 발생했습니다: ${err.message || '알 수 없는 에러'}`);
+        } finally {
+            setLoading(false);
+        }
     };
 
     // --- Spec Editing Logic ---
@@ -306,7 +343,6 @@ const BOMPage = () => {
             try {
                 const structure = await getBOMStructure(childPartID);
                 if (structure && structure.Children) {
-                    // 재귀적으로 새로 추가된 노드임을 표시
                     const markAsNew = (nodes) => {
                         return nodes.map(node => ({
                             ...node,
@@ -338,7 +374,21 @@ const BOMPage = () => {
             return node;
         };
         setBomData(updateNode(bomData));
-        setExpandAllTrigger(prev => prev + 1); // 추가 후 하위 트리가 보이도록 전체 펼치기 트리거
+        setExpandAllTrigger(prev => prev + 1);
+    };
+
+    const handleReorder = (parentId, oldIdx, newIdx) => {
+        const updateNode = (node) => {
+            if (node.PartID === parentId) {
+                const newChildren = [...node.Children];
+                const [movedItem] = newChildren.splice(oldIdx, 1);
+                newChildren.splice(newIdx, 0, movedItem);
+                return { ...node, Children: newChildren, isModified: true };
+            }
+            if (node.Children) return { ...node, Children: node.Children.map(updateNode) };
+            return node;
+        };
+        setBomData(updateNode(bomData));
     };
 
     // --- New BOM Creation Logic ---
@@ -455,8 +505,9 @@ const BOMPage = () => {
                 date: new Date().toISOString()
             };
 
+            const batch = writeBatch(db);
+
             if (isCreatingNew) {
-                // 신규 생성
                 const finalPartId = bomData.PartID !== 'IRP-NEW' && bomData.PartID !== 'IRA-NEW' ? bomData.PartID : `NEW-${Date.now()}`;
                 
                 const newPartData = {
@@ -472,18 +523,62 @@ const BOMPage = () => {
                     createdAt: serverTimestamp()
                 };
 
-                await setDoc(doc(db, 'parts', finalPartId), newPartData);
-                console.log("신규 부품 생성됨:", finalPartId);
+                batch.set(doc(db, 'parts', finalPartId), newPartData);
             } else if (selectedMaster && selectedMaster.id) {
                 const partRef = doc(db, 'parts', selectedMaster.id);
-                await updateDoc(partRef, {
+                batch.update(partRef, {
                     Spec: specString,
                     Description: bomData.Description || '',
                     LastUpdatedBy: currentUserLog
                 });
+
+                // ECN Auto-drafting
+                if (ecnData && ecnData.updateType === 'ECN') {
+                    const diffs = compareBOMs(navStack[0].originalStructure || {}, bomData);
+                    const ecnRef = doc(collection(db, 'ecns'));
+                    const ecnDraft = {
+                        Title: `[BOM Update] ${bomData.Name}`,
+                        Type: 'BOM Change',
+                        PartID: bomData.PartID,
+                        PartName: bomData.Name,
+                        MasterPartID: bomData.MasterPartID || bomData.PartID.split('-')[0],
+                        Rev: bomData.Rev || '1.0',
+                        CurrentRevision: bomData.Rev || '1.0',
+                        Reason: ecnData.reason,
+                        Status: 'Pending',
+                        CurrentStep: 0,
+                        ApprovalHistory: [],
+                        RequestedBy: userProfile?.displayName || userProfile?.Name || 'Unknown',
+                        CreatedAt: serverTimestamp(),
+                        Changes: diffs.map(d => `${d.type.toUpperCase()}: ${d.partId} (${d.name}) ${d.details || ''}`),
+                        ProposedChanges: { Spec: specString, Description: bomData.Description },
+                        ProposedBOM: [] 
+                    };
+
+                    // Only include direct children for the proposed BOM update
+                    if (bomData.Children) {
+                        ecnDraft.ProposedBOM = bomData.Children
+                            .filter(c => !c.isDeleted)
+                            .map(c => ({
+                                ChildID: c.PartID,
+                                Quantity: c.Quantity,
+                                Location: c.Location || '',
+                                Note: c.Note || ''
+                            }));
+                    }
+                    
+                    batch.set(ecnRef, ecnDraft);
+                }
+            }
+
+            await batch.commit();
+            if (ecnData?.updateType === 'ECN') {
+                alert('BOM 변경 사항이 저장되었으며 ECN 초안이 자동으로 기안되었습니다.');
+            } else {
+                alert('BOM 변경 사항이 성공적으로 저장되었습니다.');
             }
         } catch (error) {
-            console.error("Error saving specs:", error);
+            console.error("Error saving BOM:", error);
             alert("저장 중 오류가 발생했습니다.");
         } finally {
             setLoading(false);
@@ -623,18 +718,6 @@ const BOMPage = () => {
                                             <div className="truncate font-medium w-full">{p.Name}</div>
                                             <div className="text-[10px] opacity-60 truncate w-full">{p.PartID}</div>
                                         </div>
-                                        {(p.Lifecycle || p.Status) && (
-                                            <span className={`px-2 py-0.5 rounded text-[8px] font-black border shrink-0 ${
-                                                (p.Lifecycle || p.Status) === 'Draft' ? 'bg-amber-100 text-amber-700 border-amber-200' :
-                                                (p.Lifecycle || p.Status) === 'ECN' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                                                ((p.Lifecycle || p.Status) === 'Obsolete' || (p.Lifecycle || p.Status) === 'Discontinued') ? 'bg-red-100 text-red-700 border-red-200' :
-                                                'bg-emerald-100 text-emerald-700 border-emerald-200'
-                                            }`}>
-                                                {(p.Lifecycle || p.Status) === 'Draft' ? '대기' :
-                                                 (p.Lifecycle || p.Status) === 'ECN' ? '설계변경' :
-                                                 ((p.Lifecycle || p.Status) === 'Obsolete' || (p.Lifecycle || p.Status) === 'Discontinued') ? '단종' : '양산'}
-                                            </span>
-                                        )}
                                     </button>
                                 ))}
                             </div>
@@ -676,18 +759,6 @@ const BOMPage = () => {
                                             <div className="truncate font-medium">{a.Name}</div>
                                             <div className="text-[10px] opacity-60">{a.PartID}</div>
                                         </div>
-                                        {(a.Lifecycle || a.Status) && (
-                                            <span className={`px-2 py-0.5 rounded text-[8px] font-black border shrink-0 ${
-                                                (a.Lifecycle || a.Status) === 'Draft' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                                                (a.Lifecycle || a.Status) === 'ECN' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                                                ((a.Lifecycle || a.Status) === 'Obsolete' || (a.Lifecycle || a.Status) === 'Discontinued') ? 'bg-red-50 text-red-600 border-red-100' :
-                                                'bg-emerald-50 text-emerald-600 border-emerald-100'
-                                            }`}>
-                                                {(a.Lifecycle || a.Status) === 'Draft' ? '대기' :
-                                                 (a.Lifecycle || a.Status) === 'ECN' ? '설계변경' :
-                                                 ((a.Lifecycle || a.Status) === 'Obsolete' || (a.Lifecycle || a.Status) === 'Discontinued') ? '단종' : '양산'}
-                                            </span>
-                                        )}
                                     </button>
                                 ))}
                             </div>
@@ -702,311 +773,91 @@ const BOMPage = () => {
                     <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center">
                         <div className="flex flex-col items-center gap-2">
                             <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                            <span className="text-sm font-bold text-slate-600">BOM 구조를 불러오는 중...</span>
+                            <span className="text-sm font-bold text-slate-600">처리 중...</span>
                         </div>
                     </div>
                 )}
 
                 {bomData ? (
                     <div className="p-4 max-w-[1600px] mx-auto h-full w-full flex flex-col gap-3 overflow-hidden">
-                        {/* Breadcrumbs */}
-                        <div className="flex flex-col gap-4 shrink-0">
-                            {navStack.length > 1 && (
-                                <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm overflow-x-auto no-print">
-                                    {navStack.map((item, idx) => (
-                                        <React.Fragment key={`${item.PartID}-${idx}`}>
-                                            {idx > 0 && <ChevronRight size={14} className="text-slate-300 shrink-0" />}
-                                            <button 
-                                                onClick={() => handleBreadcrumbClick(idx)}
-                                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-                                                    idx === navStack.length - 1 
-                                                    ? 'bg-blue-50 text-blue-700 border border-blue-100' 
-                                                    : 'text-slate-400 hover:text-slate-700 hover:bg-slate-50'
-                                                }`}
-                                            >
-                                                {idx === 0 && <Home size={14} className={idx === navStack.length - 1 ? 'text-blue-600' : 'text-slate-400'} />}
-                                                <span className={`font-mono ${idx === navStack.length - 1 ? 'text-blue-500' : 'text-slate-400'} text-[10px]`}>
-                                                    {item.PartID}
-                                                </span>
-                                                {item.Name}
-                                            </button>
-                                        </React.Fragment>
-                                    ))}
-                                </div>
-                            )}
-
-                            <div className="flex justify-between items-start">
-                                <div className="flex items-center gap-4 text-left">
-                                    {!isCreatingNew && navStack.length > 1 && (
-                                        <button 
-                                            onClick={handleBack}
-                                            className="p-2 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-blue-600 hover:border-blue-100 hover:bg-blue-50 transition-all shadow-sm"
-                                        >
-                                            <ArrowLeft size={20} />
-                                        </button>
-                                    )}
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            {bomData.Status && (
-                                                <span className={`px-2 py-0.5 rounded text-[10px] font-black border ${
-                                                    bomData.Status === 'Draft' ? 'bg-amber-100 text-amber-700 border-amber-200' :
-                                                    bomData.Status === 'ECN' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                                                    (bomData.Status === 'Obsolete' || bomData.Status === 'Discontinued') ? 'bg-red-100 text-red-700 border-red-200' :
-                                                    'bg-emerald-100 text-emerald-700 border-emerald-200'
-                                                }`}>
-                                                    {bomData.Status === 'Draft' ? '대기' : 
-                                                     bomData.Status === 'ECN' ? '설계변경' : 
-                                                     (bomData.Status === 'Obsolete' || bomData.Status === 'Discontinued') ? '단종' : '양산'}
-                                                </span>
-                                            )}
-                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                                bomData.Category?.includes('완제품') || bomData.PartID?.startsWith('IRP')
-                                                ? 'bg-blue-100 text-blue-700'
-                                                : 'bg-amber-100 text-amber-700'
-                                            }`}>
-                                                {bomData.Category?.includes('완제품') || bomData.PartID?.startsWith('IRP') ? 'Product' : 'Assembly'}
-                                            </span>
-                                            {isCreatingNew ? (
-                                                <input 
-                                                    type="text"
-                                                    placeholder="Part ID 입력 (예: IRP-001)"
-                                                    className="bg-blue-50 border border-blue-200 rounded px-2 py-0.5 text-blue-700 font-mono text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                                                    defaultValue={bomData.PartID}
-                                                />
-                                            ) : (
-                                                <span className="text-slate-400 font-mono text-sm">{bomData.PartID}</span>
-                                            )}
-                                        </div>
-                                        {isEditMode ? (
-                                            <input 
-                                                type="text"
-                                                className="text-xl font-black text-slate-800 italic bg-slate-100 border-none rounded-lg px-3 py-1 w-full outline-none focus:ring-2 focus:ring-blue-500"
-                                                defaultValue={bomData.Name}
-                                                placeholder="제품명을 입력하세요..."
-                                            />
-                                        ) : (
-                                            <h1 className="text-xl font-black text-slate-800 italic text-left flex items-center gap-3">
-                                                {bomData.Name}
-                                                {(bomData.Status || bomData.Lifecycle) && (
-                                                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-black border shrink-0 ${
-                                                        (bomData.Status || bomData.Lifecycle) === 'Draft' ? 'bg-amber-100 text-amber-700 border-amber-200' :
-                                                        (bomData.Status || bomData.Lifecycle) === 'ECN' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                                                        ((bomData.Status || bomData.Lifecycle) === 'Obsolete' || (bomData.Status || bomData.Lifecycle) === 'Discontinued') ? 'bg-red-100 text-red-700 border-red-200' :
-                                                        'bg-emerald-100 text-emerald-700 border-emerald-200'
-                                                    }`}>
-                                                        {(bomData.Status || bomData.Lifecycle) === 'Draft' ? '대기' : 
-                                                         (bomData.Status || bomData.Lifecycle) === 'ECN' ? '설계변경' : 
-                                                         ((bomData.Status || bomData.Lifecycle) === 'Obsolete' || (bomData.Status || bomData.Lifecycle) === 'Discontinued') ? '단종' : '양산'}
-                                                    </span>
-                                                )}
-                                            </h1>
-                                        )}
+                        {/* Breadcrumbs & Actions */}
+                        <div className="flex justify-between items-start shrink-0">
+                            <div className="flex items-center gap-4 text-left">
+                                {navStack.length > 1 && (
+                                    <button onClick={handleBack} className="p-2 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-blue-600 shadow-sm transition-all"><ArrowLeft size={20} /></button>
+                                )}
+                                <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="px-2 py-0.5 rounded text-[10px] font-black bg-blue-100 text-blue-700 border border-blue-200 uppercase tracking-tighter">Rev {bomData.Rev || '1.0'}</span>
+                                        <span className="text-slate-400 font-mono text-xs">{bomData.PartID}</span>
+                                        {isComparing && <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200 uppercase tracking-tighter ml-2">Diff Mode</span>}
                                     </div>
+                                    <h1 className="text-xl font-black text-slate-800 italic">{bomData.Name}</h1>
                                 </div>
-                                
-                                <div className="flex gap-2">
-                                    {!isEditMode ? (
-                                        <>
-                                            {(bomData.Status === 'Draft' || bomData.Status === 'ECN') && userProfile && hasPermission(userProfile.role, USER_ROLES.MANAGER) && (
-                                                <button onClick={handleConfirmMaster} className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-100 font-bold text-sm shadow-sm transition-colors">
-                                                    <CheckCircle2 size={16} /> 승인 처리
-                                                </button>
-                                            )}
-                                            <button onClick={() => setIsEditMode(true)} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-bold text-sm shadow-sm">
-                                                <Edit3 size={16} /> 수정
-                                            </button>
-                                            <button onClick={() => setIsExportModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-bold text-sm shadow-sm">
-                                                <Download size={16} /> 내보내기
-                                            </button>
-                                        </>
-                                    ) : (
-                                        <>
-                                            {!isCreatingNew && (
-                                                <button 
-                                                    onClick={handleDiscontinueMaster}
-                                                    className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 font-bold text-sm shadow-sm transition-colors"
-                                                    title="이 마스터 품목을 더 이상 사용하지 않음(단종) 처리합니다."
-                                                >
-                                                    <Ban size={16} /> 단종 처리
-                                                </button>
-                                            )}
-                                            <button 
-                                                onClick={isCreatingNew ? handleCancelCreate : () => setIsEditMode(false)} 
-                                                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-bold text-sm shadow-sm"
-                                            >
-                                                <X size={16} /> 취소
-                                            </button>
-                                            <button 
-                                                onClick={() => {
-                                                    if (isCreatingNew) {
-                                                        handleSaveBOM(null);
-                                                    } else {
-                                                        setIsSaveModalOpen(true);
-                                                    }
-                                                }} 
-                                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-sm shadow-md shadow-blue-100"
-                                            >
-                                                <Save size={16} /> {isCreatingNew ? '임시 저장 (Draft)' : '저장 (ECN)'}
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
+                            </div>
+                            
+                            <div className="flex gap-2">
+                                {!isEditMode ? (
+                                    <>
+                                        <button onClick={handleComparePrevious} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-bold text-sm shadow-sm transition-all">
+                                            <GitCompare size={16} /> 이전 리비전과 비교
+                                        </button>
+                                        <button onClick={() => setIsEditMode(true)} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-sm shadow-md shadow-indigo-100 transition-all">
+                                            <Edit3 size={16} /> 수정 시작
+                                        </button>
+                                        <button onClick={() => setIsExportModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-bold text-sm shadow-sm">
+                                            <Download size={16} /> 내보내기
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <button onClick={() => { setIsEditMode(false); setIsNewCreating(false); setDiffData(null); setIsComparing(false); }} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 font-bold text-sm shadow-sm">
+                                            <X size={16} /> 취소
+                                        </button>
+                                        <button onClick={() => setIsSaveModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-sm shadow-md">
+                                            <Save size={16} /> 변경 사항 저장
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         </div>
 
-                        {/* 2-Column Content */}
+                        {/* Main Grid */}
                         <div className="grid grid-cols-5 gap-4 flex-1 min-h-0 overflow-hidden">
-                            {/* Left Column: Information (Metadata) */}
-                            <div className="col-span-2 flex flex-col overflow-y-auto pr-2 custom-scrollbar h-full text-left min-w-0 pb-4">
-                                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-5 min-h-0 h-full shrink-0">
-                                    {/* Revision & Status Control */}
-                                    <div className="shrink-0 space-y-4">
-                                        <div>
-                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Revision Control</label>
-                                            <div className="flex items-center gap-3">
-                                                <span className="text-[10px] font-bold text-slate-500">Current:</span>
-                                                <select className="flex-1 bg-slate-50 border border-slate-100 rounded-lg p-2 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
-                                                    <option>Rev {bomData.Rev || '1.0'} {isCreatingNew ? '(Initial)' : '(Active)'}</option>
-                                                </select>
-                                            </div>
+                            <div className="col-span-2 bg-white rounded-2xl border border-slate-200 p-5 overflow-y-auto custom-scrollbar">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Master Info & Specs</label>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                            <label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">Class</label>
+                                            <span className="text-xs font-bold text-slate-700">{bomData.Class}</span>
                                         </div>
-                                        <div>
-                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Lifecycle Status</label>
-                                            <div className="flex items-center">
-                                                <span className={`px-3 py-1.5 rounded-xl text-xs font-black border w-full text-center ${
-                                                    (bomData.Status || bomData.Lifecycle) === 'Draft' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                                                    (bomData.Status || bomData.Lifecycle) === 'ECN' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                                    ((bomData.Status || bomData.Lifecycle) === 'Obsolete' || (bomData.Status || bomData.Lifecycle) === 'Discontinued') ? 'bg-red-50 text-red-700 border-red-200' :
-                                                    'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                                }`}>
-                                                    {(bomData.Status || bomData.Lifecycle) === 'Draft' ? '대기' : 
-                                                     (bomData.Status || bomData.Lifecycle) === 'ECN' ? '설계변경' : 
-                                                     ((bomData.Status || bomData.Lifecycle) === 'Obsolete' || (bomData.Status || bomData.Lifecycle) === 'Discontinued') ? '단종' : '양산'}
-                                                </span>
-                                            </div>
+                                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                            <label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">Category</label>
+                                            <span className="text-xs font-bold text-slate-700">{bomData.Category}</span>
                                         </div>
                                     </div>
-
-                                    <div className="h-px bg-slate-100 w-full shrink-0"></div>
-
-                                    {/* Structured Product Specification or Where-Used */}
-                                    { (selectedMaster?.PartID?.startsWith('IRA') || (selectedMaster?.Class || '').toLowerCase().includes('assembly')) ? (
-                                        <div className="flex flex-col flex-1 min-h-0 text-left">
-                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Where Used (사용처)</label>
-                                            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-                                                {whereUsedList.length > 0 ? (
-                                                    <div className="pb-4">
-                                                        {whereUsedList.map((node, idx) => (
-                                                            <WhereUsedTreeNode key={`${node.ParentID}-${idx}`} node={node} idx={idx} />
-                                                        ))}
-                                                    </div>
-                                                ) : (
-                                                    <div className="text-xs text-slate-500 italic bg-slate-50 p-4 rounded-xl text-center mt-2">
-                                                        이 서브 어셈블리를 사용하는<br/>상위 BOM이 없습니다.
-                                                    </div>
-                                                )}
-                                            </div>
+                                    
+                                    <div className="h-px bg-slate-100"></div>
+                                    
+                                    <div>
+                                        <div className="flex justify-between items-center mb-2">
+                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Specifications</label>
+                                            {isEditMode && <button onClick={addSpecRow} className="p-1 text-blue-600 hover:bg-blue-50 rounded"><Plus size={14} /></button>}
                                         </div>
-                                    ) : (
-                                        <div className="flex flex-col flex-1 min-h-0 text-left">
-                                        <div className="flex justify-between items-center mb-4">
-                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Product Specification</label>
-                                        {isEditMode && (
-                                            <button onClick={addSpecRow} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors">
-                                                <Plus size={14} />
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="flex-1 overflow-y-auto overflow-x-hidden space-y-3 custom-scrollbar pr-1">
-                                        {isEditMode ? (
-                                            <>
-                                            <datalist id="spec-labels-list">
-                                                {specLabels.map(l => <option key={l} value={l} />)}
-                                            </datalist>
+                                        <div className="space-y-2">
                                             {editingSpecs.map((spec, idx) => (
-                                                <div key={idx} className="flex gap-2 items-center group w-full">
-                                                    <div className="w-28 shrink-0">
-                                                        <input 
-                                                            type="text"
-                                                            list="spec-labels-list"
-                                                            value={spec.label}
-                                                            onChange={(e) => updateSpecRow(idx, 'label', e.target.value)}
-                                                            placeholder="레이블명"
-                                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
-                                                        />
-                                                    </div>
-                                                    <input 
-                                                        type="text"
-                                                        value={spec.value} 
-                                                        onChange={(e) => updateSpecRow(idx, 'value', e.target.value)}
-                                                        className="flex-1 w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
-                                                        placeholder="데이터 입력..."
-                                                    />
-                                                    <button onClick={() => removeSpecRow(idx)} className="shrink-0 p-1.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <X size={14}/>
-                                                    </button>
+                                                <div key={idx} className="flex gap-2">
+                                                    <input type="text" value={spec.label} onChange={(e) => updateSpecRow(idx, 'label', e.target.value)} disabled={!isEditMode} className="w-24 bg-slate-50 border border-slate-100 rounded px-2 py-1.5 text-[10px] font-bold outline-none" placeholder="Label" />
+                                                    <input type="text" value={spec.value} onChange={(e) => updateSpecRow(idx, 'value', e.target.value)} disabled={!isEditMode} className="flex-1 bg-slate-50 border border-slate-100 rounded px-2 py-1.5 text-xs font-bold outline-none" placeholder="Value" />
                                                 </div>
                                             ))}
-                                            </>
-                                        ) : (
-                                            <div className="space-y-2">
-                                                {editingSpecs.filter(s => s.label || s.value).length > 0 ? (
-                                                    editingSpecs.filter(s => s.label || s.value).map((s, i) => (
-                                                        <div key={i} className="flex border-b border-slate-50 pb-1.5 items-center w-full">
-                                                            <span className="w-16 shrink-0 text-[9px] font-black text-slate-400 uppercase truncate mt-0.5">{s.label}</span>
-                                                            <span className="flex-1 min-w-0 text-[11px] font-bold text-slate-700 whitespace-pre-wrap break-words">{s.value}</span>
-                                                        </div>
-                                                    ))
-                                                ) : <div className="text-[11px] text-slate-400 italic">사양 정보가 없습니다.</div>}
-                                            </div>
-                                        )}
-                                    </div>
-                                    </div>
-                                    )}
-
-                                    <div className="h-px bg-slate-100 w-full shrink-0"></div>
-
-                                    <div className="flex flex-col shrink-0 h-[80px] text-left">
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Remark & Notes</label>
-                                    {isEditMode ? (
-                                        <textarea 
-                                            className="w-full flex-1 bg-slate-50 border-none rounded-xl p-2 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 min-h-0 resize-none custom-scrollbar"
-                                            value={bomData.Description || ''}
-                                            onChange={(e) => setBomData({ ...bomData, Description: e.target.value })}
-                                            placeholder="참고 사항..."
-                                        />
-                                    ) : (
-                                        <div className="text-xs text-slate-500 italic bg-slate-50 p-2 rounded-xl flex-1 overflow-y-auto custom-scrollbar">
-                                            {bomData.Description || '비고 사항이 없습니다.'}
                                         </div>
-                                    )}
                                     </div>
-
-                                    {/* Audit Trail (생성자/승인자 기록) */}
-                                    {(bomData.CreatedBy || bomData.ConfirmedBy) && (
-                                        <>
-                                            <div className="h-px bg-slate-100 w-full shrink-0 my-1"></div>
-                                            <div className="shrink-0 flex flex-col gap-1.5 text-[10px] text-slate-500 font-medium pb-1">
-                                                {bomData.CreatedBy && (
-                                                    <div className="flex justify-between items-center bg-slate-50 px-2.5 py-1.5 rounded border border-slate-100">
-                                                        <span>생성: <b>{bomData.CreatedBy.name}</b> ({bomData.CreatedBy.email})</span>
-                                                        <span>{new Date(bomData.CreatedBy.date).toLocaleDateString()}</span>
-                                                    </div>
-                                                )}
-                                                {bomData.ConfirmedBy && (
-                                                    <div className="flex justify-between items-center bg-emerald-50 px-2.5 py-1.5 rounded border border-emerald-100 text-emerald-600">
-                                                        <span>승인: <b>{bomData.ConfirmedBy.name}</b> ({bomData.ConfirmedBy.email})</span>
-                                                        <span>{new Date(bomData.ConfirmedBy.date).toLocaleDateString()}</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </>
-                                    )}
                                 </div>
                             </div>
 
-                            {/* Right Column: BOM Assembly Structure */}
-                            <div className="col-span-3 h-full flex flex-col min-h-0 overflow-hidden min-w-0">
+                            <div className="col-span-3 min-h-0">
                                 <BOMStructurePanel 
                                     bomData={bomData}
                                     isEditMode={isEditMode}
@@ -1021,36 +872,37 @@ const BOMPage = () => {
                                     onNoteChange={handleNoteChange}
                                     onDelete={handleDeleteNode}
                                     onAddChild={handleAddChild}
+                                    onReorder={handleReorder}
                                     showObsolete={showObsolete}
+                                    diffData={diffData}
                                 />
                             </div>
                         </div>
                     </div>
                 ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-4">
-                        <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center">
-                            <Layers size={40} />
-                        </div>
-                        <div className="text-center">
-                            <div className="font-bold text-lg text-slate-600 text-left">BOM을 선택하거나 새로 생성해주세요</div>
-                            <p className="text-sm">좌측 목록에서 선택하거나 [+] 버튼을 눌러 신규 설계를 시작하세요.</p>
-                        </div>
+                    <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
+                        <Layers size={48} className="mb-4 opacity-20" />
+                        <p className="font-bold text-sm">BOM을 선택하여 시작하세요</p>
                     </div>
                 )}
             </div>
 
+            <BOMSaveModal 
+                isOpen={isSaveModalOpen} 
+                onClose={() => setIsSaveModalOpen(false)} 
+                onSave={handleSaveBOM} 
+                changes={bomData ? compareBOMs(originalStructure || {}, bomData).map(d => `${d.type.toUpperCase()}: ${d.partId} (${d.name})`) : []} 
+            />
+            <BOMExportModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} rootPart={selectedMaster} bomData={bomData} />
+            
             {selectedPartIdForDetail && (
                 <PartsDetailPanel 
                     partId={selectedPartIdForDetail}
                     parts={allParts}
                     allBoms={allBoms}
                     onClose={() => setSelectedPartIdForDetail(null)}
-                    onPartSelect={(id) => setSelectedPartIdForDetail(id)}
                 />
             )}
-
-            <BOMSaveModal isOpen={isSaveModalOpen} onClose={() => setIsSaveModalOpen(false)} onSave={handleSaveBOM} changes={[]} />
-            <BOMExportModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} rootPart={selectedMaster} bomData={bomData} />
         </div>
     );
 };

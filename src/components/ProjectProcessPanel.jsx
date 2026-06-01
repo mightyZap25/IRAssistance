@@ -6,6 +6,7 @@ import {
     Trash2, Plus, Save, Briefcase, User, Layers, Layout, AlertCircle
 } from 'lucide-react';
 import { getIssuesByProject } from '../services/issueService';
+import MondayBoard from './common/MondayBoard';
 
 const STAGE_DOCUMENTS = {
     planning: ['제품 기획서', '시장 분석서', '개발 일정표'],
@@ -307,37 +308,47 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                             </div>
 
                             <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
-                                <h3 className="text-xs font-black text-slate-800 border-b pb-2 flex justify-between items-center"><span className="flex items-center gap-1.5"><CheckCircle2 size={14} className="text-emerald-500"/> TASK</span><span className="text-[9px] font-black text-slate-400">{project.tests?.[activeStageId]?.filter(t => t.completed).length || 0}/{project.tests?.[activeStageId]?.length || 0} 완료</span></h3>
-                                <div className="space-y-2">
+                                <h3 className="text-xs font-black text-slate-800 border-b pb-2 flex justify-between items-center">
+                                    <span className="flex items-center gap-1.5"><CheckCircle2 size={14} className="text-emerald-500"/> PROJECT TASK</span>
+                                    <span className="text-[9px] font-black text-slate-400">{project.tests?.[activeStageId]?.filter(t => t.completed).length || 0}/{project.tests?.[activeStageId]?.length || 0} 완료</span>
+                                </h3>
+                                <div className="space-y-4">
                                     <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 space-y-2">
-                                        <div className="flex items-center justify-between"><label className="text-[8px] font-black text-slate-400 uppercase">분류 선택/등록</label><button type="button" onClick={() => { setIsAddingNewParent(!isAddingNewParent); setNewTest({ ...newTest, parent: '' }); }} className="text-[8px] font-black text-indigo-600">{isAddingNewParent ? '목록보기' : '+ 새 분류'}</button></div>
-                                        {isAddingNewParent ? <input type="text" placeholder="새 분류 (예: 기능검증)" value={newTest.parent} onChange={(e) => setNewTest({...newTest, parent: e.target.value})} className="w-full bg-white border border-indigo-100 rounded-lg px-3 py-1.5 text-[10px] font-black" /> : <select value={newTest.parent} onChange={(e) => setNewTest({...newTest, parent: e.target.value})} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[10px] font-bold"><option value="">분류 선택</option>{[...new Set((project.tests?.[activeStageId] || []).map(t => t.parent))].sort().map(p => <option key={p} value={p}>{p}</option>)}</select>}
-                                        <div className="flex gap-2"><input type="text" placeholder="TASK 명칭" value={newTest.child} onChange={(e) => setNewTest({...newTest, child: e.target.value})} onKeyPress={(e) => e.key === 'Enter' && handleAddTest(activeStageId)} className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[10px]" /><button type="button" onClick={() => handleAddTest(activeStageId)} disabled={!newTest.parent || !newTest.child} className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-[10px] font-black">추가</button></div>
+                                        <div className="flex items-center justify-between"><label className="text-[8px] font-black text-slate-400 uppercase">신규 분류 등록</label></div>
+                                        <div className="flex gap-2">
+                                            <input type="text" placeholder="새 분류 명칭 (예: 기능검증)" value={newTest.parent} onChange={(e) => setNewTest({...newTest, parent: e.target.value})} className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[10px] font-black" />
+                                            <button type="button" onClick={() => { if(newTest.parent) handleAddTest(activeStageId); }} className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-[10px] font-black">분류 생성</button>
+                                        </div>
                                     </div>
-                                    <div className="space-y-3 pt-1">
-                                        {(() => {
-                                            const grouped = {};
-                                            project.tests?.[activeStageId]?.forEach(t => { if (!grouped[t.parent]) grouped[t.parent] = []; grouped[t.parent].push(t); });
-                                            return Object.keys(grouped).sort().map(parent => (
-                                                <div key={parent} className="space-y-1">
-                                                    <div className="flex items-center gap-1.5 px-1"><div className="w-1 h-1 rounded bg-indigo-500" /><span className="text-[9px] font-black text-slate-800">{parent}</span></div>
-                                                    <div className="ml-2 pl-2 border-l-2 border-slate-100 space-y-0.5">
-                                                        {grouped[parent].map(test => (
-                                                            <div key={test.id} className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-50 group">
-                                                                <button onClick={() => toggleTest(activeStageId, test.id)} className={test.completed ? 'text-emerald-500 animate-in zoom-in-50' : 'text-slate-300'}>{test.completed ? <CheckCircle2 size={16} /> : <Circle size={16} />}</button>
-                                                                <span className={`text-[10px] font-bold flex-1 cursor-pointer hover:text-indigo-600 ${test.completed ? 'line-through text-slate-300' : 'text-slate-700'}`} onClick={() => setEditingTest(test)}>
-                                                                    {test.child}
-                                                                    {test.assigneeName && <span className="ml-2 text-[8px] font-black px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">{test.assigneeName}</span>}
-                                                                </span>
-                                                                <button onClick={() => setEditingTest(test)} className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-indigo-600" title="상세 정보"><MessageSquare size={12} /></button>
-                                                                <button onClick={() => removeTest(activeStageId, test.id)} className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-rose-500"><X size={12} /></button>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            ));
-                                        })()}
-                                    </div>
+
+                                    <MondayBoard
+                                        tasks={project.tests?.[activeStageId] || []}
+                                        onSelect={setEditingTest}
+                                        onUpdateTask={(id, fields) => handleUpdateTestDetail(activeStageId, id, fields)}
+                                        onDeleteTask={(id) => removeTest(activeStageId, id)}
+                                        groupingField="parent"
+                                        onAddTask={(parentName) => {
+                                            const taskName = prompt(`[${parentName}] 그룹에 추가할 태스크 명칭을 입력하세요:`);
+                                            if (taskName) {
+                                                const updatedTests = { ...(project.tests || {}) };
+                                                if (!updatedTests[activeStageId]) updatedTests[activeStageId] = [];
+                                                updatedTests[activeStageId].push({ 
+                                                    id: Date.now(), 
+                                                    parent: parentName, 
+                                                    child: taskName, 
+                                                    completed: false, 
+                                                    updatedAt: new Date().toISOString(),
+                                                    startDate: project.schedules?.[activeStageId]?.start || '',
+                                                    endDate: project.schedules?.[activeStageId]?.end || '',
+                                                    assigneeUid: '',
+                                                    assigneeName: '',
+                                                    priority: 'Medium',
+                                                    notes: ''
+                                                });
+                                                onUpdate(project.id, { tests: updatedTests });
+                                            }
+                                        }}
+                                    />
                                 </div>
                             </div>
 
@@ -462,6 +473,61 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                                                 <option value="Low">쉬움 (하)</option>
                                             </select>
                                         </div>
+                                    </div>
+                                </div>
+
+                                {/* Documents & Links */}
+                                <div className="space-y-3">
+                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 border-b pb-1.5">
+                                        <ExternalLink size={12}/> 참조 문서 및 링크
+                                    </h4>
+                                    <div className="space-y-1.5">
+                                        {(editingTest.links || []).map((link, lIdx) => (
+                                            <div key={lIdx} className="flex items-center justify-between bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl group/link">
+                                                <div className="flex flex-col min-w-0">
+                                                    <span className="text-[10px] font-black text-slate-700 truncate">{link.title}</span>
+                                                    <a href={link.url} target="_blank" rel="noreferrer" className="text-[8px] text-blue-500 hover:underline truncate">{link.url}</a>
+                                                </div>
+                                                <button 
+                                                    onClick={() => {
+                                                        const nextLinks = editingTest.links.filter((_, i) => i !== lIdx);
+                                                        handleUpdateTestDetail(activeStageId, editingTest.id, { links: nextLinks });
+                                                    }}
+                                                    className="p-1 text-slate-300 hover:text-rose-500 opacity-0 group-hover/link:opacity-100 transition-all"
+                                                >
+                                                    <X size={10} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="text" 
+                                            placeholder="문서명" 
+                                            id="new-link-title"
+                                            className="w-1/3 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none" 
+                                        />
+                                        <input 
+                                            type="text" 
+                                            placeholder="URL (구글드라이브 등)" 
+                                            id="new-link-url"
+                                            className="flex-1 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none" 
+                                        />
+                                        <button 
+                                            onClick={() => {
+                                                const title = document.getElementById('new-link-title').value;
+                                                const url = document.getElementById('new-link-url').value;
+                                                if (title && url) {
+                                                    const nextLinks = [...(editingTest.links || []), { title, url }];
+                                                    handleUpdateTestDetail(activeStageId, editingTest.id, { links: nextLinks });
+                                                    document.getElementById('new-link-title').value = '';
+                                                    document.getElementById('new-link-url').value = '';
+                                                }
+                                            }}
+                                            className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black"
+                                        >
+                                            추가
+                                        </button>
                                     </div>
                                 </div>
 

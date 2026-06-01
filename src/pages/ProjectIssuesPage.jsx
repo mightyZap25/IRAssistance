@@ -9,7 +9,7 @@ import {
     X, ArrowRight, CornerDownRight, ClipboardList, Calendar, Bookmark, BarChart2,
     LayoutGrid, List, Kanban
 } from 'lucide-react';
-import IssueListView   from '../components/IssueListView';
+import MondayBoard from '../components/common/MondayBoard';
 import IssueCardView   from '../components/IssueCardView';
 import IssueKanbanView from '../components/IssueKanbanView';
 
@@ -511,12 +511,11 @@ export default function ProjectIssuesPage() {
                             <p className="text-xs font-medium text-slate-400 mt-1">새로운 이슈를 등록하거나 필터를 확인해 보세요.</p>
                         </div>
                     ) : viewMode === 'list' ? (
-                        <IssueListView
-                            issues={filteredIssues}
-                            allCategories={allCategories}
-                            STATUS_MAP={STATUS_MAP}
-                            PRIORITY_MAP={PRIORITY_MAP}
+                        <MondayBoard
+                            tasks={filteredIssues}
                             onSelect={setSelectedIssue}
+                            onUpdateTask={handleUpdateIssue}
+                            onAddTask={() => setIsCreateOpen(true)}
                         />
                     ) : viewMode === 'kanban' ? (
                         <IssueKanbanView

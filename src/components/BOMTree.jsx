@@ -1,5 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronRight, ChevronDown, Layers, Box, Cpu, Settings, Circle, Trash2, Plus, X, RotateCcw, Ban } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+    ChevronRight, ChevronDown, Layers, Box, Cpu, Settings, Circle, Trash2, Plus, X, 
+    RotateCcw, Ban, Clock, DollarSign, Image as ImageIcon, GripVertical, FileSpreadsheet
+} from 'lucide-react';
+import { 
+    DndContext, 
+    closestCenter, 
+    KeyboardSensor, 
+    PointerSensor, 
+    useSensor, 
+    useSensors,
+    DragOverlay,
+    defaultDropAnimationSideEffects
+} from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+    useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import * as XLSX from 'xlsx';
 
 // Helper to determine icon/color based on category/partID
 function getCategoryStyle(part) {
@@ -28,10 +50,33 @@ function BOMTreeNode({
     expandAllTrigger, 
     collapseAllTrigger,
     inheritedReadOnly = false,
-    showObsolete = false
+    showObsolete = false,
+    parentPath = [],
+    diffData = null,
+    onReorder
 }) {
     const [expanded, setExpanded] = useState(true);
     const [isAdding, setIsAdding] = useState(false);
+    const [showTooltip, setShowTooltip] = useState(false);
+    const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+
+    const currentPath = [...parentPath, node.PartID];
+
+    // DnD Hooks
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging
+    } = useSortable({ id: node.PartID, disabled: !isEditing || level === 0 });
+
+    const dndStyle = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    };
 
     // Explicit Expand All - Triggered whenever expandAllTrigger changes
     useEffect(() => {
@@ -58,11 +103,32 @@ function BOMTreeNode({
     const style = getCategoryStyle(node);
     const isRoot = level === 0;
 
+    // Diff Styling
+    const diff = diffData?.find(d => d.partId === node.PartID);
+    let diffBg = '';
+    let diffBorder = 'border-slate-50';
+    
+    if (node.isCircular) {
+        diffBg = 'bg-red-100';
+        diffBorder = 'border-red-400';
+    } else if (diff) {
+        if (diff.type === 'added') {
+            diffBg = 'bg-emerald-50/50';
+            diffBorder = 'border-emerald-200';
+        } else if (diff.type === 'removed') {
+            diffBg = 'bg-rose-50/50';
+            diffBorder = 'border-rose-200';
+        } else if (diff.type === 'modified') {
+            diffBg = 'bg-amber-50/50';
+            diffBorder = 'border-amber-200';
+        }
+    }
+
     // Only allow editing children if this is not the root node and not in a readonly subtree
     const canEditThisNode = isEditing && level > 0 && !inheritedReadOnly;
-    const isDeleted = node.isDeleted;
+    const isDeleted = node.isDeleted || diff?.type === 'removed';
     const isDiscontinued = node.isDiscontinued;
-    const isNew = node.isNew;
+    const isNew = node.isNew || diff?.type === 'added';
 
     const categories = ['전체', '조립품 (A)', '기구부품 (M)', '전자부품 (E)', '구매품 (O)'];
 
@@ -90,7 +156,7 @@ function BOMTreeNode({
     const isElectronic = (node.Category || '').includes('전자') || (node.PartID || '').startsWith('IRE');
     const canAddChild = node.PartID?.startsWith('IRP') || node.PartID?.startsWith('IRA') || (node.Category || '').includes('조립품') || (node.Category || '').includes('완제품');
 
-    // 하위 조립품 여부 판단: 루트(레벨0)가 아닌데 조립품인 경우, 그 하위의 자식들은 모두 읽기 전용이어야 함
+    // 하위 조립품 여부 판단
     const isSubAssembly = level > 0 && canAddChild;
     const passReadOnlyToChildren = inheritedReadOnly || isSubAssembly;
 
@@ -99,12 +165,17 @@ function BOMTreeNode({
             alert('추가할 부품을 선택해주세요.');
             return;
         }
+
+        if (currentPath.includes(draftPartID)) {
+            alert(`[순환 참조 감지] ${draftPartID} 부품은 현재 상위 경로에 이미 존재합니다.`);
+            return;
+        }
+
         const selectedPart = allParts.find(p => p.PartID === draftPartID);
         const isSelectedElectronic = (selectedPart?.Category || '').includes('전자') || (draftPartID || '').startsWith('IRE');
 
         onAddChild(node.PartID, draftPartID, draftQty, isSelectedElectronic ? draftLocation : '', !isSelectedElectronic ? draftNote : '');
         
-        // Reset and close
         setIsAdding(false);
         setDraftPartID('');
         setDraftQty(1);
@@ -112,12 +183,109 @@ function BOMTreeNode({
         setDraftNote('');
     };
 
-    return (
-        <div className={`select-none ${isDeleted || isDiscontinued ? 'opacity-50' : ''}`}>
-            <div
-                className={`flex items-center py-1 px-1 hover:bg-slate-50 border-b border-slate-50 transition-colors ${isRoot ? 'bg-slate-50/50' : ''} ${isDeleted ? 'bg-red-50/30' : ''} ${isDiscontinued ? 'bg-amber-50/20' : ''}`}
-                style={{ paddingLeft: `0px` }}
+    const handleMouseEnter = (e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        setTooltipPos({ x: rect.right + 10, y: rect.top });
+        setShowTooltip(true);
+    };
+
+    const handleMouseLeave = () => {
+        setShowTooltip(false);
+    };
+
+    const handleExcelPaste = async (e) => {
+        e.preventDefault();
+        const text = e.clipboardData.getData('text');
+        if (!text) return;
+
+        // Simple Tab-separated value parsing (Excel copy format)
+        const rows = text.split('\n').filter(r => r.trim());
+        for (const row of rows) {
+            const cols = row.split('\t');
+            if (cols.length >= 2) {
+                const pId = cols[0].trim();
+                const qty = parseInt(cols[1].trim(), 10) || 1;
+                const locOrNote = cols[2] ? cols[2].trim() : '';
+                
+                const targetPart = allParts.find(p => p.PartID === pId || p.Name === pId);
+                if (targetPart) {
+                    const isElec = (targetPart.Category || '').includes('전자') || (targetPart.PartID || '').startsWith('IRE');
+                    onAddChild(node.PartID, targetPart.PartID, qty, isElec ? locOrNote : '', !isElec ? locOrNote : '');
+                }
+            }
+        }
+    };
+
+    const renderTooltip = () => {
+        if (!showTooltip) return null;
+        const fullPart = allParts.find(p => p.PartID === node.PartID) || node;
+        let specs = [];
+        try {
+            if (fullPart.Spec && typeof fullPart.Spec === 'string' && fullPart.Spec.startsWith('[')) {
+                specs = JSON.parse(fullPart.Spec);
+            }
+        } catch(e) {}
+
+        return (
+            <div 
+                className="fixed z-[100] w-64 bg-white/90 backdrop-blur-xl border border-white/40 rounded-2xl shadow-2xl p-4 flex flex-col gap-3 pointer-events-none animate-in fade-in zoom-in duration-200"
+                style={{ left: tooltipPos.x, top: tooltipPos.y }}
             >
+                {node.isCircular && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl mb-1">
+                        <div className="flex items-center gap-2 mb-1">
+                            <Ban size={14} className="text-red-600" />
+                            <span className="text-xs font-black text-red-600 uppercase">순환 참조 오류</span>
+                        </div>
+                        <p className="text-[11px] font-bold text-red-600 leading-snug">
+                            자기 자신 또는 상위 조립품을 하위 부품으로 포함하고 있습니다. 이 항목을 삭제해야 구조가 정상화됩니다.
+                        </p>
+                    </div>
+                )}
+                {fullPart.Thumbnail ? (
+                    <div className="w-full aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
+                        <img src={fullPart.Thumbnail} alt={fullPart.Name} className="w-full h-full object-cover" />
+                    </div>
+                ) : (
+                    <div className="w-full aspect-square rounded-xl bg-slate-50 border border-slate-100 flex flex-col items-center justify-center text-slate-300 gap-2">
+                        <ImageIcon size={32} />
+                        <span className="text-[10px] font-bold">No Image</span>
+                    </div>
+                )}
+                <div className="flex flex-col gap-1">
+                    <div className="text-[10px] font-black text-blue-500 font-mono tracking-tighter uppercase">{fullPart.PartID}</div>
+                    <div className="text-sm font-black text-slate-800 leading-tight">{fullPart.Name}</div>
+                </div>
+                {specs.length > 0 && (
+                    <div className="flex flex-col gap-1.5 pt-2 border-t border-slate-100">
+                        {specs.slice(0, 5).map((s, i) => (
+                            <div key={i} className="flex justify-between items-center gap-2">
+                                <span className="text-[9px] font-black text-slate-400 uppercase truncate w-16">{s.label}</span>
+                                <span className="text-[10px] font-bold text-slate-600 truncate flex-1 text-right">{s.value}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    return (
+        <div 
+            ref={setNodeRef} 
+            style={dndStyle} 
+            className={`select-none ${isDeleted || isDiscontinued ? 'opacity-50' : ''}`}
+        >
+            <div
+                className={`flex items-center py-1 px-1 hover:bg-slate-50 border-b ${diffBorder} transition-colors ${isRoot ? 'bg-slate-50/50' : ''} ${diffBg} ${isDeleted ? 'bg-red-50/30' : ''}`}
+            >
+                {/* Drag Handle */}
+                {isEditing && level > 0 && (
+                    <div {...attributes} {...listeners} className="w-4 flex items-center justify-center cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 mr-1">
+                        <GripVertical size={14} />
+                    </div>
+                )}
+
                 {/* Toggle */}
                 {!isRoot && (
                     <div className="w-4 flex items-center justify-center shrink-0">
@@ -143,110 +311,75 @@ function BOMTreeNode({
                 <div
                     className={`flex-1 flex flex-col justify-center overflow-hidden ${!isEditing ? 'cursor-pointer hover:opacity-80' : ''} text-left`}
                     onClick={() => !isEditing && onNodeClick && onNodeClick(node)}
+                    onMouseEnter={handleMouseEnter}
+                    onMouseLeave={handleMouseLeave}
                 >
-                    <div className="flex items-baseline gap-2 overflow-hidden justify-start">
-                        <span className={`text-xs font-bold truncate ${isDeleted ? 'text-slate-400 line-through decoration-red-500' : isDiscontinued ? 'text-amber-600/70' : (style.char === 'P' ? 'text-blue-600 font-black' : 'text-slate-700')}`}>
+                    <div className="flex items-baseline gap-2 overflow-hidden justify-start relative">
+                        <span className={`text-xs font-bold truncate ${isDeleted ? 'text-slate-400 line-through decoration-red-500' : isDiscontinued ? 'text-amber-600/70' : (style.char === 'P' ? 'text-blue-600 font-black' : 'text-slate-700')} ${node.isCircular ? 'text-red-600' : ''}`}>
                             {node.Name}
                         </span>
+                        {node.isCircular && (
+                            <span className="text-[9px] bg-red-600 text-white px-1.5 py-0.5 rounded-full font-black flex items-center gap-1 animate-pulse shrink-0 whitespace-nowrap">
+                                [⚠️ 순환 참조 오류]
+                            </span>
+                        )}
                         <span className="text-[10px] text-slate-400 font-mono whitespace-nowrap">[{node.PartID}]</span>
                         
-                        {/* 상태 뱃지 */}
-                        {(node.Lifecycle || node.Status) ? (
-                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-black border shrink-0 ${
-                                (node.Lifecycle || node.Status) === 'Draft' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                                (node.Lifecycle || node.Status) === 'ECN' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                                ((node.Lifecycle || node.Status) === 'Obsolete' || (node.Lifecycle || node.Status) === 'Discontinued' || isDiscontinued) ? 'bg-red-50 text-red-600 border-red-100' :
-                                'bg-emerald-50 text-emerald-600 border-emerald-100'
-                            }`}>
-                                {(node.Lifecycle || node.Status) === 'Draft' ? '대기' :
-                                 (node.Lifecycle || node.Status) === 'ECN' ? '설계변경' :
-                                 ((node.Lifecycle || node.Status) === 'Obsolete' || (node.Lifecycle || node.Status) === 'Discontinued' || isDiscontinued) ? '단종' : '양산'}
-                            </span>
-                        ) : (
-                            isDiscontinued && <span className="text-[9px] bg-red-50 text-red-600 border-red-100 px-1.5 py-0.5 rounded font-black">단종</span>
+                        {diff?.type === 'modified' && (
+                            <span className="text-[8px] bg-amber-100 text-amber-600 px-1 rounded font-black uppercase" title={diff.details}>Modified</span>
                         )}
 
-                        {isNew && <span className="text-[8px] bg-blue-100 text-blue-600 px-1 rounded font-black uppercase tracking-tighter">New</span>}
+                        <div className="flex items-center gap-2 ml-auto pr-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-1 text-[9px] font-bold text-slate-400">
+                                <DollarSign size={8} />
+                                {new Intl.NumberFormat('ko-KR').format(node.TotalCost || 0)}
+                            </div>
+                        </div>
+
+                        {isNew && <span className="text-[8px] bg-emerald-100 text-emerald-600 px-1 rounded font-black uppercase tracking-tighter">Added</span>}
                     </div>
                 </div>
 
-                {/* Location/Note, Qty & Actions */}
                 <div className="flex items-center gap-4 ml-4">
                     {canEditThisNode ? (
                         <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1 min-w-[120px]">
-                                <span className="text-[8px] font-black text-slate-300 uppercase w-7">{isElectronic ? 'Loc' : 'Note'}</span>
-                                <input
-                                    type="text"
-                                    placeholder={isElectronic ? "PCB Loc..." : "Add note..."}
-                                    value={(isElectronic ? node.Location : node.Note) || ''}
-                                    disabled={isDeleted || isDiscontinued}
-                                    onChange={(e) => isElectronic ? onLocationChange(node.PartID, e.target.value) : onNoteChange(node.PartID, e.target.value)}
-                                    className={`w-32 px-2 py-1 text-[10px] font-bold border border-slate-200 rounded focus:ring-1 focus:ring-blue-500 outline-none ${isDeleted || isDiscontinued ? 'bg-slate-50 text-slate-300 shadow-none' : 'bg-white shadow-sm'}`}
-                                />
-                            </div>
+                            <input
+                                type="text"
+                                placeholder={isElectronic ? "PCB Loc..." : "Add note..."}
+                                value={(isElectronic ? node.Location : node.Note) || ''}
+                                disabled={isDeleted || node.isCircular}
+                                onChange={(e) => isElectronic ? onLocationChange(node.PartID, e.target.value) : onNoteChange(node.PartID, e.target.value)}
+                                className={`w-32 px-2 py-1 text-[10px] font-bold border border-slate-200 rounded focus:ring-1 focus:ring-blue-500 outline-none ${isDeleted || node.isCircular ? 'bg-slate-50 text-slate-300' : 'bg-white'}`}
+                            />
+
+                            <input
+                                type="number"
+                                value={node.Quantity || 0}
+                                disabled={isDeleted || node.isCircular}
+                                onChange={(e) => onQtyChange(node.PartID, parseInt(e.target.value, 10) || 0)}
+                                className={`w-12 px-1 py-1 text-center text-[10px] font-bold border border-slate-200 rounded focus:ring-1 focus:ring-blue-500 outline-none ${isDeleted || node.isCircular ? 'bg-slate-50 text-slate-300' : 'bg-white'}`}
+                            />
 
                             <div className="flex items-center gap-1">
-                                <span className="text-[8px] font-black text-slate-300 uppercase">Qty</span>
-                                <input
-                                    type="number"
-                                    value={node.Quantity || 0}
-                                    disabled={isDeleted || isDiscontinued}
-                                    onChange={(e) => onQtyChange(node.PartID, parseInt(e.target.value, 10) || 0)}
-                                    className={`w-12 px-1 py-1 text-center text-[10px] font-bold border border-slate-200 rounded focus:ring-1 focus:ring-blue-500 outline-none ${isDeleted || isDiscontinued ? 'bg-slate-50 text-slate-300' : 'bg-white'}`}
-                                />
+                                {isDeleted ? (
+                                    <button onClick={() => onDelete(node.PartID, isNew, 'restore')} className="p-1 px-1.5 rounded bg-blue-50 text-blue-500 hover:bg-blue-100">
+                                        <RotateCcw size={12} />
+                                    </button>
+                                ) : (
+                                    <>
+                                        <button onClick={() => onDelete(node.PartID, isNew, 'discontinue')} className="p-1 px-1.5 rounded bg-amber-50 text-amber-500 hover:bg-amber-100" disabled={node.isCircular}>
+                                            <Ban size={12} />
+                                        </button>
+                                        <button onClick={() => onDelete(node.PartID, isNew, 'delete')} className="p-1 px-1.5 rounded bg-red-50 text-red-500 hover:bg-red-100">
+                                            <Trash2 size={12} />
+                                        </button>
+                                    </>
+                                )}
                             </div>
-
-                            {isDeleted || isDiscontinued ? (
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onDelete(node.PartID, isNew, 'restore');
-                                    }}
-                                    className="p-1 px-1.5 rounded bg-blue-50 text-blue-500 hover:bg-blue-100 shadow-sm"
-                                >
-                                    <RotateCcw size={12} />
-                                </button>
-                            ) : (
-                                <div className="flex items-center gap-1">
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onDelete(node.PartID, isNew, 'discontinue');
-                                        }}
-                                        className="p-1 px-1.5 rounded bg-amber-50 text-amber-500 hover:bg-amber-100 shadow-sm"
-                                    >
-                                        <Ban size={12} />
-                                    </button>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onDelete(node.PartID, isNew, 'delete');
-                                        }}
-                                        className="p-1 px-1.5 rounded bg-red-50 text-red-500 hover:bg-red-100 shadow-sm"
-                                    >
-                                        <Trash2 size={12} />
-                                    </button>
-                                </div>
-                            )}
                         </div>
                     ) : (
                         <div className="flex items-center gap-4">
-                            {isElectronic ? (
-                                node.Location && (
-                                    <div className="flex items-center gap-1 px-2 py-0.5 bg-slate-100/50 rounded-full border border-slate-200/50">
-                                        <span className="text-[8px] font-black text-slate-400 uppercase">Loc</span>
-                                        <span className="text-[10px] font-mono font-bold text-slate-600 italic tracking-tighter">{node.Location}</span>
-                                    </div>
-                                )
-                            ) : (
-                                node.Note && (
-                                    <div className="flex items-center gap-1 px-2 py-0.5 bg-orange-50/50 rounded-full border border-orange-200/50">
-                                        <span className="text-[8px] font-black text-orange-400 uppercase">Note</span>
-                                        <span className="text-[10px] font-bold text-slate-600 italic tracking-tighter">{node.Note}</span>
-                                    </div>
-                                )
-                            )}
+                            <span className="text-[10px] font-bold text-slate-500">{isElectronic ? node.Location : node.Note}</span>
                             <div className="px-4 text-right min-w-[60px]">
                                 <span className={`text-xs font-bold px-2 py-1 rounded shadow-sm border ${isDeleted ? 'bg-slate-50 text-slate-300 border-slate-100' : 'bg-white text-slate-500 border-slate-100'}`}>
                                     {node.Quantity || (isRoot ? 1 : 0)}
@@ -255,125 +388,78 @@ function BOMTreeNode({
                         </div>
                     )}
                 </div>
+                {renderTooltip()}
             </div>
 
-            {/* Children & Adding Row */}
             {expanded && (
-                <div className={`border-l border-slate-200/60 ${isRoot ? 'ml-[14px]' : 'ml-[8px]'}`}>
-                    {hasChildren && node.Children
-                        .filter(child => {
-                            if (showObsolete) return true;
-                            const status = (child.Lifecycle || child.Status || '').toLowerCase();
-                            const isObsolete = child.isDiscontinued || status === 'obsolete' || status === 'discontinued';
-                            return !isObsolete;
-                        })
-                        .map((child, idx) => (
-                            <BOMTreeNode
-                                key={`${child.PartID}-${level + 1}-${idx}`}
-                                node={child}
-                                level={level + 1}
-                                isEditing={isEditing}
-                                onQtyChange={onQtyChange}
-                                onLocationChange={onLocationChange}
-                                onNoteChange={onNoteChange}
-                                onDelete={onDelete}
-                                onAddChild={onAddChild}
-                                onNodeClick={onNodeClick}
-                                allParts={allParts}
-                                expandAllTrigger={expandAllTrigger}
-                                collapseAllTrigger={collapseAllTrigger}
-                                inheritedReadOnly={passReadOnlyToChildren}
-                                showObsolete={showObsolete}
-                            />
-                        ))}
-
-                    {isEditing && isAdding && canAddChild && !passReadOnlyToChildren && (
-                        <div
-                            className="flex items-center py-1 px-1 bg-blue-50/50 border-b border-blue-100/50 rounded-lg my-0.5 shadow-sm overflow-hidden"
-                            style={{ marginLeft: `0px` }}
+                <div className={`border-l border-slate-200/60 ${isRoot ? 'ml-[14px]' : 'ml-[22px]'}`}>
+                    {hasChildren && (
+                        <SortableContext 
+                            items={node.Children.map(c => c.PartID)} 
+                            strategy={verticalListSortingStrategy}
                         >
-                            <div className="flex items-center gap-1 w-full flex-nowrap">
-                                <select
-                                    value={draftCat}
-                                    onChange={e => {
-                                        setDraftCat(e.target.value);
-                                        setDraftPartID('');
-                                    }}
-                                    className="text-[10px] font-bold border border-slate-200 rounded px-1.5 py-1 focus:ring-1 focus:ring-blue-500 outline-none bg-white w-20 shrink-0"
-                                >
-                                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
-                                <select
-                                    value={draftPartID}
-                                    onChange={e => setDraftPartID(e.target.value)}
-                                    className="flex-1 text-[10px] font-bold border border-slate-200 rounded px-1.5 py-1 focus:ring-1 focus:ring-blue-500 outline-none bg-white min-w-0"
-                                >
-                                    <option value="" disabled>{filteredParts.length > 0 ? '부품 선택' : '조건에 맞는 부품 없음'}</option>
-                                    {filteredParts
-                                        .filter(p => !node.Children?.some(c => c.PartID === p.PartID) && p.PartID !== node.PartID)
-                                        .map(p => (
-                                            <option key={p.PartID} value={p.PartID}>{p.Name} [{p.PartID}]</option>
-                                        ))
-                                    }
-                                </select>
-                                <div className="flex items-center bg-white border border-slate-200 rounded px-1.5 py-1 shrink-0">
-                                    <span className="text-[8px] font-black text-slate-400 mr-1 uppercase">Loc/Note</span>
-                                    <input
-                                        type="text"
-                                        placeholder="..."
-                                        value={draftCat.includes('전자') || draftCat === '전체' ? draftLocation : draftNote}
-                                        onChange={e => draftCat.includes('전자') || draftCat === '전체' ? setDraftLocation(e.target.value) : setDraftNote(e.target.value)}
-                                        className="w-16 text-[10px] font-bold outline-none"
-                                    />
-                                </div>
-                                <div className="flex items-center bg-white border border-slate-200 rounded px-1.5 py-1 shrink-0">
-                                    <span className="text-[8px] font-black text-slate-400 mr-1 uppercase">Qty</span>
-                                    <input
-                                        type="number"
-                                        value={draftQty}
-                                        onChange={e => setDraftQty(parseInt(e.target.value, 10) || 1)}
-                                        className="w-8 text-center text-[10px] font-bold outline-none"
-                                    />
-                                </div>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleAddSubmit();
-                                    }}
-                                    className="px-2 py-1 bg-blue-600 text-white rounded text-[10px] font-bold hover:bg-blue-700 shadow-sm shrink-0"
-                                >
-                                    추가
-                                </button>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setIsAdding(false);
-                                        setDraftPartID('');
-                                        setDraftQty(1);
-                                        setDraftLocation('');
-                                        setDraftNote('');
-                                    }}
-                                    className="px-1.5 py-1 text-slate-400 hover:text-slate-600 rounded bg-slate-100 hover:bg-slate-200 shrink-0"
-                                >
-                                    <X size={14} />
-                                </button>
-                            </div>
-                        </div>
+                            {node.Children.map((child, idx) => (
+                                <BOMTreeNode
+                                    key={`${child.PartID}-${idx}`}
+                                    node={child}
+                                    level={level + 1}
+                                    isEditing={isEditing}
+                                    onQtyChange={onQtyChange}
+                                    onLocationChange={onLocationChange}
+                                    onNoteChange={onNoteChange}
+                                    onDelete={onDelete}
+                                    onAddChild={onAddChild}
+                                    onNodeClick={onNodeClick}
+                                    allParts={allParts}
+                                    expandAllTrigger={expandAllTrigger}
+                                    collapseAllTrigger={collapseAllTrigger}
+                                    inheritedReadOnly={passReadOnlyToChildren}
+                                    showObsolete={showObsolete}
+                                    parentPath={currentPath}
+                                    diffData={diffData}
+                                    onReorder={(oldIdx, newIdx) => onReorder(node.PartID, oldIdx, newIdx)}
+                                />
+                            ))}
+                        </SortableContext>
                     )}
 
-                    {/* Add Child Button - Always visible when editing and expanded */}
-                    {isEditing && expanded && canAddChild && !isAdding && !passReadOnlyToChildren && (
-                        <div className="py-1" style={{ paddingLeft: `0px` }}>
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setExpanded(true);
-                                    setIsAdding(true);
-                                }}
-                                className="flex items-center gap-1 px-2 py-1 ml-2 bg-blue-50 text-[10px] font-black text-blue-600 hover:text-white hover:bg-blue-500 rounded border border-blue-100 transition-colors uppercase tracking-wider group w-fit"
-                            >
-                                <Plus size={12} className="group-hover:rotate-90 transition-transform" /> Add Child
-                            </button>
+                    {isEditing && canAddChild && !passReadOnlyToChildren && !node.isCircular && (
+                        <div className="flex flex-col gap-1 py-1">
+                            {isAdding ? (
+                                <div className="flex items-center py-1 px-1 bg-blue-50/50 border border-blue-100 rounded-lg my-0.5" onPaste={handleExcelPaste}>
+                                    <select
+                                        value={draftCat}
+                                        onChange={e => { setDraftCat(e.target.value); setDraftPartID(''); }}
+                                        className="text-[10px] font-bold border border-slate-200 rounded px-1.5 py-1 bg-white w-24"
+                                    >
+                                        {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                    <select
+                                        value={draftPartID}
+                                        onChange={e => setDraftPartID(e.target.value)}
+                                        className="flex-1 text-[10px] font-bold border border-slate-200 rounded px-1.5 py-1 bg-white mx-1"
+                                    >
+                                        <option value="" disabled>부품 선택</option>
+                                        {filteredParts.map(p => <option key={p.PartID} value={p.PartID}>{p.Name} [{p.PartID}]</option>)}
+                                    </select>
+                                    <input type="number" value={draftQty} onChange={e => setDraftQty(parseInt(e.target.value, 10) || 1)} className="w-12 text-center text-[10px] font-bold border border-slate-200 rounded px-1 py-1 mr-1" />
+                                    <button onClick={handleAddSubmit} className="px-3 py-1 bg-blue-600 text-white rounded text-[10px] font-bold hover:bg-blue-700">추가</button>
+                                    <button onClick={() => setIsAdding(false)} className="px-1.5 py-1 text-slate-400 ml-1"><X size={14} /></button>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setIsAdding(true)}
+                                        className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-[10px] font-black text-blue-600 hover:text-white hover:bg-blue-500 rounded border border-blue-100 uppercase tracking-wider transition-colors"
+                                    >
+                                        <Plus size={12} /> Add Child
+                                    </button>
+                                    <div className="flex items-center gap-1 text-[8px] font-bold text-slate-400 italic">
+                                        <FileSpreadsheet size={10} />
+                                        Excel Paste Support (Ctrl+V)
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -394,26 +480,66 @@ export default function BOMTree({
     allParts, 
     expandAllTrigger, 
     collapseAllTrigger,
-    showObsolete = false
+    showObsolete = false,
+    diffData = null,
+    onReorder
 }) {
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    );
+
     if (!data) return <div className="p-8 text-center text-slate-400 font-bold italic">구조 데이터가 없습니다.</div>;
+
+    const handleDragEnd = (event) => {
+        const { active, over } = event;
+        if (over && active.id !== over.id) {
+            // Find parent and indices
+            const findParentAndIndices = (node) => {
+                if (!node.Children) return null;
+                const oldIdx = node.Children.findIndex(c => c.PartID === active.id);
+                const newIdx = node.Children.findIndex(c => c.PartID === over.id);
+                if (oldIdx !== -1 && newIdx !== -1) return { parentId: node.PartID, oldIdx, newIdx };
+                for (let child of node.Children) {
+                    const res = findParentAndIndices(child);
+                    if (res) return res;
+                }
+                return null;
+            };
+
+            const result = findParentAndIndices(data);
+            if (result && onReorder) {
+                onReorder(result.parentId, result.oldIdx, result.newIdx);
+            }
+        }
+    };
+
     return (
-        <div className="overflow-x-auto pb-4">
-            <BOMTreeNode
-                node={data}
-                level={0}
-                isEditing={isEditing}
-                onQtyChange={onQtyChange}
-                onLocationChange={onLocationChange}
-                onNoteChange={onNoteChange}
-                onDelete={onDelete}
-                onAddChild={onAddChild}
-                onNodeClick={onNodeClick}
-                allParts={allParts}
-                expandAllTrigger={expandAllTrigger}
-                collapseAllTrigger={collapseAllTrigger}
-                showObsolete={showObsolete}
-            />
-        </div>
+        <DndContext 
+            sensors={sensors} 
+            collisionDetection={closestCenter} 
+            onDragEnd={handleDragEnd}
+        >
+            <div className="overflow-x-auto pb-4">
+                <BOMTreeNode
+                    node={data}
+                    level={0}
+                    isEditing={isEditing}
+                    onQtyChange={onQtyChange}
+                    onLocationChange={onLocationChange}
+                    onNoteChange={onNoteChange}
+                    onDelete={onDelete}
+                    onAddChild={onAddChild}
+                    onNodeClick={onNodeClick}
+                    allParts={allParts}
+                    expandAllTrigger={expandAllTrigger}
+                    collapseAllTrigger={collapseAllTrigger}
+                    showObsolete={showObsolete}
+                    parentPath={[]}
+                    diffData={diffData}
+                    onReorder={onReorder}
+                />
+            </div>
+        </DndContext>
     );
 }
