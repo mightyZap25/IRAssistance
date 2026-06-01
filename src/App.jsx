@@ -30,6 +30,9 @@ import ProjectIssuesPage from './pages/ProjectIssuesPage'
 import TasksPage from './pages/TasksPage'
 import TaskCalendarPage from './pages/TaskCalendarPage'
 import ProjectManagementPage from './pages/ProjectManagementPage'
+import SalesDashboardPage from './pages/SalesDashboardPage'
+import QuotationsPage from './pages/QuotationsPage'
+import BillingPage from './pages/BillingPage'
 
 function PrivateRoute({ children }) {
     const { currentUser } = useAuth();
@@ -247,6 +250,28 @@ function AppContent() {
                 <PrivateRoute>
                     <Layout>
                         <ProjectManagementPage />
+                    </Layout>
+                </PrivateRoute>
+            } />
+
+            <Route path="/sales/dashboard" element={
+                <PrivateRoute>
+                    <Layout>
+                        <SalesDashboardPage />
+                    </Layout>
+                </PrivateRoute>
+            } />
+            <Route path="/sales/quotations" element={
+                <PrivateRoute>
+                    <Layout>
+                        <QuotationsPage />
+                    </Layout>
+                </PrivateRoute>
+            } />
+            <Route path="/sales/billing" element={
+                <PrivateRoute>
+                    <Layout>
+                        <BillingPage />
                     </Layout>
                 </PrivateRoute>
             } />

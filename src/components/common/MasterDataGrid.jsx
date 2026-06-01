@@ -233,7 +233,8 @@ export default function MasterDataGrid({
     cardRenderer = null,
 
     extraHeaderActions = null,
-    onFilteredDataChange = null
+    onFilteredDataChange = null,
+    actionRenderer = null
 }) {
     // Column Visibility & Order State
     const [columnOrder, setColumnOrder] = useState(() => {
@@ -538,26 +539,26 @@ export default function MasterDataGrid({
                                         <th key={key} className="px-2 py-2 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 first:rounded-l-2xl last:rounded-r-2xl whitespace-nowrap sticky top-0 z-20">
                                             {col.label}
                                         </th>
-                                    );
-                                })}
-                                {(onEdit || onDelete) && (
-                                    <th className="px-2 py-2 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 rounded-r-2xl whitespace-nowrap text-center sticky top-0 z-20">
+                                        );
+                                        })}
+                                        {(onEdit || onDelete || actionRenderer) && (
+                                        <th className="px-2 py-2 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 rounded-r-2xl whitespace-nowrap text-center sticky top-0 z-20">
                                         관리
-                                    </th>
-                                )}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {finalFilteredData.map(row => (
-                                <tr
-                                    key={row[rowKey]}
-                                    onClick={() => onRowClick(row)}
-                                    className="bg-white/40 dark:bg-slate-900/35 border border-slate-200/30 hover:bg-indigo-50/50 dark:hover:bg-slate-800/40 hover:scale-[1.002] transition-all cursor-pointer group shadow-sm"
-                                >
-                                    {columnOrder.map((col) => {
+                                        </th>
+                                        )}
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        {finalFilteredData.map(row => (
+                                        <tr
+                                        key={row[rowKey]}
+                                        onClick={() => onRowClick(row)}
+                                        className="bg-white/40 dark:bg-slate-900/35 border border-slate-200/30 hover:bg-indigo-50/50 dark:hover:bg-slate-800/40 hover:scale-[1.002] transition-all cursor-pointer group shadow-sm"
+                                        >
+                                        {columnOrder.map((col) => {
                                         if (!col.visible) return null;
                                         const key = col.key;
-                                        
+
                                         // Custom renderer lookup
                                         let cellContent = row[key] !== undefined ? row[key] : '-';
                                         if (cellRenderer[key]) {
@@ -565,7 +566,7 @@ export default function MasterDataGrid({
                                         }
 
                                         let cellClass = "px-2 py-2.5 border-y border-slate-200/10 dark:border-slate-800/10 text-slate-650 dark:text-slate-350 first:rounded-l-2xl last:rounded-r-2xl whitespace-nowrap max-w-[200px] truncate";
-                                        
+
                                         // General premium styles for generic keys if not overriden
                                         if (key === 'PartID' || key === 'id') {
                                             cellClass = "px-2 py-2.5 font-mono font-bold text-slate-400 group-hover:text-indigo-650 transition-colors rounded-l-2xl border-y border-l border-slate-200/10 dark:border-slate-800/10 whitespace-nowrap max-w-[150px] truncate";
@@ -578,19 +579,20 @@ export default function MasterDataGrid({
                                         } else if (key === 'UnitPrice' || key === 'Price') {
                                             cellClass = "px-2 py-2.5 text-right font-black text-slate-800 dark:text-slate-250 border-y border-slate-200/10 dark:border-slate-800/10 whitespace-nowrap max-w-[120px] truncate";
                                         }
-                                        
+
                                         const titleText = typeof row[key] === 'string' || typeof row[key] === 'number' ? row[key] : '';
                                         return (
                                             <td key={key} className={cellClass} title={titleText}>
                                                 {cellContent}
                                             </td>
                                         );
-                                    })}
+                                        })}
 
-                                    {/* Edit/Delete row actions */}
-                                    {(onEdit || onDelete) && (
+                                        {/* Edit/Delete row actions */}
+                                        {(onEdit || onDelete || actionRenderer) && (
                                         <td className="px-2 py-2.5 text-center rounded-r-2xl border-y border-r border-slate-200/10 dark:border-slate-800/10 whitespace-nowrap" onClick={e => e.stopPropagation()}>
                                             <div className="flex gap-2.5 justify-center items-center">
+                                                {actionRenderer && actionRenderer(row)}
                                                 {onEdit && (
                                                     <button
                                                         onClick={() => onEdit(row)}
@@ -609,10 +611,10 @@ export default function MasterDataGrid({
                                                 )}
                                             </div>
                                         </td>
-                                    )}
-                                </tr>
-                            ))}
-                        </tbody>
+                                        )}
+                                        </tr>
+                                        ))}
+                                        </tbody>
                     </table>
                 </div>
             )}

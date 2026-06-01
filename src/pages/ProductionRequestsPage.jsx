@@ -62,18 +62,29 @@ function PRRegistrationModal({ isOpen, onClose, onSave }) {
     const [newCustomerForm, setNewCustomerForm] = useState({ Name: '', Contact: '', Email: '' });
     const [addingCustomer, setAddingCustomer] = useState(false);
     const [selectedPartInfo, setSelectedPartInfo] = useState(null);
+    const [availableVersions, setAvailableVersions] = useState([]);
+    const [selectedMasterID, setSelectedMasterID] = useState('');
 
     const [form, setForm] = useState({
         PartDocID: '', PartName: '', PartID: '',
+        bomId: '', bomVersion: '',
         CustomerID: '', CustomerName: '',
         TargetQty: 1, UnitPrice: 0, DueDate: '', Urgent: false, Remarks: ''
     });
 
     useEffect(() => {
         if (!isOpen) return;
-        setForm({ PartDocID: '', PartName: '', PartID: '', CustomerID: '', CustomerName: '', TargetQty: 1, UnitPrice: 0, DueDate: '', Urgent: false, Remarks: '' });
+        setForm({ 
+            PartDocID: '', PartName: '', PartID: '', 
+            bomId: '', bomVersion: '',
+            CustomerID: '', CustomerName: '', 
+            TargetQty: 1, UnitPrice: 0, DueDate: '', Urgent: false, Remarks: '' 
+        });
         setAvailabilityCheck(null);
         setSelectedPartInfo(null);
+        setAvailableVersions([]);
+        setSelectedMasterID('');
+
         (async () => {
             const [pSnap, cSnap, invSnap, bomSnap] = await Promise.all([
                 getDocs(query(collection(db, 'parts'), orderBy('Name', 'asc'))),
@@ -104,8 +115,46 @@ function PRRegistrationModal({ isOpen, onClose, onSave }) {
 
     const handlePartSelect = (partDocID) => {
         const part = parts.find(p => p.id === partDocID);
-        setForm(prev => ({ ...prev, PartDocID: partDocID, PartName: part?.Name || '', PartID: part?.PartID || '' }));
-        setSelectedPartInfo(part || null);
+        if (!part) return;
+
+        const masterID = part.MasterPartID || part.PartID.split('-').slice(0, -1).join('-');
+        setSelectedMasterID(masterID);
+
+        const versions = parts.filter(p => 
+            (p.MasterPartID === masterID || p.PartID.startsWith(masterID + '-')) && 
+            ((p.Category && p.Category.includes('완제품')) || p.PartID?.startsWith('IRP'))
+        ).sort((a, b) => {
+            const revA = a.Rev || '0';
+            const revB = b.Rev || '0';
+            return revB.localeCompare(revA, undefined, { numeric: true });
+        });
+        
+        setAvailableVersions(versions);
+
+        setForm(prev => ({ 
+            ...prev, 
+            PartDocID: partDocID, 
+            PartName: part.Name || '', 
+            PartID: part.PartID || '',
+            bomId: part.PartID || '',
+            bomVersion: part.Rev || ''
+        }));
+        setSelectedPartInfo(part);
+        setAvailabilityCheck(null);
+    };
+
+    const handleVersionSelect = (partDocID) => {
+        const part = parts.find(p => p.id === partDocID);
+        if (!part) return;
+
+        setForm(prev => ({ 
+            ...prev, 
+            PartDocID: partDocID, 
+            PartID: part.PartID || '',
+            bomId: part.PartID || '',
+            bomVersion: part.Rev || ''
+        }));
+        setSelectedPartInfo(part);
         setAvailabilityCheck(null);
     };
 
@@ -161,17 +210,38 @@ function PRRegistrationModal({ isOpen, onClose, onSave }) {
                 <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
                     <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-3 text-left">
                         <h3 className="text-xs font-black text-slate-700 flex items-center gap-2"><Layers size={14} className="text-blue-500"/> 제품 정보</h3>
-                        <div>
-                            <label className="text-xs font-bold text-slate-600 mb-1 block">생산 대상 완제품</label>
-                            <select
-                                value={form.PartDocID}
-                                onChange={e => handlePartSelect(e.target.value)}
-                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none"
-                                required
-                            >
-                                <option value="">완제품 선택</option>
-                                {latestParts.map(p => <option key={p.id} value={p.id}>[{p.PartID}] {p.Name}</option>)}
-                            </select>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-xs font-bold text-slate-600 mb-1 block">생산 대상 완제품</label>
+                                <select
+                                    value={latestParts.find(p => (p.MasterPartID || p.PartID.split('-').slice(0,-1).join('-')) === selectedMasterID)?.id || ''}
+                                    onChange={e => handlePartSelect(e.target.value)}
+                                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none"
+                                    required
+                                >
+                                    <option value="">완제품 선택</option>
+                                    {latestParts.map(p => <option key={p.id} value={p.id}>[{p.PartID}] {p.Name}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-600 mb-1 block">BOM 버전 (Revision)</label>
+                                <select
+                                    value={form.PartDocID}
+                                    onChange={e => handleVersionSelect(e.target.value)}
+                                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none"
+                                    disabled={!selectedMasterID}
+                                >
+                                    {availableVersions.length > 0 ? (
+                                        availableVersions.map(v => (
+                                            <option key={v.id} value={v.id}>
+                                                Rev {v.Rev || '1.0'} {v.IsLatestRevision !== false ? '(최신)' : ''}
+                                            </option>
+                                        ))
+                                    ) : (
+                                        <option value="">제품을 먼저 선택하세요</option>
+                                    )}
+                                </select>
+                            </div>
                         </div>
                     </div>
 

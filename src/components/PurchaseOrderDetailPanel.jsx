@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ShoppingCart, Calendar, MapPin, DollarSign, PackageCheck, Truck, ChevronRight, CheckCircle2, Clock, AlertCircle, FileText, Edit, Mail } from 'lucide-react';
+import { X, ShoppingCart, Calendar, MapPin, DollarSign, PackageCheck, Truck, ChevronRight, CheckCircle2, Clock, AlertCircle, FileText, Edit, Mail, ShieldCheck } from 'lucide-react';
 import { updateDoc, doc, writeBatch, serverTimestamp, collection, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';

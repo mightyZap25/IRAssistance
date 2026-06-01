@@ -8,16 +8,17 @@ import {
     Users, ClipboardList, ShoppingCart, Truck, Factory,
     FileCheck, BookOpen, AlertCircle, Building2,
     PlayCircle, ChevronDown, UserCheck, Briefcase, 
-    ListTodo, CalendarDays, Cloud, Mail, Activity
+    ListTodo, CalendarDays, Cloud, Mail, Activity,
+    TrendingUp, FileText, CreditCard
 } from 'lucide-react';
 
 const ROLE_MENU_MAP = {
-    admin: ['/', '/parts', '/bom', '/customers', '/prod-requests', '/prod-execution', '/purchasing', '/outsourcing', '/inventory', '/receiving/inspection', '/qa/config', '/qa/process', '/transactions', '/manufacturers', '/vendors', '/ecn', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
+    admin: ['/', '/parts', '/bom', '/customers', '/prod-requests', '/prod-execution', '/purchasing', '/outsourcing', '/inventory', '/receiving/inspection', '/qa/config', '/qa/process', '/transactions', '/manufacturers', '/vendors', '/ecn', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/quotations', '/sales/billing', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
     engineer: ['/', '/parts', '/bom', '/ecn', '/inventory', '/transactions', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
-    sales: ['/', '/customers', '/prod-requests', '/inventory', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
+    sales: ['/', '/customers', '/prod-requests', '/inventory', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/quotations', '/sales/billing', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
     qa: ['/', '/receiving/inspection', '/qa/config', '/qa/process', '/inventory', '/transactions', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
     production: ['/', '/prod-execution', '/prod-requests', '/inventory', '/outsourcing', '/transactions', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
-    manager: ['/', '/customers', '/prod-requests', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/transactions', '/manufacturers', '/vendors', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
+    manager: ['/', '/customers', '/prod-requests', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/transactions', '/manufacturers', '/vendors', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/quotations', '/sales/billing', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
     viewer: ['/', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail'],
 };
 
@@ -73,6 +74,17 @@ export default function Sidebar() {
         }
     ];
 
+    const SALES_MENU_GROUPS = [
+        {
+            title: '영업 및 매출',
+            items: [
+                { name: '매출 대시보드', path: '/sales/dashboard', icon: TrendingUp },
+                { name: '견적서 관리', path: '/sales/quotations', icon: FileText },
+                { name: '수금 및 영수증', path: '/sales/billing', icon: CreditCard }
+            ]
+        }
+    ];
+
     const COLLAB_MENU_GROUPS = [
         {
             title: '근무 및 오피스',
@@ -87,6 +99,7 @@ export default function Sidebar() {
 
     const fErp = filterGroups(ALL_MENU_GROUPS);
     const fProj = filterGroups(PROJECT_MENU_GROUPS);
+    const fSales = filterGroups(SALES_MENU_GROUPS);
     const fCollab = filterGroups(COLLAB_MENU_GROUPS);
 
     const roleInfo = {
@@ -123,7 +136,7 @@ export default function Sidebar() {
                     </NavLink>
                 )}
 
-                {[ { g: fErp, t: 'ERP' }, { g: fProj, t: 'PROJ' }, { g: fCollab, t: 'COLLAB' } ].map(sec => sec.g.length > 0 && (
+                {[ { g: fErp, t: 'ERP' }, { g: fSales, t: 'SALES' }, { g: fProj, t: 'PROJ' }, { g: fCollab, t: 'COLLAB' } ].map(sec => sec.g.length > 0 && (
                     <div key={sec.t} className="space-y-2">
                         <div className="px-3 text-[11px] font-black text-slate-400 uppercase tracking-wider">{sec.t}</div>
                         <div className="space-y-1 pl-2 border-l border-slate-100 ml-2">
