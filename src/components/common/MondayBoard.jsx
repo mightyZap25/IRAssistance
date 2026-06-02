@@ -274,6 +274,11 @@ function MondayRow({ task, users, groupColor, onSelect, onUpdateTask, onDeleteTa
                         onClick={() => onSelect(task)}
                     >
                         {task.title || task.Title || task.child}
+                        {(task.TargetProductName) && (
+                            <span className="ml-2 text-[11px] font-bold text-indigo-500/80 bg-indigo-50/50 px-1.5 py-0.5 rounded border border-indigo-100/30">
+                                @{task.TargetProductName}
+                            </span>
+                        )}
                     </span>
                     <button className="p-1 hover:bg-white rounded border border-slate-200 shadow-sm text-slate-300 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">
                         <MessageSquare size={12} />

@@ -4,10 +4,12 @@ import { collection, query, getDocs, doc, addDoc, updateDoc, serverTimestamp, or
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import MasterDataGrid from '../components/common/MasterDataGrid';
-import { ShoppingCart, Plus, X, Box, Calendar, DollarSign, AlertCircle, Clock, CheckCircle2, ShieldCheck, ChevronRight, PackageCheck } from 'lucide-react';
+import { ShoppingCart, Plus, X, Box, Calendar, DollarSign, AlertCircle, Clock, CheckCircle2, ShieldCheck, ChevronRight, PackageCheck, FileText as FileTextIcon } from 'lucide-react';
+
 import RoleGuard from '../components/common/RoleGuard';
 import { USER_ROLES } from '../services/userService';
 import PurchaseOrderDetailPanel from '../components/PurchaseOrderDetailPanel';
+import RequestQuotationModal from '../components/RequestQuotationModal';
 
 const PO_STATUS_INFO = {
     ORDERING: { label: '발주중', color: 'bg-blue-50 text-blue-600 border-blue-200' },
@@ -276,6 +278,7 @@ export default function PurchasingPage() {
     const [sortConfig, setSortConfig] = useState({ key: 'CreatedAt', direction: 'desc' });
     const [gridViewMode, setGridViewMode] = useState('list');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
     const [editingPO, setEditingPO] = useState(null);
     const [selectedPO, setSelectedPO] = useState(null);
 
@@ -410,6 +413,13 @@ export default function PurchasingPage() {
                     </div>
                 </div>
                 <div className="relative z-10 flex gap-2">
+                    <button 
+                        onClick={() => setIsRequestModalOpen(true)} 
+                        className="flex items-center gap-2 bg-white hover:bg-slate-50 text-indigo-600 border border-indigo-200 font-extrabold py-2.5 px-4 rounded-xl shadow-sm transition-all hover:scale-105"
+                    >
+                        <ShoppingCart size={16} />
+                        <span>견적 요청</span>
+                    </button>
                     <button onClick={() => setIsCreateModalOpen(true)} className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-extrabold py-2.5 px-4 rounded-xl shadow-md transition-all hover:scale-105">
                         <Plus size={16} />
                         <span>신규 발주서(PO) 생성</span>
@@ -577,6 +587,11 @@ export default function PurchasingPage() {
                 onClose={() => setSelectedPO(null)}
                 onRefresh={fetchOrders}
                 onEdit={(po) => setEditingPO(po)}
+            />
+
+            <RequestQuotationModal 
+                isOpen={isRequestModalOpen}
+                onClose={() => setIsRequestModalOpen(false)}
             />
         </div>
     );

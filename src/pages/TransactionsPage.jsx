@@ -881,9 +881,14 @@ export default function TransactionsPage() {
                             onRowClick={row => setSelectedTx(transactions.find(t => t.id === row.id))}
                             onEdit={hasEditPermission ? handleOpenEdit : null}
                             rowKey="id"
-                        />
-                    )}
-                </div>
+                            enableSearch={true}
+                            searchTerm={searchTerm}
+                            onSearchChange={setSearchTerm}
+                            searchPlaceholder="품번, 품명, 참조문서 검색..."
+                            />
+                            )}
+                            </div>
+
             </div>
 
             <ManualTransactionModal

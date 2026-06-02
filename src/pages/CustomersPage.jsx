@@ -156,56 +156,74 @@ export default function CustomersPage() {
                                         <div 
                                             key={c.id} 
                                             onClick={() => handleRowClick(c)}
-                                            className={`bg-white/70 dark:bg-slate-900/60 backdrop-blur-sm rounded-[1.8rem] p-3 border shadow-md hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[220px] ${selectedCustomer?.id === c.id ? 'border-blue-500 shadow-blue-200/50' : 'border-slate-200/50 dark:border-slate-800/80'}`}
+                                            className={`bg-white dark:bg-slate-900 rounded-[2rem] p-5 border shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[260px] ${selectedCustomer?.id === c.id ? 'border-blue-500 ring-4 ring-blue-500/10 shadow-blue-200/50' : 'border-slate-100 dark:border-slate-800'}`}
                                         >
-                                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500/0 via-blue-500/40 to-indigo-500/0 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                            {/* Top Accent Line */}
+                                            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-transparent via-blue-500/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                                             
-                                            <div className="flex justify-between items-start mb-4">
-                                                <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
-                                                    c.Category === '해외' ? 'bg-purple-100 dark:bg-purple-950/20 text-purple-700 dark:text-purple-500' : 'bg-blue-100 dark:bg-blue-950/20 text-blue-700 dark:text-blue-500'
+                                            {/* Card Top: Category & Actions */}
+                                            <div className="flex justify-between items-center mb-6">
+                                                <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest border shadow-sm ${
+                                                    c.Category === '해외' 
+                                                    ? 'bg-purple-50 dark:bg-purple-950/20 text-purple-600 dark:text-purple-400 border-purple-100 dark:border-purple-900/50' 
+                                                    : 'bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-900/50'
                                                 }`}>
                                                     {c.Category || '국내'}
                                                 </span>
-                                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                                                <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); handleEdit(c); }}
-                                                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-xl transition-all"
+                                                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-xl transition-all shadow-sm bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800"
                                                     >
                                                         <Pencil size={14} />
                                                     </button>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}
-                                                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-slate-800 rounded-xl transition-all"
+                                                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-slate-800 rounded-xl transition-all shadow-sm bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800"
                                                     >
                                                         <Trash2 size={14} />
                                                     </button>
                                                 </div>
                                             </div>
 
-                                            <div className="flex items-center gap-4 mb-4">
-                                                <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform text-lg">
-                                                    <Building2 size={24} />
+                                            {/* Card Main: Company Info */}
+                                            <div className="flex items-start gap-5 mb-auto">
+                                                <div className="w-16 h-16 rounded-[1.5rem] bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 border border-slate-100 dark:border-slate-700 flex items-center justify-center text-slate-400 dark:text-slate-500 group-hover:text-blue-600 dark:group-hover:text-blue-400 group-hover:scale-105 transition-all duration-500 shadow-inner">
+                                                    <Building2 size={32} strokeWidth={1.5} />
                                                 </div>
-                                                <div className="min-w-0 flex-1">
-                                                    <h3 className="font-extrabold text-slate-850 dark:text-slate-200 text-lg leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">{c.Name}</h3>
-                                                    <div className="text-[10px] font-mono font-bold text-slate-400 mt-1 uppercase tracking-widest">{c.id.substring(0, 8)}</div>
+                                                <div className="min-w-0 flex-1 py-1">
+                                                    <h3 className="font-black text-slate-900 dark:text-white text-xl leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight">{c.Name}</h3>
+                                                    <div className="flex items-center gap-2 mt-2">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{c.id.substring(0, 8)}</span>
+                                                    </div>
                                                 </div>
                                             </div>
 
-                                            <div className="space-y-2.5 pt-4 border-t border-slate-100 dark:border-slate-800/60 flex-grow">
-                                                <div className="flex items-center gap-3 text-xs font-bold text-slate-600 dark:text-slate-400">
-                                                    <User size={14} className="text-slate-400 shrink-0" />
-                                                    <span className="truncate">{c.ContactPerson || '-'}</span>
+                                            {/* Card Bottom: Contact Details */}
+                                            <div className="mt-8 pt-5 border-t border-slate-50 dark:border-slate-800/60 grid grid-cols-2 gap-4">
+                                                <div className="space-y-1">
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">담당자</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <User size={12} className="text-blue-500" />
+                                                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">{c.ContactPerson || '-'}</span>
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center gap-3 text-xs font-bold text-slate-600 dark:text-slate-400">
-                                                    <Mail size={14} className="text-slate-400 shrink-0" />
-                                                    <span className="truncate">{c.Email || '-'}</span>
+                                                <div className="space-y-1 text-right">
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">연락처</p>
+                                                    <div className="flex items-center gap-2 justify-end text-slate-500 group-hover:text-slate-700 transition-colors">
+                                                        <Phone size={12} />
+                                                        <span className="text-xs font-bold truncate">{c.Phone || '-'}</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                             
-                                            <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                                                <span className="text-[9px] font-black text-slate-350 dark:text-slate-500 uppercase tracking-widest">History & Details</span>
-                                                <ChevronRight size={16} className="text-slate-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
+                                            <div className="mt-4 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.2em]">
+                                                <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                                                    <History size={12} />
+                                                    <span>View Insights</span>
+                                                </div>
+                                                <ChevronRight size={16} className="text-slate-300 group-hover:text-blue-500 group-hover:translate-x-1.5 transition-all duration-300" />
                                             </div>
                                         </div>
                                     )}

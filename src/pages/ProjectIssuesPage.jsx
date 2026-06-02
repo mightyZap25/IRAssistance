@@ -7,7 +7,7 @@ import {
     AlertCircle, Bug, CheckCircle, Clock, FileText, Filter, HelpCircle, 
     MessageSquare, Plus, RefreshCw, Search, ShieldAlert, User, Users, 
     X, ArrowRight, CornerDownRight, ClipboardList, Calendar, Bookmark, BarChart2,
-    LayoutGrid, List, Kanban
+    LayoutGrid, List, Kanban, ExternalLink
 } from 'lucide-react';
 import MondayBoard from '../components/common/MondayBoard';
 import IssueCardView   from '../components/IssueCardView';
@@ -55,6 +55,7 @@ export default function ProjectIssuesPage() {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [products, setProducts] = useState([]); // 완제품 상태 추가
+    const [ecnList, setEcnList] = useState([]); // ECN 목록 추가
 
     // 필터/검색 조건
     const [activeTab, setActiveTab] = useState('ALL'); // ALL | MY_DEPT | MY_ASSIGNED
@@ -76,10 +77,11 @@ export default function ProjectIssuesPage() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [issueSnap, userSnap, partsSnap] = await Promise.all([
+            const [issueSnap, userSnap, partsSnap, ecnSnap] = await Promise.all([
                 getDocs(query(collection(db, 'project_issues'), orderBy('CreatedAt', 'desc'))),
                 getDocs(collection(db, 'users')),
-                getDocs(collection(db, 'parts'))
+                getDocs(collection(db, 'parts')),
+                getDocs(query(collection(db, 'ecns'), orderBy('CreatedAt', 'desc')))
             ]);
 
             const issueList = issueSnap.docs.map(doc => {
@@ -101,6 +103,10 @@ export default function ProjectIssuesPage() {
                 id: doc.id,
                 ...doc.data()
             }));
+            const ecns = ecnSnap.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
 
             // 완제품 필터링 (Class === 'Product (P)' 또는 Category에 '완제품' 포함 또는 PartID가 'IRP'로 시작)
             const productList = partsList.filter(p => 
@@ -112,8 +118,9 @@ export default function ProjectIssuesPage() {
             setIssues(issueList);
             setUsers(userList);
             setProducts(productList);
+            setEcnList(ecns);
         } catch (err) {
-            console.error("Error loading issues/users/parts:", err);
+            console.error("Error loading issues/users/parts/ecns:", err);
         } finally {
             setLoading(false);
         }
@@ -560,6 +567,7 @@ export default function ProjectIssuesPage() {
                 onUpdateIssue={handleUpdateIssue}
                 onAddComment={handleAddComment}
                 allCategories={allCategories}
+                ecnList={ecnList}
             />
         </div>
     );
@@ -985,10 +993,9 @@ function CreateIssueModal({ isOpen, onClose, onSave, existingCategories, product
     );
 }
 
-// ─────────────────────────────────────────────────────────────
 // 이슈 상세 정보 및 검토 패널 (Issue Detail / Review Panel)
 // ─────────────────────────────────────────────────────────────
-function IssueDetailPanel({ isOpen, onClose, issue, users, userProfile, currentUser, onUpdateIssue, onAddComment, allCategories }) {
+function IssueDetailPanel({ isOpen, onClose, issue, users, userProfile, currentUser, onUpdateIssue, onAddComment, allCategories, ecnList }) {
     const [editForm, setEditForm] = useState({
         TargetDept: '',
         AssigneeUid: '',
@@ -997,6 +1004,7 @@ function IssueDetailPanel({ isOpen, onClose, issue, users, userProfile, currentU
         DueDate: '',
         AnalysisNotes: '',
         ResolutionNotes: '',
+        LinkedECNId: '',
         Documents: []  // [{ title, url, type }]
     });
     const [newDocTitle, setNewDocTitle] = useState('');
@@ -1015,6 +1023,7 @@ function IssueDetailPanel({ isOpen, onClose, issue, users, userProfile, currentU
                 DueDate: issue.DueDate || '',
                 AnalysisNotes: issue.AnalysisNotes || '',
                 ResolutionNotes: issue.ResolutionNotes || '',
+                LinkedECNId: issue.LinkedECNId || '',
                 Documents: issue.Documents || []
             });
             setNewComment('');
@@ -1053,6 +1062,7 @@ function IssueDetailPanel({ isOpen, onClose, issue, users, userProfile, currentU
             DueDate: editForm.DueDate,
             AnalysisNotes: editForm.AnalysisNotes,
             ResolutionNotes: editForm.ResolutionNotes,
+            LinkedECNId: editForm.LinkedECNId,
             Documents: editForm.Documents || []
         };
 
@@ -1106,10 +1116,7 @@ function IssueDetailPanel({ isOpen, onClose, issue, users, userProfile, currentU
 
     return createPortal(
         <div className="relative z-[9999]">
-            {/* Backdrop */}
             <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-[140]" onClick={onClose} />
-            
-            {/* Sliding Panel */}
             <div className="fixed inset-y-0 right-0 w-full md:w-[540px] bg-slate-50 shadow-2xl z-[150] flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-300">
                 {/* Header */}
                 <div className="bg-white px-6 py-5 border-b border-slate-250 flex justify-between items-start shrink-0">
@@ -1123,449 +1130,130 @@ function IssueDetailPanel({ isOpen, onClose, issue, users, userProfile, currentU
                             </span>
                         </div>
                         <h2 className="text-base font-black text-slate-900 line-clamp-1">{issue.Title}</h2>
-                        <p className="text-[10px] text-slate-400 font-bold mt-1 font-mono">이슈 고유키: {issue.id}</p>
+                        <p className="text-[10px] text-slate-400 font-bold mt-1 font-mono">ID: {issue.id}</p>
                     </div>
-                    <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-xl"><X size={18}/></button>
+                    <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all"><X size={18}/></button>
                 </div>
 
                 {/* Panel Body */}
-                <div className="flex-1 overflow-y-auto p-5 space-y-5">
-                    {/* Basic details */}
-                    <div className="bg-white rounded-2xl p-4.5 border border-slate-200 shadow-sm space-y-3">
-                        <h3 className="text-xs font-black text-slate-800 border-b pb-2 flex items-center gap-1.5">
-                            <FileText size={14} className="text-slate-400"/>
-                            이슈 설명
-                        </h3>
-                        <p className="text-xs text-slate-600 font-medium leading-relaxed whitespace-pre-wrap bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-                            {issue.Description}
-                        </p>
+                <div className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar">
+                    {/* 1. Basic details */}
+                    <div className="bg-white border border-slate-100 rounded-2xl p-5 space-y-4">
+                        <div className="flex items-center gap-2 text-slate-400 border-b border-slate-50 pb-3">
+                            <FileText size={14} />
+                            <h3 className="text-[11px] font-black uppercase tracking-widest">Description</h3>
+                        </div>
+                        <div className="text-[13px] text-slate-700 leading-relaxed font-medium whitespace-pre-wrap">{issue.Description}</div>
                         
-                        {/* 연동 제품 정보가 있을 경우 노출 */}
                         {(issue.TargetProductName || issue.ProductSeries || issue.ProductCommType) && (
-                            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-150 space-y-2 text-xs">
-                                <div className="text-[9px] font-black text-indigo-650 uppercase tracking-wider border-b border-indigo-100/50 pb-1 flex justify-between">
-                                    <span>연동 대상 완제품 정보</span>
-                                    {issue.TargetProductID && <span className="font-mono text-[8px] text-slate-400">{issue.TargetProductID}</span>}
-                                </div>
-                                <div className="flex flex-wrap gap-2.5 items-center">
-                                    {issue.TargetProductName && (
-                                        <div className="flex gap-1 items-center">
-                                            <span className="text-[9px] font-bold text-slate-400">제품명:</span>
-                                            <span className="font-black text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200 text-[10px]" title={issue.TargetProductID}>
-                                                {issue.TargetProductName}
-                                            </span>
-                                        </div>
-                                    )}
-                                    {issue.ProductSeries && (
-                                        <div className="flex gap-1 items-center">
-                                            <span className="text-[9px] font-bold text-slate-400">시리즈:</span>
-                                            <span className="font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 text-[10px]">
-                                                {issue.ProductSeries}
-                                            </span>
-                                        </div>
-                                    )}
-                                    {issue.ProductCommType && (
-                                        <div className="flex gap-1 items-center">
-                                            <span className="text-[9px] font-bold text-slate-400">통신방식:</span>
-                                            <span className="font-black text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-100 text-[10px]">
-                                                {issue.ProductCommType}
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
+                            <div className="pt-4 border-t border-slate-50 flex flex-wrap gap-x-5 gap-y-2">
+                                {issue.TargetProductName && <div className="flex items-baseline gap-1.5"><span className="text-[10px] font-bold text-slate-400 uppercase">Product</span><span className="text-xs font-black text-indigo-600 border-b-2 border-indigo-100">{issue.TargetProductName}</span></div>}
+                                {issue.ProductSeries && <div className="flex items-baseline gap-1.5"><span className="text-[10px] font-bold text-slate-400 uppercase">Series</span><span className="text-xs font-black text-slate-700">{issue.ProductSeries}</span></div>}
+                                {issue.ProductCommType && <div className="flex items-baseline gap-1.5"><span className="text-[10px] font-bold text-slate-400 uppercase">Comm.</span><span className="text-xs font-black text-teal-600">{issue.ProductCommType}</span></div>}
                             </div>
                         )}
-
-                        <div className="grid grid-cols-2 gap-y-2 gap-x-4 pt-1 text-[10px] font-bold text-slate-500">
-                            <div>등록자: <span className="text-slate-750 font-black">{issue.CreatedBy} ({issue.CreatedByEmail})</span></div>
-                            <div>등록일: <span className="text-slate-750 font-black">{createdDate}</span></div>
+                        <div className="flex justify-between items-center pt-2 text-[10px] font-bold text-slate-400 italic">
+                            <span>{issue.CreatedBy} • {createdDate}</span>
                         </div>
                     </div>
 
-                    {/* Workflow actions & controls */}
-                    <div className="bg-white rounded-2xl p-4.5 border border-slate-200 shadow-sm space-y-4">
-                        <h3 className="text-xs font-black text-slate-800 border-b pb-2 flex items-center gap-1.5">
-                            <Users size={14} className="text-slate-400"/>
-                            담당 지정 및 의사결정 속성
-                        </h3>
-                        
+                    {/* 2. Attributes & Status */}
+                    <div className="bg-white border border-slate-100 rounded-2xl p-5 space-y-5">
+                        <div className="flex items-center gap-2 text-slate-400 border-b border-slate-50 pb-3"><Users size={14}/><h3 className="text-[11px] font-black uppercase tracking-widest">Management</h3></div>
                         <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">담당 부서</label>
-                                <select
-                                    value={editForm.TargetDept}
-                                    onChange={e => handleFieldChange('TargetDept', e.target.value)}
-                                    disabled={!hasEditPermission}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-50"
-                                >
-                                    {DEPARTMENTS.map(dept => <option key={dept} value={dept}>{dept}부서</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">담당자 배정</label>
-                                <select
-                                    value={editForm.AssigneeUid}
-                                    onChange={e => handleFieldChange('AssigneeUid', e.target.value)}
-                                    disabled={!hasEditPermission}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-50"
-                                >
-                                    <option value="">담당자 선택...</option>
-                                    {deptMembers.map(u => <option key={u.uid} value={u.uid}>{u.name} ({u.role})</option>)}
-                                </select>
-                            </div>
+                            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Dept.</label>
+                            <select value={editForm.TargetDept} onChange={e => handleFieldChange('TargetDept', e.target.value)} disabled={!hasEditPermission} className="w-full bg-slate-50/50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-300 disabled:opacity-50">
+                                {DEPARTMENTS.map(dept => <option key={dept} value={dept}>{dept}부서</option>)}
+                            </select></div>
+                            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Assignee</label>
+                            <select value={editForm.AssigneeUid} onChange={e => handleFieldChange('AssigneeUid', e.target.value)} disabled={!hasEditPermission} className="w-full bg-slate-50/50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-300 disabled:opacity-50">
+                                <option value="">미지정</option>
+                                {deptMembers.map(u => <option key={u.uid} value={u.uid}>{u.name}</option>)}
+                            </select></div>
                         </div>
-
                         <div className="grid grid-cols-3 gap-3">
-                            <div>
-                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">중요도 (Priority)</label>
-                                <select
-                                    value={editForm.Priority}
-                                    onChange={e => handleFieldChange('Priority', e.target.value)}
-                                    disabled={!hasEditPermission}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-50"
-                                >
-                                    <option value="High">높음 (상)</option>
-                                    <option value="Medium">보통 (중)</option>
-                                    <option value="Low">낮음 (하)</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">난이도 (Difficulty)</label>
-                                <select
-                                    value={editForm.Difficulty}
-                                    onChange={e => handleFieldChange('Difficulty', e.target.value)}
-                                    disabled={!hasEditPermission}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-50"
-                                >
-                                    <option value="High">상 (어려움)</option>
-                                    <option value="Medium">중 (보통)</option>
-                                    <option value="Low">하 (쉬움)</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">완료 예정일</label>
-                                <input
-                                    type="date"
-                                    value={editForm.DueDate}
-                                    onChange={e => handleFieldChange('DueDate', e.target.value)}
-                                    disabled={!hasEditPermission}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 cursor-pointer"
-                                />
-                            </div>
+                            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Priority</label>
+                            <select value={editForm.Priority} onChange={e => handleFieldChange('Priority', e.target.value)} disabled={!hasEditPermission} className="w-full bg-slate-50/50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-black text-slate-800 outline-none focus:border-indigo-300">
+                                <option value="High">HIGH</option><option value="Medium">MEDIUM</option><option value="Low">LOW</option>
+                            </select></div>
+                            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Difficulty</label>
+                            <select value={editForm.Difficulty} onChange={e => handleFieldChange('Difficulty', e.target.value)} disabled={!hasEditPermission} className="w-full bg-slate-50/50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-black text-slate-800 outline-none focus:border-indigo-300">
+                                <option value="High">HARD</option><option value="Medium">NORMAL</option><option value="Low">EASY</option>
+                            </select></div>
+                            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Due Date</label>
+                            <input type="date" value={editForm.DueDate} onChange={e => handleFieldChange('DueDate', e.target.value)} disabled={!hasEditPermission} className="w-full bg-slate-50/50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-black text-slate-800 outline-none focus:border-indigo-300" /></div>
                         </div>
-                    <div className="bg-slate-100 rounded-2xl p-4.5 border border-slate-200 space-y-3">
-                        <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">이슈 진행 상태 제어 (Workflow State)</h4>
-                        
-                        <div className="grid grid-cols-2 gap-2">
-                            {issue.Status === 'Pending' && (
-                                <>
-                                    <button
-                                        onClick={() => handleStatusTransition('InProgress', '작업 시작')}
-                                        className="bg-amber-600 hover:bg-amber-700 text-white text-[10px] py-2 px-1.5 rounded-lg font-black transition-all flex items-center justify-center gap-1"
-                                    >
-                                        🛠️ 작업 시작
-                                    </button>
-                                    <button
-                                        onClick={() => handleStatusTransition('Rejected', '기각/반려')}
-                                        className="bg-rose-600 hover:bg-rose-700 text-white text-[10px] py-2 px-1.5 rounded-lg font-black transition-all flex items-center justify-center gap-1"
-                                    >
-                                        🗑️ 폐기/반려
-                                    </button>
-                                </>
-                            )}
-                            {issue.Status === 'InProgress' && (
-                                <>
-                                    {issue.Category === 'Feature' ? (
-                                        <button
-                                            onClick={() => handleStatusTransition('Testing', '검증 및 테스트 요청')}
-                                            className="bg-purple-600 hover:bg-purple-700 text-white text-[10px] py-2 px-1.5 rounded-lg font-black transition-all flex items-center justify-center gap-1"
-                                        >
-                                            🧪 검증/테스트 요청
-                                        </button>
-                                    ) : (
-                                        <button
-                                            onClick={() => handleStatusTransition('Resolved', '조치 완료')}
-                                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] py-2 px-1.5 rounded-lg font-black transition-all flex items-center justify-center gap-1"
-                                        >
-                                            ✅ 조치 완료
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={() => handleStatusTransition('Archived', '조치 보류')}
-                                        className="bg-slate-600 hover:bg-slate-700 text-white text-[10px] py-2 px-1.5 rounded-lg font-black transition-all flex items-center justify-center gap-1"
-                                    >
-                                        📦 보류/보관
-                                    </button>
-                                </>
-                            )}
-                            {issue.Status === 'Testing' && (
-                                <>
-                                    <button
-                                        onClick={() => handleStatusTransition('Resolved', '최종 검증 및 조치 완료')}
-                                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] py-2 px-1.5 rounded-lg font-black transition-all flex items-center justify-center gap-1"
-                                    >
-                                        ✅ 조치 완료
-                                    </button>
-                                    <button
-                                        onClick={() => handleStatusTransition('InProgress', '검증 실패로 재작업')}
-                                        className="bg-red-600 hover:bg-red-700 text-white text-[10px] py-2 px-1.5 rounded-lg font-black transition-all flex items-center justify-center gap-1"
-                                    >
-                                        ⚠️ 재작업 필요
-                                    </button>
-                                </>
-                            )}
-                            {issue.Status === 'Resolved' && (
-                                <button
-                                    onClick={() => handleStatusTransition('InProgress', '조치 결함 또는 피드백으로 재오픈')}
-                                    className="bg-red-650 hover:bg-red-700 text-white text-[10px] py-2 px-1.5 rounded-lg font-black transition-all flex items-center justify-center gap-1 col-span-2"
-                                >
-                                    ⚠️ 이슈 재오픈 (Re-open)
-                                </button>
-                            )}
-                            {(issue.Status === 'Rejected' || issue.Status === 'Archived') && (
-                                <button
-                                    onClick={() => handleStatusTransition('Pending', '재검토 요청에 따른 상태 재오픈')}
-                                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] py-2 px-1.5 rounded-lg font-black transition-all flex items-center justify-center gap-1 col-span-2"
-                                >
-                                    🔄 다시 검토 (Pending)
-                                </button>
-                            )}
+                        <div className="flex gap-2 pt-2">
+                            {issue.Status === 'Pending' && <><button onClick={() => handleStatusTransition('InProgress', '작업 시작')} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] py-2.5 rounded-lg font-black transition-all">START WORK</button><button onClick={() => handleStatusTransition('Rejected', '기각')} className="px-4 border border-slate-200 text-slate-500 hover:bg-rose-50 hover:text-rose-600 text-[11px] py-2.5 rounded-lg font-black transition-all">REJECT</button></>}
+                            {issue.Status === 'InProgress' && <><button onClick={() => handleStatusTransition(issue.Category === 'Feature' ? 'Testing' : 'Resolved', '조치 완료')} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] py-2.5 rounded-lg font-black transition-all">COMPLETE</button><button onClick={() => handleStatusTransition('Archived', '보류')} className="px-4 border border-slate-200 text-slate-500 hover:bg-slate-100 text-[11px] py-2.5 rounded-lg font-black transition-all">HOLD</button></>}
+                            {issue.Status === 'Testing' && <button onClick={() => handleStatusTransition('Resolved', '최종 검증 완료')} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-[11px] py-2.5 rounded-lg font-black transition-all">VERIFY & CLOSE</button>}
+                            {issue.Status === 'Resolved' && <button onClick={() => handleStatusTransition('InProgress', '재오픈')} className="flex-1 border-2 border-rose-100 text-rose-600 hover:bg-rose-50 text-[11px] py-2.5 rounded-lg font-black transition-all">RE-OPEN ISSUE</button>}
                         </div>
                     </div>
-                </div>
 
-                    {/* ── 분석 내용 / 처리 내용 / 참조 문서 ── */}
-                    <div className="bg-white rounded-2xl p-4.5 border border-slate-200 shadow-sm space-y-5">
-                        <h3 className="text-xs font-black text-slate-800 border-b pb-2 flex items-center gap-1.5">
-                            <FileText size={14} className="text-indigo-500"/>
-                            분석 보고서 &amp; 처리 내용
-                        </h3>
-
-                        {/* 분석 내용 */}
-                        <div className="space-y-1.5">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                                🔍 원인 분석 내용
-                            </label>
-                            <textarea
-                                rows={5}
-                                value={editForm.AnalysisNotes}
-                                onChange={e => handleFieldChange('AnalysisNotes', e.target.value)}
-                                disabled={!hasEditPermission}
-                                placeholder={hasEditPermission ? '이슈 원인 분석 내용을 작성하세요...\n- 재현 조건, 원인 추정, 영향 범위 등' : '(분석 내용 없음)'}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400 resize-y leading-relaxed disabled:opacity-60 disabled:cursor-not-allowed placeholder:text-slate-300"
-                            />
+                    {/* 3. Analysis & Resolution */}
+                    <div className="bg-white border border-slate-100 rounded-2xl p-5 space-y-5">
+                        <div className="flex items-center gap-2 text-slate-400 border-b border-slate-50 pb-3"><FileText size={14} className="text-indigo-400"/><h3 className="text-[11px] font-black uppercase tracking-widest">Report</h3></div>
+                        <div className="space-y-4">
+                            <div className="space-y-1.5"><label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest ml-1 flex items-center gap-1.5"><div className="w-1 h-1 rounded-full bg-indigo-400"></div> Analysis</label>
+                            <textarea rows={4} value={editForm.AnalysisNotes} onChange={e => handleFieldChange('AnalysisNotes', e.target.value)} disabled={!hasEditPermission} placeholder="원인 분석 및 현상 기록..." className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-medium text-slate-700 outline-none focus:border-indigo-300 transition-colors resize-none" /></div>
+                            <div className="space-y-1.5"><label className="text-[10px] font-black text-emerald-500 uppercase tracking-widest ml-1 flex items-center gap-1.5"><div className="w-1 h-1 rounded-full bg-emerald-400"></div> Resolution</label>
+                            <textarea rows={4} value={editForm.ResolutionNotes} onChange={e => handleFieldChange('ResolutionNotes', e.target.value)} disabled={!hasEditPermission} placeholder="조치 결과 및 해결 방법..." className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-medium text-slate-700 outline-none focus:border-emerald-300 transition-colors resize-none" /></div>
+                            <div className="space-y-2"><label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-1">Linked ECN</label>
+                            <div className="flex gap-2">
+                                <select value={editForm.LinkedECNId} onChange={e => handleFieldChange('LinkedECNId', e.target.value)} disabled={!hasEditPermission} className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-black text-slate-800 outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50">
+                                    <option value="">NONE</option>
+                                    {ecnList && ecnList.map(ecn => <option key={ecn.id} value={ecn.id}>[{ecn.Status}] {ecn.Title}</option>)}
+                                </select>
+                                {editForm.LinkedECNId && <a href={`/ecn?id=${editForm.LinkedECNId}`} target="_blank" rel="noopener noreferrer" className="p-2.5 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 transition-colors flex items-center justify-center"><ExternalLink size={16} /></a>}
+                            </div></div>
+                            {hasEditPermission && <button onClick={handleSaveSettings} disabled={loading} className="w-full bg-slate-900 hover:bg-black text-white py-3 rounded-xl text-[11px] font-black transition-all uppercase tracking-widest">{loading ? 'SAVING...' : 'Save Changes'}</button>}
                         </div>
-
-                        {/* 처리 / 조치 내용 */}
-                        <div className="space-y-1.5">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                                ✅ 처리 / 조치 내용
-                            </label>
-                            <textarea
-                                rows={5}
-                                value={editForm.ResolutionNotes}
-                                onChange={e => handleFieldChange('ResolutionNotes', e.target.value)}
-                                disabled={!hasEditPermission}
-                                placeholder={hasEditPermission ? '조치 내용, 수정 사항, 검증 방법 등을 기록하세요...' : '(처리 내용 없음)'}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-emerald-400 resize-y leading-relaxed disabled:opacity-60 disabled:cursor-not-allowed placeholder:text-slate-300"
-                            />
-                        </div>
-
-                        {/* 저장 버튼 (분석/처리 내용) */}
-                        {hasEditPermission && (
-                            <button
-                                onClick={handleSaveSettings}
-                                disabled={loading}
-                                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-2 rounded-xl text-xs font-black transition-all"
-                            >
-                                {loading ? '저장 중...' : '💾 분석/처리 내용 저장'}
-                            </button>
-                        )}
                     </div>
 
-                    {/* ── 참조 문서 링크 관리 ── */}
-                    <div className="bg-white rounded-2xl p-4.5 border border-slate-200 shadow-sm space-y-4">
-                        <h3 className="text-xs font-black text-slate-800 border-b pb-2 flex items-center gap-1.5">
-                            <ArrowRight size={14} className="text-teal-500"/>
-                            참조 문서 &amp; 외부 링크
-                        </h3>
-
-                        {/* 등록된 문서 목록 */}
+                    {/* 4. Documents */}
+                    <div className="bg-white border border-slate-100 rounded-2xl p-5 space-y-4">
+                        <div className="flex items-center gap-2 text-slate-400 border-b border-slate-50 pb-3"><ArrowRight size={14} className="text-teal-500"/><h3 className="text-[11px] font-black uppercase tracking-widest">Docs</h3></div>
                         <div className="space-y-2">
-                            {(editForm.Documents || []).length === 0 ? (
-                                <p className="text-[10px] text-slate-400 italic text-center py-3">등록된 참조 문서가 없습니다.</p>
-                            ) : (
-                                editForm.Documents.map((doc, idx) => {
-                                    const docIcons = {
-                                        googlesheet: '📊',
-                                        googledoc:   '📄',
-                                        googledrive: '📁',
-                                        notion:      '📝',
-                                        github:      '🔗',
-                                        other:       '🌐',
-                                    };
-                                    const icon = docIcons[doc.type] || '🌐';
-                                    return (
-                                        <div key={idx} className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
-                                            <span className="text-base">{icon}</span>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-[10px] font-black text-slate-700 truncate">{doc.title || '제목 없음'}</p>
-                                                <a
-                                                    href={doc.url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-[9px] text-indigo-500 hover:text-indigo-700 underline truncate block"
-                                                >
-                                                    {doc.url}
-                                                </a>
-                                            </div>
-                                            {hasEditPermission && (
-                                                <button
-                                                    onClick={() => {
-                                                        const updated = editForm.Documents.filter((_, i) => i !== idx);
-                                                        handleFieldChange('Documents', updated);
-                                                    }}
-                                                    className="shrink-0 text-rose-400 hover:text-rose-600 text-[10px] font-black p-1 rounded hover:bg-rose-50"
-                                                >
-                                                    <X size={12}/>
-                                                </button>
-                                            )}
-                                        </div>
-                                    );
-                                })
-                            )}
+                            {(editForm.Documents || []).length === 0 ? <p className="text-[10px] text-slate-300 italic text-center py-2 uppercase">No Docs</p> : editForm.Documents.map((doc, idx) => (
+                                <div key={idx} className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"><span className="text-sm">{doc.type === 'googlesheet' ? '📊' : doc.type === 'googledoc' ? '📄' : '🔗'}</span>
+                                <div className="flex-1 min-w-0"><p className="text-[10px] font-black text-slate-700 truncate">{doc.title}</p>
+                                <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-[9px] text-indigo-500 hover:text-indigo-700 truncate block">{doc.url}</a></div>
+                                {hasEditPermission && <button onClick={() => handleFieldChange('Documents', editForm.Documents.filter((_, i) => i !== idx))} className="text-slate-300 hover:text-rose-500 p-1"><X size={12}/></button>}</div>
+                            ))}
                         </div>
-
-                        {/* 새 문서 추가 폼 */}
                         {hasEditPermission && (
-                            <div className="space-y-2 pt-2 border-t border-slate-100">
-                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">문서 추가</p>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <input
-                                        type="text"
-                                        placeholder="문서 이름 (예: 이슈 분석 시트)"
-                                        value={newDocTitle}
-                                        onChange={e => setNewDocTitle(e.target.value)}
-                                        className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium outline-none focus:ring-1 focus:ring-indigo-400"
-                                    />
-                                    <select
-                                        value={newDocType}
-                                        onChange={e => setNewDocType(e.target.value)}
-                                        className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-1 focus:ring-indigo-400 cursor-pointer"
-                                    >
-                                        <option value="googlesheet">📊 Google 스프레드시트</option>
-                                        <option value="googledoc">📄 Google 문서</option>
-                                        <option value="googledrive">📁 Google 드라이브</option>
-                                        <option value="notion">📝 Notion</option>
-                                        <option value="github">🔗 GitHub / 기타 링크</option>
-                                        <option value="other">🌐 기타 URL</option>
-                                    </select>
+                            <div className="pt-2 border-t border-slate-50 space-y-2">
+                                <div className="flex gap-2">
+                                    <input type="text" placeholder="Doc Title" value={newDocTitle} onChange={e => setNewDocTitle(e.target.value)} className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold outline-none" />
+                                    <select value={newDocType} onChange={e => setNewDocType(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-black outline-none"><option value="googlesheet">📊 Sheet</option><option value="googledoc">📄 Doc</option><option value="other">🔗 Link</option></select>
                                 </div>
                                 <div className="flex gap-2">
-                                    <input
-                                        type="url"
-                                        placeholder="https://docs.google.com/spreadsheets/..."
-                                        value={newDocUrl}
-                                        onChange={e => setNewDocUrl(e.target.value)}
-                                        className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium outline-none focus:ring-1 focus:ring-indigo-400"
-                                    />
-                                    <button
-                                        onClick={async () => {
-                                            if (!newDocUrl.trim()) return;
-                                            const newDoc = {
-                                                title: newDocTitle.trim() || newDocUrl,
-                                                url:   newDocUrl.trim(),
-                                                type:  newDocType,
-                                                addedBy: userProfile?.name || currentUser?.displayName || '팀원',
-                                                addedAt: new Date().toISOString()
-                                            };
-                                            const updatedDocs = [...(editForm.Documents || []), newDoc];
-                                            handleFieldChange('Documents', updatedDocs);
-                                            // 즉시 Firestore 저장
-                                            await onUpdateIssue(issue.id, { Documents: updatedDocs });
-                                            setNewDocTitle('');
-                                            setNewDocUrl('');
-                                            setNewDocType('googlesheet');
-                                        }}
-                                        disabled={!newDocUrl.trim()}
-                                        className="shrink-0 bg-teal-600 hover:bg-teal-700 disabled:opacity-40 text-white px-4 py-2 rounded-xl text-xs font-black transition-all"
-                                    >
-                                        + 추가
-                                    </button>
+                                    <input type="url" placeholder="URL" value={newDocUrl} onChange={e => setNewDocUrl(e.target.value)} className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-medium outline-none" />
+                                    <button onClick={async () => { if (!newDocUrl.trim()) return; const newDoc = { title: newDocTitle.trim() || newDocUrl, url: newDocUrl.trim(), type: newDocType, addedBy: userProfile?.name || 'User', addedAt: new Date().toISOString() }; const updatedDocs = [...(editForm.Documents || []), newDoc]; handleFieldChange('Documents', updatedDocs); await onUpdateIssue(issue.id, { Documents: updatedDocs }); setNewDocTitle(''); setNewDocUrl(''); }} disabled={!newDocUrl.trim()} className="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded-xl text-[10px] font-black">ADD</button>
                                 </div>
                             </div>
                         )}
                     </div>
 
-                    {/* Timeline Comments and logs */}
-                    <div className="bg-white rounded-2xl p-4.5 border border-slate-200 shadow-sm space-y-4">
-                        <h3 className="text-xs font-black text-slate-800 border-b pb-2 flex items-center gap-1.5">
-                            <MessageSquare size={14} className="text-slate-400"/>
-                            피드백 대화 & 상태 변경 이력
-                        </h3>
-
-                        {/* Comments Form */}
+                    {/* 5. Feedback */}
+                    <div className="bg-white border border-slate-100 rounded-2xl p-5 space-y-4 mb-6">
+                        <div className="flex items-center gap-2 text-slate-400 border-b border-slate-50 pb-3"><MessageSquare size={14} /><h3 className="text-[11px] font-black uppercase tracking-widest">Feedback</h3></div>
                         <form onSubmit={handleCommentSubmit} className="flex gap-2">
-                            <input
-                                type="text"
-                                placeholder="의견을 자유롭게 기재하세요..."
-                                value={newComment}
-                                onChange={e => setNewComment(e.target.value)}
-                                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:ring-1 focus:ring-indigo-500 outline-none"
-                            />
-                            <button
-                                type="submit"
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-xl text-xs font-black"
-                            >
-                                등록
-                            </button>
+                            <input type="text" placeholder="의견 작성..." value={newComment} onChange={e => setNewComment(e.target.value)} className="flex-1 bg-slate-50/50 border border-slate-100 rounded-xl px-4 py-2 text-xs font-medium focus:border-indigo-300 outline-none" />
+                            <button type="submit" className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-black hover:bg-indigo-100 transition-all">POST</button>
                         </form>
-
-                        {/* Mixed Timeline (Comments + Logs) */}
-                        <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
-                            {/* Merge comments and logs into a single chronologically sorted timeline */}
+                        <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1 custom-scrollbar">
                             {(() => {
                                 const list = [];
-                                (issue.Comments || []).forEach(c => {
-                                    list.push({
-                                        type: 'comment',
-                                        id: c.commentId,
-                                        author: c.author,
-                                        text: c.text,
-                                        date: new Date(c.timestamp)
-                                    });
-                                });
-                                (issue.History || []).forEach(h => {
-                                    list.push({
-                                        type: 'history',
-                                        id: h.logId,
-                                        author: h.updatedBy,
-                                        text: h.message || `상태 전이: [${h.previousStatus}] ➔ [${h.newStatus}]`,
-                                        date: new Date(h.timestamp)
-                                    });
-                                });
-
-                                // Sort descending by date
+                                (issue.Comments || []).forEach(c => list.push({ type: 'comment', ...c, date: new Date(c.timestamp) }));
+                                (issue.History || []).forEach(h => list.push({ type: 'history', author: h.updatedBy, text: h.message || `Status: ${h.previousStatus} ➔ ${h.newStatus}`, date: new Date(h.timestamp) }));
                                 list.sort((a, b) => b.date - a.date);
-
-                                if (list.length === 0) {
-                                    return <p className="text-[10px] text-slate-400 italic text-center py-6">남겨진 소통 대화 및 이력이 없습니다.</p>;
-                                }
-
-                                return list.map(item => (
-                                    <div key={item.id} className={`p-2.5 rounded-xl border text-[11px] leading-relaxed ${
-                                        item.type === 'comment' 
-                                            ? 'bg-slate-50 border-slate-100 text-slate-700' 
-                                            : 'bg-indigo-50/50 border-indigo-100 text-indigo-800'
-                                    }`}>
-                                        <div className="flex justify-between items-center font-bold mb-1">
-                                            <span className="flex items-center gap-1">
-                                                {item.type === 'comment' ? <User size={10} className="text-slate-400"/> : <Clock size={10} className="text-indigo-400"/>}
-                                                {item.author}
-                                            </span>
-                                            <span className="text-[9px] text-slate-400">{item.date.toLocaleString('ko-KR')}</span>
-                                        </div>
-                                        <p className="font-medium whitespace-pre-wrap">{item.text}</p>
+                                if (list.length === 0) return <p className="text-[10px] text-slate-300 font-bold italic text-center py-2 uppercase">Empty</p>;
+                                return list.map((item, idx) => (
+                                    <div key={idx} className={`p-2.5 rounded-xl border ${item.type === 'comment' ? 'bg-white border-slate-50' : 'bg-slate-50/30 border-transparent text-slate-400'}`}>
+                                        <div className="flex justify-between items-center mb-0.5"><span className="text-[10px] font-black text-slate-600">{item.author}</span><span className="text-[9px] font-bold text-slate-300">{item.date.toLocaleDateString()}</span></div>
+                                        <p className="text-[11px] font-medium text-slate-500 leading-snug">{item.text}</p>
                                     </div>
                                 ));
                             })()}

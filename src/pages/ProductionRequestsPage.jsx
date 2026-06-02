@@ -329,11 +329,20 @@ export default function ProductionRequestsPage() {
 
     const fetchSelectedPRDetails = async (partID) => {
         try {
-            const [bomSnap, invSnap] = await Promise.all([
+            const [bomSnap, invSnap, partsSnap] = await Promise.all([
                 getDocs(query(collection(db, 'bom'), where('ParentID', '==', partID))),
-                getDocs(collection(db, 'inventory'))
+                getDocs(collection(db, 'inventory')),
+                getDocs(collection(db, 'parts'))
             ]);
-            setSelectedPRBOM(bomSnap.docs.map(d => d.data()));
+            
+            const partsMap = {};
+            partsSnap.docs.forEach(d => { partsMap[d.data().PartID] = d.data().Name; });
+            
+            setSelectedPRBOM(bomSnap.docs.map(d => ({
+                ...d.data(),
+                ChildName: partsMap[d.data().ChildID] || d.data().ChildID
+            })));
+            
             const inv = {};
             invSnap.docs.forEach(d => { inv[d.data().PartID] = d.data().OnHand || 0; });
             setInventory(inv);
@@ -448,23 +457,60 @@ export default function ProductionRequestsPage() {
                             <button onClick={() => setSelectedPR(null)} className="p-2 text-slate-400 hover:text-slate-700 rounded-xl"><X size={18}/></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-5 space-y-4 text-left">
-                            <div className="bg-white rounded-2xl p-4 border border-slate-200 space-y-3">
-                                <h3 className="text-xs font-black text-slate-700">기본 정보</h3>
-                                <div className="grid grid-cols-2 gap-3 text-xs">
-                                    <div><p className="font-bold text-slate-400 mb-0.5">Part ID</p><p className="font-mono font-black text-blue-600">{selectedPR.PartID}</p></div>
-                                    <div><p className="font-bold text-slate-400 mb-0.5">수량</p><p className="font-black text-slate-800">{selectedPR.TargetQty} EA</p></div>
+                            <div className="bg-white rounded-2xl p-4 border border-slate-200 space-y-4">
+                                <h3 className="text-xs font-black text-slate-700 uppercase tracking-widest flex items-center gap-2"><ClipboardList size={14} className="text-blue-500"/> 기본 정보</h3>
+                                <div className="grid grid-cols-2 gap-y-4 gap-x-3 text-xs">
+                                    <div className="col-span-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                        <p className="font-bold text-slate-400 mb-1 uppercase tracking-tighter text-[10px]">제품 정보 (Product Info)</p>
+                                        <p className="font-black text-slate-800 text-sm">
+                                            {selectedPR.PartName}
+                                            <span className="text-[10px] font-mono font-bold text-blue-500 ml-2 bg-blue-50 px-1.5 py-0.5 rounded">[{selectedPR.PartID}]</span>
+                                        </p>
+                                    </div>
+                                    <div className="pl-1">
+                                        <p className="font-bold text-slate-400 mb-1 uppercase tracking-tighter text-[10px]">요청 수량</p>
+                                        <p className="font-black text-slate-800 text-sm">{selectedPR.TargetQty.toLocaleString()} <span className="text-[10px] text-slate-400">EA</span></p>
+                                    </div>
+                                    <div className="pl-1">
+                                        <p className="font-bold text-slate-400 mb-1 uppercase tracking-tighter text-[10px]">납기일</p>
+                                        <p className="font-black text-slate-800 text-sm">{selectedPR.DueDate}</p>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="bg-white rounded-2xl p-4 border border-slate-200 space-y-3">
-                                <h3 className="text-xs font-black text-slate-700">자재 현황</h3>
-                                <div className="space-y-2">
+                            <div className="bg-white rounded-2xl p-4 border border-slate-200 space-y-4">
+                                <div className="flex justify-between items-center px-1">
+                                    <h3 className="text-xs font-black text-slate-700 uppercase tracking-widest flex items-center gap-2"><Package size={14} className="text-amber-500"/> 자재 가용성 현황</h3>
+                                    <span className="text-[10px] font-bold text-slate-400">{selectedPRBOM.length} Items</span>
+                                </div>
+                                <div className="divide-y divide-slate-50 border-t border-slate-100">
                                     {selectedPRBOM.map((bom, idx) => (
-                                        <div key={idx} className="flex justify-between items-center p-2 rounded-lg border bg-slate-50 border-slate-100">
-                                            <span className="text-[10px] font-black text-slate-700">{bom.ChildID}</span>
-                                            <span className="text-xs font-black text-blue-600">{inventory[bom.ChildID] || 0} EA</span>
+                                        <div key={idx} className="flex items-center justify-between py-3 px-1 hover:bg-slate-50/50 transition-colors">
+                                            <div className="flex flex-col flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 overflow-hidden">
+                                                    <span className="text-xs font-bold text-slate-800 truncate">{bom.ChildName}</span>
+                                                    <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-tighter shrink-0">[{bom.ChildID}]</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-8 shrink-0 ml-4">
+                                                <div className="text-right">
+                                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mb-0.5">Required</p>
+                                                    <p className="text-xs font-black text-slate-700">{(bom.Quantity * selectedPR.TargetQty).toLocaleString()} EA</p>
+                                                </div>
+                                                <div className="text-right w-16">
+                                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mb-0.5">Inventory</p>
+                                                    <p className={`text-xs font-black ${inventory[bom.ChildID] >= (bom.Quantity * selectedPR.TargetQty) ? 'text-blue-600' : 'text-rose-500'}`}>
+                                                        {inventory[bom.ChildID] || 0} EA
+                                                    </p>
+                                                </div>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
+                                {selectedPRBOM.length === 0 && (
+                                    <div className="py-8 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                                        No BOM data found
+                                    </div>
+                                )}
                             </div>
                             <div className="bg-white rounded-2xl p-4 border border-slate-200 space-y-3">
                                 <h3 className="text-xs font-black text-slate-700">프로세스 제어</h3>

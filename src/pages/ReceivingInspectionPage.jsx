@@ -143,9 +143,10 @@ export default function ReceivingInspectionPage() {
         <div className="flex flex-col h-[calc(100vh-100px)]">
             <QAInspectionModal 
                 item={selectedItem} 
-                isOpen={!!selectedItem && activeTab === 'PENDING'} 
+                isOpen={!!selectedItem} 
                 onClose={() => setSelectedItem(null)}
                 onRefresh={fetchReceivingData}
+                readOnly={activeTab === 'HISTORY'}
             />
 
             <QAItemReportModal
@@ -332,9 +333,7 @@ export default function ReceivingInspectionPage() {
                         columnDefs={COLUMN_DEFS}
                         rowKey="id"
                         onRowClick={(row) => {
-                            if (activeTab === 'PENDING') {
-                                setSelectedItem(row);
-                            }
+                            setSelectedItem(row);
                         }}
                         cellRenderer={{
                             Status: (val) => {

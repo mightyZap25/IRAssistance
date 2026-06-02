@@ -23,10 +23,11 @@ const APPROVAL_STEPS = [
     { id: 2, label: 'QA 담당자', role: 'QA_MANAGER' },
     { id: 3, label: '영업 담당자', role: 'SALES_MANAGER' },
     { id: 4, label: '대표', role: 'CEO' }
-];
+import { useLocation } from 'react-router-dom';
 
 const ECNPage = () => {
     const { userProfile } = useAuth();
+    const location = useLocation();
     const [viewMode, setViewMode] = useState('PENDING'); // PENDING or HISTORY
     const [ecnList, setEcnList] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -34,7 +35,25 @@ const ECNPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [approvalComment, setApprovalComment] = useState('');
 
-    const [searchTerm, setSearchTerm] = useState('');
+    useEffect(() => {
+        fetchECNs();
+    }, []);
+
+    // URL 파라미터 감지 (이슈 링크 연동용)
+    useEffect(() => {
+        if (ecnList.length > 0) {
+            const params = new URLSearchParams(location.search);
+            const ecnId = params.get('id');
+            if (ecnId) {
+                const target = ecnList.find(e => e.id === ecnId);
+                if (target) {
+                    setSelectedEcn(target);
+                    setIsModalOpen(true);
+                }
+            }
+        }
+    }, [location.search, ecnList]);
+
     const [filteredData, setFilteredData] = useState([]);
     const [sortConfig, setSortConfig] = useState({ key: 'CreatedAt', direction: 'desc' });
     const [gridViewMode, setGridViewMode] = useState('list');
