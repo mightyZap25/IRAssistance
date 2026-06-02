@@ -800,26 +800,24 @@ export default function LeaveManagementPage() {
                                     </div>
                                 )}
 
-                                {formData.category !== 'Standard' && (() => {
+                                {formData.category === 'Leave' && (() => {
                                     const reqDays = Math.max(0, Math.ceil((new Date(formData.endDate) - new Date(formData.startDate)) / (1000 * 60 * 60 * 24)) + 1);
                                     // 날짜 범위 내 각 날짜의 daySchedule 기반 시간 합산
                                     let totalReqHours = 0;
-                                    if (formData.category === 'Leave') {
-                                        for (let i = 0; i < reqDays; i++) {
-                                            const d = new Date(formData.startDate);
-                                            d.setDate(d.getDate() + i);
-                                            totalReqHours += getDayWorkHours(d.getDay());
-                                        }
+                                    for (let i = 0; i < reqDays; i++) {
+                                        const d = new Date(formData.startDate);
+                                        d.setDate(d.getDate() + i);
+                                        totalReqHours += getDayWorkHours(d.getDay());
                                     }
-                                    const afterDays = formData.category === 'Leave' ? Math.max(0, balance.remaining - reqDays) : balance.remaining;
-                                    const afterHours = formData.category === 'Leave' ? Math.max(0, balance.remainingHours - totalReqHours) : balance.remainingHours;
+                                    const afterDays = Math.max(0, balance.remaining - reqDays);
+                                    const afterHours = Math.max(0, balance.remainingHours - totalReqHours);
                                     return (
                                         <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-2">
                                             {/* 신청 일수 */}
                                             <div className="text-center">
                                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-0.5">신청 일수</p>
                                                 <p className="text-lg font-black text-blue-600">{reqDays}<span className="text-xs font-bold ml-0.5 text-blue-400">일</span></p>
-                                                {formData.category === 'Leave' && <p className="text-[9px] text-slate-400 mt-0.5">{totalReqHours.toFixed(1)}h 차감</p>}
+                                                <p className="text-[9px] text-slate-400 mt-0.5">{totalReqHours.toFixed(1)}h 차감</p>
                                             </div>
                                             <div className="text-slate-300 font-black text-lg">→</div>
                                             {/* 신청 후 잔여 */}

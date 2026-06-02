@@ -6,6 +6,8 @@ import { getNextRevision } from '../services/bomService';
 import MasterDataGrid from '../components/common/MasterDataGrid';
 import { Clock, CheckCircle2, XCircle, Info, ChevronRight, User, Calendar, Tag, AlertCircle, ArrowRight, Minus, Plus, Edit3, MessageSquare, ShieldCheck } from 'lucide-react';
 
+import { useLocation } from 'react-router-dom';
+
 const ECN_COLUMN_DEFS = {
     Title: { label: '요청명 (Title)', default: true },
     Type: { label: '구분', default: true },
@@ -23,7 +25,7 @@ const APPROVAL_STEPS = [
     { id: 2, label: 'QA 담당자', role: 'QA_MANAGER' },
     { id: 3, label: '영업 담당자', role: 'SALES_MANAGER' },
     { id: 4, label: '대표', role: 'CEO' }
-import { useLocation } from 'react-router-dom';
+];
 
 const ECNPage = () => {
     const { userProfile } = useAuth();
@@ -34,6 +36,7 @@ const ECNPage = () => {
     const [selectedEcn, setSelectedEcn] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [approvalComment, setApprovalComment] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
         fetchECNs();
