@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { collection, doc, getDocs, query, where, writeBatch, addDoc, updateDoc, runTransaction } from 'firebase/firestore';
+import { collection, doc, getDocs, query, where, writeBatch, addDoc, updateDoc, runTransaction } from '../firebase';
 import { db } from '../firebase';
 import { 
     X, Save, FileText, Plus, CheckCircle2, 
@@ -68,6 +68,7 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
         UnitPrice: 0,
         Currency: 'KRW',
         LeadTime: 0,
+        IsOverseas: false,
         Description: '',
         Datasheet: '',
         Image: '',
@@ -81,6 +82,7 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
         Grade: '',
         Color: '',
         Safety: { CE: false, ROHS: false, UL: false, KC: false, REACH: false },
+        SafetyLinks: { CE: '', ROHS: '', UL: '', KC: '', REACH: '' },
         CustomData: {}
     });
 
@@ -128,6 +130,7 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                 ...prev,
                 ...initialData,
                 Safety: { CE: false, ROHS: false, UL: false, KC: false, REACH: false, ...(initialData.Safety || {}) },
+                SafetyLinks: { CE: '', ROHS: '', UL: '', KC: '', REACH: '', ...(initialData.SafetyLinks || {}) },
                 CustomData: initialData.CustomData || {}
             }));
             setCustomData(initialData.CustomData || {});
@@ -265,8 +268,8 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
             const fieldsToWatch = [
                 'Name', 'Category', 'Class', 'PartTypeCode', 'Spec', 'Unit', 'Rev', 
                 'Manufacturer', 'MPN', 'MFN', 'Maker', 'Owner', 'UnitPrice', 'Currency', 
-                'LeadTime', 'Description', 'Datasheet', 'Image', 'ProcessType', 'Material', 
-                'Grade', 'Color', 'Lifecycle', 'Supplier', 'SubstitutePartIDs'
+                'LeadTime', 'IsOverseas', 'Description', 'Datasheet', 'Image', 'ProcessType', 'Material', 
+                'Grade', 'Color', 'Lifecycle', 'Supplier', 'SubstitutePartIDs', 'Safety', 'SafetyLinks'
             ];
             fieldsToWatch.forEach(field => {
                 let oldVal = initialData[field];
@@ -601,23 +604,35 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                                             name="Lifecycle" 
                                             value={formData.Lifecycle} 
                                             onChange={handleChange} 
-                                            className={`${inputClass} w-full pl-7 ${
+                                            disabled={['Active', 'Obsolete', 'ECN Pending', 'ECN'].includes(formData.Lifecycle)}
+                                            className={`${inputClass} w-full pl-7 disabled:opacity-85 disabled:cursor-not-allowed ${
                                                 formData.Lifecycle === 'Obsolete' ? 'bg-red-50 border-red-200 text-red-600' :
                                                 formData.Lifecycle === 'Draft' ? 'bg-orange-50 border-orange-200 text-orange-600' :
                                                 formData.Lifecycle === 'Active' ? 'bg-emerald-50 border-emerald-200 text-emerald-600' :
+                                                formData.Lifecycle === 'RND' ? 'bg-purple-50 border-purple-200 text-purple-600' :
                                                 (formData.Lifecycle === 'ECN Pending' || formData.Lifecycle === 'ECN') ? 'bg-blue-50 border-blue-200 text-blue-600' :
                                                 'bg-white'
                                             }`}
                                         >
-                                            <option value="Draft">Draft (대기/개발중)</option>
-                                            <option value="Active">Active (승인완료/양산)</option>
-                                            <option value="ECN Pending">ECN Pending (설계변경/수정중)</option>
-                                            <option value="Obsolete">Obsolete (폐기/단종)</option>
+                                            {['Active', 'Obsolete', 'ECN Pending', 'ECN'].includes(formData.Lifecycle) ? (
+                                                <>
+                                                    {formData.Lifecycle === 'Active' && <option value="Active">Active (승인완료/양산)</option>}
+                                                    {formData.Lifecycle === 'Obsolete' && <option value="Obsolete">Obsolete (폐기/단종)</option>}
+                                                    {formData.Lifecycle === 'ECN Pending' && <option value="ECN Pending">ECN Pending (설계변경/수정중)</option>}
+                                                    {formData.Lifecycle === 'ECN' && <option value="ECN">ECN (설계변경 진행중)</option>}
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <option value="Draft">Draft (대기/개발중)</option>
+                                                    <option value="RND">RND (연구소용)</option>
+                                                </>
+                                            )}
                                         </select>
                                         <div className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full ${
                                             formData.Lifecycle === 'Obsolete' ? 'bg-red-500' :
                                             formData.Lifecycle === 'Draft' ? 'bg-orange-500' :
                                             formData.Lifecycle === 'Active' ? 'bg-emerald-500' :
+                                            formData.Lifecycle === 'RND' ? 'bg-purple-500' :
                                             (formData.Lifecycle === 'ECN Pending' || formData.Lifecycle === 'ECN') ? 'bg-blue-500' :
                                             'bg-slate-300'
                                         }`} />
@@ -633,9 +648,9 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <label className={labelClass}>Classification</label>
-                                    <select name="Class" value={formData.Class} onChange={handleChange} className={inputClass}>
-                                        <option>Part (I)</option>
-                                        <option>Assembly (A)</option>
+                                    <select name="Class" value={formData.Class} onChange={handleChange} disabled className={`${inputClass} bg-slate-50 text-slate-500 cursor-not-allowed`}>
+                                        <option value="Part (I)">Part (I)</option>
+                                        <option value="Assembly (A)">Assembly (A)</option>
                                     </select>
                                 </div>
                                 <div className="flex items-center gap-1">
@@ -680,8 +695,8 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                                     <input name="Manufacturer" value={formData.Manufacturer} onChange={handleChange} className={inputClass} placeholder="제조사명" />
                                 </div>
                                 <div className="flex items-center gap-1">
-                                    <label className={labelClass}>Maker / Brand</label>
-                                    <input name="Maker" value={formData.Maker} onChange={handleChange} className={inputClass} placeholder="메이커" />
+                                    <label className={labelClass}>공급사</label>
+                                    <input name="Maker" value={formData.Maker} onChange={handleChange} className={inputClass} placeholder="공급사 입력" />
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <label className={labelClass}>MPN (Part No.)</label>
@@ -692,8 +707,8 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                                     <input name="MFN" value={formData.MFN} onChange={handleChange} className={inputClass} placeholder="모델 번호" />
                                 </div>
                                 <div className="flex items-center gap-1">
-                                    <label className={labelClass}>Main Supplier</label>
-                                    <input name="Supplier" value={formData.Supplier} onChange={handleChange} className={inputClass} placeholder="주공급사" />
+                                    <label className={labelClass}>Supplier</label>
+                                    <input name="Supplier" value={formData.Supplier} onChange={handleChange} className={inputClass} placeholder="공급사" />
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <label className={labelClass}>Estimated Unit Price</label>
@@ -702,6 +717,21 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                                             <option>KRW</option><option>USD</option><option>EUR</option><option>JPY</option><option>CNY</option>
                                         </select>
                                         <input name="UnitPrice" value={formData.UnitPrice} onChange={handleChange} className="flex-1 bg-white border border-slate-200 rounded-lg py-1.5 px-2 text-sm font-black text-indigo-600 outline-none hover:border-indigo-300 transition-all shadow-sm max-w-[120px]" placeholder="0" />
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-1 mt-2">
+                                    <label className={labelClass}>해외 수입품 (Overseas)</label>
+                                    <div className="flex-1 flex items-center gap-3">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input 
+                                                type="checkbox" 
+                                                name="IsOverseas" 
+                                                checked={formData.IsOverseas || false} 
+                                                onChange={e => setFormData(prev => ({...prev, IsOverseas: e.target.checked}))}
+                                                className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500" 
+                                            />
+                                            <span className="text-[10px] font-bold text-slate-600">수입 자재 여부</span>
+                                        </label>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-1">
@@ -718,35 +748,67 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                                         <span className="text-[10px] font-bold text-slate-400">일 (Days)</span>
                                     </div>
                                 </div>
-                                {/* Compliance Certs UI Refined */}
-                                <div className="mt-1 p-2 bg-white/50 rounded-2xl border border-slate-100 flex flex-col gap-2">
-                                    <label className={labelClass}>Compliance Certs</label>
-                                    <div className="grid grid-cols-3 gap-1.5">
-                                        {[
-                                            { id: 'CE', label: 'CE', active: 'bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-blue-200', inactive: 'bg-slate-100 text-slate-400' },
-                                            { id: 'ROHS', label: 'RoHS', active: 'bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-emerald-200', inactive: 'bg-slate-100 text-slate-400' },
-                                            { id: 'UL', label: 'UL', active: 'bg-gradient-to-br from-rose-500 to-rose-700 text-white shadow-rose-200', inactive: 'bg-slate-100 text-slate-400' },
-                                            { id: 'KC', label: 'KC', active: 'bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-amber-200', inactive: 'bg-slate-100 text-slate-400' },
-                                            { id: 'REACH', label: 'REACH', active: 'bg-gradient-to-br from-teal-500 to-teal-700 text-white shadow-teal-200', inactive: 'bg-slate-100 text-slate-400' }
-                                        ].map(cert => (
-                                            <button
-                                                key={cert.id}
-                                                type="button"
-                                                onClick={() => {
-                                                    setFormData(prev => ({
-                                                        ...prev,
-                                                        Safety: { ...prev.Safety, [cert.id]: !prev.Safety[cert.id] }
-                                                    }));
-                                                }}
-                                                className={`py-1.5 px-2 rounded-xl text-[10px] font-black transition-all flex items-center justify-center border border-transparent shadow-sm hover:scale-[1.02] active:scale-95 ${
-                                                    formData.Safety[cert.id] ? cert.active : cert.inactive
-                                                }`}
-                                            >
-                                                {cert.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
+                                 {/* Compliance Certs UI Refined */}
+                                 <div className="mt-1 p-2 bg-white/50 rounded-2xl border border-slate-100 flex flex-col gap-2">
+                                     <label className={labelClass}>Compliance Certs</label>
+                                     <div className="grid grid-cols-3 gap-1.5">
+                                         {[
+                                             { id: 'CE', label: 'CE', active: 'bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-blue-200', inactive: 'bg-slate-100 text-slate-400' },
+                                             { id: 'ROHS', label: 'RoHS', active: 'bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-emerald-200', inactive: 'bg-slate-100 text-slate-400' },
+                                             { id: 'UL', label: 'UL', active: 'bg-gradient-to-br from-rose-500 to-rose-700 text-white shadow-rose-200', inactive: 'bg-slate-100 text-slate-400' },
+                                             { id: 'KC', label: 'KC', active: 'bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-amber-200', inactive: 'bg-slate-100 text-slate-400' },
+                                             { id: 'REACH', label: 'REACH', active: 'bg-gradient-to-br from-teal-500 to-teal-700 text-white shadow-teal-200', inactive: 'bg-slate-100 text-slate-400' }
+                                         ].map(cert => (
+                                             <button
+                                                 key={cert.id}
+                                                 type="button"
+                                                 onClick={() => {
+                                                     setFormData(prev => ({
+                                                         ...prev,
+                                                         Safety: { ...prev.Safety, [cert.id]: !prev.Safety[cert.id] }
+                                                     }));
+                                                 }}
+                                                 className={`py-1.5 px-2 rounded-xl text-[10px] font-black transition-all flex items-center justify-center border border-transparent shadow-sm hover:scale-[1.02] active:scale-95 ${
+                                                     formData.Safety[cert.id] ? cert.active : cert.inactive
+                                                 }`}
+                                             >
+                                                 {cert.label}
+                                             </button>
+                                         ))}
+                                     </div>
+                                     
+                                     {/* Certification and Material Sheet Link Inputs */}
+                                     {Object.keys(formData.Safety || {}).some(key => formData.Safety[key]) && (
+                                         <div className="mt-2 space-y-1.5 border-t border-slate-100 pt-2 text-left">
+                                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">인증서 / 물성시트 링크 (URL)</span>
+                                             {Object.entries(formData.Safety || {}).map(([key, isActive]) => {
+                                                 if (!isActive) return null;
+                                                 const label = key === 'ROHS' ? 'RoHS' : key;
+                                                 return (
+                                                     <div key={key} className="flex items-center gap-1.5">
+                                                         <span className="text-[9px] font-black text-slate-500 w-12 shrink-0">{label}</span>
+                                                         <input 
+                                                             type="text" 
+                                                             value={formData.SafetyLinks?.[key] || ''} 
+                                                             onChange={(e) => {
+                                                                 const val = e.target.value;
+                                                                 setFormData(prev => ({
+                                                                     ...prev,
+                                                                     SafetyLinks: {
+                                                                         ...(prev.SafetyLinks || {}),
+                                                                         [key]: val
+                                                                     }
+                                                                 }));
+                                                             }}
+                                                             placeholder="인증서 또는 물성시트 링크 URL"
+                                                             className="flex-1 bg-white border border-slate-200 rounded-lg py-1 px-2 text-[11px] font-bold text-slate-700 outline-none hover:border-indigo-300 focus:ring-1 focus:ring-indigo-500 shadow-sm"
+                                                         />
+                                                     </div>
+                                                 );
+                                             })}
+                                         </div>
+                                     )}
+                                 </div>
                             </div>
                         </div>
 

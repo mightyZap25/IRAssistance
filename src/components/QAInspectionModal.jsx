@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, CheckCircle, XCircle, AlertTriangle, Camera, Package, Info, CheckCircle2, Cloud, ExternalLink, FileText } from 'lucide-react';
-import { updateDoc, doc, collection, getDocs, addDoc, serverTimestamp, writeBatch, getDoc, query, where } from 'firebase/firestore';
+import { updateDoc, doc, collection, getDocs, addDoc, serverTimestamp, writeBatch, getDoc, query, where } from '../firebase';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import clsx from 'clsx';

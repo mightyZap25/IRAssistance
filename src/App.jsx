@@ -24,6 +24,7 @@ import WorkspaceFilesPage from './pages/WorkspaceFilesPage'
 import WorkspaceCalendarPage from './pages/WorkspaceCalendarPage'
 import WorkspaceMailPage from './pages/WorkspaceMailPage'
 import WorkspaceMemoPage from './pages/WorkspaceMemoPage'
+import MeetingsPage from './pages/MeetingsPage'
 import LeaveManagementPage from './pages/LeaveManagementPage'
 import QAConfigPage from './pages/QAConfigPage'
 import QAProcessPage from './pages/QAProcessPage'
@@ -224,6 +225,14 @@ function AppContent() {
                 </PrivateRoute>
             } />
 
+            <Route path="/workspace/meetings" element={
+                <PrivateRoute>
+                    <Layout>
+                        <MeetingsPage />
+                    </Layout>
+                </PrivateRoute>
+            } />
+
             <Route path="/hr/attendance" element={
                 <PrivateRoute>
                     <Layout>
@@ -294,6 +303,14 @@ function AppContent() {
                 </PrivateRoute>
             } />
 
+            
+            <Route path="/settings" element={
+                <PrivateRoute>
+                    <Layout>
+                        <SettingsPage />
+                    </Layout>
+                </PrivateRoute>
+            } />
             {/* Catch all */}
             <Route path="*" element={<Navigate to="/" />} />
         </Routes>

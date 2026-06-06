@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, arrayUnion, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, arrayUnion, addDoc } from '../firebase';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { getNextRevision } from '../services/bomService';
@@ -182,6 +182,14 @@ const ECNPage = () => {
         const currentStepIdx = ecn.CurrentStep || 0;
         const isFinalStep = currentStepIdx === APPROVAL_STEPS.length - 1;
 
+        if (currentStepIdx === 3 && ecn.Derivatives && ecn.Derivatives.length > 0) {
+            const hasPending = ecn.Derivatives.some(d => d.Action === 'Pending');
+            if (hasPending) {
+                alert('영업부서는 모든 파생 모델에 대해 [진행] 또는 [미진행]을 선택해야 합니다.');
+                return;
+            }
+        }
+
         if (!window.confirm(isFinalStep ? '최종 승인하시겠습니까? 리비전이 자동으로 상승하고 BOM이 업데이트됩니다.' : `${APPROVAL_STEPS[currentStepIdx].label} 단계 승인을 진행하시겠습니까?`)) return;
 
         try {
@@ -197,6 +205,11 @@ const ECNPage = () => {
                 comment: approvalComment,
                 status: 'Approved'
             };
+
+            // Save Derivatives and ECO options
+            if (ecn.Derivatives) batch.update(ecnRef, { Derivatives: ecn.Derivatives });
+            if (ecn.HasStatusChange !== undefined) batch.update(ecnRef, { HasStatusChange: ecn.HasStatusChange });
+            if (ecn.InventoryAction) batch.update(ecnRef, { InventoryAction: ecn.InventoryAction });
 
             if (isFinalStep) {
                 // Final Approval Logic
@@ -657,6 +670,82 @@ const ECNPage = () => {
                                         </div>
                                     )}
                                 </section>
+
+                                {/* Derivative Models & ECO Extra Fields */}
+                                {selectedEcn.Derivatives && selectedEcn.Derivatives.length > 0 && (
+                                    <section className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 shadow-sm mt-4">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <AlertCircle size={16} className="text-indigo-600" />
+                                            <h4 className="text-sm font-bold text-indigo-900">파생 모델 연동 검토 (Derivative Models)</h4>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {selectedEcn.Derivatives.map((deriv, idx) => (
+                                                <div key={idx} className="flex items-center justify-between bg-white p-3 rounded-lg border border-indigo-100 shadow-sm">
+                                                    <div>
+                                                        <p className="text-xs font-bold text-slate-800">{deriv.Name}</p>
+                                                        <p className="text-[10px] text-slate-500">{deriv.PartID}</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <button 
+                                                            disabled={!isUserTurn(selectedEcn) || selectedEcn.CurrentStep !== 3}
+                                                            onClick={() => {
+                                                                const newDerivs = [...selectedEcn.Derivatives];
+                                                                newDerivs[idx].Action = 'Proceed';
+                                                                setSelectedEcn({...selectedEcn, Derivatives: newDerivs});
+                                                            }}
+                                                            className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${deriv.Action === 'Proceed' ? 'bg-emerald-600 text-white shadow-md' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                                                        >
+                                                            진행 (Proceed)
+                                                        </button>
+                                                        <button 
+                                                            disabled={!isUserTurn(selectedEcn) || selectedEcn.CurrentStep !== 3}
+                                                            onClick={() => {
+                                                                const newDerivs = [...selectedEcn.Derivatives];
+                                                                newDerivs[idx].Action = 'Skip';
+                                                                setSelectedEcn({...selectedEcn, Derivatives: newDerivs});
+                                                            }}
+                                                            className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${deriv.Action === 'Skip' ? 'bg-rose-600 text-white shadow-md' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                                                        >
+                                                            미진행 (Skip)
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        {isUserTurn(selectedEcn) && selectedEcn.CurrentStep === 3 && (
+                                            <p className="text-[10px] text-indigo-500 font-bold mt-2 text-right">* 영업부서는 파생 모델 진행 여부를 필수로 선택해야 합니다.</p>
+                                        )}
+                                    </section>
+                                )}
+
+                                {/* ECO Additional Options */}
+                                {isUserTurn(selectedEcn) && (
+                                    <section className="bg-slate-50 p-4 rounded-xl border border-slate-200 mt-4 flex gap-6">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={selectedEcn.HasStatusChange || false}
+                                                onChange={(e) => setSelectedEcn({...selectedEcn, HasStatusChange: e.target.checked})}
+                                                className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                                            />
+                                            <span className="text-sm font-bold text-slate-700">현상 변경 여부 (Status Change)</span>
+                                        </label>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-bold text-slate-700">재고 처리 방식:</span>
+                                            <select 
+                                                value={selectedEcn.InventoryAction || 'Use As Is'}
+                                                onChange={(e) => setSelectedEcn({...selectedEcn, InventoryAction: e.target.value})}
+                                                className="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-indigo-500"
+                                            >
+                                                <option value="Use As Is">그대로 사용 (Use As Is)</option>
+                                                <option value="Running Change">자연 소진 후 변경 (Running Change)</option>
+                                                <option value="Immediate Change">즉시 변경 (Immediate Change)</option>
+                                                <option value="Rework">재작업 (Rework)</option>
+                                                <option value="Scrap">폐기 (Scrap)</option>
+                                            </select>
+                                        </div>
+                                    </section>
+                                )}
 
                                 {isUserTurn(selectedEcn) && (
                                     <section className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm mt-6">

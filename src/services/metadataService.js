@@ -8,7 +8,7 @@ import {
     updateDoc, 
     deleteDoc,
     serverTimestamp 
-} from 'firebase/firestore';
+} from '../firebase';
 import { db } from '../firebase';
 
 const COLLECTION_NAME = 'metadata_fields';

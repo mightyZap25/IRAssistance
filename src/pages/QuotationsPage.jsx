@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, query, getDocs, orderBy, deleteDoc, doc, addDoc, serverTimestamp, where, updateDoc } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy, deleteDoc, doc, addDoc, serverTimestamp, where, updateDoc } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { 
     FileText, Plus, Search, Filter, Trash2, Edit2, 

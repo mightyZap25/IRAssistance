@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, getDocs, doc, setDoc, updateDoc, serverTimestamp, orderBy } from 'firebase/firestore';
+import { collection, query, getDocs, doc, setDoc, updateDoc, serverTimestamp, orderBy } from '../firebase';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import MasterDataGrid from '../components/common/MasterDataGrid';

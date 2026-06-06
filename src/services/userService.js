@@ -1,5 +1,4 @@
-import { db } from '../firebase';
-import { doc, getDoc, setDoc, serverTimestamp, collection, getDocs, orderBy, query } from 'firebase/firestore';
+import { db, doc, getDoc, setDoc, serverTimestamp, collection, getDocs, orderBy, query } from '../firebase';
 
 export const USER_ROLES = {
     ADMIN: 'admin',

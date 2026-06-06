@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, query, getDocs, where, orderBy } from 'firebase/firestore';
+import { collection, query, getDocs, where, orderBy } from '../firebase';
 import { 
     TrendingUp, DollarSign, BarChart2, PieChart, 
     ArrowUpRight, ArrowDownRight, Calendar, Filter,

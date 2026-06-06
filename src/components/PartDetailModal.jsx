@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, query, where, limit, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, limit, orderBy } from '../firebase';
 import { X, Layers, ArrowRightLeft, Clock, FileText, User, Package, Box, Ruler, Factory, Settings, DollarSign, Tag } from 'lucide-react';
 
 export default function PartDetailModal({ data, onClose }) {
@@ -148,7 +148,7 @@ export default function PartDetailModal({ data, onClose }) {
                                     <Factory size={12} /> Manufacture & Cost
                                 </h3>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
-                                    <CompactInfoItem label="Maker" value={currentViewingPart.Maker} />
+                                    <CompactInfoItem label="공급사" value={currentViewingPart.Maker} />
                                     <CompactInfoItem label="MFN" value={currentViewingPart.MFN} />
                                     <CompactInfoItem label="Owner" value={currentViewingPart.Owner} />
                                     <CompactInfoItem label="Price" value={currentViewingPart.UnitPrice ? `${currentViewingPart.Currency || 'KRW'} ${Number(currentViewingPart.UnitPrice).toLocaleString()}` : '-'} highlight />

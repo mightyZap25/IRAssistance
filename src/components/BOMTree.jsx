@@ -302,7 +302,7 @@ function BOMTreeNode({
                 )}
 
                 {/* Badge */}
-                <div className={`w-5 flex items-center justify-center shrink-0 ${isRoot ? 'ml-0 mr-1' : 'mr-1'}`}>
+                <div className={`w-4 flex items-center justify-center shrink-0 ${isRoot ? 'ml-0 mr-0.5' : 'mr-0.5'}`}>
                     <span className={`w-4 h-4 flex items-center justify-center rounded ${isDeleted || isDiscontinued ? 'bg-slate-300' : style.color} text-white text-[9px] font-black shadow-sm`}>
                         {style.char}
                     </span>
@@ -314,29 +314,35 @@ function BOMTreeNode({
                     onMouseEnter={handleMouseEnter}
                     onMouseLeave={handleMouseLeave}
                 >
-                    <div className="flex items-baseline gap-2 overflow-hidden justify-start relative">
-                        <span className={`text-xs font-bold truncate ${isDeleted ? 'text-slate-400 line-through decoration-red-500' : isDiscontinued ? 'text-amber-600/70' : (style.char === 'P' ? 'text-blue-600 font-black' : 'text-slate-700')} ${node.isCircular ? 'text-red-600' : ''}`}>
-                            {node.Name}
-                        </span>
-                        {node.isCircular && (
-                            <span className="text-[9px] bg-red-600 text-white px-1.5 py-0.5 rounded-full font-black flex items-center gap-1 animate-pulse shrink-0 whitespace-nowrap">
-                                [⚠️ 순환 참조 오류]
+                    <div className="flex-1 flex justify-between items-center overflow-hidden">
+                        <div className="flex flex-col py-0.5 justify-center overflow-hidden text-left">
+                            <div className="flex items-center gap-1.5 leading-none">
+                                <span className="text-[9px] text-blue-600 font-bold font-mono tracking-tighter">
+                                    {node.PartID}
+                                </span>
+                                {node.isCircular && (
+                                    <span className="text-[8px] bg-red-600 text-white px-1 py-0.5 rounded-full font-black animate-pulse whitespace-nowrap leading-none">
+                                        [⚠️ 순환 참조]
+                                    </span>
+                                )}
+                                {diff?.type === 'modified' && (
+                                    <span className="text-[8px] bg-amber-100 text-amber-600 px-1 rounded font-black uppercase leading-none" title={diff.details}>Modified</span>
+                                )}
+                                {isNew && (
+                                    <span className="text-[8px] bg-emerald-100 text-emerald-600 px-1 rounded font-black uppercase tracking-tighter leading-none">Added</span>
+                                )}
+                            </div>
+                            <span className={`text-xs font-bold mt-0.5 truncate ${isDeleted ? 'text-slate-400 line-through decoration-red-500' : isDiscontinued ? 'text-amber-600/70' : (style.char === 'P' ? 'text-blue-600 font-black' : 'text-slate-700')} ${node.isCircular ? 'text-red-600' : ''}`}>
+                                {node.Name}
                             </span>
-                        )}
-                        <span className="text-[10px] text-slate-400 font-mono whitespace-nowrap">[{node.PartID}]</span>
+                        </div>
                         
-                        {diff?.type === 'modified' && (
-                            <span className="text-[8px] bg-amber-100 text-amber-600 px-1 rounded font-black uppercase" title={diff.details}>Modified</span>
-                        )}
-
-                        <div className="flex items-center gap-2 ml-auto pr-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-2 pr-4 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                             <div className="flex items-center gap-1 text-[9px] font-bold text-slate-400">
                                 <DollarSign size={8} />
                                 {new Intl.NumberFormat('ko-KR').format(node.TotalCost || 0)}
                             </div>
                         </div>
-
-                        {isNew && <span className="text-[8px] bg-emerald-100 text-emerald-600 px-1 rounded font-black uppercase tracking-tighter">Added</span>}
                     </div>
                 </div>
 
@@ -380,8 +386,8 @@ function BOMTreeNode({
                     ) : (
                         <div className="flex items-center gap-4">
                             <span className="text-[10px] font-bold text-slate-500">{isElectronic ? node.Location : node.Note}</span>
-                            <div className="px-4 text-right min-w-[60px]">
-                                <span className={`text-xs font-bold px-2 py-1 rounded shadow-sm border ${isDeleted ? 'bg-slate-50 text-slate-300 border-slate-100' : 'bg-white text-slate-500 border-slate-100'}`}>
+                            <div className="px-1.5 text-right min-w-[36px]">
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border ${isDeleted ? 'bg-slate-50 text-slate-300 border-slate-100' : 'bg-white text-slate-500 border-slate-100'}`}>
                                     {node.Quantity || (isRoot ? 1 : 0)}
                                 </span>
                             </div>
@@ -392,7 +398,7 @@ function BOMTreeNode({
             </div>
 
             {expanded && (
-                <div className={`border-l border-slate-200/60 ${isRoot ? 'ml-[14px]' : 'ml-[22px]'}`}>
+                <div className={`border-l border-slate-200/60 ${isRoot ? 'ml-[10px]' : 'ml-[12px]'}`}>
                     {hasChildren && (
                         <SortableContext 
                             items={node.Children.map(c => c.PartID)} 

@@ -90,7 +90,7 @@ export default function BOMPartListModal({ isOpen, onClose, rootPart, bomData })
                                     <th className="px-4 py-4">Part ID</th>
                                     <th className="px-4 py-4">Name</th>
                                     <th className="px-4 py-4">Specification</th>
-                                    <th className="px-4 py-4">Maker</th>
+                                    <th className="px-4 py-4">공급사</th>
                                     <th className="px-4 py-4 text-center">Total Qty</th>
                                 </tr>
                             </thead>

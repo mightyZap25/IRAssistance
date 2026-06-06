@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, setDoc, doc, deleteDoc, addDoc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, setDoc, doc, deleteDoc, addDoc, query, orderBy } from '../firebase';
 import { Settings, ShieldCheck, Activity, Plus, Trash2, CheckCircle2 } from 'lucide-react';
 import MasterDataGrid from '../components/common/MasterDataGrid';
 

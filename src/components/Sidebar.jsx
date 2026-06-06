@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { db } from '../firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import {
     LayoutDashboard, Package, Layers, Settings, History,
@@ -13,13 +13,13 @@ import {
 } from 'lucide-react';
 
 const ROLE_MENU_MAP = {
-    admin: ['/', '/parts', '/bom', '/customers', '/prod-requests', '/prod-execution', '/purchasing', '/outsourcing', '/inventory', '/receiving/inspection', '/qa/config', '/qa/process', '/transactions', '/manufacturers', '/vendors', '/ecn', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/quotations', '/sales/billing', '/workspace/calendar', '/workspace/files', '/workspace/mail', '/workspace/memo'],
-    engineer: ['/', '/parts', '/bom', '/ecn', '/inventory', '/transactions', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail', '/workspace/memo'],
-    sales: ['/', '/customers', '/prod-requests', '/inventory', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/quotations', '/sales/billing', '/workspace/calendar', '/workspace/files', '/workspace/mail', '/workspace/memo'],
-    qa: ['/', '/receiving/inspection', '/qa/config', '/qa/process', '/inventory', '/transactions', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail', '/workspace/memo'],
-    production: ['/', '/prod-execution', '/prod-requests', '/inventory', '/outsourcing', '/transactions', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail', '/workspace/memo'],
-    manager: ['/', '/customers', '/prod-requests', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/transactions', '/manufacturers', '/vendors', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/quotations', '/sales/billing', '/workspace/calendar', '/workspace/files', '/workspace/mail', '/workspace/memo'],
-    viewer: ['/', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/files', '/workspace/mail', '/workspace/memo'],
+    admin: ['/', '/settings', '/parts', '/bom', '/customers', '/prod-requests', '/prod-execution', '/purchasing', '/outsourcing', '/inventory', '/receiving/inspection', '/qa/config', '/qa/process', '/transactions', '/manufacturers', '/vendors', '/ecn', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/quotations', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo'],
+    engineer: ['/', '/parts', '/bom', '/ecn', '/inventory', '/transactions', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo'],
+    sales: ['/', '/customers', '/prod-requests', '/inventory', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/quotations', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo'],
+    qa: ['/', '/receiving/inspection', '/qa/config', '/qa/process', '/inventory', '/transactions', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo'],
+    production: ['/', '/prod-execution', '/prod-requests', '/inventory', '/outsourcing', '/transactions', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo'],
+    manager: ['/', '/customers', '/prod-requests', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/transactions', '/manufacturers', '/vendors', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/quotations', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo'],
+    viewer: ['/', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo'],
 };
 
 export default function Sidebar() {
@@ -58,7 +58,7 @@ export default function Sidebar() {
         { title: '메인', items: [ { name: '부품 관리', path: '/parts', icon: Settings }, { name: 'BOM 관리', path: '/bom', icon: Layers }, { name: '고객사 관리', path: '/customers', icon: Building2 } ] },
         { title: '생산 및 구매', items: [ { name: '생산 의뢰', path: '/prod-requests', icon: ClipboardList }, { name: '생산 계획', path: '/prod-execution', icon: PlayCircle }, { name: '발주 관리', path: '/purchasing', icon: ShoppingCart }, { name: '외주 관리', path: '/outsourcing', icon: Truck } ] },
         { title: '재고 및 품질', items: [ { name: '재고 현황', path: '/inventory', icon: Package }, { name: '수입 검사', path: '/receiving/inspection', icon: FileCheck }, { name: '품질 공정 관리', path: '/qa/process', icon: Activity }, { name: '품질 기준 설정', path: '/qa/config', icon: Settings }, { name: '입출고 내역', path: '/transactions', icon: History } ] },
-        { title: '마스터 데이터', items: [ { name: '제조사 관리', path: '/manufacturers', icon: Factory }, { name: '공급사 관리', path: '/vendors', icon: Users }, { name: 'ECN 승인', path: '/ecn', icon: AlertCircle, badge: pendingEcnCount > 0 ? pendingEcnCount : null } ] }
+        { title: '마스터 데이터', items: [ { name: '제조사 관리', path: '/manufacturers', icon: Factory }, { name: '공급사 관리', path: '/vendors', icon: Users }, { name: 'ECN 승인', path: '/ecn', icon: AlertCircle, badge: pendingEcnCount > 0 ? pendingEcnCount : null }, { name: '환경설정(Admin)', path: '/settings', icon: Settings } ] }
     ];
 
     const PROJECT_MENU_GROUPS = [
@@ -91,6 +91,7 @@ export default function Sidebar() {
             items: [
                 { name: '근태 관리', path: '/hr/attendance', icon: UserCheck, badge: pendingApprovalCount > 0 ? pendingApprovalCount : null },
                 { name: '통합 일정', path: '/workspace/calendar', icon: CalendarDays },
+                { name: '회의 및 미팅', path: '/workspace/meetings', icon: Users },
                 { name: '통합 메일', path: '/workspace/mail', icon: Mail },
                 { name: '메모장', path: '/workspace/memo', icon: StickyNote },
                 { name: '파일 공유', path: '/workspace/files', icon: Cloud }

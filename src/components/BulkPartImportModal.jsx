@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { collection, getDocs, query, where, writeBatch, doc, addDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { collection, getDocs, query, where, writeBatch, doc, addDoc, updateDoc, arrayUnion } from '../firebase';
 import { db } from '../firebase';
 import { X, Plus, Trash2, Save, AlertCircle, Copy, ChevronDown, ChevronRight, CheckCircle2, LayoutGrid, List, Link, Upload, FileSpreadsheet, ClipboardPaste, AlertTriangle, Check, RotateCcw } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -28,22 +28,30 @@ const DEFAULT_ROW = {
 };
 
 const FIELD_MAP = {
+    'PartID': ['ID', '부품번호', 'Part ID', 'PartID', '품번'],
     'Name': ['품명', '부품명', '이름', 'Name', 'Part Name', 'Item Name'],
-    'Spec': ['규격', '사양', 'Spec', 'Specification', 'Size'],
-    'Category': ['카테고리', '구분', 'Category', 'Classification'],
-    'Class': ['클래스', 'Class', 'Part/Assy'],
-    'PartTypeCode': ['타입', 'Type', 'PartTypeCode', '코드'],
-    'Unit': ['단위', 'Unit'],
-    'Manufacturer': ['제조사', 'Maker', 'Manufacturer'],
-    'UnitPrice': ['단가', '가격', 'Price', 'UnitPrice', 'Cost'],
+    'Spec': ['규격', '사양', 'Spec', 'Specification', 'Size', '가공방법(Tooling)/\n구매품목(Item)'],
+    'Category': ['카테고리', '구분', 'Category', 'Classification', '대분류', '종류'],
+    'Class': ['클래스', 'Class', 'Part/Assy', '분류'],
+    'PartTypeCode': ['타입', 'Type', 'PartTypeCode', '코드', '타입코드'],
+    'Unit': ['단위', 'Unit', 'UNIT'],
+    'Manufacturer': ['제조사', 'Maker', 'Manufacturer', '제조업체'],
+    'Maker': ['공급사', 'Vendor', 'Maker'],
+    'UnitPrice': ['단가', '가격', 'Price', 'UnitPrice', 'Cost', 'Unit price\n[Won]', 'Unit price\n[USD $]', 'Price\n[Won]'],
     'Currency': ['통화', 'Currency'],
     'Description': ['비고', '설명', 'Description', 'Remark'],
     'Material': ['재질', 'Material'],
+    'Grade': ['등급', 'Grade'],
     'Color': ['색상', 'Color'],
-    'ProcessType': ['공정', '가공/구매', 'ProcessType'],
-    'Owner': ['담당자', 'Owner', 'Manager'],
-    'MPN': ['MPN', '제조사부품번호'],
-    'MFN': ['MFN', '도번'],
+    'ProcessType': ['공정', '가공/구매', 'ProcessType', 'Process Type'],
+    'Owner': ['담당자', 'Owner', 'Manager', '담당부서'],
+    'MPN': ['MPN', '제조사부품번호', '제조사품번'],
+    'MFN': ['MFN', '도번', '모델번호'],
+    'Rev': ['리비전', 'Revision', 'Rev'],
+    'CE': ['CE'],
+    'RoHS': ['RoHS'],
+    'UL': ['UL'],
+    'KC': ['KC']
 };
 
 export default function BulkPartImportModal({ onClose, onSuccess }) {
@@ -276,42 +284,67 @@ export default function BulkPartImportModal({ onClose, onSuccess }) {
                 }
 
                 for (const r of chunk) {
-                    const catMap = { '기구부품 (M)': 'M', '전자부품 (E)': 'E', '구매품 (O)': 'O' };
-                    const catCode = catMap[r.Category] || 'O';
-                    let classCode = 'I';
-                    if (r.Class === 'Assembly (A)' || r.Class === 'Product (P)') classCode = 'A';
-                    const typeCode = (r.PartTypeCode || 'X').toUpperCase().charAt(0);
-                    const comb = `${catCode}${classCode}${typeCode}`;
+                    let partID = r.PartID;
+                    let masterPartID = r.MasterPartID;
+                    let rev = r.Rev || '1.0';
 
-                    sequences[comb]++;
-                    const nextSeq = String(sequences[comb]).padStart(4, '0');
-                    const masterID = `IR${comb}${nextSeq}`;
-                    const partID = `${masterID}-1.0`;
+                    if (r.PartID && r.PartID.includes('-')) {
+                        const parts = r.PartID.split('-');
+                        masterPartID = parts[0];
+                        rev = parts[1] || '1.0';
+                        partID = masterPartID; // 리비전 제외
+                    } else if (r.PartID) {
+                        masterPartID = r.PartID;
+                        partID = masterPartID; // 리비전 제외
+                    } else {
+                        const catMap = { '기구부품 (M)': 'M', '전자부품 (E)': 'E', '구매품 (O)': 'O' };
+                        const catCode = catMap[r.Category] || 'O';
+                        let classCode = 'I';
+                        if (r.Class === 'Assembly (A)' || r.Class === 'Product (P)') classCode = 'A';
+                        const typeCode = (r.PartTypeCode || 'X').toUpperCase().charAt(0);
+                        const comb = `${catCode}${classCode}${typeCode}`;
 
-                    const newDocRef = doc(collection(db, 'parts'));
+                        sequences[comb]++;
+                        const nextSeq = String(sequences[comb]).padStart(4, '0');
+                        masterPartID = `IR${comb}${nextSeq}`;
+                        partID = masterPartID; // 리비전 제외
+                    }
+
+                    const safety = {
+                        CE: r.CE === true || String(r.CE).toUpperCase() === 'Y' || (r.Safety && r.Safety.CE === true),
+                        ROHS: r.ROHS === true || String(r.ROHS).toUpperCase() === 'Y' || (r.Safety && r.Safety.ROHS === true),
+                        UL: r.UL === true || String(r.UL).toUpperCase() === 'Y' || (r.Safety && r.Safety.UL === true),
+                        KC: r.KC === true || String(r.KC).toUpperCase() === 'Y' || (r.Safety && r.Safety.KC === true),
+                        REACH: false
+                    };
+
+                    const newDocRef = doc(db, 'parts', partID);
                     batch.set(newDocRef, {
                         ...r,
                         PartID: partID,
-                        MasterPartID: masterID,
-                        Rev: '1.0',
+                        MasterPartID: masterPartID,
+                        Rev: rev,
                         IsLatestRevision: true,
                         CreatedAt: new Date(),
                         LastModified: new Date(),
                         UnitPrice: Number(r.UnitPrice) || 0,
+                        Safety: safety,
+                        SafetyLinks: { CE: "", ROHS: "", UL: "", KC: "", REACH: "" },
+                        Lifecycle: r.Lifecycle || "Active"
                     });
 
                     const ecnRef = doc(collection(db, 'ecns'));
                     batch.set(ecnRef, {
-                        MasterPartID: masterID,
+                        MasterPartID: masterPartID,
                         PartID: partID,
-                        Rev: '1.0',
+                        Rev: rev,
                         Reason: 'Bulk Import',
                         Type: 'Simple Update',
                         Status: 'Approved',
                         CreatedAt: new Date(),
                         CreatedBy: 'System (Bulk)',
                         ModifiedFields: ['Creation'],
-                        Changes: [`[신규] 부품(${masterID})이 일괄 임포트로 등록되었습니다.`]
+                        Changes: [`[신규] 부품(${masterPartID})이 일괄 임포트로 등록되었습니다.`]
                     });
                 }
                 await batch.commit();
@@ -364,24 +397,116 @@ export default function BulkPartImportModal({ onClose, onSuccess }) {
                 <div className="flex-1 overflow-auto p-8 custom-scrollbar bg-slate-50/30">
                     {/* Drag & Drop Zone */}
                     {!mappingData && (
-                        <div
-                            onDragOver={handleDragOver}
-                            onDragLeave={handleDragLeave}
-                            onDrop={handleDrop}
-                            onClick={() => fileInputRef.current?.click()}
-                            className={`mb-8 border-3 border-dashed rounded-[2rem] p-12 flex flex-col items-center justify-center transition-all cursor-pointer group relative overflow-hidden ${isDragging ? 'border-blue-500 bg-blue-50 scale-[0.98]' : 'border-slate-200 bg-white hover:border-blue-400 hover:bg-slate-50/50'}`}
-                        >
-                            <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".xlsx,.xls,.csv" />
-                            <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mb-6 transition-all duration-500 ${isDragging ? 'bg-blue-600 text-white scale-110 rotate-12' : 'bg-slate-100 text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-600'}`}>
-                                <FileSpreadsheet size={40} />
+                        <div className="flex flex-col gap-6">
+                            <div className="bg-white border border-slate-200 rounded-[2rem] p-6 shadow-sm flex flex-col md:flex-row gap-4 items-center">
+                                <div className="flex-1 w-full">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-2">구글 스프레드시트 URL 일괄 추가</label>
+                                    <input 
+                                        type="text" 
+                                        placeholder="https://docs.google.com/spreadsheets/d/.../edit 형식의 시트 주소를 붙여넣으세요"
+                                        id="sheet-url-input"
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-blue-100 outline-none transition-all"
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        const urlVal = document.getElementById('sheet-url-input')?.value?.trim();
+                                        if (!urlVal) {
+                                            alert("구글 시트 URL을 입력해주세요.");
+                                            return;
+                                        }
+                                        setIsSubmitting(true);
+                                        try {
+                                            let csvUrl = urlVal;
+                                            if (urlVal.includes('/edit')) {
+                                                csvUrl = urlVal.split('/edit')[0] + '/export?format=csv';
+                                                if (urlVal.includes('gid=')) {
+                                                    const gid = urlVal.split('gid=')[1]?.split('&')[0];
+                                                    if (gid) csvUrl += `&gid=${gid}`;
+                                                }
+                                            }
+                                            console.log("[Google Sheets Import] Fetching CSV:", csvUrl);
+                                            const res = await fetch(csvUrl);
+                                            if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+                                            const text = await res.text();
+                                            
+                                            // Split by lines and parse CSV
+                                            const lines = [];
+                                            let row = [""];
+                                            let inQuotes = false;
+                                            for (let i = 0; i < text.length; i++) {
+                                                const c = text[i];
+                                                const next = text[i+1];
+                                                if (c === '"') {
+                                                    if (inQuotes && next === '"') {
+                                                        row[row.length - 1] += '"';
+                                                        i++;
+                                                    } else {
+                                                        inQuotes = !inQuotes;
+                                                    }
+                                                } else if (c === ',' && !inQuotes) {
+                                                    row.push("");
+                                                } else if ((c === '\r' || c === '\n') && !inQuotes) {
+                                                    if (c === '\r' && next === '\n') i++;
+                                                    lines.push(row);
+                                                    row = [""];
+                                                } else {
+                                                    row[row.length - 1] += c;
+                                                }
+                                            }
+                                            if (row.length > 1 || row[0] !== "") lines.push(row);
+
+                                            if (lines.length < 2) {
+                                                alert("시트에 유효한 데이터가 없습니다.");
+                                                return;
+                                            }
+
+                                            const headers = lines[0].map(h => String(h).trim());
+                                            const rowsData = lines.slice(1);
+
+                                            // Auto mapping
+                                            const initialMap = {};
+                                            Object.keys(FIELD_MAP).forEach(sysField => {
+                                                const aliases = FIELD_MAP[sysField];
+                                                const foundHeader = headers.find(h => aliases.some(a => h.toLowerCase() === a.toLowerCase()));
+                                                if (foundHeader) initialMap[sysField] = foundHeader;
+                                            });
+
+                                            setMappingData({ headers, data: rowsData });
+                                            setColumnMap(initialMap);
+                                        } catch (err) {
+                                            console.error(err);
+                                            alert("시트를 가져오는 도중 오류가 발생했습니다. 링크 공유 설정이 '링크가 있는 모든 사용자에게 공개' 상태인지 확인해주세요.");
+                                        } finally {
+                                            setIsSubmitting(false);
+                                        }
+                                    }}
+                                    className="px-8 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm rounded-2xl transition-all shadow-lg shadow-blue-200 self-end"
+                                >
+                                    시트 불러오기
+                                </button>
                             </div>
-                            <h3 className="text-xl font-black text-slate-800 mb-2">엑셀 파일을 이곳에 드롭하거나 클릭하여 선택하세요</h3>
-                            <p className="text-slate-400 font-bold mb-6 text-sm">표준 엑셀 양식 및 사용자 정의 양식 모두 자동 인식 가능합니다.</p>
-                            
-                            <div className="flex gap-4">
-                                <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl text-[10px] font-bold text-slate-500 border border-slate-100"><Check size={14} className="text-green-500" /> 컬럼 자동 매핑</div>
-                                <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl text-[10px] font-bold text-slate-500 border border-slate-100"><ClipboardPaste size={14} className="text-blue-500" /> Ctrl+V 붙여넣기 지원</div>
-                                <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl text-[10px] font-bold text-slate-500 border border-slate-100"><AlertCircle size={14} className="text-orange-500" /> 실시간 유효성 검사</div>
+
+                            <div
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={handleDrop}
+                                onClick={() => fileInputRef.current?.click()}
+                                className={`border-3 border-dashed rounded-[2rem] p-12 flex flex-col items-center justify-center transition-all cursor-pointer group relative overflow-hidden ${isDragging ? 'border-blue-500 bg-blue-50 scale-[0.98]' : 'border-slate-200 bg-white hover:border-blue-400 hover:bg-slate-50/50'}`}
+                            >
+                                <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".xlsx,.xls,.csv" />
+                                <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mb-6 transition-all duration-500 ${isDragging ? 'bg-blue-600 text-white scale-110 rotate-12' : 'bg-slate-100 text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-600'}`}>
+                                    <FileSpreadsheet size={40} />
+                                </div>
+                                <h3 className="text-xl font-black text-slate-800 mb-2">엑셀 파일을 이곳에 드롭하거나 클릭하여 선택하세요</h3>
+                                <p className="text-slate-400 font-bold mb-6 text-sm">표준 엑셀 양식 및 사용자 정의 양식 모두 자동 인식 가능합니다.</p>
+                                
+                                <div className="flex gap-4">
+                                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl text-[10px] font-bold text-slate-500 border border-slate-100"><Check size={14} className="text-green-500" /> 컬럼 자동 매핑</div>
+                                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl text-[10px] font-bold text-slate-500 border border-slate-100"><ClipboardPaste size={14} className="text-blue-500" /> Ctrl+V 붙여넣기 지원</div>
+                                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl text-[10px] font-bold text-slate-500 border border-slate-100"><AlertCircle size={14} className="text-orange-500" /> 실시간 유효성 검사</div>
+                                </div>
                             </div>
                         </div>
                     )}

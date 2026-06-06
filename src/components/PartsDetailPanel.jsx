@@ -1,49 +1,82 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../firebase';
-import { collection, getDocs, limit, query, where, updateDoc, doc } from 'firebase/firestore';
-import { X, Clock, ArrowRightLeft, Layers, FileText, ShieldCheck, User, Sparkles, AlertTriangle, Paperclip, PenTool } from 'lucide-react';
+import { collection, getDocs, limit, query, where, updateDoc, doc } from '../firebase';
+import { X, Clock, ArrowRightLeft, Layers, FileText, ShieldCheck, User, Sparkles, AlertTriangle, Paperclip, PenTool, Plus } from 'lucide-react';
 import RoleGuard from './common/RoleGuard';
 import { USER_ROLES } from '../services/userService';
 import { useAuth } from '../contexts/AuthContext';
 
 // Recursive Tree Node component with luxurious visual cues (gradient connectors, soft shadow nodes)
 function ImpactTreeNode({ node }) {
-    const [isOpen, setIsOpen] = useState(true);
+    const [isOpen, setIsOpen] = useState(false); // Collapsed by default
     const hasChildren = node.children && node.children.length > 0;
 
     return (
         <div className="pl-6 relative mt-3 first:mt-0">
             {/* Elegant connection lines */}
-            <div className="absolute left-2.5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-indigo-500/35 via-purple-500/20 to-transparent"></div>
-            <div className="absolute left-2.5 top-5 w-4 h-0.5 bg-indigo-500/35"></div>
+            <div className="absolute left-2.5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-slate-200 dark:from-slate-700 via-slate-100 dark:via-slate-800 to-transparent"></div>
+            <div className="absolute left-2.5 top-5 w-4 h-0.5 bg-slate-200 dark:bg-slate-700"></div>
 
-            <div className="flex items-center justify-between p-3.5 bg-white/70 dark:bg-slate-900/60 backdrop-blur-sm rounded-2xl border border-slate-150/70 dark:border-slate-800/80 hover:border-indigo-300/60 dark:hover:border-indigo-800/80 hover:shadow-md transition-all duration-300 relative group">
+            <div className={`flex items-center justify-between p-4 bg-white dark:bg-slate-900 rounded-[1.5rem] border shadow-sm transition-all duration-300 relative group ${node.isProduct ? 'border-blue-100 dark:border-blue-900/50 hover:border-blue-300' : 'border-slate-150 dark:border-slate-800 hover:border-indigo-300'}`}>
+                <div className="flex items-center gap-4">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${node.isProduct ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-500'}`}>
+                        {node.isProduct ? <Sparkles size={18} /> : <Layers size={18} />}
+                    </div>
+                    
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <div className="font-black text-slate-800 dark:text-slate-100 text-sm">
+                                {node.ParentName}
+                            </div>
+                            {node.isTopLevel && (
+                                <span className="px-2 py-0.5 rounded-lg bg-emerald-500 text-white text-[8px] font-black uppercase tracking-wider">Top-Level</span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] font-mono font-black text-slate-400">{node.ParentID}</span>
+                            <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${node.isProduct ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
+                                {node.isProduct ? '완제품' : '조립품'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
                 <div className="flex items-center gap-3">
+                    <div className="text-right">
+                        <div className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">소요량</div>
+                        <div className="text-sm font-black text-indigo-600 dark:text-indigo-400">{node.Quantity} <span className="text-[10px]">EA</span></div>
+                    </div>
                     {hasChildren && (
                         <button 
                             onClick={() => setIsOpen(!isOpen)} 
-                            className="w-5 h-5 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-indigo-600 transition-colors shadow-sm"
+                            className="w-8 h-8 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all border border-slate-100 dark:border-slate-700"
                         >
-                            <span className="text-[9px] font-bold">{isOpen ? '▼' : '▶'}</span>
+                            {isOpen ? <X size={14} /> : <Plus size={14} />}
                         </button>
                     )}
-                    <div>
-                        <div className="font-extrabold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-2">
-                            {node.ParentName}
-                            {node.isTopLevel && (
-                                <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[8px] font-black uppercase tracking-wider shadow-sm">완제품 (Top-Level)</span>
-                            )}
-                        </div>
-                        <div className="text-[9px] font-mono font-bold text-slate-400 mt-0.5">{node.ParentID}</div>
-                    </div>
-                </div>
-                <div className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-1 rounded-xl border border-indigo-100/40 dark:border-indigo-950">
-                    소요량: {node.Quantity}
                 </div>
             </div>
+            
+            {/* Target Part Display - The "Red" part requested */}
+            {!hasChildren && (
+                <div className="pl-8 relative mt-2">
+                    <div className="absolute left-2.5 top-0 bottom-0 w-0.5 bg-rose-200"></div>
+                    <div className="absolute left-2.5 top-4 w-4 h-0.5 bg-rose-200"></div>
+                    <div className="flex items-center gap-3 p-3 bg-rose-50 dark:bg-rose-950/20 rounded-xl border border-rose-100 dark:border-rose-900/50 animate-pulse">
+                        <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center">
+                            <ArrowRightLeft size={14} />
+                        </div>
+                        <div>
+                            <div className="text-[10px] font-black text-rose-600 uppercase">Target Part</div>
+                            <div className="text-xs font-black text-rose-800 dark:text-rose-200 font-mono">{node.targetPartId}</div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {hasChildren && isOpen && (
-                <div className="mt-1">
+                <div className="mt-1 animate-in slide-in-from-top-2 duration-300">
                     {node.children.map((child, idx) => (
                         <ImpactTreeNode key={idx} node={child} />
                     ))}
@@ -97,8 +130,8 @@ export default function PartsDetailPanel({ partId, parts, filteredParts = [], on
         fetchPartDetails(targetId);
     }, [partId, selectedRevId]);
 
-    // Build recursive parent BOM trees
-    function buildImpactTree(targetPartId, visited = new Set()) {
+    // Build recursive parent BOM trees with target part highlighting
+    function buildImpactTree(targetPartId, originalTargetId, visited = new Set()) {
         if (!targetPartId || visited.has(targetPartId)) return [];
         visited.add(targetPartId);
 
@@ -109,14 +142,20 @@ export default function PartsDetailPanel({ partId, parts, filteredParts = [], on
             if (!p.ParentID) return;
             const parentPart = parts.find(pt => pt.PartID === p.ParentID);
             const parentName = parentPart ? parentPart.Name : p.ParentID;
+            
+            const isProduct = (parentPart?.Class || '').toLowerCase().includes('product') || p.ParentID.startsWith('IRP');
+            const isAssembly = (parentPart?.Class || '').toLowerCase().includes('assembly') || p.ParentID.startsWith('IRA');
             const isTop = !allBoms.some(b => b.ChildID === p.ParentID);
 
             paths.push({
                 ParentID: p.ParentID,
                 ParentName: parentName,
                 Quantity: p.Quantity,
-                isTopLevel: isTop || (parentPart?.Class === 'Product (P)' || parentPart?.Class === 'Product (A)'),
-                children: buildImpactTree(p.ParentID, new Set(visited))
+                isProduct,
+                isAssembly,
+                isTopLevel: isTop || isProduct,
+                targetPartId: originalTargetId, // Track the part we are looking for
+                children: buildImpactTree(p.ParentID, originalTargetId, new Set(visited))
             });
         });
 
@@ -165,7 +204,10 @@ export default function PartsDetailPanel({ partId, parts, filteredParts = [], on
             });
 
             // 6. Impact Tree
-            const impactTreeData = buildImpactTree(targetId);
+            const impactTreeData = buildImpactTree(targetId, targetId);
+
+            // 7. Derivative Models (Shared BasePartID)
+            const derivatives = partSnap.BasePartID ? parts.filter(p => p.BasePartID === partSnap.BasePartID && p.PartID !== partSnap.PartID) : [];
 
             setDetailData({
                 usedIn: resolvedUsedIn,
@@ -173,7 +215,8 @@ export default function PartsDetailPanel({ partId, parts, filteredParts = [], on
                 history: histList,
                 revisions: revList,
                 substitutes: resolvedSubs,
-                impactTree: impactTreeData
+                impactTree: impactTreeData,
+                derivatives: derivatives
             });
 
         } catch (e) {
@@ -259,10 +302,10 @@ export default function PartsDetailPanel({ partId, parts, filteredParts = [], on
                     <RoleGuard requiredRole={USER_ROLES.ENGINEER}>
                         <button
                             onClick={() => { onEdit(currentViewingPart); }}
-                            className="px-4.5 py-2.5 bg-white dark:bg-slate-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-slate-200 dark:border-indigo-900/50 font-black rounded-xl transition-all text-xs flex items-center gap-1.5 shadow-sm hover:shadow-md hover:border-indigo-300"
+                            className="px-10 min-w-[120px] justify-center py-2.5 bg-white dark:bg-slate-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-slate-200 dark:border-indigo-900/50 font-black rounded-xl transition-all text-xs flex items-center gap-2 shadow-sm hover:shadow-md hover:border-indigo-300"
                         >
-                            <PenTool size={14} />
-                            <span>수정</span>
+                            <PenTool size={16} />
+                            <span>수정하기</span>
                         </button>
                     </RoleGuard>
                     {!inline && (
@@ -348,22 +391,22 @@ export default function PartsDetailPanel({ partId, parts, filteredParts = [], on
                 <div className={`${inline ? 'lg:col-span-7' : 'lg:col-span-5'} space-y-6 ${inline ? 'h-full' : 'h-[calc(90vh-10rem)]'} overflow-y-auto pr-3 custom-scrollbar`}>
                         
                         {/* Title and Revision Selector */}
-                        <div className="bg-gradient-to-br from-white via-slate-50/50 to-indigo-50/30 dark:from-slate-900 dark:via-slate-900/80 dark:to-indigo-950/20 p-6 rounded-[2rem] border border-slate-200/60 dark:border-slate-800/80 flex flex-col justify-between items-start gap-5 shadow-sm w-full relative overflow-hidden group">
+                        <div className="bg-gradient-to-br from-white via-slate-50/50 to-indigo-50/30 dark:from-slate-900 dark:via-slate-900/80 dark:to-indigo-950/20 py-4 px-5 rounded-[2rem] border border-slate-200/60 dark:border-slate-800/80 flex flex-col justify-between items-start gap-3 shadow-sm w-full relative overflow-hidden group">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full -mr-16 -mt-16 blur-2xl group-hover:bg-indigo-500/10 transition-colors"></div>
                             <div className="w-full relative z-10">
                                 <div>
-                                    <div className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em]">부품명 (Part Name)</div>
-                                    <div className="text-3xl font-black text-slate-800 dark:text-slate-100 mt-2 leading-tight tracking-tight">{currentViewingPart.Name}</div>
+                                    <div className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em]">부품명</div>
+                                    <div className="text-xl font-black text-slate-800 dark:text-slate-100 mt-1 leading-tight tracking-tight">{currentViewingPart.Name}</div>
                                 </div>
-                                <div className="flex flex-wrap items-center gap-8 mt-5 pt-5 border-t border-slate-200/80 dark:border-slate-800/60 w-full">
+                                <div className="flex flex-wrap items-center gap-6 mt-3 pt-3 border-t border-slate-200/80 dark:border-slate-800/60 w-full">
                                     <div className="flex-1 min-w-[140px]">
-                                        <span className="text-[9px] font-black text-purple-500 uppercase tracking-widest block mb-1">규격 (Specification)</span>
+                                        <span className="text-[9px] font-black text-purple-500 uppercase tracking-widest block mb-1">규격</span>
                                         <span className="text-sm font-extrabold text-slate-700 dark:text-slate-300 leading-snug">{currentViewingPart.Spec || '-'}</span>
                                     </div>
-                                    <div className="border-l border-slate-200 dark:border-slate-800/60 pl-8">
-                                        <span className="text-[9px] font-black text-pink-500 uppercase tracking-widest block mb-1">리비전 (Revision)</span>
+                                    <div className="border-l border-slate-200 dark:border-slate-800/60 pl-4">
+                                        <span className="text-[9px] font-black text-pink-500 uppercase tracking-widest block mb-1">리비전</span>
                                         <div className="flex items-center gap-2">
-                                            <span className="text-base font-mono font-black text-slate-800 dark:text-slate-100">Rev {currentViewingPart.Rev}</span>
+                                            <span className="text-sm font-mono font-black text-slate-800 dark:text-slate-100">Rev {currentViewingPart.Rev}</span>
                                             {currentViewingPart.IsLatestRevision && (
                                                 <span className="px-2 py-0.5 rounded-lg bg-emerald-500 text-white text-[8px] font-black uppercase tracking-wider shadow-sm shadow-emerald-200 dark:shadow-none">LATEST</span>
                                             )}
@@ -371,7 +414,7 @@ export default function PartsDetailPanel({ partId, parts, filteredParts = [], on
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex justify-between items-center w-full mt-2 p-3 bg-white/50 dark:bg-slate-950/50 rounded-2xl border border-white dark:border-slate-800/50 relative z-10 shadow-sm">
+                            <div className="flex justify-between items-center w-full mt-1.5 p-2 bg-white/50 dark:bg-slate-950/50 rounded-2xl border border-white dark:border-slate-800/50 relative z-10 shadow-sm">
                                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">리비전 전환</div>
                                 <select
                                     value={selectedRevId || partId}
@@ -395,13 +438,13 @@ export default function PartsDetailPanel({ partId, parts, filteredParts = [], on
                                 </h3>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
-                                <CompactInfoItem label="부품 ID (Part ID)" value={currentViewingPart.PartID} />
-                                <CompactInfoItem label="대분류 (Category)" value={currentViewingPart.Category} />
-                                <CompactInfoItem label="분류 (Class)" value={currentViewingPart.Class} />
-                                <CompactInfoItem label="타입코드 (Type)" value={currentViewingPart.PartTypeCode} />
-                                <CompactInfoItem label="리비전 (Rev)" value={currentViewingPart.Rev} />
+                                <CompactInfoItem label="부품 ID" value={currentViewingPart.PartID} />
+                                <CompactInfoItem label="대분류" value={currentViewingPart.Category} />
+                                <CompactInfoItem label="분류" value={currentViewingPart.Class} />
+                                <CompactInfoItem label="타입코드" value={currentViewingPart.PartTypeCode} />
+                                <CompactInfoItem label="리비전" value={currentViewingPart.Rev} />
                                 <CompactInfoItem 
-                                    label="상태 (Lifecycle)" 
+                                    label="상태" 
                                     value={
                                         currentViewingPart.Lifecycle === 'Obsolete' ? (
                                             <span className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-slate-600 to-slate-800 text-white text-[9px] font-black uppercase tracking-wider shadow-sm border border-slate-500/30">폐기/단종</span>
@@ -414,21 +457,21 @@ export default function PartsDetailPanel({ partId, parts, filteredParts = [], on
                                         )
                                     } 
                                 />
-                                <CompactInfoItem label="제조사 (Maker)" value={currentViewingPart.Maker} />
-                                <CompactInfoItem label="제조업체 (Manufacturer)" value={currentViewingPart.Manufacturer} />
-                                <CompactInfoItem label="제조품번 (MPN)" value={currentViewingPart.MPN} />
-                                <CompactInfoItem label="모델번호 (MFN)" value={currentViewingPart.MFN} />
-                                <CompactInfoItem label="가공/구매 (Process)" value={currentViewingPart.ProcessType} />
-                                <CompactInfoItem label="재질 (Material)" value={currentViewingPart.Material} />
-                                <CompactInfoItem label="등급 (Grade)" value={currentViewingPart.Grade} />
-                                <CompactInfoItem label="색상 (Color)" value={currentViewingPart.Color} />
-                                <CompactInfoItem label="담당자 (Owner)" value={currentViewingPart.Owner} isSpecial />
-                                <CompactInfoItem label="보관위치 (Location)" value={currentViewingPart.DefaultLocation} highlight isSpecial />
-                                <CompactInfoItem label="단가 (Price)" value={currentViewingPart.UnitPrice ? `${currentViewingPart.Currency || 'USD'} ${Number(currentViewingPart.UnitPrice).toLocaleString()}` : '-'} isSpecial />
-                                <CompactInfoItem label="조달 기간 (Lead Time)" value={currentViewingPart.LeadTime ? `${currentViewingPart.LeadTime} 일 (Days)` : '-'} isSpecial />
-                                <CompactInfoItem label="단위 (Unit)" value={currentViewingPart.Unit} />
-                                <CompactInfoItem label="등록일 (Created At)" value={currentViewingPart.CreatedAt ? (currentViewingPart.CreatedAt.seconds ? new Date(currentViewingPart.CreatedAt.seconds * 1000).toLocaleDateString() : new Date(currentViewingPart.CreatedAt).toLocaleDateString()) : '-'} />
-                                <CompactInfoItem label="보유 인증 (Safety)" value={
+                                <CompactInfoItem label="공급사" value={currentViewingPart.Maker} />
+                                <CompactInfoItem label="제조업체" value={currentViewingPart.Manufacturer} />
+                                <CompactInfoItem label="제조품번" value={currentViewingPart.MPN} />
+                                <CompactInfoItem label="모델번호" value={currentViewingPart.MFN} />
+                                <CompactInfoItem label="가공/구매" value={currentViewingPart.ProcessType} />
+                                <CompactInfoItem label="재질" value={currentViewingPart.Material} />
+                                <CompactInfoItem label="등급" value={currentViewingPart.Grade} />
+                                <CompactInfoItem label="색상" value={currentViewingPart.Color} />
+                                <CompactInfoItem label="담당자" value={currentViewingPart.Owner} isSpecial />
+                                <CompactInfoItem label="보관위치" value={currentViewingPart.DefaultLocation} highlight isSpecial />
+                                <CompactInfoItem label="단가" value={currentViewingPart.UnitPrice ? `${currentViewingPart.Currency || 'USD'} ${Number(currentViewingPart.UnitPrice).toLocaleString()}` : '-'} isSpecial />
+                                <CompactInfoItem label="조달 기간" value={currentViewingPart.LeadTime ? `${currentViewingPart.LeadTime} 일` : '-'} isSpecial />
+                                <CompactInfoItem label="단위" value={currentViewingPart.Unit} />
+                                <CompactInfoItem label="등록일" value={currentViewingPart.CreatedAt ? (currentViewingPart.CreatedAt.seconds ? new Date(currentViewingPart.CreatedAt.seconds * 1000).toLocaleDateString() : new Date(currentViewingPart.CreatedAt).toLocaleDateString()) : '-'} />
+                                <CompactInfoItem label="보유 인증" value={
                                     (() => {
                                         const certs = [];
                                         if (currentViewingPart.Safety?.ROHS) certs.push('RoHS');
@@ -485,6 +528,7 @@ export default function PartsDetailPanel({ partId, parts, filteredParts = [], on
                             {[
                                 { id: 'substitutes', label: '대체품' },
                                 { id: 'impact', label: '파급 효과' },
+                                { id: 'derivatives', label: '파생 모델' },
                                 { id: 'usedIn', label: 'BOM 사용처' },
                                 { id: 'inOut', label: '수불 이력' },
                                 { id: 'history', label: '변경 이력' }
@@ -534,8 +578,8 @@ export default function PartsDetailPanel({ partId, parts, filteredParts = [], on
                             {/* Impact Analysis Tab */}
                             {activeTab === 'impact' && (
                                 <div className="p-5 flex-1 overflow-y-auto custom-scrollbar">
-                                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">BOM Impact Analysis</h4>
-                                    <p className="text-[9px] text-slate-400 mb-4 leading-normal">본 품목 수정 시 최종 완제품(Top-Level)까지 파급 효과를 미치는 다차 계층 경로 구조입니다.</p>
+                                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">BOM Impact Path Analysis</h4>
+                                    <p className="text-[9px] text-slate-400 mb-4 leading-normal">부품이 포함된 상위 경로입니다. 클릭하여 구조를 펼쳐볼 수 있습니다.</p>
                                     {detailData.impactTree && detailData.impactTree.length > 0 ? (
                                         <div className="space-y-3">
                                             {detailData.impactTree.map((node, idx) => (
@@ -545,6 +589,39 @@ export default function PartsDetailPanel({ partId, parts, filteredParts = [], on
                                     ) : (
                                         <div className="flex flex-col items-center justify-center h-48 text-slate-400 dark:text-slate-600 text-xs italic">
                                             BOM 사용처가 없어 파급 효과를 주는 완제품 경로가 없습니다.
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Derivative Models Tab */}
+                            {activeTab === 'derivatives' && (
+                                <div className="p-5 flex-1 overflow-y-auto custom-scrollbar">
+                                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Derivative Models (파생 모델)</h4>
+                                    <p className="text-[9px] text-slate-400 mb-4 leading-normal">동일한 기본 모델(Base Model)을 공유하는 파생된 모델 리스트입니다.</p>
+                                    {detailData.derivatives && detailData.derivatives.length > 0 ? (
+                                        <ul className="space-y-3">
+                                            {detailData.derivatives.map((deriv, idx) => (
+                                                <li 
+                                                    key={idx} 
+                                                    onClick={() => onPartSelect(deriv.PartID)}
+                                                    className="flex items-center justify-between p-4 bg-white dark:bg-slate-900/60 rounded-2xl border border-slate-150/70 dark:border-slate-850 hover:border-emerald-300 dark:hover:border-emerald-800 hover:shadow-md transition-all cursor-pointer group"
+                                                >
+                                                    <div>
+                                                        <div className="font-extrabold text-slate-850 dark:text-slate-200 text-xs group-hover:text-emerald-600 transition-colors">{deriv.Name}</div>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <div className="text-[9px] font-mono font-bold text-slate-400">{deriv.PartID}</div>
+                                                            <span className="text-[8px] font-black bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded">파생됨</span>
+                                                        </div>
+                                                    </div>
+                                                    <ArrowRightLeft size={14} className="text-slate-300 group-hover:text-emerald-500 transition-colors" />
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center h-48 text-slate-400 dark:text-slate-600 text-xs italic text-center px-6">
+                                            <Sparkles size={24} className="opacity-10 mb-2" />
+                                            해당 부품과 베이스를 공유하는<br/>파생 모델이 존재하지 않습니다.
                                         </div>
                                     )}
                                 </div>
@@ -707,7 +784,7 @@ export default function PartsDetailPanel({ partId, parts, filteredParts = [], on
 // Info Field Component with premium layout styling and interactive row hover effects
 function CompactInfoItem({ label, value, highlight = false, isSpecial = false }) {
     return (
-        <div className={`py-2 px-3 flex justify-between items-center text-xs gap-3 transition-all rounded-xl duration-200 group ${isSpecial ? 'bg-indigo-50/40 dark:bg-indigo-900/10 border border-indigo-100/50 dark:border-indigo-800/30 my-0.5' : 'hover:bg-slate-50 dark:hover:bg-slate-800/20'}`}>
+        <div className={`py-1 px-3 flex justify-between items-center text-xs gap-3 transition-all rounded-xl duration-200 group ${isSpecial ? 'bg-indigo-50/40 dark:bg-indigo-900/10 border border-indigo-100/50 dark:border-indigo-800/30 my-0.5' : 'hover:bg-slate-50 dark:hover:bg-slate-800/20'}`}>
             <span className="text-[9px] text-slate-400 dark:text-slate-500 font-black uppercase tracking-[0.1em] flex-shrink-0">{label}</span>
             <span className={`font-black text-right truncate max-w-[200px] transition-colors ${highlight ? 'text-emerald-600 dark:text-emerald-400' : isSpecial ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-200'} ${isSpecial ? 'text-[13px]' : 'text-[11px]'}`} title={value}>
                 {value || '-'}

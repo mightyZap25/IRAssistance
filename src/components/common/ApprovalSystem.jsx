@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, UserPlus, Trash2, Save, CheckCircle2, XCircle, MessageSquare, Clock, User, Star, ChevronRight } from 'lucide-react';
 import { db } from '../../firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, onSnapshot, doc, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, onSnapshot, doc, updateDoc, arrayUnion, getDoc } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
 
 async function createNotification(targetUid, title, message, link = '') {

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth, DEV_ROLES } from '../contexts/AuthContext';
-import { db } from '../firebase';
-import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { db, collection, query, where, orderBy, onSnapshot, doc, updateDoc, setDoc, serverTimestamp, getDoc } from '../firebase';
 import { LogOut, User, Bell, FlaskConical, ChevronDown, Check, StickyNote, X, Maximize2, Minimize2, Move } from 'lucide-react';
 import RichMemoEditor from './common/RichMemoEditor';
 
@@ -204,6 +203,26 @@ export default function Header() {
                 <h2 className="text-sm font-bold text-slate-700">
                     Welcome back, {userProfile?.displayName || currentUser?.displayName || 'User'}
                 </h2>
+                
+                {/* Mode Indicator */}
+                {localStorage.getItem('use_firebase') === 'true' ? (
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-black border border-emerald-200">
+                        CLOUD DB
+                    </span>
+                ) : (
+                    <span 
+                        onClick={() => {
+                            if (window.confirm("클라우드 Firebase DB 모드로 전환하시겠습니까? (페이지가 새로고침됩니다)")) {
+                                localStorage.setItem('use_firebase', 'true');
+                                window.location.reload();
+                            }
+                        }}
+                        className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-black border border-amber-200 animate-pulse cursor-pointer"
+                        title="클릭하여 Firebase 모드로 전환"
+                    >
+                        LOCAL DB (테스트)
+                    </span>
+                )}
             </div>
 
             {/* Right: Actions & Profile */}

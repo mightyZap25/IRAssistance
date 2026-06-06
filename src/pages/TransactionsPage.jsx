@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { collection, query, getDocs, addDoc, serverTimestamp, orderBy, doc, updateDoc, where, getDoc, setDoc } from 'firebase/firestore';
+import { collection, query, getDocs, addDoc, serverTimestamp, orderBy, doc, updateDoc, where, getDoc, setDoc } from '../firebase';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import MasterDataGrid from '../components/common/MasterDataGrid';

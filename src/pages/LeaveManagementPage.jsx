@@ -10,7 +10,7 @@ import { db } from '../firebase';
 import { 
     collection, query, where, onSnapshot, addDoc, 
     serverTimestamp, doc, getDoc, updateDoc, setDoc, getDocs, arrayUnion
-} from 'firebase/firestore';
+} from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import clsx from 'clsx';
 

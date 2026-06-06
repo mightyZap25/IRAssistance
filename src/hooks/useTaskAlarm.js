@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { db } from '../firebase';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, updateDoc, doc } from 'firebase/firestore';
+import { db, collection, query, where, onSnapshot, addDoc, serverTimestamp, updateDoc, doc } from '../firebase';
 
 export function useTaskAlarm(currentUser) {
     const lastCheckedRef = useRef(new Date());

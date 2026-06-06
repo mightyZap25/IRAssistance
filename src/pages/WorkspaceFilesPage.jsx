@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth as firebaseAuth, googleProvider } from '../firebase';
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { collection, addDoc, getDocs, query, orderBy, serverTimestamp, doc, updateDoc, deleteDoc, where, limit } from 'firebase/firestore';
+import { signInWithPopup, GoogleAuthProvider } from '../firebase';
+import { collection, addDoc, getDocs, query, orderBy, serverTimestamp, doc, updateDoc, deleteDoc, where, limit } from '../firebase';
 import { 
     Cloud, FileText, Search, File, Eye, Trash2, Edit3, Check, X, RefreshCw, 
     ExternalLink, Plus, FileSpreadsheet, Folder, ChevronRight, ArrowLeft, Key, AlertCircle

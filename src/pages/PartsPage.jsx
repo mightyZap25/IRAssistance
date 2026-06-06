@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, deleteDoc, doc } from '../firebase';
 import { Plus, PenTool, Trash2, HelpCircle, Layers } from 'lucide-react';
 import PartFormModal from '../components/PartFormModal';
+import BulkPartImportModal from '../components/BulkPartImportModal';
 import PartsDetailPanel from '../components/PartsDetailPanel';
 import RoleGuard from '../components/common/RoleGuard';
 import { USER_ROLES, hasPermission } from '../services/userService';
@@ -12,26 +13,28 @@ import MasterDataGrid from '../components/common/MasterDataGrid';
 const ALL_COLUMN_DEFS = {
     PartID: { label: 'Part ID', default: true },
     Name: { label: '부품명', default: true },
-    Spec: { label: '규격 (Spec)', default: true },
-    Category: { label: '대분류 (Category)', default: false },
-    Class: { label: '분류 (Class)', default: false },
+    Spec: { label: '규격', default: false },
+    Category: { label: '대분류', default: true },
+    Class: { label: '분류', default: false },
     PartTypeCode: { label: '타입코드', default: false },
-    Rev: { label: '리비전 (Rev)', default: false },
+    Rev: { label: '리비전', default: true },
     Unit: { label: '단위', default: false },
-    Maker: { label: '제조사 (Maker)', default: false },
-    Manufacturer: { label: '제조업체 (Manufacturer)', default: false },
-    MPN: { label: '제조사품번 (MPN)', default: false },
-    MFN: { label: '모델번호 (MFN)', default: false },
-    Owner: { label: '담당자 (Owner)', default: false },
-    UnitPrice: { label: '단가 (Price)', default: true },
+    Maker: { label: '공급사', default: false },
+    Manufacturer: { label: '제조업체', default: true },
+    MPN: { label: '제조사품번', default: false },
+    MFN: { label: '모델번호', default: false },
+    Owner: { label: '담당자', default: false },
+    UnitPrice: { label: '단가', default: false },
     Currency: { label: '통화', default: false },
-    DefaultLocation: { label: '기본 보관 위치', default: true },
+    DefaultLocation: { label: '기본 보관 위치', default: false },
     Lifecycle: { label: '생애주기 상태', default: true },
     ProcessType: { label: '가공/구매', default: false },
     Material: { label: '재질', default: false },
     Grade: { label: '등급', default: false },
     Color: { label: '색상', default: false },
-    Description: { label: '비고 (Description)', default: false }
+    Description: { label: '비고', default: false },
+    IsOverseas: { label: '수입품', default: false },
+    LeadTime: { label: '리드타임(일)', default: false }
 };
 
 export default function PartsPage() {
@@ -45,12 +48,14 @@ export default function PartsPage() {
 
     const [filteredParts, setFilteredParts] = useState([]);
     const [sortConfig, setSortConfig] = useState({ key: 'PartID', direction: 'asc' });
+    const [showOverseasOnly, setShowOverseasOnly] = useState(false);
 
     const { userProfile } = useAuth();
     const hasEngineerRole = userProfile && hasPermission(userProfile.role, USER_ROLES.ENGINEER);
     const hasManagerRole = userProfile && hasPermission(userProfile.role, USER_ROLES.MANAGER);
 
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [formModalMode, setFormModalMode] = useState('create');
     const [editTarget, setEditTarget] = useState(null);
 
@@ -132,8 +137,12 @@ export default function PartsPage() {
     }, [parts, sortConfig]);
 
     const latestParts = React.useMemo(() => {
-        return sortedParts.filter(p => p.IsLatestRevision !== false);
-    }, [sortedParts]);
+        let list = sortedParts.filter(p => p.IsLatestRevision !== false);
+        if (showOverseasOnly) {
+            list = list.filter(p => p.IsOverseas === true);
+        }
+        return list;
+    }, [sortedParts, showOverseasOnly]);
 
     return (
         <div className="flex flex-col h-[calc(100vh-7.5rem)] overflow-hidden gap-3 animate-fade-in text-slate-800 dark:text-slate-100">
@@ -149,8 +158,21 @@ export default function PartsPage() {
                         Master Data Control Center
                     </p>
                 </div>
-                <div className="relative">
+                <div className="relative flex items-center gap-2">
+                    <button
+                        onClick={() => setShowOverseasOnly(!showOverseasOnly)}
+                        className={`flex items-center gap-2 font-extrabold py-2.5 px-3 rounded-2xl transition-all shadow-md transform ${showOverseasOnly ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-white text-slate-600 border-slate-200'} border`}
+                    >
+                        <span>✈️ 해외수입물품 보기</span>
+                    </button>
                     <RoleGuard requiredRole={USER_ROLES.ENGINEER}>
+                        <button
+                            onClick={() => setIsImportModalOpen(true)}
+                            className="flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold py-2.5 px-3 rounded-2xl transition-all shadow-lg shadow-emerald-200 dark:shadow-none hover:scale-[1.02] transform"
+                        >
+                            <Layers size={18} />
+                            <span>일괄 추가 (Import)</span>
+                        </button>
                         <button
                             onClick={openCreateModal}
                             className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-extrabold py-2.5 px-3 rounded-2xl transition-all shadow-lg shadow-indigo-200 dark:shadow-none hover:scale-[1.02] transform"
@@ -167,7 +189,7 @@ export default function PartsPage() {
                 {loading ? (
                     <div className="flex-1 flex items-center justify-center text-slate-450 font-bold bg-white/60 dark:bg-slate-900/60 backdrop-blur-md rounded-[1.8rem]">데이터를 로드하고 있습니다...</div>
                 ) : (
-                    <div className="h-full bg-white/60 dark:bg-slate-900/60 backdrop-blur-md rounded-2xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-800">
+                    <div className="h-full flex flex-col bg-white/60 dark:bg-slate-900/60 backdrop-blur-md rounded-2xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-800">
                         <MasterDataGrid
                             data={latestParts}
                             columnDefs={ALL_COLUMN_DEFS}
@@ -200,9 +222,10 @@ export default function PartsPage() {
                                     
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="flex gap-1.5">
-                                            <span className="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[9px] font-black uppercase tracking-wider">{part.Category?.split(' ')[0] || '기구'}</span>
-                                            {part.Lifecycle === 'Draft' ? (
+                                                    {part.Lifecycle === 'Draft' ? (
                                                 <span className="px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-orange-100 animate-pulse">대기/개발중</span>
+                                            ) : part.Lifecycle === 'RND' ? (
+                                                <span className="px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-purple-100">연구소용</span>
                                             ) : (part.Lifecycle === 'ECN' || part.Lifecycle === 'ECN Pending') ? (
                                                 <span className="px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-blue-100 animate-pulse">설계변경/수정중</span>
                                             ) : part.Lifecycle === 'Obsolete' ? (
@@ -212,7 +235,7 @@ export default function PartsPage() {
                                             )}
                                         </div>
                                     </div>
-
+ 
                                     <div className="space-y-2 flex-grow">
                                         <div className="text-[10px] font-mono font-bold text-slate-400">{part.PartID}</div>
                                         <div>
@@ -224,7 +247,7 @@ export default function PartsPage() {
                                             <div className="text-xs font-bold text-slate-600 dark:text-slate-350 mt-0.5">{part.Spec || '-'}</div>
                                         </div>
                                     </div>
-
+ 
                                     <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2 text-[10px] text-slate-500 dark:text-slate-400">
                                         <div className="flex flex-col">
                                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">보관위치</span>
@@ -244,14 +267,18 @@ export default function PartsPage() {
                                         <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-rose-500 to-red-600 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-rose-100">폐기/단종</span>
                                     ) : val === 'Draft' ? (
                                         <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-orange-100 animate-pulse">대기/개발중</span>
+                                    ) : val === 'RND' ? (
+                                        <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-purple-100">연구소용</span>
                                     ) : val === 'Active' ? (
                                         <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-emerald-100">승인완료/양산</span>
                                     ) : (
                                         <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-blue-100 animate-pulse">설계변경/수정중</span>
                                     )
                                 ),
-                                UnitPrice: (val) => val ? `$${Number(val).toLocaleString()}` : '-',
-                                Description: (val) => <div className="max-w-xs truncate" title={val}>{val || '-'}</div>
+                                UnitPrice: (val) => val ? `${Number(val).toLocaleString()}` : '-',
+                                Description: (val) => <div className="max-w-xs truncate" title={val}>{val || '-'}</div>,
+                                IsOverseas: (val) => val ? <span className="text-amber-600 font-black">수입</span> : <span className="text-slate-300">내수</span>,
+                                LeadTime: (val) => val ? `${val} 일` : '-'
                             }}
                         />
                     </div>
@@ -280,6 +307,17 @@ export default function PartsPage() {
                     onClose={() => setIsFormModalOpen(false)}
                     onSuccess={() => {
                         setIsFormModalOpen(false);
+                        setIsModifying(!isModifying);
+                    }}
+                />
+            )}
+
+            {/* Bulk Import Modal */}
+            {isImportModalOpen && (
+                <BulkPartImportModal
+                    onClose={() => setIsImportModalOpen(false)}
+                    onSuccess={() => {
+                        setIsImportModalOpen(false);
                         setIsModifying(!isModifying);
                     }}
                 />

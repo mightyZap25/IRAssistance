@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, addDoc, serverTimestamp } from '../firebase';
 import { Search, Package, AlertTriangle, TrendingDown, DollarSign, ClipboardCheck, Plus, X, RefreshCw } from 'lucide-react';
 import MasterDataGrid from '../components/common/MasterDataGrid';
 import InventoryDetail from '../components/InventoryDetail';

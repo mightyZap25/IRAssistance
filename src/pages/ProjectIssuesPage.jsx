@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../firebase';
-import { collection, query, getDocs, addDoc, serverTimestamp, doc, updateDoc, orderBy } from 'firebase/firestore';
+import { collection, query, getDocs, addDoc, serverTimestamp, doc, updateDoc, orderBy } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { 
     AlertCircle, Bug, CheckCircle, Clock, FileText, Filter, HelpCircle, 

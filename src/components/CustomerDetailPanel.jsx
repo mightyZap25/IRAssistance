@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, limit } from '../firebase';
 import { Building2, X, Phone, User, Mail, History, Package, FileText, Receipt, DollarSign, PenTool, Printer, ChevronRight, ExternalLink } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
@@ -34,12 +34,14 @@ export default function CustomerDetailPanel({ customer, onClose, onEdit, inline 
                 setHistory(deliveryData);
                 setDeliveredItems(deliveryData);
 
-                // 2. Fetch Email History (Mocking for now)
-                const mockEmails = [
-                    { id: 'mail-1', type: 'EMAIL', Subject: '[견적 요청] 품목 견적 의뢰의 건', Content: '요청하신 품목에 대한 견적서입니다. 검토 후 회신 부탁드립니다.', CreatedAt: { toDate: () => new Date(Date.now() - 86400000 * 2) }, Sender: 'admin@irrobot.com' },
+                // 2. Fetch Integrated History (Mocking Emails, Quotes, Invoices for now)
+                const mockIntegrated = [
+                    { id: 'mail-1', type: 'EMAIL', Subject: '[수신] 도면 변경 건 문의', Content: '요청하신 변경 도면 검토 결과 회신드립니다.', CreatedAt: { toDate: () => new Date(Date.now() - 86400000 * 1) }, Sender: 'cs@irrobot.com' },
+                    { id: 'quote-1', type: 'QUOTE', Subject: '부품 발주 견적서 발행', Content: '총 금액: ₩12,500,000 (VAT 별도)', CreatedAt: { toDate: () => new Date(Date.now() - 86400000 * 3) } },
+                    { id: 'invoice-1', type: 'INVOICE', Subject: '세금계산서 국세청 전송 완료', Content: '공급가액: ₩5,000,000 / 세액: ₩500,000', CreatedAt: { toDate: () => new Date(Date.now() - 86400000 * 7) } },
                     { id: 'mail-2', type: 'EMAIL', Subject: '완제품 납품 일정 안내', Content: '6월 중순 납품 예정인 제품들의 생산이 완료되어 일정을 안내드립니다.', CreatedAt: { toDate: () => new Date(Date.now() - 86400000 * 5) }, Sender: 'sales@irrobot.com' }
                 ];
-                setEmailHistory(mockEmails);
+                setEmailHistory(mockIntegrated);
                 
             } catch (err) {
                 console.error("Error fetching customer data:", err);
@@ -215,22 +217,32 @@ export default function CustomerDetailPanel({ customer, onClose, onEdit, inline 
                                     <p className="text-xs font-black text-slate-300 uppercase tracking-widest">이력 정보가 없습니다.</p>
                                 </div>
                             ) : (
-                                timeline.map((item, idx) => (
+                                timeline.map((item, idx) => {
+                                    let icon, bgColor, textColor, label;
+                                    if (item.type === 'DELIVERY') {
+                                        icon = <Package size={18} />; bgColor = 'bg-blue-500'; textColor = 'text-blue-600 bg-blue-100'; label = 'Delivery (납품)';
+                                    } else if (item.type === 'EMAIL') {
+                                        icon = <Mail size={18} />; bgColor = 'bg-slate-700'; textColor = 'text-slate-700 bg-slate-200'; label = 'Email (이메일)';
+                                    } else if (item.type === 'QUOTE') {
+                                        icon = <FileText size={18} />; bgColor = 'bg-amber-500'; textColor = 'text-amber-700 bg-amber-100'; label = 'Quotation (견적)';
+                                    } else if (item.type === 'INVOICE') {
+                                        icon = <Receipt size={18} />; bgColor = 'bg-emerald-500'; textColor = 'text-emerald-700 bg-emerald-100'; label = 'Tax Invoice (세금계산서)';
+                                    } else {
+                                        icon = <History size={18} />; bgColor = 'bg-indigo-500'; textColor = 'text-indigo-600 bg-indigo-100'; label = 'Log';
+                                    }
+
+                                    return (
                                     <div key={item.id} className="relative flex gap-6 group">
                                         {/* Icon */}
-                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 z-10 shadow-sm border border-white dark:border-slate-900 ${
-                                            item.type === 'DELIVERY' ? 'bg-blue-500 text-white' : 'bg-indigo-500 text-white'
-                                        }`}>
-                                            {item.type === 'DELIVERY' ? <Package size={18} /> : <Mail size={18} />}
+                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 z-10 shadow-sm border border-white dark:border-slate-900 ${bgColor} text-white`}>
+                                            {icon}
                                         </div>
                                         {/* Content */}
                                         <div className="flex-1 bg-slate-50/50 dark:bg-slate-800/30 p-5 rounded-3xl border border-slate-100 dark:border-slate-800 group-hover:bg-white dark:group-hover:bg-slate-800 transition-all group-hover:shadow-md">
                                             <div className="flex justify-between items-start mb-2">
                                                 <div>
-                                                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg mb-2 inline-block ${
-                                                        item.type === 'DELIVERY' ? 'bg-blue-100 text-blue-600' : 'bg-indigo-100 text-indigo-600'
-                                                    }`}>
-                                                        {item.type === 'DELIVERY' ? 'Shipping' : 'Email Sent'}
+                                                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg mb-2 inline-block ${textColor}`}>
+                                                        {label}
                                                     </span>
                                                     <h4 className="text-sm font-black text-slate-800 dark:text-white">
                                                         {item.type === 'DELIVERY' ? `${item.PartName} 납품` : item.Subject}
@@ -249,7 +261,7 @@ export default function CustomerDetailPanel({ customer, onClose, onEdit, inline 
                                             </div>
                                         </div>
                                     </div>
-                                ))
+                                )})
                             )}
                         </div>
                     </div>

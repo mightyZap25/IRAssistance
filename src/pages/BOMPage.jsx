@@ -2,15 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
     Layers, Package, ChevronRight, ChevronDown, 
     Search, Edit3, Download, Save, X, Plus, Trash2, ArrowLeft, Home, Ban, CheckCircle2,
-    DollarSign, Clock, GitCompare
+    DollarSign, Clock, GitCompare, FileSpreadsheet
 } from 'lucide-react';
-import { collection, query, where, getDocs, orderBy, doc, getDoc, addDoc, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, doc, getDoc, addDoc, serverTimestamp, setDoc, updateDoc, writeBatch } from '../firebase';
 import { db } from '../firebase';
 import { getBOMStructure, getPreviousRevision, compareBOMs } from '../services/bomService';
 import BOMStructurePanel from '../components/BOMStructurePanel';
 import PartsDetailPanel from '../components/PartsDetailPanel';
 import BOMSaveModal from '../components/BOMSaveModal';
 import BOMExportModal from '../components/BOMExportModal';
+import BOMImportModal from '../components/BOMImportModal';
 import { useAuth } from '../contexts/AuthContext';
 import { hasPermission, USER_ROLES } from '../services/userService';
 
@@ -45,6 +46,7 @@ const BOMPage = () => {
     const [selectedPartIdForDetail, setSelectedPartIdForDetail] = useState(null);
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
     // Diff/Comparison State
     const [diffData, setDiffData] = useState(null);
@@ -68,13 +70,13 @@ const BOMPage = () => {
         setLoading(true);
         try {
             const partsRef = collection(db, 'parts');
-            const q = query(partsRef, orderBy('PartID', 'asc'));
-            const querySnapshot = await getDocs(q);
+            const querySnapshot = await getDocs(partsRef);
             
             const allPartsData = querySnapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
             }));
+            allPartsData.sort((a, b) => (a.PartID || '').localeCompare(b.PartID || ''));
             setAllParts(allPartsData);
 
             const prodList = allPartsData.filter(p => 
@@ -103,9 +105,10 @@ const BOMPage = () => {
 
     const fetchSpecLabels = async () => {
         try {
-            const q = query(collection(db, 'spec_labels'), orderBy('label', 'asc'));
-            const snap = await getDocs(q);
-            setSpecLabels(snap.docs.map(d => d.data().label));
+            const snap = await getDocs(collection(db, 'spec_labels'));
+            const labels = snap.docs.map(d => d.data().label || d.data().Name || '');
+            labels.sort();
+            setSpecLabels(labels);
         } catch (err) {
             console.error("Error fetching spec labels:", err);
         }
@@ -414,6 +417,43 @@ const BOMPage = () => {
         setIsEditMode(true);
     };
 
+    const handleDeriveBOM = () => {
+        if (!bomData) return;
+        
+        const type = bomData.PartID.startsWith('IRP') ? 'product' : 'assembly';
+        const tempPartID = type === 'product' ? 'IRP-DERIV-NEW' : 'IRA-DERIV-NEW';
+        
+        const derivedBOM = {
+            ...bomData,
+            PartID: tempPartID,
+            Name: `${bomData.Name} (파생)`,
+            Rev: '1.0',
+            Status: 'Draft',
+            isDerivative: true,
+            BasePartID: bomData.PartID,
+            BasePartName: bomData.Name,
+            isNew: true
+        };
+
+        // Deep copy children and mark as new for saving
+        const markAsNew = (nodes) => {
+            return nodes.map(node => ({
+                ...node,
+                isNew: true,
+                isModified: true,
+                Children: node.Children ? markAsNew(node.Children) : []
+            }));
+        };
+        derivedBOM.Children = markAsNew(bomData.Children || []);
+
+        setSelectedMaster(null);
+        setIsNewCreating(true);
+        setNewBOMType(type);
+        setBomData(derivedBOM);
+        setNavStack([{ PartID: tempPartID, Name: derivedBOM.Name }]);
+        setIsEditMode(true);
+    };
+
     const handleCancelCreate = () => {
         setIsNewCreating(false);
         setBomData(null);
@@ -508,7 +548,7 @@ const BOMPage = () => {
             const batch = writeBatch(db);
 
             if (isCreatingNew) {
-                const finalPartId = bomData.PartID !== 'IRP-NEW' && bomData.PartID !== 'IRA-NEW' ? bomData.PartID : `NEW-${Date.now()}`;
+                const finalPartId = bomData.PartID.includes('NEW') ? `NEW-${Date.now()}` : bomData.PartID;
                 
                 const newPartData = {
                     PartID: finalPartId,
@@ -523,7 +563,27 @@ const BOMPage = () => {
                     createdAt: serverTimestamp()
                 };
 
+                if (bomData.isDerivative) {
+                    newPartData.BasePartID = bomData.BasePartID;
+                    newPartData.BasePartName = bomData.BasePartName;
+                }
+
                 batch.set(doc(db, 'parts', finalPartId), newPartData);
+
+                // Save initial BOM structure (Children)
+                if (bomData.Children && bomData.Children.length > 0) {
+                    bomData.Children.forEach(child => {
+                        const bomRef = doc(collection(db, 'bom'));
+                        batch.set(bomRef, {
+                            ParentID: finalPartId,
+                            ChildID: child.PartID,
+                            Quantity: child.Quantity,
+                            Location: child.Location || '',
+                            Note: child.Note || '',
+                            Status: 'Active'
+                        });
+                    });
+                }
             } else if (selectedMaster && selectedMaster.id) {
                 const partRef = doc(db, 'parts', selectedMaster.id);
                 batch.update(partRef, {
@@ -536,8 +596,19 @@ const BOMPage = () => {
                 if (ecnData && ecnData.updateType === 'ECN') {
                     const diffs = compareBOMs(navStack[0].originalStructure || {}, bomData);
                     const ecnRef = doc(collection(db, 'ecns'));
+                    // Fetch derivative models
+                    const derivQuery = query(collection(db, 'parts'), where('BasePartID', '==', bomData.PartID));
+                    const derivSnap = await getDocs(derivQuery);
+                    const derivatives = derivSnap.docs.map(d => {
+                        const data = d.data();
+                        return { PartID: data.PartID, Name: data.Name, Action: 'Pending' };
+                    });
+
                     const ecnDraft = {
                         Title: `[BOM Update] ${bomData.Name}`,
+                        Derivatives: derivatives,
+                        HasStatusChange: false,
+                        InventoryAction: 'Use As Is',
                         Type: 'BOM Change',
                         PartID: bomData.PartID,
                         PartName: bomData.Name,
@@ -680,6 +751,13 @@ const BOMPage = () => {
                             단종/폐기 포함
                         </label>
                     </div>
+                    <button
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="w-full mt-3 flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-650 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 font-bold text-xs shadow-md shadow-blue-100 hover:scale-[1.01] active:scale-[0.99] transition-all"
+                    >
+                        <FileSpreadsheet size={14} />
+                        <span>구글 시트 BOM 가져오기</span>
+                    </button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto min-h-0 p-2 space-y-2 custom-scrollbar text-left">
@@ -790,6 +868,9 @@ const BOMPage = () => {
                                     <div className="flex items-center gap-2 mb-1">
                                         <span className="px-2 py-0.5 rounded text-[10px] font-black bg-blue-100 text-blue-700 border border-blue-200 uppercase tracking-tighter">Rev {bomData.Rev || '1.0'}</span>
                                         <span className="text-slate-400 font-mono text-xs">{bomData.PartID}</span>
+                                        {bomData.isDerivative && (
+                                            <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200 uppercase tracking-tighter ml-2" title={`기본 모델: ${bomData.BasePartID}`}>Derived</span>
+                                        )}
                                         {isComparing && <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200 uppercase tracking-tighter ml-2">Diff Mode</span>}
                                     </div>
                                     <h1 className="text-xl font-black text-slate-800 italic">{bomData.Name}</h1>
@@ -799,6 +880,9 @@ const BOMPage = () => {
                             <div className="flex gap-2">
                                 {!isEditMode ? (
                                     <>
+                                        <button onClick={handleDeriveBOM} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-bold text-sm shadow-md shadow-emerald-100 transition-all">
+                                            <GitCompare size={16} /> 파생발의
+                                        </button>
                                         <button onClick={handleComparePrevious} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-bold text-sm shadow-sm transition-all">
                                             <GitCompare size={16} /> 이전 리비전과 비교
                                         </button>
@@ -824,9 +908,42 @@ const BOMPage = () => {
 
                         {/* Main Grid */}
                         <div className="grid grid-cols-5 gap-4 flex-1 min-h-0 overflow-hidden">
-                            <div className="col-span-2 bg-white rounded-2xl border border-slate-200 p-5 overflow-y-auto custom-scrollbar">
+                            <div className="col-span-2 bg-white rounded-2xl border border-slate-200 p-5 overflow-y-auto custom-scrollbar text-left">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Master Info & Specs</label>
                                 <div className="space-y-4">
+                                    {isCreatingNew && (
+                                        <>
+                                            <div className="space-y-1.5">
+                                                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Part ID</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={bomData.PartID} 
+                                                    onChange={(e) => setBomData({...bomData, PartID: e.target.value})}
+                                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                                    placeholder="품번을 입력하세요 (예: IRP-001)"
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">품명 (Part Name)</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={bomData.Name} 
+                                                    onChange={(e) => setBomData({...bomData, Name: e.target.value})}
+                                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                                    placeholder="품명을 입력하세요"
+                                                />
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {bomData.isDerivative && (
+                                        <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                                            <label className="text-[9px] font-black text-emerald-600 uppercase mb-1 block">Base Model (기본 모델)</label>
+                                            <div className="text-xs font-bold text-emerald-800">{bomData.BasePartName}</div>
+                                            <div className="text-[10px] font-medium text-emerald-600/70">{bomData.BasePartID}</div>
+                                        </div>
+                                    )}
+
                                     <div className="grid grid-cols-2 gap-3">
                                         <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
                                             <label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">Class</label>
@@ -894,6 +1011,12 @@ const BOMPage = () => {
                 changes={bomData ? compareBOMs(originalStructure || {}, bomData).map(d => `${d.type.toUpperCase()}: ${d.partId} (${d.name})`) : []} 
             />
             <BOMExportModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} rootPart={selectedMaster} bomData={bomData} />
+            <BOMImportModal 
+                isOpen={isImportModalOpen} 
+                onClose={() => setIsImportModalOpen(false)} 
+                onImportSuccess={fetchMasters} 
+                allParts={allParts} 
+            />
             
             {selectedPartIdForDetail && (
                 <PartsDetailPanel 

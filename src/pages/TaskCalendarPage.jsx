@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where } from '../firebase';
 import { getPersonalTasks } from '../services/taskService';
 import EventDetailModal from '../components/EventDetailModal';
 import { 

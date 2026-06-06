@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { collection, query, getDocs, orderBy, where } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy, where } from '../firebase';
 import { db } from '../firebase';
 import { Factory, X, AlertCircle } from 'lucide-react';
 

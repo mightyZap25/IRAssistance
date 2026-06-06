@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, getDocs, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy, onSnapshot } from '../firebase';
 import { db } from '../firebase';
 import { ShieldCheck, Activity, Search, AlertCircle, FileText, PieChart as PieChartIcon } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';

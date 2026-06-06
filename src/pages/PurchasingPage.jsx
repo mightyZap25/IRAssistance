@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { collection, query, getDocs, doc, addDoc, updateDoc, serverTimestamp, orderBy, writeBatch } from 'firebase/firestore';
+import { collection, query, getDocs, doc, addDoc, updateDoc, serverTimestamp, orderBy, writeBatch } from '../firebase';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import MasterDataGrid from '../components/common/MasterDataGrid';
@@ -8,6 +8,7 @@ import { ShoppingCart, Plus, X, Box, Calendar, DollarSign, AlertCircle, Clock, C
 
 import RoleGuard from '../components/common/RoleGuard';
 import { USER_ROLES } from '../services/userService';
+import CreatePOModal from '../components/CreatePOModal';
 import PurchaseOrderDetailPanel from '../components/PurchaseOrderDetailPanel';
 import RequestQuotationModal from '../components/RequestQuotationModal';
 
@@ -44,227 +45,6 @@ const generatePONumber = () => {
     const dd = String(date.getDate()).padStart(2, '0');
     const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
     return `PO-${yyyy}${mm}${dd}-${random}`;
-};
-
-const CreatePOModal = ({ isOpen, onClose, onSave, initialData }) => {
-    const [vendors, setVendors] = useState([]);
-    const [parts, setParts] = useState([]);
-    const [loading, setLoading] = useState(false);
-    
-    const [formData, setFormData] = useState({
-        VendorID: '',
-        VendorName: '',
-        PartID: '',
-        PartName: '',
-        Qty: 0,
-        UnitPrice: 0,
-        DueDate: '',
-        Urgent: false
-    });
-
-    const [ecnNotes, setEcnNotes] = useState({});
-
-    useEffect(() => {
-        if (isOpen) {
-            fetchDependencies();
-            if (initialData) {
-                setFormData(initialData);
-            } else {
-                setFormData({
-                    VendorID: '', VendorName: '', PartID: '', PartName: '', Qty: 0, UnitPrice: 0, DueDate: '', Urgent: false
-                });
-            }
-        }
-    }, [isOpen, initialData]);
-
-    const fetchDependencies = async () => {
-        const vSnap = await getDocs(query(collection(db, 'vendors'), orderBy('Name', 'asc')));
-        const pSnap = await getDocs(query(collection(db, 'parts'), orderBy('Name', 'asc')));
-        setVendors(vSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setParts(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-    };
-
-    const handleVendorChange = (e) => {
-        const v = vendors.find(x => x.id === e.target.value);
-        setFormData(prev => ({ ...prev, VendorID: v?.id || '', VendorName: v?.Name || '' }));
-    };
-
-    const handlePartChange = (e) => {
-        const basePartID = e.target.value;
-        const latest = parts.find(p => getBaseID(p) === basePartID && p.IsLatestRevision !== false);
-        if (latest) {
-            setFormData(prev => ({ ...prev, PartID: latest.id, PartName: latest.Name }));
-        } else {
-            setFormData(prev => ({ ...prev, PartID: '', PartName: '' }));
-        }
-    };
-
-    const getBaseID = (p) => {
-        if (!p) return '';
-        if (p.MasterPartID) return p.MasterPartID;
-        // Fallback for older data that doesn't have MasterPartID
-        if (p.PartID && p.PartID.includes('-')) {
-            const parts = p.PartID.split('-');
-            // If it ends with something like '1.0' (a number), treat the first part as base
-            if (!isNaN(parseFloat(parts[parts.length - 1]))) {
-                return parts.slice(0, -1).join('-');
-            }
-        }
-        return p.PartID || '';
-    };
-
-    const latestParts = parts.filter(p => p.IsLatestRevision !== false);
-    const currentSelectedPart = parts.find(p => p.id === formData.PartID);
-    const currentBasePartID = getBaseID(currentSelectedPart);
-    const availableRevisions = parts.filter(p => getBaseID(p) === currentBasePartID).sort((a, b) => b.Rev?.localeCompare(a.Rev) || 0);
-
-    useEffect(() => {
-        const fetchEcnNotes = async () => {
-            if (!currentBasePartID) {
-                setEcnNotes({});
-                return;
-            }
-            try {
-                // Fetch ECNs for the current base part to show Revision Notes
-                const snap1 = await getDocs(query(collection(db, 'ecns'), where('MasterPartID', '==', currentBasePartID)));
-                
-                const notes = {};
-                snap1.forEach(d => {
-                    if (d.data().Rev) notes[d.data().Rev] = d.data().Reason;
-                });
-                
-                // Also try fetching by prefix if MasterPartID wasn't set in ECNs
-                const allEcnsSnap = await getDocs(query(collection(db, 'ecns')));
-                allEcnsSnap.forEach(d => {
-                    const data = d.data();
-                    if (data.PartID && data.PartID.startsWith(currentBasePartID + '-')) {
-                         if (data.Rev && !notes[data.Rev]) notes[data.Rev] = data.Reason;
-                    }
-                });
-
-                setEcnNotes(notes);
-            } catch (e) {
-                console.error("Failed to fetch ECN notes", e);
-            }
-        };
-        fetchEcnNotes();
-    }, [currentBasePartID]);
-
-    if (!isOpen) return null;
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!formData.VendorID || !formData.PartID || formData.Qty <= 0) return alert('필수 항목을 모두 올바르게 입력해주세요.');
-        
-        setLoading(true);
-        try {
-            await onSave(formData);
-            onClose();
-        } catch (error) {
-            console.error('Failed to create PO:', error);
-            alert('발주 생성 실패');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const modalContent = (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-2xl shadow-xl animate-in fade-in zoom-in duration-200 overflow-hidden flex flex-col">
-                <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50 shrink-0">
-                    <div>
-                        <h2 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
-                            <ShoppingCart size={20} className="text-indigo-600" />
-                            {initialData ? '발주서 수정' : '신규 발주서 (Purchase Order) 생성'}
-                        </h2>
-                    </div>
-                    <button onClick={onClose} className="p-2 bg-white rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 shadow-sm border border-slate-200"><X size={16} /></button>
-                </div>
-                <form onSubmit={handleSubmit} className="p-5 flex-1 overflow-y-auto space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5 col-span-2">
-                            <label className="text-xs font-black text-slate-700 flex items-center gap-1.5">공급업체 (Vendor) <span className="text-rose-500">*</span></label>
-                            <select value={formData.VendorID} onChange={handleVendorChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500" required>
-                                <option value="">업체를 선택하세요</option>
-                                {vendors.map(v => <option key={v.id} value={v.id}>{v.Name} ({v.Category})</option>)}
-                            </select>
-                        </div>
-                        <div className="space-y-1.5 col-span-2">
-                            <label className="text-xs font-black text-slate-700 flex items-center gap-1.5">발주 품목 (Part) <span className="text-rose-500">*</span></label>
-                            <select value={currentBasePartID} onChange={handlePartChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500" required>
-                                <option value="">품목을 선택하세요</option>
-                                {latestParts.map(p => {
-                                    const baseID = getBaseID(p);
-                                    return <option key={baseID} value={baseID}>[{baseID}] {p.Name}</option>;
-                                })}
-                            </select>
-                        </div>
-                        <div className="space-y-1.5 col-span-2">
-                            <label className="text-xs font-black text-slate-700 flex items-center gap-1.5">품목 리비전 (Revision) <span className="text-rose-500">*</span></label>
-                            <select 
-                                value={formData.PartID} 
-                                onChange={e => {
-                                    const p = parts.find(x => x.id === e.target.value);
-                                    if (p) setFormData(prev => ({ ...prev, PartID: p.id, PartName: p.Name }));
-                                }} 
-                                disabled={!currentBasePartID}
-                                className={`w-full border rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all ${!currentBasePartID ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-indigo-50/30 border-slate-200 text-indigo-900'}`}
-                                required
-                            >
-                                {!currentBasePartID && <option value="">품목을 먼저 선택하세요</option>}
-                                {currentBasePartID && availableRevisions.map(p => (
-                                    <option key={p.id} value={p.id}>
-                                        Rev {p.Rev || '1.0'} {p.IsLatestRevision !== false ? '(최신 버전)' : '(구버전)'}
-                                    </option>
-                                ))}
-                            </select>
-                            
-                            {/* 리비전 변경 사유 (Textarea) */}
-                            <div className="pt-2">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block">해당 리비전 작성 내역 (ECN Reason)</label>
-                                <textarea
-                                    readOnly
-                                    value={
-                                        !currentBasePartID 
-                                            ? '품목을 먼저 선택해 주세요.' 
-                                            : (currentSelectedPart && ecnNotes[currentSelectedPart.Rev] ? ecnNotes[currentSelectedPart.Rev] : '내역 없음 (작성된 사유가 없습니다)')
-                                    }
-                                    className={`w-full border rounded-xl px-3.5 py-2.5 text-xs font-bold outline-none resize-none min-h-[60px] transition-all ${!currentBasePartID ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-slate-50 border-slate-200 text-slate-600'}`}
-                                    placeholder="내역 없음"
-                                />
-                            </div>
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-black text-slate-700 flex items-center gap-1.5">수량 (Quantity) <span className="text-rose-500">*</span></label>
-                            <input type="number" min="1" value={formData.Qty} onChange={e => setFormData(prev => ({ ...prev, Qty: parseInt(e.target.value) || 0 }))} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500" required />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-black text-slate-700 flex items-center gap-1.5">단가 (Unit Price ₩)</label>
-                            <input type="number" min="0" value={formData.UnitPrice} onChange={e => setFormData(prev => ({ ...prev, UnitPrice: parseInt(e.target.value) || 0 }))} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500" />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-black text-slate-700 flex items-center gap-1.5">납기 예정일 (Due Date)</label>
-                            <input type="date" value={formData.DueDate} onChange={e => setFormData(prev => ({ ...prev, DueDate: e.target.value }))} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500" required />
-                        </div>
-                        <div className="space-y-1.5 flex items-center pt-6 pl-2">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" checked={formData.Urgent} onChange={e => setFormData(prev => ({ ...prev, Urgent: e.target.checked }))} className="w-4 h-4 rounded text-rose-500 focus:ring-rose-500 border-slate-300" />
-                                <span className="text-sm font-bold text-rose-600 flex items-center gap-1"><AlertCircle size={14}/> 긴급 (Urgent)</span>
-                            </label>
-                        </div>
-                    </div>
-                    <div className="pt-4 flex justify-end gap-2 border-t border-slate-100 mt-4">
-                        <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl text-xs font-black text-slate-600 bg-slate-100 hover:bg-slate-200">취소</button>
-                        <button type="submit" disabled={loading} className="px-5 py-2 rounded-xl text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-200 flex items-center gap-2">
-                            {loading ? '처리중...' : (initialData ? '수정 사항 저장' : '발주서 전송')}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
-
-    return createPortal(modalContent, document.body);
 };
 
 export default function PurchasingPage() {
@@ -311,14 +91,24 @@ export default function PurchasingPage() {
         let todayDue = 0;
 
         orders.forEach(po => {
-            // Unreceived Qty
-            if (po.Status === 'ORDERING' || po.Status === 'WAITING_DELIVERY') {
-                unreceived += (po.Qty - (po.ReceivedQty || 0));
+            const items = po.Items || [];
+            let totalPoQty = 0;
+            let totalPoReceived = 0;
+            
+            // Backward compatibility
+            if (items.length === 0 && po.Qty) {
+                totalPoQty = po.Qty;
+                totalPoReceived = po.ReceivedQty || 0;
+            } else {
+                totalPoQty = items.reduce((acc, it) => acc + (it.Qty || 0), 0);
+                totalPoReceived = items.reduce((acc, it) => acc + (it.ReceivedQty || 0), 0);
             }
-            // Pending Payment Approval
+
+            if (po.Status === 'ORDERING' || po.Status === 'WAITING_DELIVERY') {
+                unreceived += (totalPoQty - totalPoReceived);
+            }
             if (po.PaymentStatus === 'PENDING') pendingApproval++;
             
-            // Due Date checks
             if (po.DueDate) {
                 if (po.DueDate < todayStr && (po.Status === 'ORDERING' || po.Status === 'WAITING_DELIVERY')) {
                     overdue++;
@@ -353,23 +143,44 @@ export default function PurchasingPage() {
     }, [orders, sortConfig]);
 
     const handleSavePO = async (formData) => {
+        const { Items, ...restData } = formData;
+        // Calculate root level TotalPrice and ReceivedQty
+        const TotalPrice = Items.reduce((acc, item) => acc + (item.Qty * item.UnitPrice), 0);
+        let TotalQty = Items.reduce((acc, item) => acc + item.Qty, 0);
+        let ReceivedQty = Items.reduce((acc, item) => acc + (item.ReceivedQty || 0), 0);
+        
+        // Construct summary PartName
+        let summaryPartName = '';
+        if (Items.length > 0) {
+            summaryPartName = Items.length === 1 
+                ? Items[0].PartName 
+                : `${Items[0].PartName} 외 ${Items.length - 1}건`;
+        }
+
         if (formData.id) {
-            // Update existing
-            const { id, PONumber, CreatedAt, CreatedBy, ReceivedQty, Status, PaymentStatus, ...rest } = formData;
-            const TotalPrice = rest.Qty * rest.UnitPrice;
-            await updateDoc(doc(db, 'purchasing', id), { ...rest, TotalPrice, UpdatedAt: serverTimestamp() });
+            const { id, PONumber, CreatedAt, CreatedBy, Status, PaymentStatus, ...rest } = restData;
+            await updateDoc(doc(db, 'purchasing', id), { 
+                ...rest, 
+                Items,
+                PartName: summaryPartName,
+                Qty: TotalQty,
+                ReceivedQty: ReceivedQty,
+                TotalPrice, 
+                UpdatedAt: serverTimestamp() 
+            });
             
-            // If panel is open, update selectedPO so panel reflects changes immediately
             if (selectedPO && selectedPO.id === id) {
-                setSelectedPO(prev => ({ ...prev, ...rest, TotalPrice }));
+                setSelectedPO(prev => ({ ...prev, ...rest, Items, PartName: summaryPartName, Qty: TotalQty, ReceivedQty, TotalPrice }));
             }
         } else {
-            // Create new
             const newPO = {
                 PONumber: generatePONumber(),
-                ...formData,
+                ...restData,
+                Items,
+                PartName: summaryPartName,
+                Qty: TotalQty,
                 ReceivedQty: 0,
-                TotalPrice: formData.Qty * formData.UnitPrice,
+                TotalPrice,
                 Status: 'ORDERING',
                 PaymentStatus: 'PENDING',
                 CreatedAt: serverTimestamp(),

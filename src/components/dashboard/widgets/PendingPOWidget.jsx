@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../../firebase';
-import { collection, getDocs, query, where, limit, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, limit, orderBy } from '../../../firebase';
 import { ShoppingCart, Clock, Truck, PackageCheck } from 'lucide-react';
 
 export default function PendingPOWidget({ viewType = 'list' }) {

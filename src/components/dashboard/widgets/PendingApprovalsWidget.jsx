@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../../firebase';
-import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, orderBy } from '../../../firebase';
 import { ShieldCheck, Clock, ArrowRight, FileCheck } from 'lucide-react';
 
 export default function PendingApprovalsWidget({ user, viewType = 'list' }) {

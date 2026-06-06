@@ -124,7 +124,7 @@ export default function BOMExportModal({ isOpen, onClose, rootPart, bomData }) {
 
                 doc.autoTable({
                     startY: currentY,
-                    head: [['No', 'Part No', 'Name', 'Spec', 'Maker', 'Circuit', 'Loc/Note', 'Qty', 'USD', 'KRW', 'Total']],
+                    head: [['No', 'Part No', 'Name', 'Spec', '공급사', 'Circuit', 'Loc/Note', 'Qty', 'USD', 'KRW', 'Total']],
                     body: tableRows,
                     ...tableConfig,
                     didDrawPage: (data) => {

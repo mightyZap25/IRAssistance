@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Calendar, ArrowRight, ArrowLeft, MapPin, Database, Tag, Barcode, ClipboardList, Info } from 'lucide-react';
 import { db } from '../firebase';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit } from '../firebase';
 import BOMTree from './BOMTree';
 import { getBOMStructure } from '../services/bomService';
 

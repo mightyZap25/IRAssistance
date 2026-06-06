@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../../firebase';
-import { collection, getDocs, query, where, limit } from 'firebase/firestore';
+import { collection, getDocs, query, where, limit } from '../../../firebase';
 import { 
     Layers, Package, FileText, ShoppingCart, 
     Factory, AlertCircle, Loader2, ChevronRight,

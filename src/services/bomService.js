@@ -1,4 +1,4 @@
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where } from '../firebase';
 import { db } from '../firebase';
 
 /**
@@ -217,20 +217,22 @@ export async function getPreviousRevision(currentPartID) {
     
     const masterId = parts.slice(0, -1).join('-');
     
-    const partsRef = collection(db, 'parts');
-    const q = query(
-        partsRef, 
-        where('MasterPartID', '==', masterId),
-        orderBy('Rev', 'desc')
-    );
-    
-    const snap = await getDocs(q);
-    const revisions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    
-    // Find the one immediately before current
-    const currentIndex = revisions.findIndex(r => r.PartID === currentPartID);
-    if (currentIndex !== -1 && currentIndex < revisions.length - 1) {
-        return revisions[currentIndex + 1];
+    try {
+        const partsRef = collection(db, 'parts');
+        const snap = await getDocs(partsRef);
+        const revisions = snap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter(p => p.MasterPartID === masterId);
+            
+        revisions.sort((a, b) => (b.Rev || '1.0').localeCompare(a.Rev || '1.0'));
+        
+        // Find the one immediately before current
+        const currentIndex = revisions.findIndex(r => r.PartID === currentPartID);
+        if (currentIndex !== -1 && currentIndex < revisions.length - 1) {
+            return revisions[currentIndex + 1];
+        }
+    } catch (err) {
+        console.error("Error in getPreviousRevision fallback:", err);
     }
     
     return null;

@@ -430,7 +430,7 @@ export default function MasterDataGrid({
             
             {/* Header control block (Integrated Search / Filters / View Mode Toggle) */}
             {(enableSearch || enableFilter || enableViewModeToggle) ? (
-                <div className="px-5 py-3 flex flex-col gap-3 flex-none border-b border-slate-100 dark:border-slate-800/50 bg-white/40 dark:bg-slate-900/40 z-10 relative">
+                <div className="px-5 py-3 flex flex-col gap-3 flex-none border-b border-slate-100 dark:border-slate-800/50 bg-white/40 dark:bg-slate-900/40 z-30 relative">
                     <div className="flex gap-4 items-center justify-between">
                         
                         {/* Left: Search & Total Count */}
@@ -512,7 +512,7 @@ export default function MasterDataGrid({
             ) : (
                 /* Scrollable table content with dynamic border-spacing for padding */
                 <div className="flex-1 overflow-auto custom-scrollbar relative pr-1">
-                    <table className="w-full text-left text-xs text-slate-650 dark:text-slate-350 border-separate border-spacing-y-3">
+                    <table className="w-full text-left text-xs text-slate-650 dark:text-slate-350 border-separate border-spacing-y-4">
                         <thead className="text-xs uppercase text-slate-450 font-black tracking-widest sticky top-0 z-20">
                             <tr>
                                 {columnOrder.map((col) => {
@@ -529,20 +529,20 @@ export default function MasterDataGrid({
                                             <th
                                                 key={key}
                                                 onClick={() => onSort(key)}
-                                                className="px-2 py-2 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors first:rounded-l-2xl last:rounded-r-2xl whitespace-nowrap sticky top-0 z-20"
+                                                className="px-4 py-3 bg-slate-50/90 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors first:rounded-l-2xl last:rounded-r-2xl whitespace-nowrap sticky top-0 z-20"
                                             >
                                                 {col.label}{sortArrow}
                                             </th>
                                         );
                                     }
                                     return (
-                                        <th key={key} className="px-2 py-2 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 first:rounded-l-2xl last:rounded-r-2xl whitespace-nowrap sticky top-0 z-20">
+                                        <th key={key} className="px-4 py-3 bg-slate-50/90 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 first:rounded-l-2xl last:rounded-r-2xl whitespace-nowrap sticky top-0 z-20">
                                             {col.label}
                                         </th>
                                         );
                                         })}
                                         {(onEdit || onDelete || actionRenderer) && (
-                                        <th className="px-2 py-2 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 rounded-r-2xl whitespace-nowrap text-center sticky top-0 z-20">
+                                        <th className="px-4 py-3 bg-slate-50/90 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 rounded-r-2xl whitespace-nowrap text-center sticky top-0 z-20">
                                         관리
                                         </th>
                                         )}
@@ -565,19 +565,19 @@ export default function MasterDataGrid({
                                             cellContent = cellRenderer[key](row[key], row);
                                         }
 
-                                        let cellClass = "px-2 py-2.5 border-y border-slate-200/10 dark:border-slate-800/10 text-slate-650 dark:text-slate-350 first:rounded-l-2xl last:rounded-r-2xl whitespace-nowrap max-w-[200px] truncate";
+                                        let cellClass = "px-4 py-4 border-y border-slate-200/10 dark:border-slate-800/10 text-slate-650 dark:text-slate-350 first:rounded-l-2xl last:rounded-r-2xl whitespace-nowrap max-w-[250px] truncate";
 
                                         // General premium styles for generic keys if not overriden
                                         if (key === 'PartID' || key === 'id') {
-                                            cellClass = "px-2 py-2.5 font-mono font-bold text-slate-400 group-hover:text-indigo-650 transition-colors rounded-l-2xl border-y border-l border-slate-200/10 dark:border-slate-800/10 whitespace-nowrap max-w-[150px] truncate";
+                                            cellClass = "px-4 py-4 font-mono font-bold text-slate-400 group-hover:text-indigo-650 transition-colors rounded-l-2xl border-y border-l border-slate-200/10 dark:border-slate-800/10 whitespace-nowrap max-w-[150px] truncate";
                                         } else if (key === 'Name' || key === 'Title') {
-                                            cellClass = "px-2 py-2.5 font-extrabold text-slate-800 dark:text-slate-200 group-hover:text-indigo-655 transition-colors max-w-xs truncate whitespace-nowrap border-y border-slate-200/10 dark:border-slate-800/10";
+                                            cellClass = "px-4 py-4 font-extrabold text-slate-800 dark:text-slate-200 group-hover:text-indigo-655 transition-colors max-w-xs truncate whitespace-nowrap border-y border-slate-200/10 dark:border-slate-800/10";
                                         } else if (key === 'Spec') {
-                                            cellClass = "px-2 py-2.5 text-slate-500 font-bold border-y border-slate-200/10 dark:border-slate-800/10 whitespace-nowrap max-w-[200px] truncate";
+                                            cellClass = "px-4 py-4 text-slate-500 font-bold border-y border-slate-200/10 dark:border-slate-800/10 whitespace-nowrap max-w-[200px] truncate";
                                         } else if (key === 'DefaultLocation' || key === 'Location') {
-                                            cellClass = "px-2 py-2.5 text-emerald-600 dark:text-emerald-500 font-extrabold border-y border-slate-200/10 dark:border-slate-800/10 whitespace-nowrap max-w-[150px] truncate";
+                                            cellClass = "px-4 py-4 text-emerald-600 dark:text-emerald-500 font-extrabold border-y border-slate-200/10 dark:border-slate-800/10 whitespace-nowrap max-w-[150px] truncate";
                                         } else if (key === 'UnitPrice' || key === 'Price') {
-                                            cellClass = "px-2 py-2.5 text-right font-black text-slate-800 dark:text-slate-250 border-y border-slate-200/10 dark:border-slate-800/10 whitespace-nowrap max-w-[120px] truncate";
+                                            cellClass = "px-4 py-4 text-right font-black text-slate-800 dark:text-slate-250 border-y border-slate-200/10 dark:border-slate-800/10 whitespace-nowrap max-w-[120px] truncate";
                                         }
 
                                         const titleText = typeof row[key] === 'string' || typeof row[key] === 'number' ? row[key] : '';
@@ -590,8 +590,8 @@ export default function MasterDataGrid({
 
                                         {/* Edit/Delete row actions */}
                                         {(onEdit || onDelete || actionRenderer) && (
-                                        <td className="px-2 py-2.5 text-center rounded-r-2xl border-y border-r border-slate-200/10 dark:border-slate-800/10 whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                                            <div className="flex gap-2.5 justify-center items-center">
+                                        <td className="px-4 py-4 text-center rounded-r-2xl border-y border-r border-slate-200/10 dark:border-slate-800/10 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                            <div className="flex gap-3 justify-center items-center">
                                                 {actionRenderer && actionRenderer(row)}
                                                 {onEdit && (
                                                     <button

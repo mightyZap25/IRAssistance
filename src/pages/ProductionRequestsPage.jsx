@@ -1,13 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { createPortal } from 'react-dom';
-import { collection, query, getDocs, addDoc, updateDoc, doc, serverTimestamp, orderBy, where, writeBatch } from 'firebase/firestore';
-import { db } from '../firebase';
-import { useAuth } from '../contexts/AuthContext';
-import MasterDataGrid from '../components/common/MasterDataGrid';
 import {
     ClipboardList, Plus, X, AlertCircle, CheckCircle2, Clock, DollarSign,
-    ChevronRight, Layers, Search, Package, Users, Calendar, TrendingUp, ShieldAlert, UserPlus, History, RotateCcw
+    ChevronRight, Layers, Search, Package, Users, Calendar, TrendingUp, ShieldAlert, UserPlus, History, RotateCcw,
+    Printer, Send
 } from 'lucide-react';
+import WorkOrderPrintModal from '../components/WorkOrderPrintModal';
 
 // ─────────────────────────────────────────────────────────────
 // 상태 및 상수 정의
@@ -313,6 +310,28 @@ export default function ProductionRequestsPage() {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [selectedPR, setSelectedPR] = useState(null);
     const [transitionNote, setTransitionNote] = useState('');
+    const [isPrintOpen, setIsPrintOpen] = useState(false);
+    
+    const handleERPSync = async () => {
+        if (!window.confirm('이카운트(ECount) 등 외부 ERP로 생산 의뢰 데이터를 전송하시겠습니까? (현재는 Mocking 테스트입니다)')) return;
+        setLoading(true);
+        setTimeout(async () => {
+            alert(`[ERP 전송 성공] 의뢰 번호 ${selectedPR.PRNumber} 가 외부 시스템에 성공적으로 등록되었습니다.`);
+            try {
+                const logEntry = {
+                    from: selectedPR.Status, to: selectedPR.Status,
+                    message: '외부 ERP 전송 완료 (Mock)',
+                    user: userProfile?.displayName || 'Unknown', timestamp: new Date().toISOString()
+                };
+                await updateDoc(doc(db, 'production_requests', selectedPR.id), { 
+                    ERPSynced: true,
+                    Logs: [logEntry, ...(selectedPR.Logs || [])] 
+                });
+                await fetchPRs();
+            } catch(e){}
+            setLoading(false);
+        }, 1500);
+    };
     const [selectedPRBOM, setSelectedPRBOM] = useState([]);
     const [inventory, setInventory] = useState({});
 
@@ -516,7 +535,15 @@ export default function ProductionRequestsPage() {
                                 <h3 className="text-xs font-black text-slate-700">프로세스 제어</h3>
                                 {isPRReadOnly(selectedPR.Status) ? <p className="text-xs text-slate-400 font-bold text-center py-2 bg-slate-50 rounded-xl">생산/QA 단계 수정 불가</p> : 
                                 <div className="space-y-2">
-                                    {selectedPR.Status === 'CONFIRMED' && <button onClick={() => handleStatusChange(selectedPR.id, 'PROD_WAITING', transitionNote)} className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-xs font-black">생산 대기로 이관</button>}
+                                    <div className="flex gap-2">
+                                        <button onClick={() => setIsPrintOpen(true)} className="flex-1 py-2.5 bg-slate-800 text-white rounded-xl text-xs font-black flex items-center justify-center gap-2 hover:bg-slate-700 transition-colors">
+                                            <Printer size={14} /> 작업 지시서 출력
+                                        </button>
+                                        <button onClick={handleERPSync} disabled={selectedPR.ERPSynced} className={`flex-1 py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-2 transition-colors ${selectedPR.ERPSynced ? 'bg-emerald-100 text-emerald-600 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>
+                                            <Send size={14} /> {selectedPR.ERPSynced ? 'ERP 전송 완료' : 'ERP 연동 (Mock)'}
+                                        </button>
+                                    </div>
+                                    {selectedPR.Status === 'CONFIRMED' && <button onClick={() => handleStatusChange(selectedPR.id, 'PROD_WAITING', transitionNote)} className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-xs font-black mt-2">생산 대기로 이관</button>}
                                     {selectedPR.Status === 'SHIP_READY' && <button onClick={() => handleStatusChange(selectedPR.id, 'SHIPPED', transitionNote)} className="w-full py-2.5 bg-green-600 text-white rounded-xl text-xs font-black">출하 완료 처리</button>}
                                 </div>}
                                 {PR_STATUS[selectedPR.Status]?.step > 0 && <button onClick={() => { const steps = Object.entries(PR_STATUS).sort((a,b) => a[1].step - b[1].step); const idx = steps.findIndex(s => s[0] === selectedPR.Status); if (idx > 0) handleStatusChange(selectedPR.id, steps[idx - 1][0]); }} className="w-full py-2.5 bg-white border border-rose-200 text-rose-500 rounded-xl text-xs font-black flex items-center justify-center gap-2"><RotateCcw size={14}/> 이전 단계 복구</button>}
@@ -538,6 +565,7 @@ export default function ProductionRequestsPage() {
                 document.body
             )}
             <PRRegistrationModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} onSave={handleSavePR} />
+            <WorkOrderPrintModal isOpen={isPrintOpen} onClose={() => setIsPrintOpen(false)} pr={selectedPR} bomList={selectedPRBOM} />
         </div>
     );
 }
