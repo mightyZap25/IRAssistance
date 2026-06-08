@@ -1,130 +1,171 @@
 import partsBackup from './parts_backup.json';
 import bomBackup from './bom_backup.json';
 
-// Initialize mock DB in LocalStorage if not exists
-function initMockDB() {
-    if (!localStorage.getItem('mock_db_initialized_v4')) {
-        console.log('[MockDB] Initializing LocalStorage with backups...');
-        localStorage.setItem('parts', JSON.stringify(partsBackup));
-        localStorage.setItem('bom', JSON.stringify(bomBackup));
-        
-        // Mock default users
-        const mockUsers = [
-            {
-                uid: 'mock-admin',
-                email: 'admin@irrobot.com',
-                displayName: '로컬 마스터',
-                role: 'admin',
-                department: 'Management'
-            }
-        ];
-        localStorage.setItem('users', JSON.stringify(mockUsers));
-        localStorage.setItem('mock_db_initialized_v4', 'true');
+// Initialize mock DB in PostgreSQL via Express on first run
+async function initMockDB() {
+    if (!localStorage.getItem('mock_pg_db_seeded_v1')) {
+        console.log('[MockDB] Seeding PostgreSQL with backups via Express proxy...');
+        try {
+            // Seed parts
+            const partsRes = await fetch('/api/db/init', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ collection: 'parts', data: partsBackup })
+            });
+            const partsResult = await partsRes.json();
+            console.log('[MockDB] Parts seed result:', partsResult);
+
+            // Seed bom
+            const bomRes = await fetch('/api/db/init', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ collection: 'bom', data: bomBackup })
+            });
+            const bomResult = await bomRes.json();
+            console.log('[MockDB] BOM seed result:', bomResult);
+
+            // Mock admin user seed
+            const mockUsers = [
+                {
+                    uid: 'mock-admin',
+                    email: 'admin@irrobot.com',
+                    displayName: '로컬 마스터',
+                    role: 'admin',
+                    department: 'Management'
+                }
+            ];
+            const userRes = await fetch('/api/db/init', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ collection: 'users', data: mockUsers })
+            });
+            const userResult = await userRes.json();
+            console.log('[MockDB] Users seed result:', userResult);
+
+            localStorage.setItem('mock_pg_db_seeded_v1', 'true');
+        } catch (err) {
+            console.error('[MockDB] Database seeding failed:', err);
+        }
     }
 }
 
 initMockDB();
 
-// Mock Firestore functions
+// Mock Firestore functions communicating with Express proxy server
 export const mockFirestore = {
-    // collection helper
     collection: (db, name) => {
         return { collectionName: name };
     },
     doc: (...args) => {
         if (args.length === 3) {
-            // doc(db, collectionName, id)
             return { collectionName: args[1], id: args[2] };
         } else if (args.length === 2) {
-            // doc(collectionRef, id)
             return { collectionName: args[0].collectionName || args[0], id: args[1] };
         }
         if (args.length === 1 && args[0].collectionName) {
-            // doc(collectionRef) - auto generate ID
             return { collectionName: args[0].collectionName, id: 'auto_' + Math.random().toString(36).substr(2, 9) };
         }
         return { collectionName: 'unknown', id: 'unknown' };
     },
-    // getDocs mock
     getDocs: async (q) => {
         const collectionName = q.collectionName || q;
-        const raw = localStorage.getItem(collectionName) || '[]';
-        const data = JSON.parse(raw);
-        
-        return {
-            docs: data.map(item => ({
-                id: item.id || item.PartID || item.uid || '',
-                data: () => item,
-                exists: () => true
-            })),
-            size: data.length,
-            forEach: (cb) => {
-                data.forEach(item => cb({
+        try {
+            const res = await fetch(`/api/db/${collectionName}`);
+            if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+            const data = await res.json();
+            
+            return {
+                docs: data.map(item => ({
                     id: item.id || item.PartID || item.uid || '',
-                    data: () => item
-                }));
-            }
-        };
+                    data: () => item,
+                    exists: () => true
+                })),
+                size: data.length,
+                forEach: (cb) => {
+                    data.forEach(item => cb({
+                        id: item.id || item.PartID || item.uid || '',
+                        data: () => item
+                    }));
+                }
+            };
+        } catch (err) {
+            console.error(`[MockDB] getDocs error for ${collectionName}:`, err);
+            return { docs: [], size: 0, forEach: () => {} };
+        }
     },
-    // getDoc mock
     getDoc: async (docRef) => {
         const { collectionName, id } = docRef;
-        const raw = localStorage.getItem(collectionName) || '[]';
-        const data = JSON.parse(raw);
-        const item = data.find(x => (x.id || x.PartID || x.uid) === id);
-        return {
-            exists: () => !!item,
-            data: () => item || null,
-            id
-        };
+        try {
+            const res = await fetch(`/api/db/${collectionName}/${id}`);
+            if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+            const item = await res.json();
+            return {
+                exists: () => !!item,
+                data: () => item || null,
+                id
+            };
+        } catch (err) {
+            console.error(`[MockDB] getDoc error for ${collectionName}/${id}:`, err);
+            return { exists: () => false, data: () => null, id };
+        }
     },
-    // setDoc mock
     setDoc: async (docRef, docData, options = {}) => {
         const { collectionName, id } = docRef;
-        const raw = localStorage.getItem(collectionName) || '[]';
-        let data = JSON.parse(raw);
-        
-        const existingIdx = data.findIndex(x => (x.id || x.PartID || x.uid) === id);
-        let updatedData = { ...docData, id };
-        
-        if (existingIdx !== -1) {
+        try {
+            let finalData = { ...docData };
+            
             if (options.merge) {
-                updatedData = { ...data[existingIdx], ...docData, id };
+                const getRes = await fetch(`/api/db/${collectionName}/${id}`);
+                const existing = getRes.ok ? await getRes.json() : null;
+                if (existing) {
+                    finalData = { ...existing, ...docData };
+                }
             }
-            data[existingIdx] = updatedData;
-        } else {
-            data.push(updatedData);
+            
+            const res = await fetch(`/api/db/${collectionName}/${id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(finalData)
+            });
+            if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+            console.log(`[MockDB] setDoc saved ${collectionName}/${id}`);
+            return true;
+        } catch (err) {
+            console.error(`[MockDB] setDoc error for ${collectionName}/${id}:`, err);
+            return false;
         }
-        
-        localStorage.setItem(collectionName, JSON.stringify(data));
-        console.log(`[MockDB] Saved doc in ${collectionName}: ${id}`, updatedData);
-        return true;
     },
-    // addDoc mock
     addDoc: async (collRef, docData) => {
         const collectionName = collRef.collectionName;
-        const raw = localStorage.getItem(collectionName) || '[]';
-        const data = JSON.parse(raw);
-        
-        const id = Math.random().toString(36).substring(2, 11);
-        const newItem = { ...docData, id };
-        data.push(newItem);
-        
-        localStorage.setItem(collectionName, JSON.stringify(data));
-        console.log(`[MockDB] Added doc to ${collectionName}: ${id}`, newItem);
-        return { id, ...newItem };
+        const id = 'auto_' + Math.random().toString(36).substr(2, 9);
+        try {
+            const res = await fetch(`/api/db/${collectionName}/${id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...docData, id })
+            });
+            if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+            console.log(`[MockDB] addDoc added ${collectionName}/${id}`);
+            return { id, ...docData };
+        } catch (err) {
+            console.error(`[MockDB] addDoc error for ${collectionName}:`, err);
+            throw err;
+        }
     },
-    // deleteDoc mock
     deleteDoc: async (docRef) => {
         const { collectionName, id } = docRef;
-        const raw = localStorage.getItem(collectionName) || '[]';
-        let data = JSON.parse(raw);
-        data = data.filter(x => (x.id || x.PartID || x.uid) !== id);
-        localStorage.setItem(collectionName, JSON.stringify(data));
-        console.log(`[MockDB] Deleted doc in ${collectionName}: ${id}`);
-        return true;
+        try {
+            const res = await fetch(`/api/db/${collectionName}/${id}`, {
+                method: 'DELETE'
+            });
+            if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+            console.log(`[MockDB] deleteDoc deleted ${collectionName}/${id}`);
+            return true;
+        } catch (err) {
+            console.error(`[MockDB] deleteDoc error for ${collectionName}/${id}:`, err);
+            return false;
+        }
     },
-    // writeBatch mock
     writeBatch: () => {
         const operations = [];
         return {
@@ -141,6 +182,8 @@ export const mockFirestore = {
                 for (const op of operations) {
                     if (op.type === 'set') {
                         await mockFirestore.setDoc(op.docRef, op.data, op.options);
+                    } else if (op.type === 'update') {
+                        await mockFirestore.setDoc(op.docRef, op.data, { merge: true });
                     } else if (op.type === 'delete') {
                         await mockFirestore.deleteDoc(op.docRef);
                     }

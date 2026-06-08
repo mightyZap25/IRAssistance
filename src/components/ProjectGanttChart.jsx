@@ -313,7 +313,7 @@ export default function ProjectGanttChart({ projects, stages }) {
                 <div className="flex items-center gap-3">
                     {stages.map(s => (
                         <div key={s.id} className="flex items-center gap-1">
-                            <div className={`w-2 h-2 rounded-full ${STAGE_COLORS[s.id].split(' ')[0]}`} />
+                            <div className={`w-2 h-2 rounded-full ${(STAGE_COLORS[s.id] || 'bg-slate-500').split(' ')[0]}`} />
                             <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">{s.label}</span>
                         </div>
                     ))}
@@ -446,7 +446,7 @@ export default function ProjectGanttChart({ projects, stages }) {
                                         ) : (
                                             /* Standard Stage Task Bar with resource color */
                                             <div 
-                                                className={`absolute top-1/2 -translate-y-1/2 h-[13px] rounded ${STAGE_COLORS[row.stageId]} border flex items-center overflow-hidden shadow-sm z-10`}
+                                                className={`absolute top-1/2 -translate-y-1/2 h-[13px] rounded ${STAGE_COLORS[row.stageId] || 'bg-slate-500 border-slate-600'} border flex items-center overflow-hidden shadow-sm z-10`}
                                                 style={{ left: `${x}px`, width: `${w}px` }}
                                             >
                                                 {/* Inner Progress Fill */}

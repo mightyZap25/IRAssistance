@@ -36,6 +36,92 @@ export default function SettingsPage() {
         requireQAForProduction: true
     });
 
+    const [dbSettings, setDbSettings] = useState({
+        host: '',
+        port: '15432',
+        user: '',
+        password: '',
+        database: ''
+    });
+    const [dbTesting, setDbTesting] = useState(false);
+    const [dbSaving, setDbSaving] = useState(false);
+
+    React.useEffect(() => {
+        if (activeTab === 'database') {
+            fetch('/api/config/db')
+                .then(res => res.json())
+                .then(data => {
+                    if (data) {
+                        setDbSettings({
+                            host: data.host || '',
+                            port: data.port || '15432',
+                            user: data.user || '',
+                            database: data.database || '',
+                            password: ''
+                        });
+                    }
+                })
+                .catch(err => console.error("Failed to load DB config:", err));
+        }
+    }, [activeTab]);
+
+    const handleTestDB = async () => {
+        setDbTesting(true);
+        try {
+            const res = await fetch('/api/config/db/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dbSettings)
+            });
+            
+            let result;
+            try {
+                result = await res.json();
+            } catch (jsonErr) {
+                throw new Error(`서버 응답 파싱 실패 (HTTP ${res.status})`);
+            }
+
+            if (res.ok && result.success) {
+                alert('연결 테스트 성공: ' + result.message);
+            } else {
+                alert('연결 테스트 실패: ' + (result?.error || result?.message || '알 수 없는 오류'));
+            }
+        } catch (err) {
+            alert('연결 테스트 에러: ' + err.message);
+        } finally {
+            setDbTesting(false);
+        }
+    };
+
+    const handleSaveDB = async (e) => {
+        e.preventDefault();
+        setDbSaving(true);
+        try {
+            const res = await fetch('/api/config/db', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dbSettings)
+            });
+            
+            let result;
+            try {
+                result = await res.json();
+            } catch (jsonErr) {
+                throw new Error(`서버 응답 파싱 실패 (HTTP ${res.status})`);
+            }
+
+            if (res.ok && result.success) {
+                alert('데이터베이스 설정이 성공적으로 저장 및 적용되었습니다.');
+            } else {
+                alert('데이터베이스 설정 저장 실패: ' + (result?.error || result?.message || '알 수 없는 오류'));
+            }
+        } catch (err) {
+            alert('설정 저장 중 오류가 발생했습니다: ' + err.message);
+        } finally {
+            setDbSaving(false);
+        }
+    };
+
     const handleSaveEmail = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -93,11 +179,14 @@ export default function SettingsPage() {
                 <div className="flex flex-1 gap-4 overflow-hidden">
                     {/* Sidebar Tabs */}
                     <div className="w-64 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex flex-col gap-2 shrink-0">
+                        <button onClick={() => setActiveTab('database')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-bold ${activeTab === 'database' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'text-slate-600 hover:bg-slate-50'}`}>
+                            <Database size={18} /> DB 연동 설정 (PostgreSQL)
+                        </button>
                         <button onClick={() => setActiveTab('email')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-bold ${activeTab === 'email' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'text-slate-600 hover:bg-slate-50'}`}>
                             <Mail size={18} /> A/S 이메일 연동 (CS)
                         </button>
                         <button onClick={() => setActiveTab('api')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-bold ${activeTab === 'api' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'text-slate-600 hover:bg-slate-50'}`}>
-                            <Database size={18} /> 외부 API 연동 (ECount 등)
+                            <Database size={18} strokeWidth={2} className="opacity-40" /> 외부 API 연동 (ECount 등)
                         </button>
                         <button onClick={() => setActiveTab('templates')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-bold ${activeTab === 'templates' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'text-slate-600 hover:bg-slate-50'}`}>
                             <FileText size={18} /> 이메일/문서 템플릿
@@ -113,6 +202,48 @@ export default function SettingsPage() {
                     {/* Content Area */}
                     <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-y-auto p-8 relative">
                         
+                        {activeTab === 'database' && (
+                            <div className="max-w-2xl animate-fade-in">
+                                <h2 className="text-lg font-black text-slate-900 mb-2">NAS PostgreSQL 데이터베이스 연동 설정</h2>
+                                <p className="text-sm text-slate-500 font-medium mb-8">Synology NAS 등에 설치된 PostgreSQL 데이터베이스와의 실시간 동기화를 설정합니다. 설정을 변경하면 실시간으로 접속 풀이 갱신됩니다.</p>
+                                
+                                <form onSubmit={handleSaveDB} className="space-y-5">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-black text-slate-700">호스트 IP (Host)</label>
+                                            <input type="text" value={dbSettings.host} onChange={e => setDbSettings({...dbSettings, host: e.target.value})} placeholder="192.168.0.7" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500" required />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-black text-slate-700">포트 (Port)</label>
+                                            <input type="text" value={dbSettings.port} onChange={e => setDbSettings({...dbSettings, port: e.target.value})} placeholder="15432" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500" required />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-black text-slate-700">접속 계정 (Username)</label>
+                                            <input type="text" value={dbSettings.user} onChange={e => setDbSettings({...dbSettings, user: e.target.value})} placeholder="postgres" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500" required />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-black text-slate-700">데이터베이스 이름 (Database)</label>
+                                            <input type="text" value={dbSettings.database} onChange={e => setDbSettings({...dbSettings, database: e.target.value})} placeholder="ir_assistant" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500" required />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-black text-slate-700">비밀번호 (Password)</label>
+                                        <input type="password" value={dbSettings.password} onChange={e => setDbSettings({...dbSettings, password: e.target.value})} placeholder="변경시에만 입력하세요 (기존 암호 보존됨)" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500" />
+                                    </div>
+                                    <div className="pt-4 border-t border-slate-100 flex gap-3">
+                                        <button type="button" onClick={handleTestDB} disabled={dbTesting || dbSaving} className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-black flex items-center gap-2">
+                                            {dbTesting ? '테스트 중...' : '연결 테스트'}
+                                        </button>
+                                        <button type="submit" disabled={dbTesting || dbSaving} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-black flex items-center gap-2 shadow-sm">
+                                            <Save size={16} /> 설정 저장 및 적용
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        )}
+
                         {activeTab === 'email' && (
                             <div className="max-w-2xl animate-fade-in">
                                 <h2 className="text-lg font-black text-slate-900 mb-2">고객지원(A/S) 이메일 자동 수집 설정</h2>

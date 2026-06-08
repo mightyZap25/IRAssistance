@@ -5,6 +5,10 @@ import {
     Printer, Send
 } from 'lucide-react';
 import WorkOrderPrintModal from '../components/WorkOrderPrintModal';
+import { createPortal } from 'react-dom';
+import { db, collection, getDocs, doc, updateDoc, addDoc, serverTimestamp, query, orderBy, where } from '../firebase';
+import { useAuth } from '../contexts/AuthContext';
+import MasterDataGrid from '../components/common/MasterDataGrid';
 
 // ─────────────────────────────────────────────────────────────
 // 상태 및 상수 정의
@@ -273,6 +277,16 @@ function PRRegistrationModal({ isOpen, onClose, onSave }) {
                         </select>
                     </div>
 
+                    <div className="space-y-3 text-left">
+                        <label className="text-xs font-bold text-slate-600 block">참고사항 (Remarks)</label>
+                        <textarea
+                            value={form.Remarks}
+                            onChange={e => setForm(prev => ({ ...prev, Remarks: e.target.value }))}
+                            placeholder="추가적인 참고사항이나 작업 지시사항을 입력하세요..."
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold h-24 outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+
                     <div className="border border-slate-200 rounded-2xl overflow-hidden text-left">
                         <div className="flex items-center justify-between bg-slate-50 px-4 py-3 border-b border-slate-100">
                             <h3 className="text-xs font-black text-slate-700 flex items-center gap-2"><Package size={14} className="text-amber-500"/> 자재 가용성 체크</h3>
@@ -494,6 +508,12 @@ export default function ProductionRequestsPage() {
                                         <p className="font-bold text-slate-400 mb-1 uppercase tracking-tighter text-[10px]">납기일</p>
                                         <p className="font-black text-slate-800 text-sm">{selectedPR.DueDate}</p>
                                     </div>
+                                    {selectedPR.Remarks && (
+                                        <div className="col-span-2 mt-2 p-3 bg-amber-50/50 dark:bg-amber-950/20 rounded-xl border border-amber-200/50 dark:border-amber-900/30">
+                                            <p className="font-black text-amber-800 dark:text-amber-500 mb-1 uppercase tracking-tighter text-[10px]">참고사항 (Remarks)</p>
+                                            <p className="font-bold text-slate-700 dark:text-slate-350 whitespace-pre-line text-xs">{selectedPR.Remarks}</p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             <div className="bg-white rounded-2xl p-4 border border-slate-200 space-y-4">

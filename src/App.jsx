@@ -36,6 +36,7 @@ import ProjectManagementPage from './pages/ProjectManagementPage'
 import SalesDashboardPage from './pages/SalesDashboardPage'
 import QuotationsPage from './pages/QuotationsPage'
 import BillingPage from './pages/BillingPage'
+import SettingsPage from './pages/SettingsPage'
 
 function PrivateRoute({ children }) {
     const { currentUser } = useAuth();

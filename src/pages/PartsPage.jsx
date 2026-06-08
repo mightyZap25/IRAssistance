@@ -159,12 +159,6 @@ export default function PartsPage() {
                     </p>
                 </div>
                 <div className="relative flex items-center gap-2">
-                    <button
-                        onClick={() => setShowOverseasOnly(!showOverseasOnly)}
-                        className={`flex items-center gap-2 font-extrabold py-2.5 px-3 rounded-2xl transition-all shadow-md transform ${showOverseasOnly ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-white text-slate-600 border-slate-200'} border`}
-                    >
-                        <span>✈️ 해외수입물품 보기</span>
-                    </button>
                     <RoleGuard requiredRole={USER_ROLES.ENGINEER}>
                         <button
                             onClick={() => setIsImportModalOpen(true)}

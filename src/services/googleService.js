@@ -5,11 +5,11 @@ import { signInWithPopup, GoogleAuthProvider } from '../firebase';
  * Google Drive API 및 토큰 관리를 위한 공통 서비스
  */
 
-export const ensureValidToken = async () => {
+export const ensureValidToken = async (forceRefresh = false) => {
     console.log("[ensureValidToken] Checking token in localStorage...");
     const token = localStorage.getItem('google_access_token');
     const expiresAt = localStorage.getItem('google_access_token_expires_at');
-    const isExpired = !token || !expiresAt || Date.now() > Number(expiresAt);
+    const isExpired = forceRefresh || !token || !expiresAt || Date.now() > Number(expiresAt);
     
     console.log("[ensureValidToken] isExpired:", isExpired, "ExpiresAt:", expiresAt ? new Date(Number(expiresAt)).toISOString() : 'N/A');
 
@@ -39,7 +39,7 @@ export const ensureValidToken = async () => {
 
 export const fetchDrive = async (url, options = {}) => {
     console.log(`[fetchDrive] Starting request to: ${url}`);
-    const token = await ensureValidToken();
+    const token = await ensureValidToken(!!options._retry);
     if (!token) {
         console.error("[fetchDrive] Failed to obtain valid Google Token.");
         throw new Error('구글 인증이 필요합니다. 팝업 차단이 되어 있는지 확인해 주세요.');
@@ -67,6 +67,13 @@ export const fetchDrive = async (url, options = {}) => {
         console.log(`[fetchDrive] Response status: ${res.status} ${res.statusText}`);
 
         if (!res.ok) {
+            if (res.status === 401 && !options._retry) {
+                console.warn("[fetchDrive] 401 Unauthorized detected. Clearing token and retrying with fresh token...");
+                localStorage.removeItem('google_access_token');
+                localStorage.removeItem('google_access_token_expires_at');
+                return fetchDrive(url, { ...options, _retry: true });
+            }
+
             let errorMsg = 'Drive API Error';
             try {
                 const error = await res.json();
