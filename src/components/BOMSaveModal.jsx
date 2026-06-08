@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, AlertCircle, Save, FileText, CheckCircle2, Info } from 'lucide-react';
 
 export default function BOMSaveModal({ 
@@ -12,6 +13,14 @@ export default function BOMSaveModal({
     const [reason, setReason] = useState('');
     const [updateType, setUpdateType] = useState('Simple Update');
 
+    // Reset state when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            setReason('');
+            setUpdateType('Simple Update');
+        }
+    }, [isOpen]);
+
     if (!isOpen) return null;
 
     const handleConfirm = () => {
@@ -22,8 +31,11 @@ export default function BOMSaveModal({
         onSave({ reason, updateType, changes });
     };
 
-    return (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[200] p-4 animate-in fade-in duration-300">
+    const modalContent = (
+        <div 
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-300"
+            onKeyDown={(e) => e.stopPropagation()}
+        >
             <div className="bg-white/90 backdrop-blur-2xl w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-white/40 overflow-hidden animate-in zoom-in-95 duration-300">
                 {/* Decorative Background Element */}
                 <div className="absolute -top-24 -right-24 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -77,6 +89,7 @@ export default function BOMSaveModal({
                             autoFocus
                             value={reason}
                             onChange={e => setReason(e.target.value)}
+                            onKeyDown={e => e.stopPropagation()}
                             placeholder="이번 BOM 수정의 배경과 구체적인 변경 사유를 입력해주세요..."
                             className="w-full h-32 bg-slate-50 border border-slate-200 rounded-[1.5rem] p-5 text-sm font-bold text-slate-700 focus:ring-4 focus:ring-blue-100 focus:border-blue-500 focus:bg-white transition-all outline-none resize-none shadow-inner"
                         />
@@ -147,4 +160,6 @@ export default function BOMSaveModal({
             </div>
         </div>
     );
+
+    return createPortal(modalContent, document.body);
 }

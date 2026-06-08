@@ -1,10 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { X, Globe, FileSpreadsheet, Eye, CheckCircle2, Play, AlertTriangle, HelpCircle, Layers, Check, Loader2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { collection, doc, writeBatch, getDocs, getDoc, serverTimestamp, setDoc } from '../firebase';
+import { collection, doc, writeBatch, getDocs, serverTimestamp } from '../firebase';
 import { db } from '../firebase';
-import { fetchSpreadsheetMetadata, fetchSpreadsheetValues } from '../services/googleService';
 import BOMTree from './BOMTree';
+
+// Helper to normalize Part IDs for robust comparison (strips out revision suffixes like -1.0, _v1.1)
+function normalizePartId(id) {
+    if (!id) return '';
+    let normalized = String(id).trim().toUpperCase();
+    // Remove revision suffixes if present (e.g., -1.0, -1.1, _1.0)
+    normalized = normalized.replace(/[-_]v?\d+\.\d+$/i, '');
+    return normalized;
+}
 
 export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allParts: existingPartsList }) {
     const [sheetUrl, setSheetUrl] = useState('');
@@ -23,8 +31,6 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
     
     const [spreadsheetId, setSpreadsheetId] = useState('');
     const [workbookObj, setWorkbookObj] = useState(null);
-    const [targetSheets, setTargetSheets] = useState([]);
-    const [currentSheetIndex, setCurrentSheetIndex] = useState(0);
 
     useEffect(() => {
         if (!isOpen) {
@@ -41,8 +47,6 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
             setPartStatusMap({});
             setSpreadsheetId('');
             setWorkbookObj(null);
-            setTargetSheets([]);
-            setCurrentSheetIndex(0);
         }
     }, [isOpen]);
 
@@ -77,7 +81,7 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
             
             if (workbook && workbook.SheetNames) {
                 setAvailableSheets(workbook.SheetNames);
-                setSheetName('ALL_SHEETS');
+                setSheetName(''); // Clear or set default
             } else {
                 throw new Error("시트 목록을 가져오지 못했습니다.");
             }
@@ -90,22 +94,19 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
     };
 
     // Parse the fetched Google Sheet cells
-    const processSingleSheet = async (index, sheets, wb) => {
+    const processSingleSheet = async (tabName, wb) => {
         try {
-            const tabName = sheets[index];
-            setLoadingStatus(`[${index + 1}/${sheets.length}] '${tabName}' 시트 데이터를 분석하고 있습니다...`);
+            setLoadingStatus(`'${tabName}' 시트 데이터를 분석하고 있습니다...`);
             await new Promise(resolve => setTimeout(resolve, 50));
 
             const worksheet = wb.Sheets[tabName];
             if (!worksheet) {
-                goToNextSheet();
-                return;
+                throw new Error(`'${tabName}' 시트를 찾을 수 없습니다.`);
             }
 
             const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
             if (!rows || rows.length === 0) {
-                goToNextSheet();
-                return;
+                throw new Error(`'${tabName}' 시트에 데이터가 없습니다.`);
             }
 
             let headerRowIdx = -1;
@@ -141,17 +142,9 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
                 spec: headers.findIndex(h => { const l = h.toLowerCase(); return l.includes('manufacturer no') || l.includes('mfn') || l.includes('spec') || l.includes('규격') || l.includes('스펙'); }),
             };
 
+            // Defaults if not found
             if (colMap.partId === -1) colMap.partId = 0;
             if (colMap.name === -1) colMap.name = 1;
-            if (colMap.qty === -1) colMap.qty = 2;
-            if (colMap.category === -1) colMap.category = 3;
-            if (colMap.rev === -1) colMap.rev = 4;
-            if (colMap.location === -1) colMap.location = 5;
-            if (colMap.manufacturer === -1) colMap.manufacturer = 6;
-            if (colMap.supplier === -1) colMap.supplier = 7;
-            if (colMap.unitPrice === -1) colMap.unitPrice = 8;
-            if (colMap.spec === -1) colMap.spec = 9;
-            if (colMap.assyPart === -1) colMap.assyPart = 10;
 
             const parsedAccumulated = [];
             const relationsAccumulated = [];
@@ -181,11 +174,6 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
                 let partId = String(partIdRaw).trim();
                 if (!partId || partId.toLowerCase() === 'n/a') continue;
 
-                // Auto-correct 'IRO' to 'IRE' for electronic parts
-                const categoryRawForCheck = String(row[colMap.category] || '').trim();
-                if (categoryRawForCheck.toLowerCase() === 'elec' && partId.startsWith('IRO')) {
-                    partId = partId.replace(/^IRO/, 'IRE');
-                }
                 if (colMap.levelCol !== -1 && row[colMap.levelCol] !== undefined && String(row[colMap.levelCol]).trim() !== '') {
                     const levelStr = String(row[colMap.levelCol]).trim();
                     if (levelStr.includes('.')) {
@@ -231,7 +219,6 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
                 
                 const priceRaw = String(row[colMap.unitPrice] || '0').replace(/[^0-9.]/g, '');
                 const unitPrice = parseFloat(priceRaw) || 0;
-                
                 const spec = String(row[colMap.spec] || '').trim();
 
                 const itemData = {
@@ -278,7 +265,12 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
 
             const statusMap = {};
             for (const item of parsedAccumulated) {
-                const existing = existingPartsList.find(p => p.PartID === item.PartID);
+                const targetId = normalizePartId(item.PartID);
+                const existing = existingPartsList.find(p => {
+                    const dbId = normalizePartId(p.PartID);
+                    const dbMaster = p.MasterPartID ? normalizePartId(p.MasterPartID) : dbId;
+                    return dbId === targetId || dbMaster === targetId;
+                });
                 statusMap[item.PartID] = {
                     exists: !!existing,
                     data: existing || null,
@@ -303,37 +295,24 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
             setError("올바른 구글 시트 주소를 입력하세요.");
             return;
         }
+        if (!sheetName) {
+            setError("가져올 시트를 선택해 주세요.");
+            return;
+        }
 
         setLoading(true);
         setError('');
         try {
             let wb = workbookObj;
             if (!wb) {
-                setLoadingStatus('구글 시트 전체 데이터를 불러오는 중입니다...');
                 const exportUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=xlsx`;
                 const res = await fetch(exportUrl);
-                if (!res.ok) throw new Error(`HTTP Error: ${res.status} - 시트가 '링크가 있는 모든 사용자에게 공개' 상태인지 확인하세요.`);
-                
+                if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
                 const arrayBuffer = await res.arrayBuffer();
                 wb = XLSX.read(arrayBuffer, { type: 'array' });
                 setWorkbookObj(wb);
             }
-
-            let sheetsToProcess = availableSheets;
-            if (sheetName !== 'ALL_SHEETS' && sheetName) {
-                sheetsToProcess = [sheetName];
-            } else if (sheetsToProcess.length === 0 && wb && wb.SheetNames) {
-                sheetsToProcess = wb.SheetNames.filter(name => !name.toLowerCase().includes('master') && !name.toLowerCase().includes('reference'));
-            }
-
-            if (sheetsToProcess.length === 0) {
-                throw new Error("가져올 시트(탭)를 찾을 수 없습니다.");
-            }
-
-            setTargetSheets(sheetsToProcess);
-            setCurrentSheetIndex(0);
-            
-            await processSingleSheet(0, sheetsToProcess, wb);
+            await processSingleSheet(sheetName, wb);
         } catch (err) {
             console.error(err);
             setError("오류가 발생했습니다: " + err.message);
@@ -341,51 +320,33 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
         }
     };
 
-    const goToNextSheet = () => {
-        const nextIdx = currentSheetIndex + 1;
-        if (nextIdx < targetSheets.length) {
-            setCurrentSheetIndex(nextIdx);
-            setLoading(true);
-            setTimeout(() => {
-                processSingleSheet(nextIdx, targetSheets, workbookObj);
-            }, 50);
-        } else {
-            alert('모든 시트 처리가 완료되었습니다!');
-            onImportSuccess();
-            onClose();
-        }
-    };
-
-    const handleSkip = () => {
-        goToNextSheet();
-    };
-
     const handleConfirmImport = async () => {
         setLoading(true);
         setLoadingStatus('기존 데이터 정합성을 검토하는 중입니다...');
         setError('');
         try {
-            // 1. Fetch all existing BOM documents to build a duplicate-check map
             const bomColl = collection(db, 'bom');
             const qSnap = await getDocs(bomColl);
-            
-            const existingBomSet = new Set();
+            const existingBomMap = new Map();
             qSnap.docs.forEach(docSnap => {
                 const data = docSnap.data();
                 if (data.ParentID && data.ChildID) {
-                    existingBomSet.add(`${data.ParentID}_${data.ChildID}`);
+                    const pId = normalizePartId(data.ParentID);
+                    const cId = normalizePartId(data.ChildID);
+                    existingBomMap.set(`${pId}_${cId}`, docSnap.ref);
                 }
             });
 
             const operations = [];
 
-            // 2. Add new parts creation operations
-            setLoadingStatus('새로 발견된 부품 마스터 정보를 데이터베이스에 신규 등록 중입니다...');
+            // 1. Create new parts
             const newPartsToCreate = parsedItems.filter(item => partStatusMap[item.PartID]?.isNew);
             newPartsToCreate.forEach(item => {
-                const partRef = doc(db, 'parts', item.PartID);
+                const finalPartId = normalizePartId(item.PartID); // 새 정책에 따라 PartID에서 리비전 제거
+                const partRef = doc(db, 'parts', finalPartId);
                 operations.push((batch) => batch.set(partRef, {
-                    PartID: item.PartID,
+                    PartID: finalPartId,
+                    MasterPartID: finalPartId,
                     Name: item.Name,
                     Class: item.Class,
                     Category: item.Category,
@@ -402,227 +363,163 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
                 }));
             });
 
-            // 3. Add new BOM relations operations (checking for duplicates)
-            setLoadingStatus('새로운 BOM 계층 관계를 검증하고 추가하는 중입니다...');
-            let skippedRelationsCount = 0;
+            // 2. Create or Update BOM relations
             let addedRelationsCount = 0;
-
+            let updatedRelationsCount = 0;
+            
             bomRelations.forEach(link => {
-                const relationKey = `${link.parentId}_${link.childId}`;
-                if (existingBomSet.has(relationKey)) {
-                    skippedRelationsCount++;
+                const pId = normalizePartId(link.parentId);
+                const cId = normalizePartId(link.childId);
+                const relationKey = `${pId}_${cId}`;
+                
+                if (existingBomMap.has(relationKey)) {
+                    // Update existing BOM relation (Qty, Location, Note)
+                    const existingRef = existingBomMap.get(relationKey);
+                    operations.push((batch) => batch.update(existingRef, {
+                        Quantity: link.qty,
+                        Location: link.location || '',
+                        Note: link.note || ''
+                    }));
+                    updatedRelationsCount++;
                 } else {
                     const newLinkRef = doc(collection(db, 'bom'));
                     operations.push((batch) => batch.set(newLinkRef, {
-                        ParentID: link.parentId,
-                        ChildID: link.childId,
+                        ParentID: pId, // DB에는 정규화된 ID를 저장
+                        ChildID: cId,
                         Quantity: link.qty,
                         Location: link.location || '',
                         Note: link.note || '',
                         Status: 'Active'
                     }));
                     addedRelationsCount++;
-                    // Add it to set in case of duplicates in the same import session
-                    existingBomSet.add(relationKey);
+                    existingBomMap.set(relationKey, newLinkRef);
                 }
             });
 
-            // 4. Commit operations in chunks of 400
             if (operations.length > 0) {
-                setLoadingStatus('데이터베이스에 변경 사항을 반영하는 중입니다 (트랜잭션 실행)...');
-                const commitInChunks = async (ops) => {
-                    let currentBatch = writeBatch(db);
-                    let count = 0;
-                    for (const op of ops) {
-                        if (count >= 400) {
-                            await currentBatch.commit();
-                            currentBatch = writeBatch(db);
-                            count = 0;
-                        }
-                        op(currentBatch);
-                        count++;
-                    }
-                    if (count > 0) {
+                let currentBatch = writeBatch(db);
+                let count = 0;
+                for (const op of operations) {
+                    if (count >= 400) {
                         await currentBatch.commit();
+                        currentBatch = writeBatch(db);
+                        count = 0;
                     }
-                };
-
-                await commitInChunks(operations);
+                    op(currentBatch);
+                    count++;
+                }
+                if (count > 0) await currentBatch.commit();
             }
 
-            alert(`BOM 가져오기가 성공적으로 완료되었습니다!\n\n- 등록된 신규 부품: ${newPartsToCreate.length}개\n- 생성된 신규 BOM 관계: ${addedRelationsCount}개\n- 이미 존재하여 제외된 관계: ${skippedRelationsCount}개`);
-            goToNextSheet();
+            alert(`BOM 가져오기가 성공적으로 완료되었습니다!\n\n- 등록된 신규 품목: ${newPartsToCreate.length}개\n- 생성된 신규 BOM 관계: ${addedRelationsCount}개\n- 갱신된 기존 BOM 관계: ${updatedRelationsCount}개`);
+            onImportSuccess();
+            onClose();
         } catch (err) {
-            console.error("Firebase import transaction failed:", err);
+            console.error(err);
             setError("데이터베이스 저장 중 오류가 발생했습니다: " + err.message);
         } finally {
             setLoading(false);
         }
     };
 
-    if (!isOpen) return null;
-
-    // Helper to build a nested tree structure for preview rendering
     const buildPreviewTree = () => {
         if (parsedItems.length === 0) return null;
-        
-        const existingMap = {};
-        existingPartsList.forEach(p => {
-            existingMap[p.PartID] = p;
-        });
-
         const root = parsedItems[0];
         const itemMap = {};
         parsedItems.forEach(item => {
-            const exist = existingMap[item.PartID];
+            const targetId = normalizePartId(item.PartID);
+            const exist = existingPartsList.find(p => {
+                const dbId = normalizePartId(p.PartID);
+                const dbMaster = p.MasterPartID ? normalizePartId(p.MasterPartID) : dbId;
+                return dbId === targetId || dbMaster === targetId;
+            });
             itemMap[item.PartID] = exist ? { ...item, ...exist } : item;
         });
-
-        // Group relations by parentId
         const relationsMap = {};
         bomRelations.forEach(rel => {
-            if (!relationsMap[rel.parentId]) {
-                relationsMap[rel.parentId] = [];
-            }
+            if (!relationsMap[rel.parentId]) relationsMap[rel.parentId] = [];
             relationsMap[rel.parentId].push(rel);
         });
 
         const buildNode = (partId, visited = new Set()) => {
             const item = itemMap[partId];
             if (!item) return { PartID: partId, Name: 'Unknown Part', Level: 1, Children: [] };
-
-            if (visited.has(partId)) {
-                return {
-                    ...item,
-                    Name: `[순환 참조] ${item.Name}`,
-                    Children: [],
-                    isCircular: true
-                };
-            }
-
+            if (visited.has(partId)) return { ...item, Name: `[순환 참조] ${item.Name}`, Children: [], isCircular: true };
+            
             const nextVisited = new Set(visited);
             nextVisited.add(partId);
-
-            const childrenRels = relationsMap[partId] || [];
-            const children = childrenRels.map(rel => {
-                const childNode = buildNode(rel.childId, nextVisited);
-                return {
-                    ...childNode,
-                    Quantity: rel.qty,
-                    Location: rel.location,
-                    Note: rel.note || ''
-                };
-            });
-
-            return {
-                ...item,
-                Children: children
-            };
+            const children = (relationsMap[partId] || []).map(rel => ({
+                ...buildNode(rel.childId, nextVisited),
+                Quantity: rel.qty,
+                Location: rel.location,
+                Note: rel.note || ''
+            }));
+            return { ...item, Children: children };
         };
-
         return buildNode(root.PartID);
     };
 
     const previewTree = buildPreviewTree();
 
+    if (!isOpen) return null;
+
     return (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                {/* Header */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                     <div className="flex items-center gap-2">
                         <FileSpreadsheet className="text-blue-600" size={20} />
-                        <h2 className="text-lg font-black text-slate-800">구글 시트 BOM 가져오기</h2>
+                        <h2 className="text-lg font-black text-slate-800">구글 시트 BOM 가져오기 (단일 시트)</h2>
                     </div>
-                    <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all">
+                    <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
                         <X size={18} />
                     </button>
                 </div>
 
-                {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-4 relative">
                     {loading && (
-                        <div className="absolute inset-0 bg-white/95 backdrop-blur-xs z-50 flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-200">
+                        <div className="absolute inset-0 bg-white/95 z-50 flex flex-col items-center justify-center p-6 text-center">
                             <Loader2 size={40} className="animate-spin text-blue-600 mb-4" />
-                            <p className="font-extrabold text-slate-800 text-sm mb-3">{loadingStatus || '처리 중입니다...'}</p>
-                            
-                            {(spreadsheetId || sheetName) && (
-                                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-left text-xs space-y-1.5 max-w-md w-full font-mono text-slate-600">
-                                    <div className="flex justify-between gap-4">
-                                        <span className="font-bold text-slate-400">Spreadsheet ID:</span>
-                                        <span className="truncate max-w-[200px]" title={spreadsheetId}>{spreadsheetId || 'N/A'}</span>
-                                    </div>
-                                    <div className="flex justify-between gap-4">
-                                        <span className="font-bold text-slate-400">Target Tab:</span>
-                                        <span className="truncate">{sheetName || 'N/A'}</span>
-                                    </div>
-                                    <div className="flex justify-between gap-4">
-                                        <span className="font-bold text-slate-400">Range Target:</span>
-                                        <span>{sheetName ? `${sheetName}!A1:Z1000` : 'N/A'}</span>
-                                    </div>
-                                    <div className="flex justify-between gap-4 border-t border-slate-200 pt-1.5 mt-1.5">
-                                        <span className="font-bold text-slate-400">Auth Status:</span>
-                                        <span className="text-emerald-600 font-bold">Token Checked (OK)</span>
-                                    </div>
-                                </div>
-                            )}
-                            
-                            <p className="text-slate-400 text-[10px] mt-4">구글 클라우드 서버와 데이터 교신 중에는 시간이 다소 소요될 수 있습니다.</p>
+                            <p className="font-bold text-slate-800">{loadingStatus || '처리 중입니다...'}</p>
                         </div>
                     )}
 
                     {error && (
-                        <div className="p-3.5 bg-rose-50 border border-rose-100 text-rose-700 text-xs font-bold rounded-xl flex items-start gap-2 text-left">
-                            <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                        <div className="p-3 bg-rose-50 border border-rose-100 text-rose-700 text-xs font-bold rounded-xl flex items-start gap-2">
+                            <AlertTriangle size={16} className="shrink-0" />
                             <span>{error}</span>
                         </div>
                     )}
 
                     {step === 1 ? (
-                        <div className="space-y-4 text-left">
-                            <div className="p-4 bg-blue-50/50 border border-blue-100/50 rounded-2xl text-xs text-blue-700 leading-relaxed font-medium">
-                                <span className="font-bold block mb-1">💡 구글 시트 연결 안내</span>
-                                1. 구글 시트의 링크 주소창 주소를 그대로 복사해 입력해 주세요.<br />
-                                2. 아래 입력 칸에 주소를 넣으면 자동으로 하단 시트(탭) 목록을 가져옵니다.<br />
-                                3. 분석하려는 올바른 탭을 선택하고 "구글 시트 데이터 분석"을 클릭하세요.
-                            </div>
-
+                        <div className="space-y-4">
                             <div className="space-y-1.5">
-                                <label className="text-xs font-bold text-slate-500 ml-1">구글 시트 주소 (URL)</label>
-                                <div className="flex gap-2">
-                                    <div className="relative flex-1">
-                                        <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                        <input 
-                                            type="text" 
-                                            value={sheetUrl}
-                                            onChange={handleUrlChange}
-                                            placeholder="https://docs.google.com/spreadsheets/d/.../edit"
-                                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                                        />
-                                    </div>
+                                <label className="text-xs font-bold text-slate-500">구글 시트 주소 (URL)</label>
+                                <div className="relative">
+                                    <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                    <input 
+                                        type="text" 
+                                        value={sheetUrl}
+                                        onChange={handleUrlChange}
+                                        placeholder="https://docs.google.com/spreadsheets/d/.../edit"
+                                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
+                                    />
                                 </div>
                             </div>
 
                             {spreadsheetId && (
                                 <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-slate-500 ml-1">시트(탭) 선택</label>
-                                    {loading && availableSheets.length === 0 ? (
-                                        <div className="flex items-center gap-2 text-xs text-slate-500 py-2">
-                                            <Loader2 size={14} className="animate-spin text-blue-600" />
-                                            <span>시트 정보를 로딩 중입니다...</span>
-                                        </div>
-                                    ) : (
-                                        <select 
-                                            value={sheetName} 
-                                            onChange={(e) => setSheetName(e.target.value)}
-                                            className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                                        >
-                                            <option value="ALL_SHEETS">전체 시트 순차 처리</option>
-                                            {availableSheets.map(name => (
-                                                <option key={name} value={name}>{name}</option>
-                                            ))}
-                                        </select>
-                                    )}
+                                    <label className="text-xs font-bold text-slate-500">가져올 시트(탭) 선택</label>
+                                    <select 
+                                        value={sheetName} 
+                                        onChange={(e) => setSheetName(e.target.value)}
+                                        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
+                                    >
+                                        <option value="">시트를 선택하세요</option>
+                                        {availableSheets.map(name => (
+                                            <option key={name} value={name}>{name}</option>
+                                        ))}
+                                    </select>
                                 </div>
                             )}
 
@@ -630,90 +527,108 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
                                 <button
                                     onClick={handleFetchAndParse}
                                     disabled={loading || !spreadsheetId || !sheetName}
-                                    className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold text-sm shadow-md disabled:opacity-50 transition-all"
+                                    className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold text-sm disabled:opacity-50"
                                 >
-                                    {loading ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
-                                    <span>구글 시트 데이터 분석</span>
+                                    <Play size={16} />
+                                    <span>시트 데이터 분석</span>
                                 </button>
                             </div>
                         </div>
                     ) : (
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
-                                {/* Left Side: Visual Tree Preview */}
-                                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col min-h-[350px] max-h-[450px]">
+                                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col h-[400px]">
                                     <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                                         <Layers size={14} className="text-blue-500" />
-                                        BOM 계층 구조 미리보기
+                                        BOM 계층 구조 미리보기 (탭: {sheetName})
                                     </h3>
-                                    <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                    <div className="flex-1 overflow-y-auto">
                                         {previewTree ? (
-                                            <BOMTree 
-                                                data={previewTree} 
-                                                isEditing={false} 
-                                                allParts={existingPartsList} 
-                                            />
+                                            <BOMTree data={previewTree} isEditing={false} allParts={existingPartsList} />
                                         ) : (
                                             <span className="text-xs text-slate-400">구조를 생성할 수 없습니다.</span>
                                         )}
                                     </div>
                                 </div>
 
-                                {/* Right Side: Component Creation Check */}
-                                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col min-h-[350px] max-h-[450px]">
+                                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col h-[400px]">
                                     <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                                         <CheckCircle2 size={14} className="text-emerald-500" />
-                                        신규 부품 등록 검토 ({parsedItems.filter(item => partStatusMap[item.PartID]?.isNew).length}건)
+                                        신규 등록 예정 부품 ({parsedItems.filter(item => partStatusMap[item.PartID]?.isNew).length}건)
                                     </h3>
-                                    <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar pr-1">
-                                        {(() => {
-                                            const rootItem = parsedItems[0];
-                                            const isRootExists = rootItem && partStatusMap[rootItem.PartID]?.exists;
-                                            if (isRootExists) {
-                                                return (
-                                                    <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-3 text-xs flex gap-2 items-start font-semibold mb-3 text-left">
-                                                        <AlertTriangle size={15} className="shrink-0 mt-0.5 text-amber-600" />
-                                                        <div>
-                                                            <span className="font-bold text-amber-900 block mb-0.5">⚠️ 최상위 완제품 이미 존재함</span>
-                                                            최상위 완제품 <span className="font-mono bg-white px-1 py-0.5 rounded border border-amber-100 text-slate-700">{rootItem.PartID}</span> {rootItem.Name}은(는) 이미 등록되어 있습니다. (BOM 관계만 재생성됩니다.)
-                                                        </div>
-                                                    </div>
-                                                );
-                                            }
-                                            return null;
-                                        })()}
+                                    <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                                         {parsedItems
                                             .filter(item => partStatusMap[item.PartID]?.isNew)
                                             .sort((a, b) => b.Level - a.Level)
                                             .map((item, idx) => {
+                                                const isElectronic = (item.Category || '').includes('전자') || (item.PartID || '').startsWith('IRE');
+                                                const isMechanical = (item.Category || '').includes('기구') || (item.PartID || '').startsWith('IRM');
+                                                const isProduct = item.Class.includes('Product');
+                                                const isAssembly = item.Class.includes('Assembly');
+
+                                                let cardStyle = "bg-white border-slate-100";
+                                                let nameStyle = "text-slate-700";
+                                                let classBadge = "bg-slate-500 text-white";
+                                                let className = "단품";
+
+                                                if (isProduct) {
+                                                    cardStyle = "bg-blue-50/50 border-blue-100";
+                                                    nameStyle = "text-blue-800";
+                                                    classBadge = "bg-blue-600 text-white";
+                                                    className = "완제품";
+                                                } else if (isAssembly) {
+                                                    cardStyle = "bg-amber-50/50 border-amber-100";
+                                                    nameStyle = "text-amber-800";
+                                                    classBadge = "bg-amber-500 text-white";
+                                                    className = "조립품";
+                                                }
+
                                                 return (
-                                                    <div key={`${item.PartID}-${idx}`} className="bg-white border border-slate-100 rounded-xl p-2.5 flex items-start justify-between shadow-sm text-left">
-                                                        <div className="min-w-0">
-                                                            <div className="flex items-center gap-1.5 mb-1">
-                                                                <span className="text-[9px] bg-slate-100 text-slate-600 px-1 rounded font-bold">Lv {item.Level}</span>
-                                                                <span className="font-mono text-xs font-bold text-slate-700">{item.PartID}</span>
-                                                                <span className={`text-[9px] px-1 rounded font-black ${
-                                                                    item.Class.includes('Product') 
-                                                                        ? 'bg-blue-100 text-blue-700' 
-                                                                        : item.Class.includes('Assembly') 
-                                                                            ? 'bg-amber-100 text-amber-700' 
-                                                                            : 'bg-slate-100 text-slate-600'
-                                                                }`}>{item.Class}</span>
+                                                    <div key={idx} className={`border rounded-xl p-3 shadow-sm flex flex-col gap-2 transition-all hover:shadow-md ${cardStyle}`}>
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="text-[10px] bg-white border border-slate-200 text-slate-500 px-1.5 py-0.5 rounded font-black">Lv {item.Level}</span>
+                                                                <span className="font-mono text-xs font-black text-slate-800 tracking-tighter">{item.PartID}</span>
                                                             </div>
-                                                            <div className="text-xs text-slate-500 truncate font-semibold">{item.Name}</div>
-                                                            {item.Spec && (
-                                                                <div className="text-[10px] text-slate-400 truncate mt-0.5">Spec: {item.Spec}</div>
-                                                            )}
+                                                            <div className="flex gap-1">
+                                                                {isElectronic && (
+                                                                    <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-black">전자부품</span>
+                                                                )}
+                                                                {isMechanical && (
+                                                                    <span className="text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-black">기구부품</span>
+                                                                )}
+                                                                {!isElectronic && !isMechanical && item.Category && (
+                                                                    <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full font-black">{item.Category}</span>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                        <span className="text-[9px] font-black bg-amber-50 text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded shrink-0">신규 등록</span>
+                                                        <div className="flex flex-col">
+                                                            <div className={`text-xs font-black truncate ${nameStyle}`}>{item.Name}</div>
+                                                            <div className="flex items-center justify-between mt-1.5 gap-2">
+                                                                <select 
+                                                                    value={item.Class}
+                                                                    onChange={(e) => {
+                                                                        const newClass = e.target.value;
+                                                                        setParsedItems(prev => prev.map(p => 
+                                                                            p.PartID === item.PartID ? { ...p, Class: newClass } : p
+                                                                        ));
+                                                                    }}
+                                                                    className={`text-[10px] px-1.5 py-0.5 rounded font-black uppercase tracking-tight outline-none cursor-pointer border ${classBadge}`}
+                                                                >
+                                                                    <option value="Product (P)" className="bg-white text-slate-800">완제품 (Product)</option>
+                                                                    <option value="Assembly (A)" className="bg-white text-slate-800">조립품 (Assembly)</option>
+                                                                    <option value="Part (I)" className="bg-white text-slate-800">단품 (Part)</option>
+                                                                </select>
+                                                                {item.Spec && (
+                                                                    <span className="text-[9px] text-slate-400 font-bold truncate flex-1 text-right" title={item.Spec}>
+                                                                        {item.Spec}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 );
                                             })}
-                                        {parsedItems.filter(item => partStatusMap[item.PartID]?.isNew).length === 0 && (
-                                            <div className="flex flex-col items-center justify-center h-full text-slate-400 italic text-xs py-20 text-center">
-                                                새로 등록할 신규 부품이 없습니다.<br />(모든 부품이 데이터베이스에 등록되어 있습니다.)
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -721,24 +636,17 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
                             <div className="pt-2 flex justify-between">
                                 <button
                                     onClick={() => setStep(1)}
-                                    className="px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 font-bold text-sm shadow-sm"
+                                    className="px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 font-bold text-sm"
                                 >
                                     이전 단계
                                 </button>
                                 <button
-                                    onClick={handleSkip}
-                                    disabled={loading}
-                                    className="flex items-center gap-2 px-6 py-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 font-bold text-sm transition-all"
-                                >
-                                    건너뛰기
-                                </button>
-                                <button
                                     onClick={handleConfirmImport}
                                     disabled={loading}
-                                    className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-bold text-sm shadow-md transition-all"
+                                    className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-bold text-sm shadow-md"
                                 >
-                                    {loading ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-                                    <span>{currentSheetIndex < targetSheets.length - 1 ? '저장 및 다음 시트' : '저장 및 완료'}</span>
+                                    <Check size={16} />
+                                    <span>BOM 데이터 저장하기</span>
                                 </button>
                             </div>
                         </div>

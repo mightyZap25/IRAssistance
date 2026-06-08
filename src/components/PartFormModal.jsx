@@ -306,14 +306,7 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                 const partRef = doc(db, 'parts', initialData.id);
                 if (isRevisionUp) {
                     const newRev = getNextRevision(formData.Rev);
-                    let newPartID = formData.PartID;
-                    
-                    // Update PartID with new revision if it follows the combined rule
-                    const catCode = formData.Category.match(/\((.*?)\)/)?.[1] || 'M';
-                    if (catCode === 'M' || catCode === 'E') {
-                        const masterID = formData.PartID.split('-')[0];
-                        newPartID = `${masterID}-${newRev}`;
-                    }
+                    const newPartID = formData.PartID; // 리비전을 덧붙이지 않고 원본 ID를 그대로 유지
 
                     const newPartData = { 
                         ...formData, 
@@ -393,18 +386,14 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                     }
 
                     const nextSeq = nextSeqNum.toString().padStart(4, '0');
-                    let newPartID = `${prefix}${nextSeq}`;
-
-                    if (catCode === 'M' || catCode === 'E') {
-                        newPartID = `${newPartID}-${formData.Rev || '1.0'}`;
-                    }
+                    const newPartID = `${prefix}${nextSeq}`; // 리비전을 덧붙이지 않음
 
                     // Create new document docRef
                     const newDocRef = doc(collection(db, 'parts'));
                     const finalPartData = {
                         ...formData,
                         PartID: newPartID,
-                        MasterPartID: `${prefix}${nextSeq}`,
+                        MasterPartID: newPartID,
                         CreatedAt: new Date().toISOString()
                     };
                     

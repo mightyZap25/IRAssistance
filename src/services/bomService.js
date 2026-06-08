@@ -211,28 +211,32 @@ export function compareBOMs(oldTree, newTree) {
 export async function getPreviousRevision(currentPartID) {
     if (!currentPartID) return null;
     
-    // Assume PartID format: MASTER-REV (e.g., IRP-001-1.1)
-    const parts = currentPartID.split('-');
-    if (parts.length < 2) return null;
-    
-    const masterId = parts.slice(0, -1).join('-');
-    
     try {
         const partsRef = collection(db, 'parts');
-        const snap = await getDocs(partsRef);
-        const revisions = snap.docs
-            .map(d => ({ id: d.id, ...d.data() }))
-            .filter(p => p.MasterPartID === masterId);
-            
-        revisions.sort((a, b) => (b.Rev || '1.0').localeCompare(a.Rev || '1.0'));
+        // PartID가 동일한 모든 리비전을 가져옵니다. (MasterPartID 또는 PartID)
+        const q = query(partsRef, where('PartID', '==', currentPartID));
+        const snap = await getDocs(q);
         
-        // Find the one immediately before current
-        const currentIndex = revisions.findIndex(r => r.PartID === currentPartID);
-        if (currentIndex !== -1 && currentIndex < revisions.length - 1) {
-            return revisions[currentIndex + 1];
-        }
+        const revisions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            
+        // 리비전 내림차순 정렬 (예: 1.2, 1.1, 1.0)
+        revisions.sort((a, b) => {
+            const revA = String(a.Rev || '1.0');
+            const revB = String(b.Rev || '1.0');
+            // 간단한 버전 문자열 비교
+            return revB.localeCompare(revA, undefined, { numeric: true, sensitivity: 'base' });
+        });
+        
+        if (revisions.length <= 1) return null; // 이전 리비전 없음
+
+        // 현재 조회된 데이터 중 가장 최신 리비전을 제외한 바로 이전 리비전을 반환하거나,
+        // 특정 버전이 주어졌다면 그 버전을 찾을 수도 있지만 여기서는 2번째 최신(index 1)을 반환합니다.
+        // (만약 파라미터로 currentRev가 들어온다면 명확하지만, 현재는 PartID만 들어오므로 가장 최근에서 두 번째를 이전으로 간주합니다)
+        // 실제로는 IsLatestRevision 플래그에 상관없이 가장 높은 버전 다음의 것을 리턴하는 것이 일반적입니다.
+        return revisions[1];
+        
     } catch (err) {
-        console.error("Error in getPreviousRevision fallback:", err);
+        console.error("Error in getPreviousRevision:", err);
     }
     
     return null;

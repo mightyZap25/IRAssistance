@@ -34,6 +34,8 @@ const BOMPage = () => {
     
     const [isProductOpen, setIsProductOpen] = useState(true);
     const [isAssemblyOpen, setIsAssemblyOpen] = useState(true);
+    const [expandedGroups, setExpandedGroups] = useState({});
+    const toggleGroup = (id) => setExpandedGroups(prev => ({ ...prev, [id]: !prev[id] }));
     const [searchTerm, setSearchTerm] = useState('');
     const [showObsolete, setShowObsolete] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
@@ -432,7 +434,22 @@ const BOMPage = () => {
             Children: []
         };
 
-        if (categoryId) newTemplate.ProductCategoryId = categoryId;
+        if (categoryId) {
+            newTemplate.ProductCategoryId = categoryId;
+            const selectedCat = bomFolders.find(f => f.id === categoryId);
+            if (selectedCat && selectedCat.name.toLowerCase().includes('actuator')) {
+                newTemplate.Spec = JSON.stringify([
+                    { label: '정격부하', value: '' },
+                    { label: 'Speed', value: '' },
+                    { label: 'Stroke', value: '' },
+                    { label: '최소입력 전압', value: '' },
+                    { label: '최대입력 전압', value: '' },
+                    { label: '반복정밀도', value: '' },
+                    { label: '통신', value: 'PT' },
+                    { label: 'Protocol', value: 'IRPROTOCOL' }
+                ]);
+            }
+        }
         if (seriesId) newTemplate.ProductSeriesId = seriesId;
         
         setSelectedMaster(null);
@@ -656,6 +673,55 @@ const BOMPage = () => {
                 if (bomData.ProductCategoryId !== undefined) updateData.ProductCategoryId = bomData.ProductCategoryId;
                 if (bomData.ProductSeriesId !== undefined) updateData.ProductSeriesId = bomData.ProductSeriesId;
                 batch.update(partRef, updateData);
+
+                // --- Update BOM relationships (Recursive) ---
+                const processBOMNodes = async (parentNode) => {
+                    if (!parentNode.Children) return;
+                    for (const child of parentNode.Children) {
+                        // DB에 기존 관계가 있는지 쿼리
+                        const bomQuery = query(
+                            collection(db, 'bom'), 
+                            where('ParentID', '==', parentNode.PartID), 
+                            where('ChildID', '==', child.PartID)
+                        );
+                        const bomSnap = await getDocs(bomQuery);
+
+                        if (child.isDeleted) {
+                            // 삭제된 노드면 db에서 해당 관계 삭제 (또는 Status를 Obsolete으로 변경. 여기선 완전 삭제로 구현)
+                            bomSnap.docs.forEach(d => {
+                                batch.delete(doc(db, 'bom', d.id));
+                            });
+                        } else if (child.isNew || bomSnap.empty) {
+                            // 신규 추가된 자식
+                            const newBomRef = doc(collection(db, 'bom'));
+                            batch.set(newBomRef, {
+                                ParentID: parentNode.PartID,
+                                ChildID: child.PartID,
+                                Quantity: child.Quantity,
+                                Location: child.Location || '',
+                                Note: child.Note || '',
+                                Status: 'Active'
+                            });
+                        } else if (child.isModified) {
+                            // 기존 데이터 수정 (수량, 로케이션 등)
+                            bomSnap.docs.forEach(d => {
+                                batch.update(doc(db, 'bom', d.id), {
+                                    Quantity: child.Quantity,
+                                    Location: child.Location || '',
+                                    Note: child.Note || ''
+                                });
+                            });
+                        }
+
+                        // 재귀적으로 자식의 자식도 처리
+                        if (!child.isDeleted) {
+                            await processBOMNodes(child);
+                        }
+                    }
+                };
+
+                await processBOMNodes(bomData);
+                // ---------------------------------------------
 
                 // ECN Auto-drafting
                 if (ecnData && ecnData.updateType === 'ECN') {
@@ -1051,7 +1117,32 @@ const BOMPage = () => {
                                         <button onClick={handleComparePrevious} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-bold text-sm shadow-sm transition-all">
                                             <GitCompare size={16} /> 이전 리비전과 비교
                                         </button>
-                                        <button onClick={() => setIsEditMode(true)} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-sm shadow-md shadow-indigo-100 transition-all">
+                                        <button 
+                                            onClick={() => {
+                                                setIsEditMode(true);
+                                                const selectedCat = bomFolders.find(f => f.id === bomData.ProductCategoryId);
+                                                const isActuator = (bomData.Category && bomData.Category.toLowerCase().includes('actuator')) || 
+                                                                   (selectedCat && selectedCat.name.toLowerCase().includes('actuator'));
+                                                
+                                                if (isActuator) {
+                                                    const hasExistingData = editingSpecs.some(s => s.label.trim() !== '' && s.value.trim() !== '');
+                                                    if (!hasExistingData) {
+                                                        const defaultSpecs = [
+                                                            { label: '정격부하', value: '' },
+                                                            { label: 'Speed', value: '' },
+                                                            { label: 'Stroke', value: '' },
+                                                            { label: '최소입력 전압', value: '' },
+                                                            { label: '최대입력 전압', value: '' },
+                                                            { label: '반복정밀도', value: '' },
+                                                            { label: '통신', value: 'PT' },
+                                                            { label: 'Protocol', value: 'IRPROTOCOL' }
+                                                        ];
+                                                        setBomData({...bomData, Spec: JSON.stringify(defaultSpecs)});
+                                                    }
+                                                }
+                                            }} 
+                                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-sm shadow-md shadow-indigo-100 transition-all"
+                                        >
                                             <Edit3 size={16} /> 수정 시작
                                         </button>
                                         <button onClick={() => setIsExportModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-bold text-sm shadow-sm">
@@ -1126,7 +1217,31 @@ const BOMPage = () => {
                                                 <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Category (카테고리)</label>
                                                 <select
                                                     value={bomData.ProductCategoryId || ''}
-                                                    onChange={(e) => setBomData({...bomData, ProductCategoryId: e.target.value, ProductSeriesId: ''})}
+                                                    onChange={(e) => {
+                                                        const newCatId = e.target.value;
+                                                        let newSpec = bomData.Spec;
+                                                        
+                                                        // 카테고리가 Actuator인 경우 기본 스펙 주입
+                                                        const selectedCat = bomFolders.find(f => f.id === newCatId);
+                                                        if (selectedCat && selectedCat.name.toLowerCase().includes('actuator')) {
+                                                            const hasExistingData = editingSpecs.some(s => s.label.trim() !== '' && s.value.trim() !== '');
+                                                            if (!hasExistingData) {
+                                                                const defaultSpecs = [
+                                                                    { label: '정격부하', value: '' },
+                                                                    { label: 'Speed', value: '' },
+                                                                    { label: 'Stroke', value: '' },
+                                                                    { label: '최소입력 전압', value: '' },
+                                                                    { label: '최대입력 전압', value: '' },
+                                                                    { label: '반복정밀도', value: '' },
+                                                                    { label: '통신', value: 'PT' },
+                                                                    { label: 'Protocol', value: 'IRPROTOCOL' }
+                                                                ];
+                                                                newSpec = JSON.stringify(defaultSpecs);
+                                                            }
+                                                        }
+                                                        
+                                                        setBomData({...bomData, ProductCategoryId: newCatId, ProductSeriesId: '', Spec: newSpec});
+                                                    }}
                                                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                                                 >
                                                     <option value="">카테고리 선택 (선택 안하면 미분류)</option>
@@ -1189,7 +1304,27 @@ const BOMPage = () => {
                                             {editingSpecs.map((spec, idx) => (
                                                 <div key={idx} className="flex gap-2">
                                                     <input type="text" value={spec.label} onChange={(e) => updateSpecRow(idx, 'label', e.target.value)} disabled={!isEditMode} className="w-24 bg-slate-50 border border-slate-100 rounded px-2 py-1.5 text-[10px] font-bold outline-none" placeholder="Label" />
-                                                    <input type="text" value={spec.value} onChange={(e) => updateSpecRow(idx, 'value', e.target.value)} disabled={!isEditMode} className="flex-1 bg-slate-50 border border-slate-100 rounded px-2 py-1.5 text-xs font-bold outline-none" placeholder="Value" />
+                                                    
+                                                    {spec.label === '통신' ? (
+                                                        <select value={spec.value} onChange={(e) => updateSpecRow(idx, 'value', e.target.value)} disabled={!isEditMode} className="flex-1 bg-slate-50 border border-slate-100 rounded px-2 py-1.5 text-xs font-bold outline-none">
+                                                            <option value="">선택하세요</option>
+                                                            <option value="PT">PT</option>
+                                                            <option value="PWM">PWM</option>
+                                                            <option value="RS485">RS485</option>
+                                                            <option value="CAN">CAN</option>
+                                                        </select>
+                                                    ) : spec.label === 'Protocol' ? (
+                                                        <select value={spec.value} onChange={(e) => updateSpecRow(idx, 'value', e.target.value)} disabled={!isEditMode} className="flex-1 bg-slate-50 border border-slate-100 rounded px-2 py-1.5 text-xs font-bold outline-none">
+                                                            <option value="">선택하세요</option>
+                                                            <option value="IRPROTOCOL">IRPROTOCOL</option>
+                                                            <option value="Modbus RTU">Modbus RTU</option>
+                                                            <option value="CANOpen">CANOpen</option>
+                                                        </select>
+                                                    ) : (
+                                                        <input type="text" value={spec.value} onChange={(e) => updateSpecRow(idx, 'value', e.target.value)} disabled={!isEditMode} className="flex-1 bg-slate-50 border border-slate-100 rounded px-2 py-1.5 text-xs font-bold outline-none" placeholder="Value" />
+                                                    )}
+                                                    
+                                                    {isEditMode && <button onClick={() => removeSpecRow(idx)} className="p-1 text-slate-300 hover:text-red-500 rounded"><Trash2 size={14} /></button>}
                                                 </div>
                                             ))}
                                         </div>

@@ -27,13 +27,26 @@ import * as XLSX from 'xlsx';
 function getCategoryStyle(part) {
     const cat = (part.Category || '').toLowerCase();
     const pid = (part.PartID || '').toUpperCase();
+    const isAssy = (part.Class || '').includes('Assembly') || pid.startsWith('IRA');
+    const isProduct = (part.Class || '').includes('Product') || pid.startsWith('IRP');
 
-    if (pid.startsWith('IRP') || cat.includes('product')) return { icon: Box, color: 'bg-blue-600', char: 'P', text: 'text-blue-600' };
-    if (pid.startsWith('IRA') || cat.includes('assy')) return { icon: Layers, color: 'bg-amber-500', char: 'A', text: 'text-amber-600' };
-    if (pid.startsWith('IRE') || cat.includes('electronic')) return { icon: Cpu, color: 'bg-emerald-500', char: 'E', text: 'text-emerald-500' };
-    if (pid.startsWith('IRM') || cat.includes('mech')) return { icon: Settings, color: 'bg-orange-500', char: 'M', text: 'text-orange-500' };
+    const isElectronic = pid.startsWith('IRE') || cat.includes('electronic') || cat.includes('전자');
+    const isMechanical = pid.startsWith('IRM') || cat.includes('mech') || cat.includes('기구');
 
-    return { icon: Circle, color: 'bg-slate-400', char: 'O', text: 'text-slate-400' };
+    if (isProduct) return { color: 'bg-blue-600', char: 'P', text: 'text-blue-700' };
+
+    if (isElectronic) {
+        if (isAssy) return { color: 'bg-emerald-500', char: 'E', text: 'text-emerald-700' }; // 회로 어셈블리 (녹색 배경)
+        return { color: 'bg-slate-400', char: 'E', text: 'text-emerald-600' };             // 회로 부품 (회색 배경)
+    }
+    
+    if (isMechanical) {
+        if (isAssy) return { color: 'bg-orange-500', char: 'M', text: 'text-orange-700' };  // 기구 어셈블리 (주황색 배경)
+        return { color: 'bg-slate-400', char: 'M', text: 'text-slate-700' };               // 기구 부품 (회색 배경, 회색 폰트)
+    }
+
+    if (isAssy) return { color: 'bg-amber-500', char: 'A', text: 'text-amber-700' };       // 기타 일반 조립품
+    return { color: 'bg-slate-400', char: 'P', text: 'text-slate-700' };                   // 기타 일반 부품
 }
 
 function BOMTreeNode({ 
@@ -301,11 +314,9 @@ function BOMTreeNode({
                     </div>
                 )}
 
-                {/* Badge */}
-                <div className={`w-4 flex items-center justify-center shrink-0 ${isRoot ? 'ml-0 mr-0.5' : 'mr-0.5'}`}>
-                    <span className={`w-4 h-4 flex items-center justify-center rounded ${isDeleted || isDiscontinued ? 'bg-slate-300' : style.color} text-white text-[9px] font-black shadow-sm`}>
-                        {style.char}
-                    </span>
+                {/* Badge (Text based) */}
+                <div className={`w-5 h-5 flex items-center justify-center shrink-0 rounded-md ${isDeleted || isDiscontinued ? 'bg-slate-300' : style.color} text-white shadow-sm ${isRoot ? 'ml-0 mr-1.5' : 'mr-1.5'}`}>
+                    <span className="text-[10px] font-black">{style.char}</span>
                 </div>
 
                 <div
@@ -317,7 +328,7 @@ function BOMTreeNode({
                     <div className="flex-1 flex justify-between items-center overflow-hidden">
                         <div className="flex flex-col py-0.5 justify-center overflow-hidden text-left">
                             <div className="flex items-center gap-1.5 leading-none">
-                                <span className="text-[9px] text-blue-600 font-bold font-mono tracking-tighter">
+                                <span className={`text-[9px] font-black font-mono tracking-tighter ${style.text}`}>
                                     {node.PartID}
                                 </span>
                                 {node.isCircular && (
@@ -332,7 +343,7 @@ function BOMTreeNode({
                                     <span className="text-[8px] bg-emerald-100 text-emerald-600 px-1 rounded font-black uppercase tracking-tighter leading-none">Added</span>
                                 )}
                             </div>
-                            <span className={`text-xs font-bold mt-0.5 truncate ${isDeleted ? 'text-slate-400 line-through decoration-red-500' : isDiscontinued ? 'text-amber-600/70' : (style.char === 'P' ? 'text-blue-600 font-black' : 'text-slate-700')} ${node.isCircular ? 'text-red-600' : ''}`}>
+                            <span className={`text-xs font-bold mt-0.5 truncate ${isDeleted ? 'text-slate-400 line-through decoration-red-500' : isDiscontinued ? 'text-amber-600/70' : style.text} ${node.isCircular ? 'text-red-600' : ''}`}>
                                 {node.Name}
                             </span>
                         </div>
