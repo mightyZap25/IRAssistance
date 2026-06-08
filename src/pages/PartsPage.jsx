@@ -69,7 +69,9 @@ export default function PartsPage() {
             const partsSnap = await getDocs(collection(db, 'parts'));
             const partsData = [];
             partsSnap.forEach(docSnap => {
-                partsData.push({ ...docSnap.data(), id: docSnap.id });
+                const data = docSnap.data();
+                if (data.Class === 'BOM_Category' || data.Class === 'BOM_Series') return;
+                partsData.push({ ...data, id: docSnap.id });
             });
             partsData.sort((a, b) => (b.CreatedAt?.seconds || 0) - (a.CreatedAt?.seconds || 0));
             setParts(partsData);

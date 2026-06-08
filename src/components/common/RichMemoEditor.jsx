@@ -52,8 +52,8 @@ export default function RichMemoEditor({ value, onChange, onSave, saving = false
     return (
         <div className="rich-memo-editor bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-full relative">
             {/* Custom Quill Toolbar Container */}
-            <div id={toolbarId} className="flex items-center justify-between px-3 py-1.5 border-b border-slate-100 bg-slate-50/50 shrink-0 !border-0 z-30">
-                <div className="flex items-center">
+            <div id={toolbarId} className="flex flex-wrap items-center justify-between px-3 py-1.5 border-b border-slate-100 bg-slate-50/50 shrink-0 !border-0 z-30 gap-y-2">
+                <div className="flex flex-wrap items-center gap-y-1">
                     {/* Save Button */}
                     <button 
                         onClick={() => {

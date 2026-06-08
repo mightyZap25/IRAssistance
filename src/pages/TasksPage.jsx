@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { 
-    getPersonalTasks, 
-    createPersonalTask, 
-    updatePersonalTask, 
-    deletePersonalTask 
+import {
+    getPersonalTasks,
+    createPersonalTask,
+    updatePersonalTask,
+    deletePersonalTask
 } from '../services/taskService';
-import { 
-    Plus, Search, Filter, MoreVertical, CheckCircle2, Circle, 
+import {
+    Plus, Search, Filter, MoreVertical, CheckCircle2, Circle,
     Clock, AlertTriangle, Calendar, Trash2, Edit2, X, Check,
     Bell, BellOff, RotateCcw, ListChecks, LayoutGrid, List,
     Link as LinkIcon
@@ -38,7 +38,7 @@ export default function TasksPage() {
     const [statusFilter, setStatusFilter] = useState('all');
     const [priorityFilter, setPriorityFilter] = useState('all');
     const [viewMode, setViewMode] = useState('list'); // list | card
-    
+
     // Modal & Panel states
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
@@ -76,8 +76,8 @@ export default function TasksPage() {
 
     const filteredTasks = useMemo(() => {
         return tasks.filter(task => {
-            const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                                 (task.description || '').toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (task.description || '').toLowerCase().includes(searchTerm.toLowerCase());
             const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
             const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter;
             return matchesSearch && matchesStatus && matchesPriority;
@@ -108,6 +108,36 @@ export default function TasksPage() {
         } catch (error) {
             console.error("Failed to save task:", error);
             alert("저장 중 오류가 발생했습니다.");
+        }
+    };
+
+    const handleCreateSubtask = async (parentId, title) => {
+        try {
+            await createPersonalTask(currentUser.uid, {
+                title,
+                parentId,
+                status: 'todo',
+                priority: 'medium',
+                subtasks: [],
+            });
+            fetchTasks();
+        } catch (error) {
+            console.error("Failed to create subtask:", error);
+        }
+    };
+
+    const handleQuickAddTask = async (groupId, title) => {
+        try {
+            const status = groupId === 'done' ? 'completed' : 'todo';
+            await createPersonalTask(currentUser.uid, {
+                title,
+                status,
+                priority: 'medium',
+                subtasks: [],
+            });
+            fetchTasks();
+        } catch (error) {
+            console.error("Failed to quick add task:", error);
         }
     };
 
@@ -142,11 +172,11 @@ export default function TasksPage() {
     // Subtask Logic (for Create Modal)
     const addSubtask = () => {
         if (!newSubtask.trim()) return;
-        const sub = { 
-            id: Date.now(), 
-            text: newSubtask, 
+        const sub = {
+            id: Date.now(),
+            text: newSubtask,
             link: newSubtaskLink || null,
-            completed: false 
+            completed: false
         };
         setTaskForm(prev => ({ ...prev, subtasks: [...prev.subtasks, sub] }));
         setNewSubtask('');
@@ -246,16 +276,17 @@ export default function TasksPage() {
                             <p className="font-bold">등록된 할 일이 없습니다.</p>
                         </div>
                     ) : viewMode === 'list' ? (
-                        <MondayBoard 
-                            tasks={filteredTasks} 
-                            onSelect={setSelectedTask} 
+                        <MondayBoard
+                            tasks={filteredTasks}
+                            onSelect={setSelectedTask}
                             onUpdateTask={handleUpdateTask}
                             onDeleteTask={handleDelete}
+                            onAddTask={handleQuickAddTask}
                         />
                     ) : (
-                        <TaskCardView 
-                            tasks={filteredTasks} 
-                            onSelect={setSelectedTask} 
+                        <TaskCardView
+                            tasks={filteredTasks}
+                            onSelect={setSelectedTask}
                             onToggleStatus={toggleStatus}
                         />
                     )}
@@ -268,9 +299,9 @@ export default function TasksPage() {
                     <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 my-8">
                         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                             <h2 className="text-lg font-black text-slate-800 flex items-center gap-2">
-                                <Plus className="text-indigo-600"/> 새 할 일 등록
+                                <Plus className="text-indigo-600" /> 새 할 일 등록
                             </h2>
-                            <button onClick={() => setIsCreateModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-700 bg-slate-100 rounded-xl"><X size={18}/></button>
+                            <button onClick={() => setIsCreateModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-700 bg-slate-100 rounded-xl"><X size={18} /></button>
                         </div>
 
                         <form onSubmit={handleCreateTask} className="p-6 space-y-6">
@@ -280,7 +311,7 @@ export default function TasksPage() {
                                     type="text"
                                     required
                                     value={taskForm.title}
-                                    onChange={(e) => setTaskForm({...taskForm, title: e.target.value})}
+                                    onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
                                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-black outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner"
                                     placeholder="무엇을 해야 하나요?"
                                 />
@@ -288,9 +319,9 @@ export default function TasksPage() {
 
                             <div>
                                 <label className="text-[10px] font-black text-slate-500 uppercase block mb-1.5 tracking-widest">상세 설명 (Rich Memo)</label>
-                                <RichMemoEditor 
+                                <RichMemoEditor
                                     value={taskForm.description}
-                                    onChange={(val) => setTaskForm({...taskForm, description: val})}
+                                    onChange={(val) => setTaskForm({ ...taskForm, description: val })}
                                     placeholder="헤더, 리스트, 테이블 등을 사용하여 자유롭게 작성하세요..."
                                 />
                             </div>
@@ -300,7 +331,7 @@ export default function TasksPage() {
                                     <label className="text-[10px] font-black text-slate-500 uppercase block mb-1.5 tracking-widest">중요도</label>
                                     <select
                                         value={taskForm.priority}
-                                        onChange={(e) => setTaskForm({...taskForm, priority: e.target.value})}
+                                        onChange={(e) => setTaskForm({ ...taskForm, priority: e.target.value })}
                                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                                     >
                                         <option value="low">낮음</option>
@@ -314,7 +345,7 @@ export default function TasksPage() {
                                     <input
                                         type="datetime-local"
                                         value={taskForm.dueDate}
-                                        onChange={(e) => setTaskForm({...taskForm, dueDate: e.target.value})}
+                                        onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })}
                                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
                                     />
                                 </div>
@@ -326,7 +357,7 @@ export default function TasksPage() {
                                     <input
                                         type="number"
                                         value={taskForm.budget}
-                                        onChange={(e) => setTaskForm({...taskForm, budget: Number(e.target.value)})}
+                                        onChange={(e) => setTaskForm({ ...taskForm, budget: Number(e.target.value) })}
                                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
                                         placeholder="0"
                                     />
@@ -347,7 +378,7 @@ export default function TasksPage() {
                                         <label className="text-[10px] font-black text-slate-500 uppercase block mb-1.5 tracking-widest">반복</label>
                                         <select
                                             value={taskForm.recurring}
-                                            onChange={(e) => setTaskForm({...taskForm, recurring: e.target.value})}
+                                            onChange={(e) => setTaskForm({ ...taskForm, recurring: e.target.value })}
                                             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                                         >
                                             <option value="none">안 함</option>
@@ -371,7 +402,7 @@ export default function TasksPage() {
                                     <div className="flex gap-2">
                                         <div className="relative flex-1">
                                             <LinkIcon size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                            <input 
+                                            <input
                                                 type="text"
                                                 value={newSubtaskLink}
                                                 onChange={(e) => setNewSubtaskLink(e.target.value)}
@@ -390,7 +421,7 @@ export default function TasksPage() {
                                                     <span className="text-[11px] font-bold text-slate-700">{sub.text}</span>
                                                     {sub.link && <span className="text-[9px] text-blue-500 truncate max-w-[300px] font-medium">{sub.link}</span>}
                                                 </div>
-                                                <button type="button" onClick={() => removeSubtask(sub.id)} className="p-1 text-slate-300 hover:text-rose-500"><X size={14}/></button>
+                                                <button type="button" onClick={() => removeSubtask(sub.id)} className="p-1 text-slate-300 hover:text-rose-500"><X size={14} /></button>
                                             </div>
                                         ))}
                                     </div>
@@ -417,10 +448,13 @@ export default function TasksPage() {
                 </div>
             )}
 
-            <TaskDetailPanel 
+            <TaskDetailPanel
                 isOpen={!!selectedTask}
                 onClose={() => setSelectedTask(null)}
                 task={selectedTask}
+                allTasks={tasks}
+                onSelectTask={setSelectedTask}
+                onCreateSubtask={handleCreateSubtask}
                 onUpdate={handleUpdateTask}
                 onDelete={handleDelete}
             />

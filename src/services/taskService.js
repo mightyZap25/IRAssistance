@@ -4,6 +4,7 @@ import {
     updateDoc, 
     deleteDoc, 
     doc, 
+    getDoc,
     getDocs, 
     query, 
     where, 
@@ -11,6 +12,7 @@ import {
     serverTimestamp 
 } from '../firebase';
 import { db } from '../firebase';
+import { syncTaskToGoogleCalendar, deleteTaskFromGoogleCalendar } from './calendarService';
 
 const COLLECTION_NAME = 'personal_tasks';
 
@@ -56,8 +58,15 @@ export async function createPersonalTask(uid, taskData) {
             alarmSent: false,
             recurring: taskData.recurring || 'none', // none, daily, weekly
             createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
         });
+        
+        // 구글 캘린더 백그라운드 동기화
+        syncTaskToGoogleCalendar(docRef.id, taskData).then(googleEventId => {
+            if (googleEventId) {
+                updateDoc(docRef, { googleEventId }).catch(err => console.error("Failed to save googleEventId:", err));
+            }
+        }).catch(err => console.error("Calendar sync error:", err));
+        
         return docRef.id;
     } catch (error) {
         console.error("Error adding personal task: ", error);
@@ -71,10 +80,25 @@ export async function createPersonalTask(uid, taskData) {
 export async function updatePersonalTask(taskId, updateData) {
     try {
         const taskRef = doc(db, COLLECTION_NAME, taskId);
+        
+        // 기존 문서 가져오기 (전체 데이터 유지 및 googleTaskId, googleEventId 확인용)
+        const taskSnap = await getDoc(taskRef);
+        if (!taskSnap.exists()) return;
+        const existingData = taskSnap.data();
+        
+        const mergedData = { ...existingData, ...updateData };
+
         await updateDoc(taskRef, {
             ...updateData,
             updatedAt: serverTimestamp()
         });
+        
+        // 구글 캘린더 백그라운드 동기화
+        syncTaskToGoogleCalendar(taskId, mergedData).then(googleEventId => {
+            if (googleEventId && googleEventId !== existingData.googleEventId) {
+                updateDoc(taskRef, { googleEventId }).catch(err => console.error("Failed to save googleEventId:", err));
+            }
+        }).catch(err => console.error("Calendar sync error:", err));
     } catch (error) {
         console.error("Error updating personal task: ", error);
         throw error;
@@ -86,7 +110,18 @@ export async function updatePersonalTask(taskId, updateData) {
  */
 export async function deletePersonalTask(taskId) {
     try {
-        await deleteDoc(doc(db, COLLECTION_NAME, taskId));
+        const taskRef = doc(db, COLLECTION_NAME, taskId);
+        
+        // 삭제 전 데이터 조회 (googleTaskId 확인용)
+        const taskSnap = await getDoc(taskRef);
+        const googleEventId = taskSnap.exists() ? taskSnap.data().googleEventId : null;
+
+        await deleteDoc(taskRef);
+        
+        // 구글 캘린더에서 항목 삭제
+        if (googleEventId) {
+            deleteTaskFromGoogleCalendar(taskId).catch(err => console.error("Calendar delete error:", err));
+        }
     } catch (error) {
         console.error("Error deleting personal task: ", error);
         throw error;

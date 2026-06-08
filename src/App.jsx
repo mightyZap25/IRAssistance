@@ -1,7 +1,8 @@
 import React from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Login from './components/Login'
+import GoogleChatPage from './pages/GoogleChatPage'
 
 import Layout from './components/Layout'
 import DashboardPage from './pages/DashboardPage'
@@ -222,6 +223,14 @@ function AppContent() {
                 <PrivateRoute>
                     <Layout>
                         <WorkspaceMemoPage />
+                    </Layout>
+                </PrivateRoute>
+            } />
+
+            <Route path="/workspace/chat" element={
+                <PrivateRoute>
+                    <Layout>
+                        <GoogleChatPage />
                     </Layout>
                 </PrivateRoute>
             } />

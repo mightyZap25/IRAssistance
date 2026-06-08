@@ -1,8 +1,24 @@
 import { useEffect, useRef } from 'react';
 import { db, collection, query, where, onSnapshot, addDoc, serverTimestamp, updateDoc, doc } from '../firebase';
+import { pollGoogleCalendarToTasks } from '../services/calendarService';
 
 export function useTaskAlarm(currentUser) {
     const lastCheckedRef = useRef(new Date());
+
+    // 구글 테스크 폴링 (5분 주기)
+    useEffect(() => {
+        if (!currentUser) return;
+        
+        // 초기 1회 실행
+        pollGoogleCalendarToTasks(currentUser.uid);
+        
+        // 5분마다 백그라운드 동기화 (구글 캘린더 -> ERP)
+        const intervalId = setInterval(() => {
+            pollGoogleCalendarToTasks(currentUser.uid);
+        }, 1000 * 60 * 5); // 5분마다
+
+        return () => clearInterval(intervalId);
+    }, [currentUser]);
 
     useEffect(() => {
         if (!currentUser) return;

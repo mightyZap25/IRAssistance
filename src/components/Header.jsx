@@ -205,8 +205,17 @@ export default function Header() {
                 </h2>
                 
                 {/* Mode Indicator */}
-                {localStorage.getItem('use_firebase') === 'true' ? (
-                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-black border border-emerald-200">
+                {localStorage.getItem('use_firebase') !== 'false' ? (
+                    <span 
+                        onClick={() => {
+                            if (window.confirm("로컬(테스트) 모드로 전환하시겠습니까? (페이지가 새로고침됩니다)")) {
+                                localStorage.setItem('use_firebase', 'false');
+                                window.location.reload();
+                            }
+                        }}
+                        className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-black border border-emerald-200 cursor-pointer"
+                        title="클릭하여 LOCAL 모드로 전환"
+                    >
                         CLOUD DB
                     </span>
                 ) : (

@@ -13,6 +13,7 @@ import {
 } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import clsx from 'clsx';
+import { syncTaskToGoogleCalendar, deleteTaskFromGoogleCalendar } from '../services/calendarService';
 
 // 공휴일 데이터
 const KOREAN_HOLIDAYS = {
@@ -231,10 +232,25 @@ export default function LeaveManagementPage() {
         });
 
         if (action === 'Approve') {
-            if (!isLast) await createNotification(req.ApprovalSteps[curIdx + 1].approverUid, '결재 대기', `'${req.title}' 결재 차례입니다.`);
-            else await createNotification(req.userId, '최종 승인', `'${req.title}' 건이 승인되었습니다.`);
+            if (!isLast) {
+                await createNotification(req.ApprovalSteps[curIdx + 1].approverUid, '결재 대기', `'${req.title}' 결재 차례입니다.`);
+            } else {
+                await createNotification(req.userId, '최종 승인', `'${req.title}' 건이 승인되었습니다.`);
+                
+                // 구글 캘린더 연동 (백그라운드 비동기)
+                syncTaskToGoogleCalendar(req.id, {
+                    title: `[${req.category}] ${req.title} (${req.userName})`,
+                    description: `사유: ${req.reason}\n부서: ${req.department}`,
+                    startDate: req.startDate,
+                    endDate: req.endDate,
+                    status: 'confirmed',
+                    priority: 'high' // 색상을 위해 임의 지정
+                }).catch(err => console.error("Calendar sync error:", err));
+            }
         } else {
             await createNotification(req.userId, '반려 알림', `'${req.title}' 건이 반려되었습니다. 사유: ${comment}`);
+            // 반려(취소) 시 캘린더에서도 삭제
+            deleteTaskFromGoogleCalendar(req.id).catch(err => console.error("Calendar delete error:", err));
         }
         setDetailItem(null);
     };

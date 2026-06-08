@@ -2,11 +2,16 @@
     "name": "erp-firebase",
     "private": true,
     "version": "0.0.0",
+    "description": "IR Assistant ERP Desktop Application",
+    "author": "Antigravity",
     "type": "module",
+    "main": "main.js",
     "scripts": {
-        "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+        "dev": "concurrently \"vite\" \"node server.js\"",
         "dev:frontend": "vite",
         "dev:backend": "node server.js",
+        "electron:dev": "concurrently \"vite\" \"electron .\"",
+        "electron:build": "vite build && electron-builder",
         "build": "vite build",
         "lint": "eslint .",
         "preview": "vite preview"
@@ -45,6 +50,8 @@
         "@types/react-dom": "^18.2.19",
         "@vitejs/plugin-react": "^4.2.1",
         "autoprefixer": "^10.4.17",
+        "electron": "^41.7.1",
+        "electron-builder": "^26.15.2",
         "eslint": "^8.56.0",
         "eslint-plugin-react": "^7.33.2",
         "eslint-plugin-react-hooks": "^4.6.0",
@@ -52,5 +59,25 @@
         "postcss": "^8.4.35",
         "tailwindcss": "^3.4.1",
         "vite": "^5.1.4"
+    },
+    "build": {
+        "appId": "com.irassistant.erp",
+        "productName": "IR Assistant ERP",
+        "files": [
+            "dist/**/*",
+            "main.js",
+            "preload.js",
+            "server.js",
+            "app_tray_icon.png",
+            "package.json"
+        ],
+        "directories": {
+            "output": "dist-electron"
+        },
+        "win": {
+            "target": [
+                "nsis"
+            ]
+        }
     }
 }

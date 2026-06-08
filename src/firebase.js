@@ -16,9 +16,10 @@ const firebaseConfig = {
     measurementId: "G-L10Z73Y1T8"
 };
 
-// Force local DB testing by default so that read quotas aren't hit.
-// The user can type `localStorage.setItem('use_firebase', 'true')` in devtools to switch back.
-const useFirebase = localStorage.getItem('use_firebase') === 'true';
+// Force CLOUD mode by default so real Google Auth is used.
+// The user can type `localStorage.setItem('use_firebase', 'false')` in devtools to switch to local testing.
+const storedVal = localStorage.getItem('use_firebase');
+const useFirebase = storedVal === null ? true : storedVal === 'true';
 
 let app, analytics, auth, db;
 let signInWithPopup, signOut, onAuthStateChanged, GoogleAuthProviderClass;
@@ -31,6 +32,10 @@ googleProvider.addScope('https://www.googleapis.com/auth/drive.readonly');
 googleProvider.addScope('https://www.googleapis.com/auth/drive.metadata.readonly');
 googleProvider.addScope('https://www.googleapis.com/auth/drive.file');
 googleProvider.addScope('https://www.googleapis.com/auth/spreadsheets.readonly');
+googleProvider.addScope('https://www.googleapis.com/auth/calendar');
+googleProvider.addScope('https://www.googleapis.com/auth/calendar.events');
+// Google Tasks API
+googleProvider.addScope('https://www.googleapis.com/auth/tasks');
 
 if (useFirebase) {
     console.log("[Firebase] Operating in CLOUD Firebase mode.");

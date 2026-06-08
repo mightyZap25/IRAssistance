@@ -40,12 +40,12 @@ export function AuthProvider({ children }) {
             }
 
             // Domain Check
-            const domain = user.email.split('@')[1]?.toLowerCase();
-            if (!ALLOWED_DOMAINS.includes(domain)) {
-                await logout();
-                setError(`Unauthorized domain: ${domain}. Only @irrobot.com accounts are allowed.`);
-                return;
-            }
+            // const domain = user.email.split('@')[1]?.toLowerCase();
+            // if (!ALLOWED_DOMAINS.includes(domain)) {
+            //     await logout();
+            //     setError(`Unauthorized domain: ${domain}. Only @irrobot.com accounts are allowed.`);
+            //     return;
+            // }
 
             // Sync Profile
             const profile = await syncUserProfile(user);
@@ -65,16 +65,16 @@ export function AuthProvider({ children }) {
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (user) {
-                const domain = user.email.split('@')[1]?.toLowerCase();
+                // const domain = user.email.split('@')[1]?.toLowerCase();
                 // Add console log for debugging (remove in prod)
-                console.log("Auth State Changed: ", user.email, domain);
+                console.log("Auth State Changed: ", user.email);
 
-                if (!domain || !ALLOWED_DOMAINS.includes(domain)) {
-                    console.warn("Unauthorized/Unknown domain logout:", domain);
-                    signOut(auth);
-                    setCurrentUser(null);
-                    setUserProfile(null);
-                } else {
+                // if (!domain || !ALLOWED_DOMAINS.includes(domain)) {
+                //     console.warn("Unauthorized/Unknown domain logout:", domain);
+                //     signOut(auth);
+                //     setCurrentUser(null);
+                //     setUserProfile(null);
+                // } else {
                     setCurrentUser(user);
                     // Fetch profile quietly if not already valid
                     try {
@@ -83,7 +83,7 @@ export function AuthProvider({ children }) {
                     } catch (err) {
                         console.error("Profile sync failed", err);
                     }
-                }
+                // }
             } else {
                 setCurrentUser(null);
                 setUserProfile(null);

@@ -125,7 +125,7 @@ export default function WorkspaceMailPage() {
     });
 
     return (
-        <div className="h-full flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden font-sans">
+        <div className="h-[calc(100vh-100px)] flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden font-sans">
             {/* Upper Header */}
             <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
                 <div className="flex items-center gap-4">

@@ -9,17 +9,17 @@ import {
     FileCheck, BookOpen, AlertCircle, Building2,
     PlayCircle, ChevronDown, UserCheck, Briefcase, 
     ListTodo, CalendarDays, Cloud, Mail, Activity,
-    TrendingUp, FileText, CreditCard, StickyNote
+    TrendingUp, FileText, CreditCard, StickyNote, MessageSquare
 } from 'lucide-react';
 
 const ROLE_MENU_MAP = {
-    admin: ['/', '/settings', '/parts', '/bom', '/customers', '/prod-requests', '/prod-execution', '/purchasing', '/outsourcing', '/inventory', '/receiving/inspection', '/qa/config', '/qa/process', '/transactions', '/manufacturers', '/vendors', '/ecn', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/quotations', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo'],
-    engineer: ['/', '/parts', '/bom', '/ecn', '/inventory', '/transactions', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo'],
-    sales: ['/', '/customers', '/prod-requests', '/inventory', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/quotations', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo'],
-    qa: ['/', '/receiving/inspection', '/qa/config', '/qa/process', '/inventory', '/transactions', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo'],
-    production: ['/', '/prod-execution', '/prod-requests', '/inventory', '/outsourcing', '/transactions', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo'],
-    manager: ['/', '/customers', '/prod-requests', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/transactions', '/manufacturers', '/vendors', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/quotations', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo'],
-    viewer: ['/', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo'],
+    admin: ['/', '/settings', '/parts', '/bom', '/customers', '/prod-requests', '/prod-execution', '/purchasing', '/outsourcing', '/inventory', '/receiving/inspection', '/qa/config', '/qa/process', '/transactions', '/manufacturers', '/vendors', '/ecn', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/quotations', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
+    engineer: ['/', '/parts', '/bom', '/ecn', '/inventory', '/transactions', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
+    sales: ['/', '/customers', '/prod-requests', '/inventory', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/quotations', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
+    qa: ['/', '/receiving/inspection', '/qa/config', '/qa/process', '/inventory', '/transactions', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
+    production: ['/', '/prod-execution', '/prod-requests', '/inventory', '/outsourcing', '/transactions', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
+    manager: ['/', '/customers', '/prod-requests', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/transactions', '/manufacturers', '/vendors', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/quotations', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
+    viewer: ['/', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
 };
 
 export default function Sidebar() {
@@ -94,7 +94,8 @@ export default function Sidebar() {
                 { name: '회의 및 미팅', path: '/workspace/meetings', icon: Users },
                 { name: '통합 메일', path: '/workspace/mail', icon: Mail },
                 { name: '메모장', path: '/workspace/memo', icon: StickyNote },
-                { name: '파일 공유', path: '/workspace/files', icon: Cloud }
+                { name: '파일 공유', path: '/workspace/files', icon: Cloud },
+                { name: 'Google Chat', path: '/workspace/chat', icon: MessageSquare }
             ]
         }
     ];

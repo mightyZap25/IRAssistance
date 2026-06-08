@@ -12,6 +12,7 @@ import PartsDetailPanel from '../components/PartsDetailPanel';
 import BOMSaveModal from '../components/BOMSaveModal';
 import BOMExportModal from '../components/BOMExportModal';
 import BOMImportModal from '../components/BOMImportModal';
+import CategoryManagerModal from '../components/CategoryManagerModal';
 import { useAuth } from '../contexts/AuthContext';
 import { hasPermission, USER_ROLES } from '../services/userService';
 
@@ -21,6 +22,7 @@ const BOMPage = () => {
     const [assemblies, setAssemblies] = useState([]);
     const [allParts, setAllParts] = useState([]);
     const [allBoms, setAllBoms] = useState([]);
+    const [bomFolders, setBomFolders] = useState([]);
     
     const [selectedMaster, setSelectedMaster] = useState(null);
     const [bomData, setBomData] = useState(null);
@@ -47,6 +49,7 @@ const BOMPage = () => {
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
     // Diff/Comparison State
     const [diffData, setDiffData] = useState(null);
@@ -60,11 +63,25 @@ const BOMPage = () => {
     // Where-Used (상위 사용처) State
     const [whereUsedList, setWhereUsedList] = useState([]);
 
-    // Initial Load
     useEffect(() => {
         fetchMasters();
         fetchSpecLabels();
+        fetchFolders();
     }, []);
+
+    const fetchFolders = async () => {
+        try {
+            const snap = await getDocs(query(collection(db, 'parts'), where('Class', 'in', ['BOM_Category', 'BOM_Series'])));
+            setBomFolders(snap.docs.map(d => ({
+                id: d.id,
+                type: d.data().Class === 'BOM_Category' ? 'category' : 'series',
+                name: d.data().Name,
+                parentId: d.data().ParentFolderId || null
+            })));
+        } catch (err) {
+            console.error("Error fetching folders:", err);
+        }
+    };
 
     const fetchMasters = async () => {
         setLoading(true);
@@ -75,7 +92,8 @@ const BOMPage = () => {
             const allPartsData = querySnapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
-            }));
+            })).filter(p => p.Class !== 'BOM_Category' && p.Class !== 'BOM_Series');
+            
             allPartsData.sort((a, b) => (a.PartID || '').localeCompare(b.PartID || ''));
             setAllParts(allPartsData);
 
@@ -190,6 +208,11 @@ const BOMPage = () => {
         setLoading(true);
         try {
             const structure = await getBOMStructure(partId);
+            // selectedMaster의 카테고리/시리즈 정보를 bomData에 병합
+            if (selectedMaster) {
+                structure.ProductCategoryId = selectedMaster.ProductCategoryId || null;
+                structure.ProductSeriesId = selectedMaster.ProductSeriesId || null;
+            }
             setBomData(structure);
             if (isRoot) {
                 // Store initial structure for later comparison
@@ -395,7 +418,7 @@ const BOMPage = () => {
     };
 
     // --- New BOM Creation Logic ---
-    const handleStartNewBOM = (type) => {
+    const handleStartNewBOM = (type, categoryId = null, seriesId = null) => {
         const tempPartID = type === 'product' ? 'IRP-NEW' : 'IRA-NEW';
         const newTemplate = {
             PartID: tempPartID,
@@ -408,6 +431,9 @@ const BOMPage = () => {
             Status: 'Draft',
             Children: []
         };
+
+        if (categoryId) newTemplate.ProductCategoryId = categoryId;
+        if (seriesId) newTemplate.ProductSeriesId = seriesId;
         
         setSelectedMaster(null);
         setIsNewCreating(true);
@@ -415,6 +441,39 @@ const BOMPage = () => {
         setBomData(newTemplate);
         setNavStack([{ PartID: tempPartID, Name: newTemplate.Name }]);
         setIsEditMode(true);
+    };
+
+    const handleAddCategory = async () => {
+        const name = prompt('새 카테고리 이름을 입력하세요 (예: Actuator, Board):');
+        if (!name?.trim()) return;
+        try {
+            const docRef = await addDoc(collection(db, 'bom_folders'), {
+                type: 'category',
+                name: name.trim(),
+                createdAt: serverTimestamp()
+            });
+            setBomFolders(prev => [...prev, { id: docRef.id, type: 'category', name: name.trim() }]);
+        } catch (err) {
+            console.error("카테고리 추가 에러:", err);
+            alert("카테고리를 추가하지 못했습니다.");
+        }
+    };
+
+    const handleAddSeries = async (categoryId) => {
+        const name = prompt('새 시리즈 이름을 입력하세요 (예: 12LF 시리즈):');
+        if (!name?.trim()) return;
+        try {
+            const docRef = await addDoc(collection(db, 'bom_folders'), {
+                type: 'series',
+                name: name.trim(),
+                parentId: categoryId,
+                createdAt: serverTimestamp()
+            });
+            setBomFolders(prev => [...prev, { id: docRef.id, type: 'series', name: name.trim(), parentId: categoryId }]);
+        } catch (err) {
+            console.error("시리즈 추가 에러:", err);
+            alert("시리즈를 추가하지 못했습니다.");
+        }
     };
 
     const handleDeriveBOM = () => {
@@ -568,6 +627,9 @@ const BOMPage = () => {
                     newPartData.BasePartName = bomData.BasePartName;
                 }
 
+                if (bomData.ProductCategoryId) newPartData.ProductCategoryId = bomData.ProductCategoryId;
+                if (bomData.ProductSeriesId) newPartData.ProductSeriesId = bomData.ProductSeriesId;
+
                 batch.set(doc(db, 'parts', finalPartId), newPartData);
 
                 // Save initial BOM structure (Children)
@@ -586,11 +648,14 @@ const BOMPage = () => {
                 }
             } else if (selectedMaster && selectedMaster.id) {
                 const partRef = doc(db, 'parts', selectedMaster.id);
-                batch.update(partRef, {
+                const updateData = {
                     Spec: specString,
                     Description: bomData.Description || '',
                     LastUpdatedBy: currentUserLog
-                });
+                };
+                if (bomData.ProductCategoryId !== undefined) updateData.ProductCategoryId = bomData.ProductCategoryId;
+                if (bomData.ProductSeriesId !== undefined) updateData.ProductSeriesId = bomData.ProductSeriesId;
+                batch.update(partRef, updateData);
 
                 // ECN Auto-drafting
                 if (ecnData && ecnData.updateType === 'ECN') {
@@ -725,9 +790,32 @@ const BOMPage = () => {
     };
 
     return (
-        <div className="flex h-[calc(100vh-140px)] bg-slate-50 overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
-            {/* Left Sidebar */}
-            <div className="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 h-full overflow-hidden">
+        <div className="flex flex-col h-[calc(100vh-7.5rem)] overflow-hidden gap-3 animate-fade-in text-slate-800 dark:text-slate-100">
+            {/* Header section with sophisticated glass card background */}
+            <div className="bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-transparent p-3 rounded-xl border border-indigo-100/35 dark:border-slate-850 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 flex-none relative overflow-hidden">
+                <div className="absolute right-0 top-0 w-48 h-48 bg-indigo-500/5 blur-3xl rounded-full -mr-10 -mt-5 pointer-events-none"></div>
+                <div className="relative">
+                    <h1 className="text-xl font-black tracking-tight leading-tight bg-gradient-to-r from-slate-900 to-indigo-950 dark:from-white dark:to-slate-350 bg-clip-text text-transparent">
+                        BOM 관리 (BOM List)
+                    </h1>
+                    <p className="text-slate-500 dark:text-slate-400 mt-1.5 text-xs font-bold uppercase tracking-wider">
+                        Bill of Materials Control Center
+                    </p>
+                </div>
+                <div className="relative flex items-center gap-2">
+                    <button 
+                        onClick={() => setIsCategoryModalOpen(true)}
+                        className="flex items-center gap-2 bg-white/50 hover:bg-white dark:bg-slate-800/50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold py-2 px-3 rounded-xl transition-colors border border-slate-200/50 dark:border-slate-700 shadow-sm text-sm"
+                    >
+                        <Layers size={16} className="text-indigo-500" />
+                        <span>분류(카테고리) 관리</span>
+                    </button>
+                </div>
+            </div>
+
+            <div className="flex flex-1 bg-slate-50 overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
+                {/* Left Sidebar */}
+                <div className="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 h-full overflow-hidden">
                 <div className="p-4 border-b border-slate-100 shrink-0">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
@@ -774,30 +862,107 @@ const BOMPage = () => {
                             </button>
                             <button 
                                 onClick={(e) => { e.stopPropagation(); handleStartNewBOM('product'); }}
-                                className="p-1 text-blue-600 hover:bg-blue-100 rounded opacity-0 group-hover/section:opacity-100 transition-opacity ml-1"
-                                title="신규 완제품 BOM 생성"
+                                className="p-1 text-blue-600 hover:bg-blue-100 rounded ml-1"
+                                title="신규 완제품 생성"
                             >
                                 <Plus size={14} />
                             </button>
                         </div>
                         {isProductOpen && (
                             <div className="mt-1 space-y-1 ml-2">
-                                {filteredProducts.map(p => (
-                                    <button
-                                        key={p.id}
-                                        onClick={() => setSelectedMaster(p)}
-                                        className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center justify-between gap-2 overflow-hidden ${
-                                            selectedMaster?.id === p.id 
-                                            ? 'bg-blue-50 text-blue-700 font-bold border border-blue-100' 
-                                            : 'text-slate-600 hover:bg-slate-50'
-                                        }`}
-                                    >
-                                        <div className="min-w-0 flex-1">
-                                            <div className="truncate font-medium w-full">{p.Name}</div>
-                                            <div className="text-[10px] opacity-60 truncate w-full">{p.PartID}</div>
+                                {/* 카테고리 렌더링 */}
+                                {bomFolders.filter(f => f.type === 'category').map(cat => (
+                                    <div key={cat.id} className="mb-2">
+                                        <div className="flex items-center justify-between px-2 py-1.5 hover:bg-slate-50 rounded-md group/cat cursor-pointer">
+                                            <div className="flex items-center gap-1.5 font-bold text-xs text-slate-700">
+                                                <Layers size={12} className="text-blue-500" />
+                                                {cat.name}
+                                            </div>
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); handleStartNewBOM('product', cat.id); }} 
+                                                className="text-blue-500 hover:bg-blue-100 rounded p-1"
+                                                title="이 카테고리에 신규 완제품 생성"
+                                            >
+                                                <Plus size={12} />
+                                            </button>
                                         </div>
-                                    </button>
+                                        
+                                        {/* 시리즈 렌더링 */}
+                                        <div className="ml-3 pl-2 border-l-2 border-slate-100 mt-1 space-y-1">
+                                            {bomFolders.filter(f => f.type === 'series' && f.parentId === cat.id).map(ser => (
+                                                <div key={ser.id}>
+                                                    <div className="flex items-center justify-between px-2 py-1 hover:bg-slate-50 rounded-md group/ser cursor-pointer">
+                                                        <div className="flex items-center gap-1.5 font-semibold text-xs text-slate-600">
+                                                            <Package size={10} className="text-indigo-400" />
+                                                            {ser.name}
+                                                        </div>
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); handleStartNewBOM('product', cat.id, ser.id); }} 
+                                                            className="text-indigo-500 hover:bg-indigo-100 rounded p-1"
+                                                            title="신규 완제품 추가"
+                                                        >
+                                                            <Plus size={10} />
+                                                        </button>
+                                                    </div>
+
+                                                    {/* 완제품 렌더링 */}
+                                                    <div className="ml-3 mt-1 space-y-0.5">
+                                                        {filteredProducts.filter(p => p.ProductSeriesId === ser.id).map(p => (
+                                                            <button
+                                                                key={p.id}
+                                                                onClick={() => setSelectedMaster(p)}
+                                                                className={`w-full text-left px-2 py-1.5 rounded-md transition-colors flex items-center justify-between gap-2 overflow-hidden ${
+                                                                    selectedMaster?.id === p.id 
+                                                                    ? 'bg-blue-50 text-blue-700 font-bold border border-blue-100' 
+                                                                    : 'text-slate-600 hover:bg-slate-50'
+                                                                }`}
+                                                            >
+                                                                <div className="min-w-0 flex-1 flex items-center justify-between gap-2">
+                                                                    <span className="truncate text-[11px] font-bold w-full">{p.Name}</span>
+                                                                    <span className="text-[9px] opacity-60 shrink-0">{p.PartID}</span>
+                                                                </div>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
                                 ))}
+
+                                {/* 미분류 완제품 (카테고리 없는 것들) */}
+                                {filteredProducts.filter(p => !p.ProductSeriesId).length > 0 && (
+                                    <div className="mt-3">
+                                        <div className="px-2 py-1 flex justify-between items-center group/unassigned">
+                                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">미분류 완제품</div>
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); handleStartNewBOM('product'); }}
+                                                className="text-slate-400 hover:text-blue-500 hover:bg-slate-100 rounded p-1"
+                                                title="미분류 신규 완제품 생성"
+                                            >
+                                                <Plus size={10} />
+                                            </button>
+                                        </div>
+                                        <div className="space-y-0.5 mt-1">
+                                            {filteredProducts.filter(p => !p.ProductSeriesId).map(p => (
+                                                <button
+                                                    key={p.id}
+                                                    onClick={() => setSelectedMaster(p)}
+                                                    className={`w-full text-left px-2 py-1.5 rounded-md transition-colors flex items-center justify-between gap-2 overflow-hidden ${
+                                                        selectedMaster?.id === p.id 
+                                                        ? 'bg-blue-50 text-blue-700 font-bold border border-blue-100' 
+                                                        : 'text-slate-600 hover:bg-slate-50'
+                                                    }`}
+                                                >
+                                                    <div className="min-w-0 flex-1 flex items-center justify-between gap-2">
+                                                        <span className="truncate text-[11px] font-bold w-full">{p.Name}</span>
+                                                        <span className="text-[9px] opacity-60 shrink-0">{p.PartID}</span>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -827,15 +992,15 @@ const BOMPage = () => {
                                     <button
                                         key={a.id}
                                         onClick={() => setSelectedMaster(a)}
-                                        className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center justify-between gap-2 overflow-hidden ${
+                                        className={`w-full text-left px-2 py-1.5 rounded-md transition-colors flex items-center justify-between gap-2 overflow-hidden ${
                                             selectedMaster?.id === a.id 
                                             ? 'bg-amber-50 text-amber-700 font-bold border border-amber-100' 
                                             : 'text-slate-600 hover:bg-slate-50'
                                         }`}
                                     >
-                                        <div className="min-w-0 flex-1">
-                                            <div className="truncate font-medium">{a.Name}</div>
-                                            <div className="text-[10px] opacity-60">{a.PartID}</div>
+                                        <div className="min-w-0 flex-1 flex items-center justify-between gap-2">
+                                            <span className="truncate text-xs font-bold w-full">{a.Name}</span>
+                                            <span className="text-[9px] opacity-60 shrink-0">{a.PartID}</span>
                                         </div>
                                     </button>
                                 ))}
@@ -954,6 +1119,64 @@ const BOMPage = () => {
                                             <span className="text-xs font-bold text-slate-700">{bomData.Category}</span>
                                         </div>
                                     </div>
+                                    {/* 카테고리 / 시리즈: 편집 모드엔 드롭다운, 보기 모드엔 레이블 */}
+                                    {isEditMode ? (
+                                        <div className="space-y-3">
+                                            <div className="space-y-1.5">
+                                                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Category (카테고리)</label>
+                                                <select
+                                                    value={bomData.ProductCategoryId || ''}
+                                                    onChange={(e) => setBomData({...bomData, ProductCategoryId: e.target.value, ProductSeriesId: ''})}
+                                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                                >
+                                                    <option value="">카테고리 선택 (선택 안하면 미분류)</option>
+                                                    {bomFolders.filter(f => f.type === 'category').map(cat => (
+                                                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Series (시리즈)</label>
+                                                <select
+                                                    value={bomData.ProductSeriesId || ''}
+                                                    onChange={(e) => setBomData({...bomData, ProductSeriesId: e.target.value})}
+                                                    disabled={!bomData.ProductCategoryId}
+                                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <option value="">{bomData.ProductCategoryId ? '시리즈 선택 (선택 안하면 카테고리 수준)' : '먼저 카테고리를 선택하세요'}</option>
+                                                    {bomFolders.filter(f => f.type === 'series' && f.parentId === bomData.ProductCategoryId).map(ser => (
+                                                        <option key={ser.id} value={ser.id}>{ser.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        (() => {
+                                            const catFolder = bomData.ProductCategoryId
+                                                ? bomFolders.find(f => f.id === bomData.ProductCategoryId)
+                                                : null;
+                                            const serFolder = bomData.ProductSeriesId
+                                                ? bomFolders.find(f => f.id === bomData.ProductSeriesId)
+                                                : null;
+                                            if (!catFolder && !serFolder) return null;
+                                            return (
+                                                <div className="flex gap-2">
+                                                    {catFolder && (
+                                                        <div className="flex-1 p-2.5 bg-indigo-50 rounded-xl border border-indigo-100">
+                                                            <label className="text-[9px] font-black text-indigo-400 uppercase mb-0.5 block">Category (카테고리)</label>
+                                                            <span className="text-xs font-bold text-indigo-700">{catFolder.name}</span>
+                                                        </div>
+                                                    )}
+                                                    {serFolder && (
+                                                        <div className="flex-1 p-2.5 bg-purple-50 rounded-xl border border-purple-100">
+                                                            <label className="text-[9px] font-black text-purple-400 uppercase mb-0.5 block">Series (시리즈)</label>
+                                                            <span className="text-xs font-bold text-purple-700">{serFolder.name}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()
+                                    )}
                                     
                                     <div className="h-px bg-slate-100"></div>
                                     
@@ -1026,6 +1249,14 @@ const BOMPage = () => {
                     onClose={() => setSelectedPartIdForDetail(null)}
                 />
             )}
+            
+            {isCategoryModalOpen && (
+                <CategoryManagerModal
+                    onClose={() => setIsCategoryModalOpen(false)}
+                    onUpdate={() => fetchFolders()}
+                />
+            )}
+            </div>
         </div>
     );
 };
