@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, getDocs, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, orderBy } from '../firebase';
+import { collection, query, getDocs, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, orderBy, where } from '../firebase';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import MasterDataGrid from '../components/common/MasterDataGrid';
-import { Plus, X, Globe, MapPin, Building2, AlignLeft, ShieldCheck } from 'lucide-react';
+import {
+    Plus, X, Globe, MapPin, Building2, AlignLeft, Phone, Mail, Package,
+    Tag, ChevronRight, Search, Loader2, User, ArrowDownCircle, ArrowUpCircle,
+    ShoppingCart, FileText, RefreshCw, ExternalLink
+} from 'lucide-react';
 import RoleGuard from '../components/common/RoleGuard';
 import { USER_ROLES } from '../services/userService';
 
@@ -15,26 +19,18 @@ const MANUFACTURER_COLUMN_DEFS = {
     CreatedAt: { label: '등록일', default: false }
 };
 
+/* ─────────────────────────────── Modal ─────────────────────────────── */
 const ManufacturerModal = ({ isOpen, onClose, targetData, onSave }) => {
     const [formData, setFormData] = useState({
-        Name: '',
-        Country: '',
-        Website: '',
-        Description: ''
+        Name: '', Country: '', Address: '', ContactPerson: '', Phone: '', Website: '', Description: ''
     });
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (targetData) {
-            setFormData({
-                Name: targetData.Name || '',
-                Country: targetData.Country || '',
-                Website: targetData.Website || '',
-                Description: targetData.Description || ''
-            });
-        } else {
-            setFormData({ Name: '', Country: '', Website: '', Description: '' });
-        }
+        setFormData(targetData
+            ? { Name: targetData.Name || '', Country: targetData.Country || '', Address: targetData.Address || '', ContactPerson: targetData.ContactPerson || '', Phone: targetData.Phone || '', Website: targetData.Website || '', Description: targetData.Description || '' }
+            : { Name: '', Country: '', Address: '', ContactPerson: '', Phone: '', Website: '', Description: '' }
+        );
     }, [targetData, isOpen]);
 
     if (!isOpen) return null;
@@ -42,78 +38,58 @@ const ManufacturerModal = ({ isOpen, onClose, targetData, onSave }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!formData.Name.trim()) return alert('제조사명을 입력해주세요.');
-        
         setLoading(true);
-        try {
-            await onSave(formData);
-            onClose();
-        } catch (error) {
-            console.error('Save failed:', error);
-            alert('저장 실패');
-        } finally {
-            setLoading(false);
-        }
+        try { await onSave(formData); onClose(); }
+        catch (error) { alert('저장 실패'); }
+        finally { setLoading(false); }
     };
 
+    const Field = ({ label, children }) => (
+        <div className="space-y-1.5">{label && <label className="text-xs font-black text-slate-700">{label}</label>}{children}</div>
+    );
+    const Input = ({ ...props }) => (
+        <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500 transition-all" {...props} />
+    );
+
     return (
-        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl animate-in fade-in zoom-in duration-200 overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[300] flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
                 <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50 shrink-0">
-                    <div>
-                        <h2 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
-                            <Building2 size={20} className="text-indigo-600" />
-                            {targetData ? '제조사 정보 수정' : '신규 제조사 등록'}
-                        </h2>
-                        <p className="text-xs text-slate-500 font-bold mt-1">부품 생산 및 공급 원천 업체의 마스터 정보</p>
-                    </div>
-                    <button onClick={onClose} className="p-2 bg-white rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 shadow-sm border border-slate-200 transition-all"><X size={16} /></button>
+                    <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                        <Building2 size={20} className="text-indigo-600" />
+                        {targetData ? '제조사 정보 수정' : '신규 제조사 등록'}
+                    </h2>
+                    <button onClick={onClose} className="p-2 rounded-xl text-slate-400 hover:bg-slate-100 transition-all"><X size={16} /></button>
                 </div>
                 <form onSubmit={handleSubmit} className="p-5 flex-1 overflow-y-auto space-y-4">
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-black text-slate-700 flex items-center gap-1.5">제조사명 (Name) <span className="text-rose-500">*</span></label>
-                        <input
-                            type="text"
-                            value={formData.Name}
-                            onChange={e => setFormData(prev => ({ ...prev, Name: e.target.value }))}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-                            placeholder="예: Samsung, TAIYO YUDEN..."
-                            required
-                        />
+                    <Field label={<>제조사명 <span className="text-rose-500">*</span></>}>
+                        <Input value={formData.Name} onChange={e => setFormData(p => ({ ...p, Name: e.target.value }))} placeholder="예: Samsung, TAIYO YUDEN" required />
+                    </Field>
+                    <div className="grid grid-cols-2 gap-4">
+                        <Field label="국가">
+                            <Input value={formData.Country} onChange={e => setFormData(p => ({ ...p, Country: e.target.value }))} placeholder="대한민국, Japan" />
+                        </Field>
+                        <Field label="전화번호">
+                            <Input value={formData.Phone} onChange={e => setFormData(p => ({ ...p, Phone: e.target.value }))} placeholder="02-000-0000" />
+                        </Field>
                     </div>
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-black text-slate-700 flex items-center gap-1.5">국가 (Country)</label>
-                        <input
-                            type="text"
-                            value={formData.Country}
-                            onChange={e => setFormData(prev => ({ ...prev, Country: e.target.value }))}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-                            placeholder="예: 대한민국, Japan, USA..."
-                        />
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-black text-slate-700 flex items-center gap-1.5">웹사이트 (Website)</label>
-                        <input
-                            type="url"
-                            value={formData.Website}
-                            onChange={e => setFormData(prev => ({ ...prev, Website: e.target.value }))}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-                            placeholder="https://..."
-                        />
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-black text-slate-700 flex items-center gap-1.5">비고 (Description)</label>
-                        <textarea
-                            value={formData.Description}
-                            onChange={e => setFormData(prev => ({ ...prev, Description: e.target.value }))}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500 transition-all resize-none h-24"
-                            placeholder="주요 취급 품목 등 특징 입력"
-                        />
-                    </div>
-                    <div className="pt-2 flex justify-end gap-2">
-                        <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl text-xs font-black text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">취소</button>
-                        <button type="submit" disabled={loading} className="px-5 py-2 rounded-xl text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all disabled:opacity-50 flex items-center gap-2">
+                    <Field label="담당자">
+                        <Input value={formData.ContactPerson} onChange={e => setFormData(p => ({ ...p, ContactPerson: e.target.value }))} placeholder="담당자 이름" />
+                    </Field>
+                    <Field label="주소">
+                        <Input value={formData.Address} onChange={e => setFormData(p => ({ ...p, Address: e.target.value }))} placeholder="사업장 주소" />
+                    </Field>
+                    <Field label="웹사이트">
+                        <Input type="url" value={formData.Website} onChange={e => setFormData(p => ({ ...p, Website: e.target.value }))} placeholder="https://..." />
+                    </Field>
+                    <Field label="비고">
+                        <textarea value={formData.Description} onChange={e => setFormData(p => ({ ...p, Description: e.target.value }))} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500 transition-all resize-none h-20" />
+                    </Field>
+                    <div className="flex justify-end gap-2 pt-2">
+                        <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl text-xs font-black text-slate-600 bg-slate-100 hover:bg-slate-200">취소</button>
+                        <button type="submit" disabled={loading} className="px-5 py-2 rounded-xl text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 shadow-md disabled:opacity-50 flex items-center gap-2">
                             {loading && <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-                            {targetData ? '수정 사항 저장' : '신규 등록 완료'}
+                            {targetData ? '수정 저장' : '등록 완료'}
                         </button>
                     </div>
                 </form>
@@ -122,182 +98,352 @@ const ManufacturerModal = ({ isOpen, onClose, targetData, onSave }) => {
     );
 };
 
+/* ─────────────────────────────── Detail Panel ─────────────────────────────── */
+const ManufacturerDetailPanel = ({ manufacturer, onClose, onEdit, allParts }) => {
+    const [tab, setTab] = useState('info');
+    const [partSearch, setPartSearch] = useState('');
+
+    const relatedParts = useMemo(() => {
+        if (!manufacturer || !allParts) return [];
+        const name = manufacturer.Name?.trim().toLowerCase();
+        return allParts.filter(p => (p.Manufacturer || '').trim().toLowerCase() === name);
+    }, [manufacturer, allParts]);
+
+    const filteredParts = useMemo(() => {
+        if (!partSearch.trim()) return relatedParts;
+        const q = partSearch.toLowerCase();
+        return relatedParts.filter(p =>
+            (p.Name || '').toLowerCase().includes(q) ||
+            (p.PartID || '').toLowerCase().includes(q) ||
+            (p.Spec || '').toLowerCase().includes(q)
+        );
+    }, [relatedParts, partSearch]);
+
+    if (!manufacturer) return null;
+
+    const tabs = [
+        { key: 'info', label: '기본 정보', icon: <Building2 size={14} /> },
+        { key: 'parts', label: `납품 부품 (${relatedParts.length})`, icon: <Package size={14} /> },
+    ];
+
+    return (
+        <div className="flex flex-col h-full bg-white border-l border-slate-200 overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-4 text-white shrink-0">
+                <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center"><Building2 size={22} /></div>
+                        <div>
+                            <h2 className="text-base font-black">{manufacturer.Name}</h2>
+                            <p className="text-blue-200 text-xs font-bold flex items-center gap-1">
+                                <MapPin size={11} /> {manufacturer.Country || '국가 미기재'}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <button onClick={() => onEdit(manufacturer)} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors text-xs font-black flex items-center gap-1 px-2">
+                            <AlignLeft size={13} /> 수정
+                        </button>
+                        <button onClick={onClose} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"><X size={16} /></button>
+                    </div>
+                </div>
+                {/* Tabs */}
+                <div className="flex gap-1 mt-3">
+                    {tabs.map(t => (
+                        <button key={t.key} onClick={() => setTab(t.key)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all ${tab === t.key ? 'bg-white text-blue-700' : 'text-blue-200 hover:bg-white/20'}`}
+                        >
+                            {t.icon} {t.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto">
+                {tab === 'info' && (
+                    <div className="p-5 space-y-4">
+                        {/* Stats */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-center">
+                                <div className="text-2xl font-black text-blue-700">{relatedParts.length}</div>
+                                <div className="text-[10px] font-black text-blue-400 uppercase tracking-wider">등록 부품</div>
+                            </div>
+                            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-center">
+                                <div className="text-2xl font-black text-emerald-700">{relatedParts.filter(p => p.Lifecycle === 'Active').length}</div>
+                                <div className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">양산 중</div>
+                            </div>
+                        </div>
+
+                        {/* Info Fields */}
+                        <div className="space-y-3">
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider">제조사 기본 정보</h3>
+                            {[
+                                { icon: <Building2 size={15} className="text-slate-400" />, label: '회사명', value: manufacturer.Name },
+                                { icon: <MapPin size={15} className="text-slate-400" />, label: '국가', value: manufacturer.Country },
+                                { icon: <MapPin size={15} className="text-slate-400" />, label: '주소', value: manufacturer.Address },
+                                { icon: <User size={15} className="text-slate-400" />, label: '담당자', value: manufacturer.ContactPerson },
+                                { icon: <Phone size={15} className="text-slate-400" />, label: '전화번호', value: manufacturer.Phone },
+                                { icon: <Globe size={15} className="text-slate-400" />, label: '웹사이트', value: manufacturer.Website, isLink: true },
+                            ].map((item, i) => (
+                                <div key={i} className="flex items-start gap-3 py-2.5 border-b border-slate-100 last:border-0">
+                                    <div className="mt-0.5 shrink-0">{item.icon}</div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{item.label}</p>
+                                        {item.value ? (
+                                            item.isLink ? (
+                                                <a href={item.value.startsWith('http') ? item.value : `https://${item.value}`}
+                                                    target="_blank" rel="noreferrer"
+                                                    className="text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 mt-0.5"
+                                                >
+                                                    {item.value} <ExternalLink size={11} />
+                                                </a>
+                                            ) : (
+                                                <p className="text-sm font-bold text-slate-800 mt-0.5 break-words">{item.value}</p>
+                                            )
+                                        ) : (
+                                            <p className="text-sm text-slate-300 italic mt-0.5">미기재</p>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {manufacturer.Description && (
+                            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">비고</p>
+                                <p className="text-xs text-slate-600 font-medium leading-relaxed">{manufacturer.Description}</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {tab === 'parts' && (
+                    <div className="flex flex-col h-full">
+                        <div className="px-4 py-3 border-b border-slate-100 shrink-0">
+                            <div className="relative">
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input type="text" value={partSearch} onChange={e => setPartSearch(e.target.value)}
+                                    className="w-full pl-8 pr-3 py-2 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-400/30"
+                                    placeholder="부품명, Part ID 검색..." />
+                            </div>
+                        </div>
+                        <div className="overflow-y-auto p-3 space-y-2">
+                            {filteredParts.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-16 text-slate-300">
+                                    <Package size={36} strokeWidth={1} className="mb-2" />
+                                    <p className="text-sm font-bold text-slate-400">{partSearch ? '검색 결과 없음' : '등록된 부품 없음'}</p>
+                                </div>
+                            ) : filteredParts.map(part => (
+                                <div key={part.id} className="bg-slate-50 hover:bg-blue-50/50 border border-slate-200 hover:border-blue-200 rounded-xl p-3 transition-all">
+                                    <div className="flex items-start gap-2">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${part.Lifecycle === 'Active' ? 'bg-emerald-100 text-emerald-700' : part.Lifecycle === 'Obsolete' ? 'bg-rose-100 text-rose-700' : 'bg-orange-100 text-orange-700'}`}>
+                                                    {part.Lifecycle === 'Active' ? '양산' : part.Lifecycle === 'Obsolete' ? '단종' : '개발'}
+                                                </span>
+                                                <span className="text-[10px] font-mono font-bold text-slate-400">{part.PartID}</span>
+                                            </div>
+                                            <p className="text-sm font-black text-slate-800 truncate">{part.Name}</p>
+                                            {part.Spec && <p className="text-[11px] text-slate-500 mt-0.5 truncate">{part.Spec}</p>}
+                                            {part.UnitPrice > 0 && (
+                                                <p className="text-[10px] text-emerald-600 font-black mt-1">
+                                                    {Number(part.UnitPrice).toLocaleString()} {part.Currency || 'KRW'}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+/* ─────────────────────────────── Main Page ─────────────────────────────── */
 export default function ManufacturersPage() {
     const { userProfile } = useAuth();
     const [manufacturers, setManufacturers] = useState([]);
+    const [allParts, setAllParts] = useState([]);
     const [loading, setLoading] = useState(true);
-    
-    // MasterDataGrid States
+
     const [searchTerm, setSearchTerm] = useState('');
     const [filteredData, setFilteredData] = useState([]);
     const [sortConfig, setSortConfig] = useState({ key: 'Name', direction: 'asc' });
     const [gridViewMode, setGridViewMode] = useState('list');
-    
-    // Modal States
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editTarget, setEditTarget] = useState(null);
+    const [selectedManufacturer, setSelectedManufacturer] = useState(null);
 
-    useEffect(() => {
-        fetchManufacturers();
-    }, []);
+    useEffect(() => { fetchAll(); }, []);
 
-    const fetchManufacturers = async () => {
+    const fetchAll = async () => {
         setLoading(true);
         try {
-            const q = query(collection(db, 'manufacturers'), orderBy('Name', 'asc'));
-            const querySnapshot = await getDocs(q);
-            const list = [];
-            querySnapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
-            setManufacturers(list);
+            const [mfSnap, partsSnap] = await Promise.all([
+                getDocs(query(collection(db, 'manufacturers'), orderBy('Name', 'asc'))),
+                getDocs(collection(db, 'parts'))
+            ]);
+            const mfList = [];
+            mfSnap.forEach(d => mfList.push({ id: d.id, ...d.data() }));
+            setManufacturers(mfList);
+
+            const partsList = [];
+            partsSnap.forEach(d => {
+                const data = d.data();
+                if (data.IsLatestRevision !== false) partsList.push({ id: d.id, ...data });
+            });
+            setAllParts(partsList);
         } catch (error) {
-            console.error("Error fetching manufacturers: ", error);
+            console.error('Error fetching data:', error);
         } finally {
             setLoading(false);
         }
     };
 
+    const partCountByManufacturer = useMemo(() => {
+        const map = {};
+        allParts.forEach(p => {
+            const name = (p.Manufacturer || '').trim().toLowerCase();
+            if (name) map[name] = (map[name] || 0) + 1;
+        });
+        return map;
+    }, [allParts]);
+
     const handleSort = (key) => {
-        let direction = 'asc';
-        if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
-        setSortConfig({ key, direction });
+        setSortConfig(prev => ({ key, direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc' }));
     };
 
     const sortedList = useMemo(() => {
         return [...manufacturers].sort((a, b) => {
             if (sortConfig.key === 'CreatedAt') {
-                const getTime = val => val?.seconds ? val.seconds * 1000 : (val instanceof Date ? val.getTime() : 0);
-                return sortConfig.direction === 'asc' 
-                    ? getTime(a.CreatedAt) - getTime(b.CreatedAt) 
-                    : getTime(b.CreatedAt) - getTime(a.CreatedAt);
+                const gt = val => val?.seconds ? val.seconds * 1000 : 0;
+                return sortConfig.direction === 'asc' ? gt(a.CreatedAt) - gt(b.CreatedAt) : gt(b.CreatedAt) - gt(a.CreatedAt);
             }
-            const aVal = String(a[sortConfig.key] || '');
-            const bVal = String(b[sortConfig.key] || '');
-            return sortConfig.direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+            const aV = String(a[sortConfig.key] || ''), bV = String(b[sortConfig.key] || '');
+            return sortConfig.direction === 'asc' ? aV.localeCompare(bV) : bV.localeCompare(aV);
         });
     }, [manufacturers, sortConfig]);
 
     const handleSave = async (formData) => {
         if (editTarget) {
-            await updateDoc(doc(db, 'manufacturers', editTarget.id), {
-                ...formData,
-                UpdatedAt: serverTimestamp(),
-                UpdatedBy: userProfile?.uid
-            });
+            await updateDoc(doc(db, 'manufacturers', editTarget.id), { ...formData, UpdatedAt: serverTimestamp(), UpdatedBy: userProfile?.uid });
         } else {
-            await addDoc(collection(db, 'manufacturers'), {
-                ...formData,
-                CreatedAt: serverTimestamp(),
-                CreatedBy: userProfile?.uid
-            });
+            await addDoc(collection(db, 'manufacturers'), { ...formData, CreatedAt: serverTimestamp(), CreatedBy: userProfile?.uid });
         }
-        await fetchManufacturers();
+        await fetchAll();
+        if (selectedManufacturer && editTarget?.id === selectedManufacturer.id) {
+            setSelectedManufacturer(prev => ({ ...prev, ...formData }));
+        }
     };
 
     const handleDelete = async (row) => {
-        if (!window.confirm(`'${row.Name}' 제조사를 정말 삭제하시겠습니까?`)) return;
-        try {
-            await deleteDoc(doc(db, 'manufacturers', row.id));
-            setManufacturers(prev => prev.filter(m => m.id !== row.id));
-        } catch (error) {
-            console.error("Error deleting manufacturer: ", error);
-            alert("삭제 실패");
-        }
+        if (!window.confirm(`'${row.Name}' 제조사를 삭제하시겠습니까?`)) return;
+        await deleteDoc(doc(db, 'manufacturers', row.id));
+        setManufacturers(prev => prev.filter(m => m.id !== row.id));
+        if (selectedManufacturer?.id === row.id) setSelectedManufacturer(null);
     };
 
+    const openEdit = (row, e) => { if (e) e.stopPropagation(); setEditTarget(row); setIsModalOpen(true); };
+
     return (
-        <div className="flex flex-col h-[calc(100vh-7.5rem)] overflow-hidden gap-3 animate-fade-in text-slate-800 dark:text-slate-100 p-3">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-blue-500/10 via-indigo-500/5 to-transparent p-3 rounded-2xl border border-blue-100/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 flex-none relative overflow-hidden">
-                <div className="relative z-10 flex items-center gap-4">
+        <div className="flex flex-col h-[calc(100vh-7.5rem)] overflow-hidden gap-3 animate-fade-in text-slate-800 p-3">
+            <div className="bg-gradient-to-r from-blue-500/10 via-indigo-500/5 to-transparent p-3 rounded-2xl border border-blue-100/50 flex justify-between items-center flex-none">
+                <div className="flex items-center gap-4">
                     <div className="p-3 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl text-white shadow-xl shadow-blue-200">
                         <Building2 size={24} strokeWidth={2.5} />
                     </div>
                     <div>
                         <h1 className="text-xl font-black tracking-tight text-slate-900">제조사 관리</h1>
-                        <p className="text-slate-500 mt-1 text-xs font-bold">부품 원천 제조사 마스터 데이터</p>
+                        <p className="text-slate-500 mt-0.5 text-xs font-bold">부품 원천 제조사 마스터 · 클릭 시 상세 및 납품 부품 확인</p>
                     </div>
                 </div>
-                <div className="relative z-10">
-                        <button
-                            onClick={() => { setEditTarget(null); setIsModalOpen(true); }}
-                            className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold py-2.5 px-4 rounded-xl shadow-md transition-all hover:scale-105"
-                        >
-                            <Plus size={16} />
-                            <span>제조사 등록</span>
-                        </button>
-                </div>
+                <button onClick={() => { setEditTarget(null); setIsModalOpen(true); }}
+                    className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold py-2.5 px-4 rounded-xl shadow-md transition-all hover:scale-105">
+                    <Plus size={16} /> 제조사 등록
+                </button>
             </div>
 
-            {/* List Content */}
-            <div className="bg-white/60 backdrop-blur-md rounded-2xl border border-slate-200/50 shadow-sm flex-1 flex flex-col min-h-0 relative z-20 overflow-hidden">
-                {loading ? (
-                    <div className="flex-1 flex items-center justify-center text-slate-400 font-bold">데이터를 로드하는 중...</div>
-                ) : (
-                    <MasterDataGrid
-                        data={sortedList}
-                        columnDefs={MANUFACTURER_COLUMN_DEFS}
-                        sortConfig={sortConfig}
-                        onSort={handleSort}
-                        rowKey="id"
-                        onRowClick={(row) => { setEditTarget(row); setIsModalOpen(true); }}
-                        onEdit={(row) => { setEditTarget(row); setIsModalOpen(true); }}
-                        onDelete={handleDelete}
-                        sortableColumns={['Name', 'Country', 'CreatedAt']}
-                        enableSearch={true}
-                        searchTerm={searchTerm}
-                        onSearchChange={setSearchTerm}
-                        searchPlaceholder="제조사명, 국가 검색..."
-                        enableFilter={true}
-                        onFilteredDataChange={setFilteredData}
-                        enableViewModeToggle={true}
-                        viewMode={gridViewMode}
-                        onViewModeChange={setGridViewMode}
-                        cellRenderer={{
-                            Name: (val) => <span className="font-extrabold text-slate-900">{val}</span>,
-                            Country: (val) => (
-                                <div className="flex items-center gap-1.5 text-slate-600 font-bold">
-                                    <MapPin size={12} className="text-slate-400" />
-                                    {val || <span className="text-slate-300 italic">미기재</span>}
-                                </div>
-                            ),
-                            Website: (val) => val ? (
-                                <a href={val.startsWith('http') ? val : `https://${val}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-bold hover:underline">
-                                    <Globe size={12} /> Link
-                                </a>
-                            ) : <span className="text-slate-300">-</span>,
-                            Description: (val) => <div className="max-w-xs truncate text-slate-500" title={val}>{val}</div>,
-                            CreatedAt: (val) => <span className="text-xs text-slate-400 font-bold tracking-tight">{val?.toDate ? val.toDate().toLocaleDateString() : 'N/A'}</span>
-                        }}
-                        cardRenderer={(row) => (
-                            <div key={row.id} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:shadow-md hover:border-blue-200 transition-all group relative">
-                                <div className="absolute top-4 right-4 flex opacity-0 group-hover:opacity-100 transition-opacity gap-1">
-                                    <button onClick={(e) => { e.stopPropagation(); setEditTarget(row); setIsModalOpen(true); }} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><AlignLeft size={14} /></button>
-                                </div>
-                                <div className="flex items-start gap-4">
-                                    <div className="w-12 h-12 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 text-indigo-400">
-                                        <Building2 size={20} />
+            <div className="flex-1 min-h-0 flex gap-3 overflow-hidden">
+                <div className={`bg-white/60 backdrop-blur-md rounded-2xl border border-slate-200/50 shadow-sm flex flex-col min-h-0 overflow-hidden transition-all duration-300 ${selectedManufacturer ? 'flex-[0_0_52%]' : 'flex-1'}`}>
+                    {loading ? (
+                        <div className="flex-1 flex items-center justify-center text-slate-400 gap-2 font-bold">
+                            <Loader2 size={20} className="animate-spin" /> 로드 중...
+                        </div>
+                    ) : (
+                        <MasterDataGrid
+                            data={sortedList}
+                            columnDefs={MANUFACTURER_COLUMN_DEFS}
+                            sortConfig={sortConfig}
+                            onSort={handleSort}
+                            rowKey="id"
+                            onRowClick={(row) => setSelectedManufacturer(row)}
+                            onEdit={(row) => openEdit(row)}
+                            onDelete={handleDelete}
+                            sortableColumns={['Name', 'Country', 'CreatedAt']}
+                            enableSearch={true}
+                            searchTerm={searchTerm}
+                            onSearchChange={setSearchTerm}
+                            searchPlaceholder="제조사명, 국가 검색..."
+                            enableFilter={true}
+                            onFilteredDataChange={setFilteredData}
+                            enableViewModeToggle={true}
+                            viewMode={gridViewMode}
+                            onViewModeChange={setGridViewMode}
+                            cellRenderer={{
+                                Name: (val) => (
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-extrabold text-slate-900">{val}</span>
+                                        {partCountByManufacturer[(val || '').toLowerCase()] > 0 && (
+                                            <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 text-[9px] font-black">
+                                                {partCountByManufacturer[(val || '').toLowerCase()]} 부품
+                                            </span>
+                                        )}
                                     </div>
-                                    <div className="flex-1 min-w-0 pr-12">
-                                        <h3 className="text-base font-black text-slate-900 truncate">{row.Name}</h3>
-                                        <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-500 font-medium">
-                                            <div className="flex items-center gap-1"><MapPin size={12} /> {row.Country || '국가 미상'}</div>
-                                            {row.Website && <a href={row.Website.startsWith('http') ? row.Website : `https://${row.Website}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-blue-500 hover:underline"><Globe size={12} /> 웹사이트</a>}
+                                ),
+                                Country: (val) => <div className="flex items-center gap-1.5 text-slate-600 font-bold"><MapPin size={12} className="text-slate-400" />{val || <span className="text-slate-300 italic">미기재</span>}</div>,
+                                Website: (val) => val ? <a href={val.startsWith('http') ? val : `https://${val}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="flex items-center gap-1 text-blue-600 hover:underline font-bold"><Globe size={12} /> Link</a> : <span className="text-slate-300">-</span>,
+                                Description: (val) => <div className="max-w-xs truncate text-slate-500">{val}</div>,
+                                CreatedAt: (val) => <span className="text-xs text-slate-400 font-bold">{val?.toDate ? val.toDate().toLocaleDateString() : 'N/A'}</span>
+                            }}
+                            cardRenderer={(row) => (
+                                <div key={row.id} onClick={() => setSelectedManufacturer(row)}
+                                    className={`bg-white rounded-xl border p-4 shadow-sm hover:shadow-md transition-all cursor-pointer ${selectedManufacturer?.id === row.id ? 'border-blue-400' : 'border-slate-200 hover:border-blue-200'}`}>
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-indigo-400 shrink-0"><Building2 size={18} /></div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="text-sm font-black text-slate-900 truncate">{row.Name}</h3>
+                                                {partCountByManufacturer[(row.Name || '').toLowerCase()] > 0 && (
+                                                    <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 text-[9px] font-black shrink-0">{partCountByManufacturer[(row.Name || '').toLowerCase()]} 부품</span>
+                                                )}
+                                            </div>
+                                            <div className="text-xs text-slate-500 font-medium mt-1 flex items-center gap-1"><MapPin size={11} /> {row.Country || '국가 미상'}</div>
                                         </div>
-                                        <p className="mt-2 text-xs text-slate-600 line-clamp-2 leading-relaxed">{row.Description || '설명이 없습니다.'}</p>
                                     </div>
                                 </div>
-                            </div>
-                        )}
-                    />
+                            )}
+                        />
+                    )}
+                </div>
+
+                {selectedManufacturer && (
+                    <div className="flex-[0_0_48%] rounded-2xl overflow-hidden border border-slate-200 shadow-lg">
+                        <ManufacturerDetailPanel
+                            manufacturer={selectedManufacturer}
+                            allParts={allParts}
+                            onClose={() => setSelectedManufacturer(null)}
+                            onEdit={(row) => openEdit(row)}
+                        />
+                    </div>
                 )}
             </div>
 
-            <ManufacturerModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                targetData={editTarget}
-                onSave={handleSave}
-            />
+            <ManufacturerModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} targetData={editTarget} onSave={handleSave} />
         </div>
     );
 }

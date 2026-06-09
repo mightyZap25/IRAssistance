@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import BOMSaveModal from './BOMSaveModal';
 import { getCustomFields, createCustomField, deactivateCustomField } from '../services/metadataService';
+import { autoRegisterFromPart } from '../services/supplierAutoRegister';
 
 // Local helper for revision update
 function getNextRevision(currentRev) {
@@ -316,13 +317,15 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                         CreatedAt: new Date().toISOString() 
                     };
                     delete newPartData.id;
-                    batch.set(doc(collection(db, 'parts')), newPartData);
+                    batch.set(doc(db, 'parts', newPartID), newPartData);
                     batch.update(partRef, { IsLatestRevision: false });
                     await batch.commit();
                 } else {
                     batch.update(partRef, formData);
                     await batch.commit();
                 }
+                // 공급사/제조사 자동 등록 (편집 후)
+                try { await autoRegisterFromPart(formData); } catch (e) { console.warn('[AutoReg] 공급사/제조사 자동 등록 오류(무시):', e); }
             } else {
                 // RUN TRANSACTION FOR SAFE AUTO-ID GENERATION (CONCURRENCY LOCK)
                 const { runTransaction } = await import('firebase/firestore');
@@ -388,8 +391,8 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                     const nextSeq = nextSeqNum.toString().padStart(4, '0');
                     const newPartID = `${prefix}${nextSeq}`; // 리비전을 덧붙이지 않음
 
-                    // Create new document docRef
-                    const newDocRef = doc(collection(db, 'parts'));
+                    // Create new document docRef with explicit PartID
+                    const newDocRef = doc(db, 'parts', newPartID);
                     const finalPartData = {
                         ...formData,
                         PartID: newPartID,
@@ -400,6 +403,8 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                     transaction.set(newDocRef, finalPartData);
                     transaction.set(counterRef, { ...countersData, [prefix]: nextSeqNum }, { merge: true });
                 });
+                // 공급사/제조사 자동 등록 (신규 등록 후)
+                try { await autoRegisterFromPart(formData); } catch (e) { console.warn('[AutoReg] 공급사/제조사 자동 등록 오류(무시):', e); }
             }
             onSuccess();
             onClose();

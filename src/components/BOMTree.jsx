@@ -33,20 +33,20 @@ function getCategoryStyle(part) {
     const isElectronic = pid.startsWith('IRE') || cat.includes('electronic') || cat.includes('전자');
     const isMechanical = pid.startsWith('IRM') || cat.includes('mech') || cat.includes('기구');
 
-    if (isProduct) return { color: 'bg-blue-600', char: 'P', text: 'text-blue-700' };
+    if (isProduct) return { color: 'bg-blue-600', char: 'P', text: 'text-blue-700', badgeText: 'text-white' };
 
     if (isElectronic) {
-        if (isAssy) return { color: 'bg-emerald-500', char: 'E', text: 'text-emerald-700' }; // 회로 어셈블리 (녹색 배경)
-        return { color: 'bg-slate-400', char: 'E', text: 'text-emerald-600' };             // 회로 부품 (회색 배경)
+        if (isAssy) return { color: 'bg-emerald-500', char: 'E', text: 'text-emerald-700', badgeText: 'text-white' }; // 회로 어셈블리 (녹색 배경)
+        return { color: 'bg-emerald-100', char: 'E', text: 'text-slate-800', badgeText: 'text-emerald-800' };             // 회로 부품 (연한 녹색 배경)
     }
     
     if (isMechanical) {
-        if (isAssy) return { color: 'bg-orange-500', char: 'M', text: 'text-orange-700' };  // 기구 어셈블리 (주황색 배경)
-        return { color: 'bg-slate-400', char: 'M', text: 'text-slate-700' };               // 기구 부품 (회색 배경, 회색 폰트)
+        if (isAssy) return { color: 'bg-orange-500', char: 'M', text: 'text-orange-700', badgeText: 'text-white' };  // 기구 어셈블리 (주황색 배경)
+        return { color: 'bg-orange-100', char: 'M', text: 'text-slate-800', badgeText: 'text-orange-800' };           // 기구 부품 (연한 주황색 배경)
     }
 
-    if (isAssy) return { color: 'bg-amber-500', char: 'A', text: 'text-amber-700' };       // 기타 일반 조립품
-    return { color: 'bg-slate-400', char: 'P', text: 'text-slate-700' };                   // 기타 일반 부품
+    if (isAssy) return { color: 'bg-amber-500', char: 'A', text: 'text-amber-700', badgeText: 'text-white' };       // 기타 일반 조립품
+    return { color: 'bg-slate-200', char: 'P', text: 'text-slate-800', badgeText: 'text-slate-700' };               // 기타 일반 부품
 }
 
 function BOMTreeNode({ 
@@ -116,6 +116,13 @@ function BOMTreeNode({
     const style = getCategoryStyle(node);
     const isRoot = level === 0;
 
+    // 대소문자 무시하고 동일한 이름의 다른 품번이 등록되어 있는지 확인
+    const dupNamePart = allParts.find(p => 
+        p.PartID !== node.PartID &&
+        p.Name && node.Name &&
+        p.Name.trim().toLowerCase() === node.Name.trim().toLowerCase()
+    );
+
     // Diff Styling
     const diff = diffData?.find(d => d.partId === node.PartID);
     let diffBg = '';
@@ -137,8 +144,8 @@ function BOMTreeNode({
         }
     }
 
-    // Only allow editing children if this is not the root node and not in a readonly subtree
-    const canEditThisNode = isEditing && level > 0 && !inheritedReadOnly;
+    // Only allow editing children if this is the immediate child of the root node (level === 1)
+    const canEditThisNode = isEditing && level === 1;
     const isDeleted = node.isDeleted || diff?.type === 'removed';
     const isDiscontinued = node.isDiscontinued;
     const isNew = node.isNew || diff?.type === 'added';
@@ -315,7 +322,7 @@ function BOMTreeNode({
                 )}
 
                 {/* Badge (Text based) */}
-                <div className={`w-5 h-5 flex items-center justify-center shrink-0 rounded-md ${isDeleted || isDiscontinued ? 'bg-slate-300' : style.color} text-white shadow-sm ${isRoot ? 'ml-0 mr-1.5' : 'mr-1.5'}`}>
+                <div className={`w-5 h-5 flex items-center justify-center shrink-0 rounded-md ${isDeleted || isDiscontinued ? 'bg-slate-300' : style.color} ${style.badgeText || 'text-white'} shadow-sm ${isRoot ? 'ml-0 mr-1.5' : 'mr-1.5'}`}>
                     <span className="text-[10px] font-black">{style.char}</span>
                 </div>
 
@@ -343,9 +350,16 @@ function BOMTreeNode({
                                     <span className="text-[8px] bg-emerald-100 text-emerald-600 px-1 rounded font-black uppercase tracking-tighter leading-none">Added</span>
                                 )}
                             </div>
-                            <span className={`text-xs font-bold mt-0.5 truncate ${isDeleted ? 'text-slate-400 line-through decoration-red-500' : isDiscontinued ? 'text-amber-600/70' : style.text} ${node.isCircular ? 'text-red-600' : ''}`}>
-                                {node.Name}
-                            </span>
+                             <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                 <span className={`text-xs font-bold truncate ${isDeleted ? 'text-slate-400 line-through decoration-red-500' : isDiscontinued ? 'text-amber-600/70' : style.text} ${node.isCircular ? 'text-red-600' : ''}`}>
+                                     {node.Name}
+                                 </span>
+                                 {dupNamePart && (
+                                     <span className="text-[8px] bg-rose-50 text-rose-600 border border-rose-100 px-1 py-0.5 rounded font-black whitespace-nowrap leading-none animate-pulse">
+                                         동일 이름 등록됨 ({dupNamePart.PartID})
+                                     </span>
+                                 )}
+                             </div>
                         </div>
                         
                         <div className="flex items-center gap-2 pr-4 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">

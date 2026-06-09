@@ -443,59 +443,34 @@ function CustomerModal({ initialData, onClose, onSuccess }) {
         Name: '', 
         Category: '국내', 
         Address: '',
-        Contacts: []
+        ContactPerson: '',
+        Phone: '',
+        Email: ''
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         if (initialData) {
-            // Backward compatibility for old single contact data
-            let initialContacts = initialData.Contacts || [];
-            if (initialContacts.length === 0 && (initialData.ContactPerson || initialData.Email || initialData.Phone)) {
-                initialContacts = [{
-                    id: Date.now().toString(),
-                    Name: initialData.ContactPerson || '',
-                    Title: '담당자',
-                    Phone: initialData.Phone || '',
-                    Email: initialData.Email || ''
-                }];
-            } else if (initialContacts.length === 0) {
-                initialContacts = [createEmptyContact()];
-            }
-
+            const primaryContact = initialData.Contacts?.[0] || {};
             setFormData({
                 Name: initialData.Name || '',
                 Category: initialData.Category || '국내',
                 Address: initialData.Address || '',
-                Contacts: initialContacts
+                ContactPerson: initialData.ContactPerson || primaryContact.Name || '',
+                Phone: initialData.Phone || primaryContact.Phone || '',
+                Email: initialData.Email || primaryContact.Email || ''
             });
         } else {
-            setFormData(prev => ({ ...prev, Contacts: [createEmptyContact()] }));
+            setFormData({
+                Name: '',
+                Category: '국내',
+                Address: '',
+                ContactPerson: '',
+                Phone: '',
+                Email: ''
+            });
         }
     }, [initialData]);
-
-    const createEmptyContact = () => ({
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-        Name: '',
-        Title: '',
-        Phone: '',
-        Email: ''
-    });
-
-    const handleAddContact = () => {
-        setFormData(prev => ({ ...prev, Contacts: [...prev.Contacts, createEmptyContact()] }));
-    };
-
-    const handleRemoveContact = (id) => {
-        setFormData(prev => ({ ...prev, Contacts: prev.Contacts.filter(c => c.id !== id) }));
-    };
-
-    const updateContact = (id, field, value) => {
-        setFormData(prev => ({
-            ...prev,
-            Contacts: prev.Contacts.map(c => c.id === id ? { ...c, [field]: value } : c)
-        }));
-    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -505,13 +480,20 @@ function CustomerModal({ initialData, onClose, onSuccess }) {
 
         setIsSubmitting(true);
         try {
-            // Keep backward compatible top-level fields for existing grid columns
-            const primaryContact = formData.Contacts[0] || {};
             const savePayload = {
-                ...formData,
-                ContactPerson: primaryContact.Name || '',
-                Phone: primaryContact.Phone || '',
-                Email: primaryContact.Email || ''
+                Name: formData.Name,
+                Category: formData.Category,
+                Address: formData.Address,
+                ContactPerson: formData.ContactPerson,
+                Phone: formData.Phone,
+                Email: formData.Email,
+                Contacts: [{
+                    id: 'primary',
+                    Name: formData.ContactPerson || '',
+                    Title: '담당자',
+                    Phone: formData.Phone || '',
+                    Email: formData.Email || ''
+                }]
             };
 
             if (initialData) {
@@ -539,106 +521,88 @@ function CustomerModal({ initialData, onClose, onSuccess }) {
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose}></div>
-            <div className="relative bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in-95 duration-200 text-left flex flex-col max-h-[90vh]">
+            <div className="relative bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200 text-left flex flex-col max-h-[90vh]">
                 <div className="px-6 py-5 flex justify-between items-center border-b border-slate-50 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-850/30 shrink-0">
                     <div>
-                        <h2 className="text-xl font-black text-slate-800 dark:text-white tracking-tight leading-tight">{initialData ? '고객사 수정' : '신규 고객사 등록'}</h2>
+                        <h2 className="text-lg font-black text-slate-800 dark:text-white tracking-tight leading-tight">{initialData ? '고객사 수정' : '신규 고객사 등록'}</h2>
                         <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 uppercase font-black tracking-widest">Customer Master Data</p>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all text-slate-400"><X size={24} /></button>
                 </div>
                 
-                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-8">
+                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
                     
                     {/* Basic Info */}
-                    <div>
-                        <h3 className="text-sm font-black text-slate-800 mb-4 flex items-center gap-2">
-                            <span className="w-1.5 h-4 bg-blue-500 rounded-full"></span> 기본 정보
-                        </h3>
-                        <div className="grid grid-cols-3 gap-4">
-                            <div className="col-span-2 space-y-1.5">
-                                <label className={labelClasses}>고객사명 (Company Name) <span className="text-rose-500">*</span></label>
-                                <input type="text" required
-                                    placeholder="회사명을 입력하세요"
-                                    className={`${inputClasses} bg-white dark:bg-slate-900 border-blue-100 focus:ring-blue-500/10 text-base`}
-                                    value={formData.Name}
-                                    onChange={e => setFormData({ ...formData, Name: e.target.value })}
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className={labelClasses}>구분</label>
-                                <select
-                                    className={inputClasses}
-                                    value={formData.Category}
-                                    onChange={e => setFormData({ ...formData, Category: e.target.value })}
-                                >
-                                    <option value="국내">국내 (Domestic)</option>
-                                    <option value="해외">해외 (Overseas)</option>
-                                    <option value="유통사">유통사 (Distributor)</option>
-                                </select>
-                            </div>
-                            <div className="col-span-3 space-y-1.5">
-                                <label className={labelClasses}>주소 (Address)</label>
-                                <input type="text"
-                                    placeholder="회사 주소를 입력하세요"
-                                    className={inputClasses}
-                                    value={formData.Address}
-                                    onChange={e => setFormData({ ...formData, Address: e.target.value })}
-                                />
-                            </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="md:col-span-2 space-y-1">
+                            <label className={labelClasses}>고객사명 (Company Name) <span className="text-rose-500">*</span></label>
+                            <input type="text" required
+                                placeholder="회사명을 입력하세요"
+                                className={inputClasses}
+                                value={formData.Name}
+                                onChange={e => setFormData({ ...formData, Name: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className={labelClasses}>구분</label>
+                            <select
+                                className={inputClasses}
+                                value={formData.Category}
+                                onChange={e => setFormData({ ...formData, Category: e.target.value })}
+                            >
+                                <option value="국내">국내 (Domestic)</option>
+                                <option value="해외">해외 (Overseas)</option>
+                                <option value="유통사">유통사 (Distributor)</option>
+                            </select>
                         </div>
                     </div>
 
-                    <hr className="border-slate-100 dark:border-slate-800" />
-
                     {/* Contacts Info */}
-                    <div>
-                        <div className="flex justify-between items-end mb-4">
-                            <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
-                                <span className="w-1.5 h-4 bg-emerald-500 rounded-full"></span> 담당자 정보
-                            </h3>
-                            <button type="button" onClick={handleAddContact} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg text-xs font-black text-slate-600 dark:text-slate-300 transition-colors">
-                                + 담당자 추가
-                            </button>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-1">
+                            <label className={labelClasses}>담당자명</label>
+                            <input type="text" 
+                                placeholder="성함"
+                                value={formData.ContactPerson} 
+                                onChange={e => setFormData({ ...formData, ContactPerson: e.target.value })} 
+                                className={inputClasses} 
+                            />
                         </div>
-                        
-                        <div className="space-y-3">
-                            {formData.Contacts.map((contact, index) => (
-                                <div key={contact.id} className="flex gap-3 items-start bg-slate-50/50 dark:bg-slate-800/20 p-3 rounded-xl border border-slate-100 dark:border-slate-800 relative group">
-                                    <div className="w-6 pt-2 text-center text-xs font-black text-slate-400">{index + 1}</div>
-                                    <div className="flex-1 grid grid-cols-4 gap-3">
-                                        <div>
-                                            <label className={labelClasses}>이름</label>
-                                            <input type="text" value={contact.Name} onChange={e => updateContact(contact.id, 'Name', e.target.value)} className={inputClasses} placeholder="성함" required={index === 0} />
-                                        </div>
-                                        <div>
-                                            <label className={labelClasses}>직급</label>
-                                            <input type="text" value={contact.Title} onChange={e => updateContact(contact.id, 'Title', e.target.value)} className={inputClasses} placeholder="예: 팀장" />
-                                        </div>
-                                        <div>
-                                            <label className={labelClasses}>연락처</label>
-                                            <input type="tel" value={contact.Phone} onChange={e => updateContact(contact.id, 'Phone', e.target.value)} className={inputClasses} placeholder="010-0000-0000" />
-                                        </div>
-                                        <div>
-                                            <label className={labelClasses}>이메일</label>
-                                            <input type="email" value={contact.Email} onChange={e => updateContact(contact.id, 'Email', e.target.value)} className={inputClasses} placeholder="mail@example.com" />
-                                        </div>
-                                    </div>
-                                    <div className="pt-5 pr-1">
-                                        <button type="button" onClick={() => handleRemoveContact(contact.id)} disabled={formData.Contacts.length <= 1} className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-30">
-                                            <X size={16} />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
+                        <div className="space-y-1">
+                            <label className={labelClasses}>연락처</label>
+                            <input type="tel" 
+                                placeholder="010-0000-0000"
+                                value={formData.Phone} 
+                                onChange={e => setFormData({ ...formData, Phone: e.target.value })} 
+                                className={inputClasses} 
+                            />
                         </div>
+                        <div className="space-y-1">
+                            <label className={labelClasses}>이메일</label>
+                            <input type="email" 
+                                placeholder="mail@example.com"
+                                value={formData.Email} 
+                                onChange={e => setFormData({ ...formData, Email: e.target.value })} 
+                                className={inputClasses} 
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className={labelClasses}>주소 (Address)</label>
+                        <input type="text"
+                            placeholder="회사 주소를 입력하세요"
+                            className={inputClasses}
+                            value={formData.Address}
+                            onChange={e => setFormData({ ...formData, Address: e.target.value })}
+                        />
                     </div>
                 </form>
 
                 <div className="p-6 bg-slate-50 border-t border-slate-100 dark:bg-slate-850 dark:border-slate-800 shrink-0 flex gap-4">
-                    <button type="button" onClick={onClose} className="flex-1 py-3.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 font-black text-slate-500 transition-all text-xs uppercase tracking-widest bg-transparent">취소</button>
-                    <button type="submit" disabled={isSubmitting} onClick={handleSubmit} className="flex-[2] py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black shadow-lg shadow-blue-200 dark:shadow-none transition-all disabled:opacity-50 text-xs uppercase tracking-widest">
-                        {isSubmitting ? '처리 중...' : (initialData ? '고객사 정보 수정' : '고객사 등록')}
+                    <button type="button" onClick={onClose} className="flex-1 py-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 font-black text-slate-500 transition-all text-xs uppercase tracking-widest bg-transparent">취소</button>
+                    <button type="submit" disabled={isSubmitting} onClick={handleSubmit} className="flex-[2] py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black shadow-lg shadow-blue-200 dark:shadow-none transition-all disabled:opacity-50 text-xs uppercase tracking-widest">
+                        {isSubmitting ? '처리 중...' : (initialData ? '수정 완료' : '등록 완료')}
                     </button>
                 </div>
             </div>

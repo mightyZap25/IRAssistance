@@ -401,7 +401,55 @@ export default function PartsDetailPanel({ partId, parts, filteredParts = [], on
                                 <div className="flex flex-wrap items-center gap-6 mt-3 pt-3 border-t border-slate-200/80 dark:border-slate-800/60 w-full">
                                     <div className="flex-1 min-w-[140px]">
                                         <span className="text-[9px] font-black text-purple-500 uppercase tracking-widest block mb-1">규격</span>
-                                        <span className="text-sm font-extrabold text-slate-700 dark:text-slate-300 leading-snug">{currentViewingPart.Spec || '-'}</span>
+                                        <div className="mt-1 space-y-2">
+                                            {(() => {
+                                                const specStr = currentViewingPart.Spec;
+                                                if (!specStr) return <span className="text-sm font-extrabold text-slate-700 dark:text-slate-300 leading-snug">-</span>;
+                                                
+                                                // JSON 형식 파싱 시도
+                                                if (specStr.startsWith('[') && specStr.endsWith(']')) {
+                                                    try {
+                                                        const parsed = JSON.parse(specStr);
+                                                        const validSpecs = parsed.filter(s => s.value && s.value.trim() !== '');
+                                                        if (validSpecs.length === 0) return <span className="text-sm font-extrabold text-slate-700 dark:text-slate-300 leading-snug">-</span>;
+                                                        
+                                                        return validSpecs.map((s, idx) => (
+                                                            <div key={idx} className="flex gap-2 items-center text-xs">
+                                                                <span className="w-20 px-2 py-1 bg-slate-100/50 dark:bg-slate-900/40 rounded border border-slate-200/50 dark:border-slate-800 text-[10px] font-black text-slate-500 uppercase tracking-wider flex items-center justify-center shrink-0">{s.label || '-'}</span>
+                                                                <div className="flex flex-wrap gap-1 items-center">
+                                                                    {s.value.split(',').map(v => v.trim()).filter(Boolean).map(v => {
+                                                                        let colorClass = "bg-emerald-50 text-emerald-600 border-emerald-100/50";
+                                                                        if (s.label === '통신' || s.label === '통신 방식') {
+                                                                            colorClass = "bg-blue-50 text-blue-600 border-blue-100/50";
+                                                                        } else if (s.label === 'Protocol' || s.label === '프로토콜') {
+                                                                            colorClass = "bg-indigo-50 text-indigo-600 border-indigo-100/50";
+                                                                        }
+                                                                        return (
+                                                                            <span key={v} className={`px-2 py-0.5 dark:bg-slate-950/40 text-[10px] font-black rounded-lg border ${colorClass}`}>
+                                                                                {v}
+                                                                            </span>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        ));
+                                                    } catch (e) {
+                                                        // JSON 파싱 실패 시 일반 텍스트 렌더링으로 폴백
+                                                    }
+                                                }
+                                                
+                                                // 일반 텍스트인 경우 쉼표로 분할하여 뱃지 렌더링
+                                                return (
+                                                    <div className="flex flex-wrap gap-1 items-center">
+                                                        {specStr.split(',').map(v => v.trim()).filter(Boolean).map(v => (
+                                                            <span key={v} className="px-2 py-0.5 bg-emerald-50 dark:bg-slate-950/40 text-emerald-600 dark:text-emerald-400 text-[10px] font-black rounded-lg border border-emerald-100/50">
+                                                                {v}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
                                     </div>
                                     <div className="border-l border-slate-200 dark:border-slate-800/60 pl-4">
                                         <span className="text-[9px] font-black text-pink-500 uppercase tracking-widest block mb-1">리비전</span>

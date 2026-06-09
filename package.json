@@ -75,6 +75,8 @@
             "output": "dist-electron"
         },
         "win": {
+
+            
             "target": [
                 "nsis"
             ]

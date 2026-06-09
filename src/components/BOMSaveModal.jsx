@@ -35,6 +35,8 @@ export default function BOMSaveModal({
         <div 
             className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-300"
             onKeyDown={(e) => e.stopPropagation()}
+            onKeyUp={(e) => e.stopPropagation()}
+            onKeyPress={(e) => e.stopPropagation()}
         >
             <div className="bg-white/90 backdrop-blur-2xl w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-white/40 overflow-hidden animate-in zoom-in-95 duration-300">
                 {/* Decorative Background Element */}
@@ -90,6 +92,8 @@ export default function BOMSaveModal({
                             value={reason}
                             onChange={e => setReason(e.target.value)}
                             onKeyDown={e => e.stopPropagation()}
+                            onKeyUp={e => e.stopPropagation()}
+                            onKeyPress={e => e.stopPropagation()}
                             placeholder="이번 BOM 수정의 배경과 구체적인 변경 사유를 입력해주세요..."
                             className="w-full h-32 bg-slate-50 border border-slate-200 rounded-[1.5rem] p-5 text-sm font-bold text-slate-700 focus:ring-4 focus:ring-blue-100 focus:border-blue-500 focus:bg-white transition-all outline-none resize-none shadow-inner"
                         />

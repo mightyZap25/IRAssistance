@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import { collection, doc, writeBatch, getDocs, serverTimestamp } from '../firebase';
 import { db } from '../firebase';
 import BOMTree from './BOMTree';
+import { autoRegisterFromParts } from '../services/supplierAutoRegister';
 
 // Helper to normalize Part IDs for robust comparison (strips out revision suffixes like -1.0, _v1.1)
 function normalizePartId(id) {
@@ -271,10 +272,18 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
                     const dbMaster = p.MasterPartID ? normalizePartId(p.MasterPartID) : dbId;
                     return dbId === targetId || dbMaster === targetId;
                 });
+
+                // 대소문자 무시하고 동일한 이름으로 등록된 기존 파트가 있는지 검사
+                const duplicateNamePart = existingPartsList.find(p => 
+                    p.Name && item.Name &&
+                    p.Name.trim().toLowerCase() === item.Name.trim().toLowerCase()
+                );
+
                 statusMap[item.PartID] = {
                     exists: !!existing,
                     data: existing || null,
-                    isNew: !existing
+                    isNew: !existing,
+                    duplicateNamePart: duplicateNamePart || null
                 };
             }
 
@@ -333,7 +342,7 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
                 if (data.ParentID && data.ChildID) {
                     const pId = normalizePartId(data.ParentID);
                     const cId = normalizePartId(data.ChildID);
-                    existingBomMap.set(`${pId}_${cId}`, docSnap.ref);
+                    existingBomMap.set(`${pId}_${cId}`, docSnap.ref || doc(db, 'bom', docSnap.id));
                 }
             });
 
@@ -342,7 +351,8 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
             // 1. Create new parts
             const newPartsToCreate = parsedItems.filter(item => partStatusMap[item.PartID]?.isNew);
             newPartsToCreate.forEach(item => {
-                const finalPartId = normalizePartId(item.PartID); // 새 정책에 따라 PartID에서 리비전 제거
+                const finalPartId = normalizePartId(item.PartID);
+                // parts 문서 ID를 실제 품번(finalPartId)으로 지정하여 저장
                 const partRef = doc(db, 'parts', finalPartId);
                 operations.push((batch) => batch.set(partRef, {
                     PartID: finalPartId,
@@ -373,7 +383,6 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
                 const relationKey = `${pId}_${cId}`;
                 
                 if (existingBomMap.has(relationKey)) {
-                    // Update existing BOM relation (Qty, Location, Note)
                     const existingRef = existingBomMap.get(relationKey);
                     operations.push((batch) => batch.update(existingRef, {
                         Quantity: link.qty,
@@ -382,9 +391,10 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
                     }));
                     updatedRelationsCount++;
                 } else {
-                    const newLinkRef = doc(collection(db, 'bom'));
+                    const customBomId = `${pId}_${cId}`;
+                    const newLinkRef = doc(db, 'bom', customBomId);
                     operations.push((batch) => batch.set(newLinkRef, {
-                        ParentID: pId, // DB에는 정규화된 ID를 저장
+                        ParentID: pId,
                         ChildID: cId,
                         Quantity: link.qty,
                         Location: link.location || '',
@@ -412,6 +422,8 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
             }
 
             alert(`BOM 가져오기가 성공적으로 완료되었습니다!\n\n- 등록된 신규 품목: ${newPartsToCreate.length}개\n- 생성된 신규 BOM 관계: ${addedRelationsCount}개\n- 갱신된 기존 BOM 관계: ${updatedRelationsCount}개`);
+            // 공급사/제조사 자동 등록 (BOM 가져오기 후, 오류 시 무시)
+            try { await autoRegisterFromParts(parsedItems); } catch (e) { console.warn('[AutoReg] BOM 가져오기 후 공급사/제조사 자동 등록 오류(무시):', e); }
             onImportSuccess();
             onClose();
         } catch (err) {
@@ -516,9 +528,17 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
                                         className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
                                     >
                                         <option value="">시트를 선택하세요</option>
-                                        {availableSheets.map(name => (
-                                            <option key={name} value={name}>{name}</option>
-                                        ))}
+                                        {availableSheets.map(name => {
+                                            const isRegistered = existingPartsList.some(p => 
+                                                (p.Name && p.Name.trim().toLowerCase() === name.trim().toLowerCase()) ||
+                                                (p.PartID && p.PartID.trim().toLowerCase() === name.trim().toLowerCase())
+                                            );
+                                            return (
+                                                <option key={name} value={name}>
+                                                    {name}{isRegistered ? ' (이미 등록됨)' : ''}
+                                                </option>
+                                            );
+                                        })}
                                     </select>
                                 </div>
                             )}
@@ -554,11 +574,11 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
                                 <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col h-[400px]">
                                     <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                                         <CheckCircle2 size={14} className="text-emerald-500" />
-                                        신규 등록 예정 부품 ({parsedItems.filter(item => partStatusMap[item.PartID]?.isNew).length}건)
+                                        신규 등록 예정 부품 ({parsedItems.filter(item => partStatusMap[item.PartID]?.isNew && !item.Class.includes('Part')).length}건)
                                     </h3>
                                     <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                                         {parsedItems
-                                            .filter(item => partStatusMap[item.PartID]?.isNew)
+                                            .filter(item => partStatusMap[item.PartID]?.isNew && !item.Class.includes('Part'))
                                             .sort((a, b) => b.Level - a.Level)
                                             .map((item, idx) => {
                                                 const isElectronic = (item.Category || '').includes('전자') || (item.PartID || '').startsWith('IRE');
@@ -603,7 +623,14 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
                                                             </div>
                                                         </div>
                                                         <div className="flex flex-col">
-                                                            <div className={`text-xs font-black truncate ${nameStyle}`}>{item.Name}</div>
+                                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                                <span className={`text-xs font-black truncate ${nameStyle}`}>{item.Name}</span>
+                                                                {partStatusMap[item.PartID]?.duplicateNamePart && (
+                                                                    <span className="text-[9px] bg-rose-50 text-rose-600 border border-rose-100 px-1 py-0.5 rounded font-black whitespace-nowrap animate-pulse">
+                                                                        동일 이름 등록됨 ({partStatusMap[item.PartID].duplicateNamePart.PartID})
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                             <div className="flex items-center justify-between mt-1.5 gap-2">
                                                                 <select 
                                                                     value={item.Class}

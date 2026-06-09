@@ -75,17 +75,25 @@ export const mockFirestore = {
             const data = await res.json();
             
             return {
-                docs: data.map(item => ({
-                    id: item.id || item.PartID || item.uid || '',
-                    data: () => item,
-                    exists: () => true
-                })),
+                docs: data.map(item => {
+                    const docId = item.id || item.PartID || item.uid || '';
+                    return {
+                        id: docId,
+                        ref: { collectionName, id: docId },
+                        data: () => item,
+                        exists: () => true
+                    };
+                }),
                 size: data.length,
                 forEach: (cb) => {
-                    data.forEach(item => cb({
-                        id: item.id || item.PartID || item.uid || '',
-                        data: () => item
-                    }));
+                    data.forEach(item => {
+                        const docId = item.id || item.PartID || item.uid || '';
+                        cb({
+                            id: docId,
+                            ref: { collectionName, id: docId },
+                            data: () => item
+                        });
+                    });
                 }
             };
         } catch (err) {
