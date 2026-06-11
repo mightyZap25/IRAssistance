@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth, DEV_ROLES } from '../contexts/AuthContext';
 import { db, collection, query, where, orderBy, onSnapshot, doc, updateDoc, setDoc, serverTimestamp, getDoc } from '../firebase';
-import { LogOut, User, Bell, FlaskConical, ChevronDown, Check, StickyNote, X, Maximize2, Minimize2, Move } from 'lucide-react';
+import { LogOut, User, Bell, FlaskConical, ChevronDown, Check, StickyNote, X, Maximize2, Minimize2, Move, Printer } from 'lucide-react';
 import RichMemoEditor from './common/RichMemoEditor';
 
 export default function Header() {
@@ -151,23 +151,64 @@ export default function Header() {
         };
     }, [isDragging, isResizing, dragOffset, resizeStart]);
 
-    // 실시간 알림 구독 (인덱스 에러 회피를 위해 orderBy 삭제 후 메모리 정렬)
+    // 실시간 알림 구독 (부서 권한 및 마스터 권한 반영)
     useEffect(() => {
-        if (!currentUser?.email) return;
-        const q = query(
-            collection(db, 'notifications'),
-            where('userEmail', '==', currentUser.email)
-        );
+        if (!currentUser?.uid) return;
+
+        // 알림 필터링 로직:
+        // 1. master 권한: 모든 알림 표시
+        // 2. 일반 부서 권한: targetDepts에 자신의 부서가 포함되었거나, 본인 이메일로 온 알림 표시
+        
+        const q = query(collection(db, 'notifications'));
+        
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const list = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-                time: doc.data().createdAt?.toDate()?.toLocaleTimeString() || '방금 전'
-            }));
+            const list = snapshot.docs.map(doc => {
+                const data = doc.data();
+                const createdAt = data.createdAt;
+                let dateObj = null;
+
+                if (createdAt?.toDate) {
+                    dateObj = createdAt.toDate();
+                } else if (createdAt?.seconds) {
+                    dateObj = new Date(createdAt.seconds * 1000);
+                } else if (createdAt) {
+                    dateObj = new Date(createdAt);
+                }
+
+                return {
+                    id: doc.id,
+                    ...data,
+                    _date: dateObj,
+                    time: dateObj && !isNaN(dateObj) ? dateObj.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '방금 전'
+                };
+            });
+
+            // ─── 부서 및 권한 필터링 (메모리 내 처리로 유연성 확보) ───
+            const userDept = rawUserProfile?.department?.toLowerCase() || '';
+            const userRole = devRoleOverride || rawUserProfile?.role || '';
+
+            const filteredList = list.filter(noti => {
+                // 1. Master 권한은 모든 알림 허용
+                if (userRole === 'admin') return true;
+
+                // 2. 본인 이메일로 직접 온 알림
+                if (noti.userEmail === currentUser.email) return true;
+
+                // 3. 부서 또는 역할 대상 알림 체크
+                if (noti.targetDepts && Array.isArray(noti.targetDepts)) {
+                    return noti.targetDepts.some(target => 
+                        target.toLowerCase() === userDept || 
+                        target.toLowerCase() === userRole
+                    );
+                }
+
+                return false;
+            });
+
             // 로컬(메모리) 정렬
-            const sortedList = list.sort((a, b) => {
-                const timeA = a.createdAt?.toDate()?.getTime() || 0;
-                const timeB = b.createdAt?.toDate()?.getTime() || 0;
+            const sortedList = filteredList.sort((a, b) => {
+                const timeA = a._date?.getTime() || 0;
+                const timeB = b._date?.getTime() || 0;
                 return timeB - timeA;
             });
             setNotifications(sortedList);
@@ -176,7 +217,7 @@ export default function Header() {
         });
 
         return () => unsubscribe();
-    }, [currentUser]);
+    }, [currentUser, rawUserProfile, devRoleOverride]);
 
     // 알림 읽음 처리
     const handleReadNotification = async (notiId) => {
@@ -186,6 +227,20 @@ export default function Header() {
         } catch (error) {
             console.error("알림 읽음 처리 실패:", error);
         }
+    };
+
+    const [printablePR, setPrintablePR] = useState(null);
+    const [isPrintLoading, setIsPrintLoading] = useState(false);
+
+    // Subscribe to printable PR selection events from pages
+    useEffect(() => {
+        const handleSetPR = (e) => setPrintablePR(e.detail);
+        window.addEventListener('set-printable-pr', handleSetPR);
+        return () => window.removeEventListener('set-printable-pr', handleSetPR);
+    }, []);
+
+    const handleGlobalPrint = () => {
+        window.dispatchEvent(new CustomEvent('trigger-print-modal'));
     };
 
     const currentDevRole = DEV_ROLES.find(r => r.key === devRoleOverride);
@@ -285,6 +340,17 @@ export default function Header() {
                         </>
                     )}
                 </div>
+
+                {/* ─── Global Work Order Print Button ─── */}
+                {printablePR && (
+                    <button
+                        onClick={handleGlobalPrint}
+                        className="flex items-center gap-2 px-4 py-1.5 bg-slate-900 text-white rounded-xl text-xs font-black shadow-lg shadow-slate-200 hover:bg-slate-800 transition-all animate-fade-in"
+                    >
+                        <Printer size={14} className="text-blue-400" />
+                        <span>작업 지시서 출력</span>
+                    </button>
+                )}
 
                 {/* Divider */}
                 <div className="h-6 w-[1px] bg-slate-200 mx-1"/>

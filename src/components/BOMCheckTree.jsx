@@ -27,7 +27,8 @@ function isNodeReady(node, multiplier, inventoryMap) {
     const isFinishedGood = (node.PartID || '').toUpperCase().startsWith('IRPA');
 
     if (hasChildren && !isFinishedGood) {
-        return node.Children.every(child => isNodeReady(child, required, inventoryMap));
+        const remainingNeeded = required - stock;
+        return node.Children.every(child => isNodeReady(child, remainingNeeded, inventoryMap));
     }
 
     // 3. Otherwise (Part or Finished Good with no stock), it's not ready.
@@ -41,20 +42,24 @@ function BOMCheckTreeNode({ node, level = 0, multiplier = 1, inventoryMap = {}, 
     const style = getCategoryStyle(node);
     const isRoot = level === 0;
 
-    const requiredQty = (node.Quantity || 1) * multiplier;
+    const unitQty = Number(node.Quantity || 1);
+    const setQty = multiplier;
+    const requiredQty = unitQty * setQty;
     const currentStock = Number(inventoryMap[node.PartID] || 0);
-
     const isActuallyEnough = currentStock >= requiredQty;
-    const isReadyToBuild = !isActuallyEnough && hasChildren && node.Children.every(child => isNodeReady(child, requiredQty, inventoryMap));
+    const shortage = requiredQty - currentStock;
+
+    const remainingNeeded = Math.max(0, requiredQty - currentStock);
+    const isReadyToBuild = !isActuallyEnough && hasChildren && node.Children.every(child => isNodeReady(child, remainingNeeded, inventoryMap));
 
     // Final Label logic
-    let statusLabel = { text: '부족', color: 'text-red-500', icon: AlertCircle, bg: 'bg-red-50/30' };
+    let statusLabel = { text: '부족', color: 'text-red-500', icon: AlertCircle, bg: 'bg-red-50/10' };
     if (isRoot) {
-        statusLabel = { text: '생산 대상', color: 'text-blue-500', icon: Box, bg: 'bg-blue-50/20' };
+        statusLabel = { text: '생산 대상', color: 'text-blue-500', icon: Box, bg: 'bg-blue-50/10' };
     } else if (isActuallyEnough) {
         statusLabel = { text: 'OK', color: 'text-emerald-600', icon: CheckCircle2, bg: '' };
     } else if (isReadyToBuild) {
-        statusLabel = { text: '제작 필요', color: 'text-blue-600', icon: Layers, bg: 'bg-blue-50/20' };
+        statusLabel = { text: '제작 필요', color: 'text-blue-600', icon: Layers, bg: 'bg-blue-50/10' };
     }
 
     const isInboundAvailable = !isActuallyEnough && !isReadyToBuild;
@@ -71,91 +76,74 @@ function BOMCheckTreeNode({ node, level = 0, multiplier = 1, inventoryMap = {}, 
         <div className="select-none">
             <div
                 onClick={handleClick}
-                className={`flex items-center py-2 px-2 border-b border-slate-50 transition-colors ${isRoot ? 'bg-slate-50/50' : ''} ${statusLabel.bg} ${isClickable ? 'cursor-pointer hover:bg-red-100/50' : 'hover:bg-slate-50'}`}
+                className={`flex items-center py-1.5 px-2 border-b border-slate-50 transition-colors ${isRoot ? 'bg-slate-50/30' : ''} ${statusLabel.bg} ${isClickable ? 'cursor-pointer hover:bg-red-100/50' : 'hover:bg-slate-50'}`}
                 style={{ paddingLeft: `${level * 16 + 8}px` }}
             >
-                {/* Toggle */}
-                <div className="w-8 flex items-center justify-center">
+                {/* Toggle & Badge */}
+                <div className="flex items-center gap-1 shrink-0 mr-2">
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
                             setExpanded(!expanded);
                         }}
-                        className={`w-6 h-6 flex items-center justify-center rounded hover:bg-slate-200 text-slate-400 transition-transform ${hasChildren ? 'visible' : 'invisible'}`}
+                        className={`w-5 h-5 flex items-center justify-center rounded hover:bg-slate-200 text-slate-400 transition-transform ${hasChildren ? 'visible' : 'invisible'}`}
                     >
-                        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                     </button>
-                </div>
-
-                {/* Badge */}
-                <div className="w-8 flex items-center justify-center mr-1">
-                    <span className={`w-5 h-5 flex items-center justify-center rounded ${style.color} text-white text-[10px] font-bold shadow-sm`}>
+                    <span className={`w-4 h-4 flex items-center justify-center rounded ${style.color} text-white text-[8px] font-black shadow-sm`}>
                         {style.char}
                     </span>
                 </div>
 
-                {/* Info */}
-                <div className="flex-1 flex flex-col justify-center overflow-hidden">
-                    <div className="flex items-center gap-2 overflow-hidden">
-                        <span className={`text-sm font-bold truncate ${style.char === 'P' ? 'text-orange-600 font-black' : 'text-slate-700'}`}>
+                {/* Info (Expanded to take more space) */}
+                <div className="flex-1 flex flex-col justify-center overflow-hidden min-w-0 pr-4">
+                    <div className="flex items-center gap-1.5 overflow-hidden">
+                        <span className={`text-[11px] font-black truncate ${style.char === 'P' ? 'text-orange-600' : 'text-slate-700'}`}>
                             {node.Name || node.PartID}
                         </span>
+                        <span className="text-[8px] font-mono text-slate-400 bg-slate-100 px-1 py-0.5 rounded shrink-0">[{node.PartID}]</span>
                     </div>
-                    {/* Real Inbound Schedule - Only for true shortage (not OK, not ReadyToBuild) */}
                     {inboundInfo && (
-                        <div className="flex items-center mt-0.5 gap-2">
-                            <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded whitespace-nowrap">
-                                입고 예정: {inboundInfo.date}
-                            </span>
-                            <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded whitespace-nowrap">
-                                수량: {inboundInfo.qty?.toLocaleString()} EA
-                            </span>
+                        <div className="flex items-center mt-0.5 gap-1">
+                            <span className="text-[7px] font-black text-blue-600 bg-blue-50 px-1 py-0.5 rounded whitespace-nowrap border border-blue-100 uppercase">IN: {inboundInfo.date}</span>
+                            <span className="text-[7px] font-black text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded whitespace-nowrap border border-emerald-100">{inboundInfo.qty?.toLocaleString()} EA</span>
                         </div>
                     )}
                 </div>
 
-                {/* Availability Check Right Side */}
-                <div className="flex items-center gap-4 ml-4 min-w-[120px] justify-end">
-
-                    {/* Stock / Required */}
-                    {!isRoot && (
-                        <div className="text-right flex flex-col items-end">
-                            <div className="flex items-center gap-1.5">
-                                <span className={`text-xs font-black tabular-nums ${isActuallyEnough ? 'text-slate-300' : 'text-red-500'}`}>
-                                    {currentStock.toLocaleString()}
-                                </span>
-                                <span className="text-[10px] text-slate-300">/</span>
-                                <span className="text-xs font-black text-slate-700 tabular-nums">
-                                    {requiredQty.toLocaleString()}
-                                </span>
-                            </div>
-                            {/* Status Label */}
-                            <div className={`flex items-center gap-1 text-[9px] font-bold ${statusLabel.color}`}>
-                                {React.createElement(statusLabel.icon, { size: 10 })}
-                                <span>{statusLabel.text}</span>
-                            </div>
-                        </div>
-                    )}
-                    {isRoot && (
-                        <div className="text-right flex flex-col items-end">
-                            <div className={`flex items-center gap-1 text-[9px] font-bold ${statusLabel.color}`}>
-                                {React.createElement(statusLabel.icon, { size: 10 })}
-                                <span>{statusLabel.text}</span>
-                            </div>
-                        </div>
-                    )}
+                {/* Columns (Tighter and Pushed to extreme right) */}
+                <div className="flex items-center gap-2.5 shrink-0 ml-auto border-l border-slate-50 pl-3">
+                    <div className="text-right w-11">
+                        <p className="text-[7px] font-black text-slate-300 uppercase tracking-tighter leading-tight mb-0.5">Unit</p>
+                        <p className="text-[11px] font-black text-indigo-500 tabular-nums leading-none">{unitQty.toLocaleString()}<span className="text-[8px] ml-0.5 opacity-40">/D</span></p>
+                    </div>
+                    <div className="text-right w-11">
+                        <p className="text-[7px] font-black text-slate-300 uppercase tracking-tighter leading-tight mb-0.5">Set</p>
+                        <p className="text-[11px] font-black text-indigo-500 tabular-nums leading-none">{setQty.toLocaleString()}<span className="text-[8px] ml-0.5 opacity-40">S</span></p>
+                    </div>
+                    <div className="text-right w-14">
+                        <p className="text-[7px] font-black text-slate-300 uppercase tracking-tighter leading-tight mb-0.5">Req</p>
+                        <p className="text-[11px] font-black text-slate-700 tabular-nums leading-none">{requiredQty.toLocaleString()}<span className="text-[8px] ml-0.5 opacity-40">E</span></p>
+                    </div>
+                    <div className="text-right w-18">
+                        <p className="text-[7px] font-black text-slate-300 uppercase tracking-tighter leading-tight mb-0.5">Stock</p>
+                        <p className={`text-[11px] font-black tabular-nums leading-none ${isActuallyEnough ? 'text-blue-600' : 'text-rose-500'}`}>{currentStock.toLocaleString()}<span className="text-[8px] ml-0.5 opacity-40">A</span></p>
+                        {shortage > 0 && (
+                            <p className="text-[9px] font-black text-rose-600 mt-1 animate-pulse leading-none">-{shortage.toLocaleString()}</p>
+                        )}
+                    </div>
                 </div>
             </div>
 
             {/* Children */}
             {expanded && hasChildren && (
                 <div className="ml-0">
-                    {node.Children.map(child => (
+                    {node.Children.map((child, idx) => (
                         <BOMCheckTreeNode
-                            key={child.PartID}
+                            key={idx}
                             node={child}
                             level={level + 1}
-                            multiplier={requiredQty}
+                            multiplier={remainingNeeded}
                             inventoryMap={inventoryMap}
                             inboundMap={inboundMap}
                             onShortageClick={onShortageClick}
@@ -172,23 +160,15 @@ export default function BOMCheckTree({ data, targetQty, inventoryMap, inboundMap
 
     return (
         <div className={`flex flex-col min-h-0 ${className}`}>
-            <div className="flex-1 overflow-y-auto custom-scrollbar bg-white rounded-xl border border-slate-100 relative pr-1">
-                <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center sticky top-0 z-10 backdrop-blur-sm">
-                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                        <Layers size={14} className="text-slate-400" />
-                        BOM Structure & Availability
-                    </h4>
-                </div>
-                <div className="pb-4">
-                    <BOMCheckTreeNode
-                        node={data}
-                        level={0}
-                        multiplier={targetQty}
-                        inventoryMap={inventoryMap}
-                        inboundMap={inboundMap}
-                        onShortageClick={onShortageClick}
-                    />
-                </div>
+            <div className="flex-1 bg-white rounded-2xl border border-slate-100 overflow-hidden">
+                <BOMCheckTreeNode
+                    node={data}
+                    level={0}
+                    multiplier={targetQty}
+                    inventoryMap={inventoryMap}
+                    inboundMap={inboundMap}
+                    onShortageClick={onShortageClick}
+                />
             </div>
         </div>
     );

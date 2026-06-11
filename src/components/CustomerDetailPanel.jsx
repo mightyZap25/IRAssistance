@@ -76,14 +76,9 @@ export default function CustomerDetailPanel({ customer, onClose, onEdit, inline 
                                 : 'bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800'
                             }`}>{customer.Category || '국내'}</span>
                         </div>
-                        <div className="flex items-center gap-4 text-slate-400">
-                            <div className="flex items-center gap-1.5 text-xs font-bold">
-                                <User size={14} className="text-blue-500" /> {customer.ContactPerson || '담당자 미지정'}
-                            </div>
-                            <div className="w-1 h-1 rounded-full bg-slate-200"></div>
-                            <div className="flex items-center gap-1.5 text-xs font-bold">
-                                <Phone size={14} className="text-slate-300" /> {customer.Phone || '연락처 없음'}
-                            </div>
+                        <div className="flex items-center gap-2 text-slate-400">
+                            <Building2 size={14} className="text-blue-500" />
+                            <p className="text-xs font-bold text-slate-500 truncate max-w-md">{customer.Address || '주소 정보 없음'}</p>
                         </div>
                     </div>
                     <div className="flex gap-2">
@@ -120,39 +115,75 @@ export default function CustomerDetailPanel({ customer, onClose, onEdit, inline 
             {/* Content Area */}
             <div className="flex-1 overflow-y-auto px-8 pb-8 custom-scrollbar bg-white dark:bg-slate-900">
                 {activeTab === 'info' && (
-                    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-2 duration-300 pt-4">
-                        <div className="grid grid-cols-2 gap-x-12 gap-y-8">
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">사업자 등록 번호</label>
-                                <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{customer.BusinessNumber || '-'}</p>
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">결제 조건</label>
-                                <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{customer.PaymentTerms || '익월 말 결제'}</p>
-                            </div>
-                            <div className="col-span-2 space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">이메일 주소</label>
-                                <p className="text-sm font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-                                    <Mail size={14} className="text-blue-500" />
-                                    {customer.Email || '-'}
-                                </p>
-                            </div>
-                            <div className="col-span-2 space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">본사 주소</label>
-                                <p className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-relaxed">{customer.Address || '주소 정보가 없습니다.'}</p>
+                    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300 pt-6">
+                        {/* Company & Main Info */}
+                        <div className="space-y-1">
+                            <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                <div className="flex items-center gap-2 shrink-0 w-[120px]">
+                                    <Building2 size={14} className="text-blue-500" />
+                                    <span className="text-xs font-black text-slate-800 dark:text-slate-200 truncate">{customer.Name}</span>
+                                </div>
+                                <div className="w-px h-3 bg-slate-200 dark:bg-slate-700 shrink-0"></div>
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <MapPin size={13} className="text-slate-400" />
+                                    <p className="text-xs font-bold text-slate-500 dark:text-slate-400 truncate">{customer.Address || '주소 정보 없음'}</p>
+                                </div>
                             </div>
                         </div>
 
-                        <div className="p-6 rounded-[2rem] bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex justify-between items-center shadow-inner">
+                        {/* Contacts Section */}
+                        <div className="space-y-1.5">
+                            <div className="flex items-center justify-between mb-2 px-1">
+                                <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">Contacts</h3>
+                            </div>
+                            {(customer.Contacts && customer.Contacts.length > 0 ? customer.Contacts : [{
+                                Name: customer.ContactPerson,
+                                Phone: customer.Phone,
+                                Email: customer.Email,
+                                Title: '주담당자'
+                            }]).map((contact, idx) => (
+                                <div key={idx} className="flex items-center gap-4 p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 group hover:border-blue-200 transition-colors shadow-sm">
+                                    <div className="flex items-center gap-2 w-[120px] shrink-0">
+                                        <User size={14} className="text-blue-500" />
+                                        <span className="text-xs font-black text-slate-800 dark:text-slate-200 truncate">{contact.Name || '-'}</span>
+                                        {contact.Title && <span className="text-[8px] font-bold text-slate-400 border border-slate-100 px-1 rounded shrink-0">{contact.Title}</span>}
+                                    </div>
+                                    <div className="w-px h-3 bg-slate-100 dark:bg-slate-800 shrink-0"></div>
+                                    <div className="flex items-center gap-2 w-[130px] shrink-0">
+                                        <Phone size={13} className="text-slate-300" />
+                                        <span className="text-xs font-bold text-slate-600 dark:text-slate-400 font-mono">{contact.Phone || '-'}</span>
+                                    </div>
+                                    <div className="w-px h-3 bg-slate-100 dark:bg-slate-800 shrink-0"></div>
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                        <Mail size={13} className="text-slate-300" />
+                                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400 truncate">{contact.Email || '-'}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Business Info Info Cards */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="p-5 rounded-[1.5rem] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">사업자 등록 번호</label>
+                                <p className="text-sm font-black text-slate-700 dark:text-slate-200">{customer.BusinessNumber || '-'}</p>
+                            </div>
+                            <div className="p-5 rounded-[1.5rem] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">결제 조건</label>
+                                <p className="text-sm font-black text-slate-700 dark:text-slate-200">{customer.PaymentTerms || '익월 말 결제'}</p>
+                            </div>
+                        </div>
+
+                        <div className="p-6 rounded-[2rem] bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex justify-between items-center shadow-lg shadow-blue-200/50 dark:shadow-none">
                             <div className="space-y-1">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">총 누적 매출</label>
-                                <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">₩ 4,700,000</div>
+                                <label className="text-[9px] font-black text-blue-100 uppercase tracking-widest">총 누적 매출</label>
+                                <div className="text-2xl font-black tracking-tight">₩ 4,700,000</div>
                             </div>
                             <div className="text-right space-y-1">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">고객 상태</label>
+                                <label className="text-[9px] font-black text-blue-100 uppercase tracking-widest">고객 상태</label>
                                 <div className="flex items-center gap-2 justify-end">
-                                    <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></div>
-                                    <span className="text-xs font-black text-emerald-600 uppercase tracking-widest">Active</span>
+                                    <div className="w-2 h-2 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]"></div>
+                                    <span className="text-xs font-black uppercase tracking-widest">Active Partner</span>
                                 </div>
                             </div>
                         </div>

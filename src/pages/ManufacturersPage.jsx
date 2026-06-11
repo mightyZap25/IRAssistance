@@ -100,7 +100,6 @@ const ManufacturerModal = ({ isOpen, onClose, targetData, onSave }) => {
 
 /* ─────────────────────────────── Detail Panel ─────────────────────────────── */
 const ManufacturerDetailPanel = ({ manufacturer, onClose, onEdit, allParts }) => {
-    const [tab, setTab] = useState('info');
     const [partSearch, setPartSearch] = useState('');
 
     const relatedParts = useMemo(() => {
@@ -120,11 +119,6 @@ const ManufacturerDetailPanel = ({ manufacturer, onClose, onEdit, allParts }) =>
     }, [relatedParts, partSearch]);
 
     if (!manufacturer) return null;
-
-    const tabs = [
-        { key: 'info', label: '기본 정보', icon: <Building2 size={14} /> },
-        { key: 'parts', label: `납품 부품 (${relatedParts.length})`, icon: <Package size={14} /> },
-    ];
 
     return (
         <div className="flex flex-col h-full bg-white border-l border-slate-200 overflow-hidden">
@@ -147,117 +141,101 @@ const ManufacturerDetailPanel = ({ manufacturer, onClose, onEdit, allParts }) =>
                         <button onClick={onClose} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"><X size={16} /></button>
                     </div>
                 </div>
-                {/* Tabs */}
-                <div className="flex gap-1 mt-3">
-                    {tabs.map(t => (
-                        <button key={t.key} onClick={() => setTab(t.key)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all ${tab === t.key ? 'bg-white text-blue-700' : 'text-blue-200 hover:bg-white/20'}`}
-                        >
-                            {t.icon} {t.label}
-                        </button>
-                    ))}
-                </div>
             </div>
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto">
-                {tab === 'info' && (
-                    <div className="p-5 space-y-4">
-                        {/* Stats */}
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-center">
-                                <div className="text-2xl font-black text-blue-700">{relatedParts.length}</div>
-                                <div className="text-[10px] font-black text-blue-400 uppercase tracking-wider">등록 부품</div>
+                {/* Simple Information Section */}
+                <div className="p-5 space-y-5 border-b border-slate-100 bg-white">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-1.5 text-center">
+                                <span className="text-xs font-black text-blue-700">{relatedParts.length}</span>
+                                <span className="ml-1 text-[10px] font-bold text-blue-400">부품</span>
                             </div>
-                            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-center">
-                                <div className="text-2xl font-black text-emerald-700">{relatedParts.filter(p => p.Lifecycle === 'Active').length}</div>
-                                <div className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">양산 중</div>
+                            <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-1.5 text-center">
+                                <span className="text-xs font-black text-emerald-700">{relatedParts.filter(p => p.Lifecycle === 'Active').length}</span>
+                                <span className="ml-1 text-[10px] font-bold text-emerald-400">양산</span>
                             </div>
                         </div>
-
-                        {/* Info Fields */}
-                        <div className="space-y-3">
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider">제조사 기본 정보</h3>
-                            {[
-                                { icon: <Building2 size={15} className="text-slate-400" />, label: '회사명', value: manufacturer.Name },
-                                { icon: <MapPin size={15} className="text-slate-400" />, label: '국가', value: manufacturer.Country },
-                                { icon: <MapPin size={15} className="text-slate-400" />, label: '주소', value: manufacturer.Address },
-                                { icon: <User size={15} className="text-slate-400" />, label: '담당자', value: manufacturer.ContactPerson },
-                                { icon: <Phone size={15} className="text-slate-400" />, label: '전화번호', value: manufacturer.Phone },
-                                { icon: <Globe size={15} className="text-slate-400" />, label: '웹사이트', value: manufacturer.Website, isLink: true },
-                            ].map((item, i) => (
-                                <div key={i} className="flex items-start gap-3 py-2.5 border-b border-slate-100 last:border-0">
-                                    <div className="mt-0.5 shrink-0">{item.icon}</div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{item.label}</p>
-                                        {item.value ? (
-                                            item.isLink ? (
-                                                <a href={item.value.startsWith('http') ? item.value : `https://${item.value}`}
-                                                    target="_blank" rel="noreferrer"
-                                                    className="text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 mt-0.5"
-                                                >
-                                                    {item.value} <ExternalLink size={11} />
-                                                </a>
-                                            ) : (
-                                                <p className="text-sm font-bold text-slate-800 mt-0.5 break-words">{item.value}</p>
-                                            )
-                                        ) : (
-                                            <p className="text-sm text-slate-300 italic mt-0.5">미기재</p>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {manufacturer.Description && (
-                            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">비고</p>
-                                <p className="text-xs text-slate-600 font-medium leading-relaxed">{manufacturer.Description}</p>
-                            </div>
+                        {manufacturer.Website && (
+                            <a href={manufacturer.Website.startsWith('http') ? manufacturer.Website : `https://${manufacturer.Website}`}
+                                target="_blank" rel="noreferrer"
+                                className="text-[11px] font-black text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 flex items-center gap-1.5 transition-colors"
+                            >
+                                <Globe size={12} /> 공식 웹사이트
+                            </a>
                         )}
                     </div>
-                )}
 
-                {tab === 'parts' && (
-                    <div className="flex flex-col h-full">
-                        <div className="px-4 py-3 border-b border-slate-100 shrink-0">
-                            <div className="relative">
-                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                <input type="text" value={partSearch} onChange={e => setPartSearch(e.target.value)}
-                                    className="w-full pl-8 pr-3 py-2 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-400/30"
-                                    placeholder="부품명, Part ID 검색..." />
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                        {[
+                            { icon: <MapPin size={13} />, label: '국가', value: manufacturer.Country },
+                            { icon: <User size={13} />, label: '담당자', value: manufacturer.ContactPerson },
+                            { icon: <Phone size={13} />, label: '연락처', value: manufacturer.Phone },
+                            { icon: <Building2 size={13} />, label: '주소', value: manufacturer.Address, fullWidth: true },
+                        ].map((item, i) => (
+                            <div key={i} className={`flex items-center gap-2 ${item.fullWidth ? 'col-span-2' : ''}`}>
+                                <div className="flex items-center gap-1.5 text-slate-400 shrink-0 min-w-[65px]">
+                                    {item.icon}
+                                    <span className="text-[10px] font-black uppercase tracking-tight">{item.label}</span>
+                                </div>
+                                <p className="text-xs font-bold text-slate-700 truncate">
+                                    {item.value || <span className="text-slate-300 font-medium italic">미기재</span>}
+                                </p>
                             </div>
+                        ))}
+                    </div>
+
+                    {manufacturer.Description && (
+                        <div className="bg-slate-50/50 rounded-xl p-3 border border-slate-100/50 mt-1">
+                            <p className="text-xs text-slate-500 font-medium leading-relaxed italic">" {manufacturer.Description} "</p>
                         </div>
-                        <div className="overflow-y-auto p-3 space-y-2">
-                            {filteredParts.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-16 text-slate-300">
-                                    <Package size={36} strokeWidth={1} className="mb-2" />
-                                    <p className="text-sm font-bold text-slate-400">{partSearch ? '검색 결과 없음' : '등록된 부품 없음'}</p>
-                                </div>
-                            ) : filteredParts.map(part => (
-                                <div key={part.id} className="bg-slate-50 hover:bg-blue-50/50 border border-slate-200 hover:border-blue-200 rounded-xl p-3 transition-all">
-                                    <div className="flex items-start gap-2">
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${part.Lifecycle === 'Active' ? 'bg-emerald-100 text-emerald-700' : part.Lifecycle === 'Obsolete' ? 'bg-rose-100 text-rose-700' : 'bg-orange-100 text-orange-700'}`}>
-                                                    {part.Lifecycle === 'Active' ? '양산' : part.Lifecycle === 'Obsolete' ? '단종' : '개발'}
-                                                </span>
-                                                <span className="text-[10px] font-mono font-bold text-slate-400">{part.PartID}</span>
-                                            </div>
-                                            <p className="text-sm font-black text-slate-800 truncate">{part.Name}</p>
-                                            {part.Spec && <p className="text-[11px] text-slate-500 mt-0.5 truncate">{part.Spec}</p>}
-                                            {part.UnitPrice > 0 && (
-                                                <p className="text-[10px] text-emerald-600 font-black mt-1">
-                                                    {Number(part.UnitPrice).toLocaleString()} {part.Currency || 'KRW'}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
+                    )}
+                </div>
+
+                {/* Parts List Section */}
+                <div className="bg-slate-50/50 min-h-full">
+                    <div className="p-4 flex items-center justify-between shrink-0 bg-white border-b border-slate-100">
+                        <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                            <Package size={16} className="text-indigo-600" /> 납품 부품 ({relatedParts.length})
+                        </h3>
+                    </div>
+                    
+                    <div className="p-4 pb-0 shrink-0">
+                        <div className="relative">
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input type="text" value={partSearch} onChange={e => setPartSearch(e.target.value)}
+                                className="w-full pl-8 pr-3 py-2 text-xs font-bold bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-400/30"
+                                placeholder="부품명, Part ID 검색..." />
                         </div>
                     </div>
-                )}
+
+                    <div className="p-4 space-y-0.5">
+                        {filteredParts.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-10 text-slate-300">
+                                <Package size={32} strokeWidth={1} className="mb-2" />
+                                <p className="text-xs font-bold text-slate-400">{partSearch ? '검색 결과 없음' : '등록된 부품 없음'}</p>
+                            </div>
+                        ) : filteredParts.map(part => (
+                            <div key={part.id} className="flex items-center gap-2 px-2 py-2 hover:bg-white rounded-md transition-colors group cursor-default border-b border-slate-50 last:border-0">
+                                <div className={`w-1 h-4 rounded-full shrink-0 ${part.Lifecycle === 'Active' ? 'bg-emerald-400' : part.Lifecycle === 'Obsolete' ? 'bg-rose-400' : 'bg-orange-400'}`} />
+                                <div className="flex-1 min-w-0 flex items-center gap-3">
+                                    <span className="text-xs font-mono font-bold text-slate-400 group-hover:text-blue-600 transition-colors shrink-0 w-[85px]">{part.PartID}</span>
+                                    <p className="text-[13px] font-bold text-slate-800 truncate flex-1">{part.Name}</p>
+                                    {part.Spec && (
+                                        <p className="text-[11px] text-slate-500 truncate w-32 text-right">{part.Spec}</p>
+                                    )}
+                                    {part.UnitPrice > 0 && (
+                                        <p className="text-[11px] text-slate-900 font-black shrink-0 w-20 text-right">
+                                            {Number(part.UnitPrice).toLocaleString()}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
         </div>
     );

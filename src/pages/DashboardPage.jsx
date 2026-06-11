@@ -21,6 +21,7 @@ import ProjectProgressWidget from '../components/dashboard/widgets/ProjectProgre
 import LowInventoryWidget from '../components/dashboard/widgets/LowInventoryWidget';
 import PendingPOWidget from '../components/dashboard/widgets/PendingPOWidget';
 import AttendanceWidget from '../components/dashboard/widgets/AttendanceWidget';
+import PartWaitingPRWidget from '../components/dashboard/widgets/PartWaitingPRWidget';
 import TextWidget from '../components/dashboard/widgets/TextWidget';
 import DynamicListWidget from '../components/dashboard/widgets/DynamicListWidget';
 
@@ -33,6 +34,7 @@ const WIDGET_MAP = {
     'project': { component: ProjectProgressWidget, title: '프로젝트 공정 현황', defaultSize: { w: 8, h: 10 } },
     'inventory': { component: LowInventoryWidget, title: '재고 부족 알림', defaultSize: { w: 4, h: 10 } },
     'purchase': { component: PendingPOWidget, title: '발주/입고 대기 현황', defaultSize: { w: 4, h: 10 } },
+    'part-waiting': { component: PartWaitingPRWidget, title: '자재 대기 PR', defaultSize: { w: 4, h: 10 } },
     'attendance': { component: AttendanceWidget, title: '오늘의 근태 현황', defaultSize: { w: 4, h: 8 } },
     'text': { component: TextWidget, title: '텍스트 메모', defaultSize: { w: 4, h: 4 } },
     'dynamic-list': { component: DynamicListWidget, title: '사용자 정의 리스트', defaultSize: { w: 4, h: 8 } }

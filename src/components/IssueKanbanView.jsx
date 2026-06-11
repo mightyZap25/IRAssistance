@@ -289,7 +289,7 @@ export default function IssueKanbanView({
             onDragEnd={handleDragEnd}
             onDragCancel={handleDragCancel}
         >
-            <div className="flex gap-4 overflow-x-auto pb-4 h-full items-start">
+            <div className="flex gap-4 overflow-x-auto pb-2 h-full items-start custom-scrollbar">
                 {KANBAN_COLUMNS.map(col => {
                     const colIssues = issues.filter(i => col.statuses.includes(i.Status));
                     return (

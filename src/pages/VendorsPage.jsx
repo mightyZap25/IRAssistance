@@ -6,7 +6,7 @@ import MasterDataGrid from '../components/common/MasterDataGrid';
 import {
     Plus, X, Briefcase, MapPin, AlignLeft, Phone, Mail, User, Package,
     Tag, ChevronRight, Search, Loader2, ArrowDownCircle, ArrowUpCircle,
-    ShoppingCart, FileText, History, RefreshCw
+    ShoppingCart, FileText, History, RefreshCw, Trash2
 } from 'lucide-react';
 import RoleGuard from '../components/common/RoleGuard';
 import { USER_ROLES } from '../services/userService';
@@ -25,32 +25,87 @@ const VENDOR_COLUMN_DEFS = {
 
 /* ─────────────────────────────── Modal ─────────────────────────────── */
 const VendorModal = ({ isOpen, onClose, targetData, onSave }) => {
-    const [formData, setFormData] = useState({ Name: '', Category: '부품공급', ContactPerson: '', Phone: '', Email: '', Address: '' });
+    const [formData, setFormData] = useState({ 
+        Name: '', 
+        Category: '부품공급', 
+        Address: '',
+        Contacts: [{ name: '', title: '', phone: '', email: '' }]
+    });
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        setFormData(targetData
-            ? { Name: targetData.Name || '', Category: targetData.Category || '부품공급', ContactPerson: targetData.ContactPerson || '', Phone: targetData.Phone || '', Email: targetData.Email || '', Address: targetData.Address || '' }
-            : { Name: '', Category: '부품공급', ContactPerson: '', Phone: '', Email: '', Address: '' }
-        );
+        if (targetData) {
+            setFormData({
+                Name: targetData.Name || '',
+                Category: targetData.Category || '부품공급',
+                Address: targetData.Address || '',
+                Contacts: targetData.Contacts && targetData.Contacts.length > 0 
+                    ? targetData.Contacts 
+                    : [{ 
+                        name: targetData.ContactPerson || '', 
+                        title: '담당자',
+                        phone: targetData.Phone || '', 
+                        email: targetData.Email || '' 
+                      }]
+            });
+        } else {
+            setFormData({ 
+                Name: '', 
+                Category: '부품공급', 
+                Address: '', 
+                Contacts: [{ name: '', title: '', phone: '', email: '' }] 
+            });
+        }
     }, [targetData, isOpen]);
 
     if (!isOpen) return null;
+
+    const handleContactChange = (index, field, value) => {
+        const newContacts = [...formData.Contacts];
+        newContacts[index][field] = value;
+        setFormData({ ...formData, Contacts: newContacts });
+    };
+
+    const addContact = () => {
+        setFormData({
+            ...formData,
+            Contacts: [...formData.Contacts, { name: '', title: '', phone: '', email: '' }]
+        });
+    };
+
+    const removeContact = (index) => {
+        if (formData.Contacts.length <= 1) return;
+        setFormData({
+            ...formData,
+            Contacts: formData.Contacts.filter((_, i) => i !== index)
+        });
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!formData.Name.trim()) return alert('업체명을 입력해주세요.');
         setLoading(true);
-        try { await onSave(formData, targetData); onClose(); }
-        catch { alert('저장 실패'); }
+        try { 
+            // 호환성을 위해 첫 번째 담당자 정보를 최상위 필드에도 복사
+            const primary = formData.Contacts[0] || {};
+            const payload = {
+                ...formData,
+                ContactPerson: primary.name || '',
+                Phone: primary.phone || '',
+                Email: primary.email || ''
+            };
+            await onSave(payload, targetData); 
+            onClose(); 
+        }
+        catch (err) { console.error(err); alert('저장 실패'); }
         finally { setLoading(false); }
     };
 
-    const Input = ({ ...props }) => <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-teal-500 transition-all" {...props} />;
+    const Input = ({ ...props }) => <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-teal-500 transition-all placeholder:text-slate-300 placeholder:font-normal" {...props} />;
 
     return (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[300] flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="bg-white rounded-2xl w-full max-w-3xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
                 <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50 shrink-0">
                     <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
                         <Briefcase size={20} className="text-teal-600" />
@@ -58,28 +113,54 @@ const VendorModal = ({ isOpen, onClose, targetData, onSave }) => {
                     </h2>
                     <button onClick={onClose} className="p-2 rounded-xl text-slate-400 hover:bg-slate-100"><X size={16} /></button>
                 </div>
-                <form onSubmit={handleSubmit} className="p-5 flex-1 overflow-y-auto space-y-4">
+                <form onSubmit={handleSubmit} className="p-6 flex-1 overflow-y-auto space-y-6">
+                    <div className="grid grid-cols-3 gap-4">
+                        <div className="col-span-2 space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">업체명 <span className="text-rose-500">*</span></label>
+                            <Input value={formData.Name} onChange={e => setFormData(p => ({ ...p, Name: e.target.value }))} placeholder="예: (주)한국테크" required />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">유형</label>
+                            <select value={formData.Category} onChange={e => setFormData(p => ({ ...p, Category: e.target.value }))} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-teal-500">
+                                {VENDOR_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                        </div>
+                    </div>
+
                     <div className="space-y-1.5">
-                        <label className="text-xs font-black text-slate-700">업체명 <span className="text-rose-500">*</span></label>
-                        <Input value={formData.Name} onChange={e => setFormData(p => ({ ...p, Name: e.target.value }))} placeholder="예: (주)한국테크" required />
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">사업장 주소</label>
+                        <Input value={formData.Address} onChange={e => setFormData(p => ({ ...p, Address: e.target.value }))} placeholder="전체 주소 입력" />
                     </div>
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-black text-slate-700">유형</label>
-                        <select value={formData.Category} onChange={e => setFormData(p => ({ ...p, Category: e.target.value }))} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-teal-500">
-                            {VENDOR_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
+
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between px-1">
+                            <label className="text-[10px] font-black text-teal-600 uppercase tracking-widest">Contact Persons (담당자 리스트)</label>
+                            <button type="button" onClick={addContact} className="text-[10px] font-black text-teal-600 hover:bg-teal-50 px-2 py-1 rounded-lg border border-teal-100 flex items-center gap-1 transition-colors">
+                                <Plus size={10} /> 담당자 추가
+                            </button>
+                        </div>
+                        <div className="space-y-2">
+                            {formData.Contacts.map((contact, idx) => (
+                                <div key={idx} className="flex items-center gap-2 group">
+                                    <div className="flex-1 grid grid-cols-4 gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100 group-hover:border-teal-100 transition-colors">
+                                        <input className="bg-transparent px-2 py-1 text-xs font-bold text-slate-800 outline-none border-r border-slate-200" placeholder="이름" value={contact.name} onChange={e => handleContactChange(idx, 'name', e.target.value)} />
+                                        <input className="bg-transparent px-2 py-1 text-xs font-bold text-slate-800 outline-none border-r border-slate-200" placeholder="직급 (예: 과장)" value={contact.title} onChange={e => handleContactChange(idx, 'title', e.target.value)} />
+                                        <input className="bg-transparent px-2 py-1 text-xs font-bold text-slate-800 outline-none border-r border-slate-200 font-mono" placeholder="전화번호" value={contact.phone} onChange={e => handleContactChange(idx, 'phone', e.target.value)} />
+                                        <input className="bg-transparent px-2 py-1 text-xs font-bold text-slate-800 outline-none" placeholder="이메일" value={contact.email} onChange={e => handleContactChange(idx, 'email', e.target.value)} />
+                                    </div>
+                                    <button type="button" onClick={() => removeContact(idx)} className={`p-2 text-slate-300 hover:text-rose-500 transition-colors ${formData.Contacts.length <= 1 ? 'invisible' : ''}`}>
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5"><label className="text-xs font-black text-slate-700">담당자</label><Input value={formData.ContactPerson} onChange={e => setFormData(p => ({ ...p, ContactPerson: e.target.value }))} placeholder="담당자명" /></div>
-                        <div className="space-y-1.5"><label className="text-xs font-black text-slate-700">전화번호</label><Input value={formData.Phone} onChange={e => setFormData(p => ({ ...p, Phone: e.target.value }))} placeholder="02-000-0000" /></div>
-                    </div>
-                    <div className="space-y-1.5"><label className="text-xs font-black text-slate-700">이메일</label><Input type="email" value={formData.Email} onChange={e => setFormData(p => ({ ...p, Email: e.target.value }))} placeholder="contact@company.com" /></div>
-                    <div className="space-y-1.5"><label className="text-xs font-black text-slate-700">주소</label><Input value={formData.Address} onChange={e => setFormData(p => ({ ...p, Address: e.target.value }))} placeholder="사업장 주소" /></div>
-                    <div className="flex justify-end gap-2 pt-2">
-                        <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl text-xs font-black text-slate-600 bg-slate-100 hover:bg-slate-200">취소</button>
-                        <button type="submit" disabled={loading} className="px-5 py-2 rounded-xl text-xs font-black text-white bg-teal-600 hover:bg-teal-700 shadow-md disabled:opacity-50 flex items-center gap-2">
-                            {loading && <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-                            {targetData ? '수정 저장' : '등록 완료'}
+
+                    <div className="flex justify-end gap-2 pt-4 border-t border-slate-50">
+                        <button type="button" onClick={onClose} className="px-5 py-2.5 rounded-xl text-xs font-black text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors">취소</button>
+                        <button type="submit" disabled={loading} className="px-6 py-2.5 rounded-xl text-xs font-black text-white bg-teal-600 hover:bg-teal-700 shadow-lg shadow-teal-200 disabled:opacity-50 flex items-center gap-2 transition-all active:scale-95">
+                            {loading && <Loader2 size={14} className="animate-spin" />}
+                            {targetData ? '수정 내용 저장' : '공급업체 등록'}
                         </button>
                     </div>
                 </form>
@@ -117,81 +198,31 @@ const VendorDetailPanel = ({ vendor, onClose, onEdit, allParts }) => {
         );
     }, [relatedParts, partSearch]);
 
-    // 거래 이력 로드 (탭 클릭 시 지연 로드)
+    // 거래 이력 로드
     const loadHistory = async () => {
         if (historyLoaded || historyLoading) return;
         setHistoryLoading(true);
         try {
             const name = vendor.Name?.trim();
             const nameLower = name.toLowerCase();
-
-            // 발주서(purchasing) - VendorName 필드
-            const poSnap = await getDocs(
-                query(collection(db, 'purchasing'), orderBy('CreatedAt', 'desc'), limit(50))
-            );
-            const poItems = [];
-            poSnap.forEach(d => {
-                const data = d.data();
-                if ((data.VendorName || '').toLowerCase() === nameLower) {
-                    poItems.push({ id: d.id, type: 'PO', ...data });
-                }
-            });
-
-            // 입출고 내역(transactions) - CustomerName 필드
-            const txSnap = await getDocs(
-                query(collection(db, 'transactions'), orderBy('Date', 'desc'), limit(100))
-            );
-            const txItems = [];
-            txSnap.forEach(d => {
-                const data = d.data();
-                if ((data.CustomerName || '').toLowerCase() === nameLower) {
-                    txItems.push({ id: d.id, type: 'TX', ...data });
-                }
-            });
-
-            // 견적(quotations)
-            const quotSnap = await getDocs(
-                query(collection(db, 'quotations'), orderBy('createdAt', 'desc'), limit(50))
-            );
-            const quotItems = [];
-            quotSnap.forEach(d => {
-                const data = d.data();
-                if ((data.vendorName || data.VendorName || '').toLowerCase() === nameLower) {
-                    quotItems.push({ id: d.id, type: 'QUOT', ...data });
-                }
-            });
-
-            // 시간순 정렬 (최신순)
-            const allHistory = [...poItems, ...txItems, ...quotItems].sort((a, b) => {
-                const getTs = item => {
-                    const v = item.CreatedAt || item.Date || item.createdAt;
-                    if (!v) return 0;
-                    if (v?.seconds) return v.seconds;
-                    if (v instanceof Date) return v.getTime() / 1000;
-                    return new Date(v).getTime() / 1000;
-                };
+            const poSnap = await getDocs(query(collection(db, 'purchasing'), orderBy('CreatedAt', 'desc'), limit(50)));
+            const poItems = []; poSnap.forEach(d => { if ((d.data().VendorName || '').toLowerCase() === nameLower) poItems.push({ id: d.id, type: 'PO', ...d.data() }); });
+            const txSnap = await getDocs(query(collection(db, 'transactions'), orderBy('Date', 'desc'), limit(100)));
+            const txItems = []; txSnap.forEach(d => { if ((d.data().CustomerName || '').toLowerCase() === nameLower) txItems.push({ id: d.id, type: 'TX', ...d.data() }); });
+            const quotSnap = await getDocs(query(collection(db, 'quotations'), orderBy('createdAt', 'desc'), limit(50)));
+            const quotItems = []; quotSnap.forEach(d => { if ((d.data().vendorName || d.data().VendorName || '').toLowerCase() === nameLower) quotItems.push({ id: d.id, type: 'QUOT', ...d.data() }); });
+            setHistory([...poItems, ...txItems, ...quotItems].sort((a, b) => {
+                const getTs = item => { const v = item.CreatedAt || item.Date || item.createdAt; return v?.seconds ? v.seconds : new Date(v || 0).getTime() / 1000; };
                 return getTs(b) - getTs(a);
-            });
-            setHistory(allHistory);
+            }));
             setHistoryLoaded(true);
-        } catch (err) {
-            console.error('거래이력 로드 오류:', err);
-        } finally {
-            setHistoryLoading(false);
-        }
+        } catch (err) { console.error('History load error:', err); }
+        finally { setHistoryLoading(false); }
     };
 
-    useEffect(() => {
-        // vendor 변경 시 이력 리셋
-        setHistory([]);
-        setHistoryLoaded(false);
-        setTab('info');
-    }, [vendor?.id]);
+    useEffect(() => { setHistory([]); setHistoryLoaded(false); setTab('info'); }, [vendor?.id]);
 
-    const handleTabChange = (key) => {
-        setTab(key);
-        if (key === 'history') loadHistory();
-    };
+    const handleTabChange = (key) => { setTab(key); if (key === 'history') loadHistory(); };
 
     if (!vendor) return null;
 
@@ -215,9 +246,7 @@ const VendorDetailPanel = ({ vendor, onClose, onEdit, allParts }) => {
             <div className={`bg-gradient-to-r ${catColor} p-4 text-white shrink-0`}>
                 <div className="flex justify-between items-start">
                     <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center">
-                            <Briefcase size={22} />
-                        </div>
+                        <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center"><Briefcase size={22} /></div>
                         <div>
                             <div className="flex items-center gap-2 mb-0.5">
                                 <span className="px-2 py-0.5 bg-white/20 rounded text-[10px] font-black">{vendor.Category || '기타'}</span>
@@ -226,17 +255,15 @@ const VendorDetailPanel = ({ vendor, onClose, onEdit, allParts }) => {
                         </div>
                     </div>
                     <div className="flex items-center gap-1">
-                        <button onClick={() => onEdit(vendor)} className="p-1.5 hover:bg-white/20 rounded-lg text-xs font-black flex items-center gap-1 px-2">
-                            <AlignLeft size={13} /> 수정
-                        </button>
+                        <button onClick={() => onEdit(vendor)} className="p-1.5 hover:bg-white/20 rounded-lg text-xs font-black flex items-center gap-1 px-2"><AlignLeft size={13} /> 수정</button>
                         <button onClick={onClose} className="p-1.5 hover:bg-white/20 rounded-lg"><X size={16} /></button>
                     </div>
                 </div>
                 {/* Tabs */}
-                <div className="flex gap-1 mt-3 overflow-x-auto">
+                <div className="flex gap-1 mt-3 overflow-x-auto custom-scrollbar-none">
                     {tabs.map(t => (
                         <button key={t.key} onClick={() => handleTabChange(t.key)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black whitespace-nowrap transition-all ${tab === t.key ? 'bg-white text-teal-700' : 'text-white/70 hover:bg-white/20'}`}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black whitespace-nowrap transition-all ${tab === t.key ? 'bg-white text-teal-700 shadow-sm' : 'text-white/70 hover:bg-white/20'}`}
                         >
                             {t.icon} {t.label}
                         </button>
@@ -244,218 +271,114 @@ const VendorDetailPanel = ({ vendor, onClose, onEdit, allParts }) => {
                 </div>
             </div>
 
-            {/* Content */}
+            {/* Content Area */}
             <div className="flex-1 overflow-y-auto">
-
-                {/* ── 기본 정보 탭 ── */}
+                {/* 1. Info Tab */}
                 {tab === 'info' && (
-                    <div className="p-5 space-y-4">
-                        {/* Stats */}
-                        <div className="grid grid-cols-3 gap-2">
-                            <div className="bg-teal-50 border border-teal-100 rounded-xl p-3 text-center">
-                                <div className="text-xl font-black text-teal-700">{relatedParts.length}</div>
-                                <div className="text-[10px] font-black text-teal-400 uppercase tracking-wider">납품 부품</div>
-                            </div>
-                            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-center">
-                                <div className="text-xl font-black text-blue-700">{relatedParts.filter(p => p.Lifecycle === 'Active').length}</div>
-                                <div className="text-[10px] font-black text-blue-400 uppercase tracking-wider">양산 중</div>
-                            </div>
-                            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-center">
-                                <div className="text-xl font-black text-emerald-700">-</div>
-                                <div className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">발주 건수</div>
+                    <div className="p-5 space-y-6">
+                        <div className="space-y-2">
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Company Info</h3>
+                            <div className="flex items-center gap-3 p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                                <div className="flex items-center gap-2 shrink-0 w-[140px]">
+                                    <Briefcase size={14} className="text-teal-600" />
+                                    <span className="text-xs font-black text-slate-800 truncate">{vendor.Name}</span>
+                                </div>
+                                <div className="w-px h-3 bg-slate-200 shrink-0"></div>
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <MapPin size={13} className="text-slate-400" />
+                                    <p className="text-xs font-bold text-slate-500 truncate">{vendor.Address || '주소 정보 없음'}</p>
+                                </div>
                             </div>
                         </div>
 
-                        {/* Info Fields */}
-                        <div className="space-y-0.5">
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3">담당자 및 연락처</h3>
-                            {[
-                                { icon: <User size={15} className="text-slate-400" />, label: '담당자', value: vendor.ContactPerson },
-                                { icon: <Phone size={15} className="text-slate-400" />, label: '전화번호', value: vendor.Phone, isPhone: true },
-                                { icon: <Mail size={15} className="text-slate-400" />, label: '이메일', value: vendor.Email, isEmail: true },
-                            ].map((item, i) => (
-                                <div key={i} className="flex items-center gap-3 py-2.5 border-b border-slate-100">
-                                    <div className="shrink-0">{item.icon}</div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{item.label}</p>
-                                        {item.value ? (
-                                            item.isPhone ? <a href={`tel:${item.value}`} className="text-sm font-bold text-teal-600 hover:underline">{item.value}</a> :
-                                            item.isEmail ? <a href={`mailto:${item.value}`} className="text-sm font-bold text-teal-600 hover:underline truncate block">{item.value}</a> :
-                                            <p className="text-sm font-bold text-slate-800">{item.value}</p>
-                                        ) : (
-                                            <p className="text-sm text-slate-300 italic">미기재</p>
-                                        )}
-                                    </div>
+                        <div className="space-y-2">
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Primary Contact</h3>
+                            <div className="flex items-center gap-4 p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
+                                <div className="flex items-center gap-2 w-[120px] shrink-0">
+                                    <User size={14} className="text-teal-600" />
+                                    <span className="text-xs font-black text-slate-800 truncate">{vendor.ContactPerson || '담당자 미상'}</span>
                                 </div>
-                            ))}
+                                <div className="w-px h-3 bg-slate-100 shrink-0"></div>
+                                <div className="flex items-center gap-2 w-[130px] shrink-0">
+                                    <Phone size={13} className="text-slate-300" />
+                                    <span className="text-xs font-bold text-slate-600 font-mono">{vendor.Phone || '-'}</span>
+                                </div>
+                                <div className="w-px h-3 bg-slate-100 shrink-0"></div>
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <Mail size={13} className="text-slate-300" />
+                                    <span className="text-xs font-bold text-slate-500 truncate">{vendor.Email || '-'}</span>
+                                </div>
+                            </div>
+                        </div>
 
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3 mt-4">업체 정보</h3>
-                            {[
-                                { icon: <MapPin size={15} className="text-slate-400" />, label: '주소', value: vendor.Address },
-                                { icon: <Briefcase size={15} className="text-slate-400" />, label: '유형', value: vendor.Category },
-                            ].map((item, i) => (
-                                <div key={i} className="flex items-start gap-3 py-2.5 border-b border-slate-100 last:border-0">
-                                    <div className="mt-0.5 shrink-0">{item.icon}</div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{item.label}</p>
-                                        <p className="text-sm font-bold text-slate-800 mt-0.5 break-words">{item.value || <span className="text-slate-300 italic">미기재</span>}</p>
-                                    </div>
-                                </div>
-                            ))}
+                        <div className="grid grid-cols-2 gap-3 px-1">
+                            <div className="bg-teal-50 border border-teal-100 rounded-xl p-3">
+                                <div className="text-[10px] font-black text-teal-400 uppercase tracking-widest mb-1">납품 품목</div>
+                                <div className="text-xl font-black text-teal-700">{relatedParts.length}</div>
+                            </div>
+                            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                                <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">양산 부품</div>
+                                <div className="text-xl font-black text-blue-700">{relatedParts.filter(p => p.Lifecycle === 'Active').length}</div>
+                            </div>
                         </div>
                     </div>
                 )}
 
-                {/* ── 납품 부품 탭 ── */}
+                {/* 2. Parts Tab */}
                 {tab === 'parts' && (
-                    <div className="flex flex-col">
-                        <div className="px-4 py-3 border-b border-slate-100">
+                    <div className="flex flex-col h-full bg-slate-50/30">
+                        <div className="px-4 py-3 border-b border-slate-100 bg-white sticky top-0 z-10">
                             <div className="relative">
                                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                 <input type="text" value={partSearch} onChange={e => setPartSearch(e.target.value)}
                                     className="w-full pl-8 pr-3 py-2 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-teal-400/30"
-                                    placeholder="부품명, Part ID, 규격 검색..." />
+                                    placeholder="부품명, Part ID 검색..." />
                             </div>
                         </div>
-                        <div className="p-3 space-y-2">
+                        <div className="p-4 space-y-0.5">
                             {filteredParts.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-16 text-slate-300">
-                                    <Package size={36} strokeWidth={1} className="mb-2" />
-                                    <p className="text-sm font-bold text-slate-400">{partSearch ? '검색 결과 없음' : '납품 등록 부품 없음'}</p>
-                                    <p className="text-xs text-slate-300 mt-1">{!partSearch && 'Parts의 Maker 또는 Supplier 필드에 업체명을 등록하세요'}</p>
+                                <div className="flex flex-col items-center justify-center py-10 text-slate-300">
+                                    <Package size={32} strokeWidth={1} className="mb-2" />
+                                    <p className="text-xs font-bold text-slate-400">데이터가 없습니다.</p>
                                 </div>
-                            ) : filteredParts.map(part => {
-                                const matchedField = (part.Maker || '').toLowerCase() === vendor.Name.toLowerCase() ? 'Maker' : 'Supplier';
-                                return (
-                                    <div key={part.id} className="bg-slate-50 hover:bg-teal-50/50 border border-slate-200 hover:border-teal-200 rounded-xl p-3 transition-all">
-                                        <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${part.Lifecycle === 'Active' ? 'bg-emerald-100 text-emerald-700' : part.Lifecycle === 'Obsolete' ? 'bg-rose-100 text-rose-700' : 'bg-orange-100 text-orange-700'}`}>
-                                                {part.Lifecycle === 'Active' ? '양산' : part.Lifecycle === 'Obsolete' ? '단종' : '개발'}
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-teal-50 text-teal-600 border border-teal-100">{matchedField}</span>
-                                            <span className="text-[10px] font-mono font-bold text-slate-400">{part.PartID}</span>
-                                        </div>
-                                        <p className="text-sm font-black text-slate-800 truncate">{part.Name}</p>
-                                        {part.Spec && <p className="text-[11px] text-slate-500 mt-0.5 truncate">{part.Spec}</p>}
-                                        <div className="flex items-center gap-3 mt-1.5">
-                                            {part.Category && <span className="text-[10px] text-slate-400 font-bold flex items-center gap-1"><Tag size={10} />{part.Category.split('(')[0].trim()}</span>}
-                                            {part.Manufacturer && <span className="text-[10px] text-indigo-500 font-bold">제조: {part.Manufacturer}</span>}
-                                            {part.UnitPrice > 0 && <span className="text-[10px] text-emerald-600 font-black">{Number(part.UnitPrice).toLocaleString()} {part.Currency || 'KRW'}</span>}
-                                        </div>
+                            ) : filteredParts.map(part => (
+                                <div key={part.id} className="flex items-center gap-2 px-2 py-2.5 hover:bg-white rounded-lg transition-colors group cursor-default border-b border-slate-50 last:border-0 bg-white/40">
+                                    <div className={`w-1 h-4 rounded-full shrink-0 ${part.Lifecycle === 'Active' ? 'bg-emerald-400' : part.Lifecycle === 'Obsolete' ? 'bg-rose-400' : 'bg-orange-400'}`} />
+                                    <div className="flex-1 min-w-0 flex items-center gap-3">
+                                        <span className="text-xs font-mono font-bold text-slate-400 group-hover:text-teal-600 transition-colors shrink-0 w-[85px]">{part.PartID}</span>
+                                        <p className="text-[13px] font-bold text-slate-800 truncate flex-1">{part.Name}</p>
+                                        {part.Spec && <p className="text-[11px] text-slate-500 truncate w-32 text-right">{part.Spec}</p>}
+                                        {part.UnitPrice > 0 && <p className="text-[11px] text-slate-900 font-black shrink-0 w-20 text-right">{Number(part.UnitPrice).toLocaleString()}</p>}
                                     </div>
-                                );
-                            })}
+                                </div>
+                            ))}
                         </div>
                     </div>
                 )}
 
-                {/* ── 거래 이력 탭 ── */}
+                {/* 3. History Tab */}
                 {tab === 'history' && (
-                    <div className="flex flex-col">
+                    <div className="flex flex-col p-4 space-y-2">
                         {historyLoading ? (
-                            <div className="flex items-center justify-center py-16 gap-2 text-slate-400">
-                                <Loader2 size={20} className="animate-spin" />
-                                <span className="text-sm font-bold">거래 이력 로드 중...</span>
-                            </div>
+                            <div className="py-20 flex justify-center"><Loader2 size={24} className="animate-spin text-slate-300" /></div>
                         ) : history.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 text-slate-300">
-                                <History size={36} strokeWidth={1} className="mb-2" />
-                                <p className="text-sm font-bold text-slate-400">거래 이력 없음</p>
-                                <p className="text-xs text-slate-300 mt-1">발주서, 입출고, 견적 내역이 없습니다</p>
+                            <div className="py-20 text-center text-slate-300 font-bold text-xs uppercase tracking-widest">거래 내역이 없습니다.</div>
+                        ) : history.map((item, i) => (
+                            <div key={item.id + i} className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:border-teal-100 transition-colors">
+                                <div className="flex justify-between items-start mb-2">
+                                    <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${item.type === 'PO' ? 'bg-blue-50 text-blue-600' : item.type === 'TX' ? 'bg-orange-50 text-orange-600' : 'bg-amber-50 text-amber-600'}`}>
+                                        {item.type}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-slate-400">{formatDate(item.CreatedAt || item.Date || item.createdAt)}</span>
+                                </div>
+                                <h4 className="text-sm font-black text-slate-800 truncate">{item.PartName || item.PONumber || item.Subject}</h4>
+                                <div className="flex items-center gap-3 mt-2 text-[11px] font-bold text-slate-500">
+                                    {item.type === 'TX' && <span>{item.Type === 'In' ? '입고' : '출고'} {(item.Quantity || 0).toLocaleString()} EA</span>}
+                                    {item.type === 'PO' && <span>{(item.Qty || 0).toLocaleString()} EA | ₩{(item.TotalPrice || 0).toLocaleString()}</span>}
+                                    {item.Status && <span className="ml-auto text-teal-600 uppercase text-[10px]">{item.Status}</span>}
+                                </div>
                             </div>
-                        ) : (
-                            <div className="p-3 space-y-2">
-                                {history.map((item, i) => {
-                                    if (item.type === 'PO') {
-                                        const statusColors = {
-                                            ORDERING: 'bg-blue-100 text-blue-700',
-                                            WAITING_DELIVERY: 'bg-amber-100 text-amber-700',
-                                            RECEIVED: 'bg-slate-100 text-slate-600',
-                                            INSPECTION_COMPLETE: 'bg-teal-100 text-teal-700',
-                                        };
-                                        const statusLabel = { ORDERING: '발주중', WAITING_DELIVERY: '입고대기', RECEIVED: '적재완료', INSPECTION_COMPLETE: '검사완료' };
-                                        return (
-                                            <div key={item.id + i} className="bg-white border border-slate-200 rounded-xl p-3 hover:border-indigo-200 hover:bg-indigo-50/30 transition-all">
-                                                <div className="flex items-start gap-2">
-                                                    <div className="w-8 h-8 bg-indigo-100 rounded-xl flex items-center justify-center shrink-0">
-                                                        <ShoppingCart size={15} className="text-indigo-600" />
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2 justify-between">
-                                                            <span className="text-xs font-black text-slate-800 font-mono">{item.PONumber}</span>
-                                                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${statusColors[item.Status] || 'bg-slate-100 text-slate-600'}`}>
-                                                                {statusLabel[item.Status] || item.Status}
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-sm font-bold text-slate-700 mt-0.5 truncate">{item.PartName}</p>
-                                                        <div className="flex items-center gap-3 mt-1">
-                                                            <span className="text-[10px] text-slate-400 font-bold">수량: {(item.Qty || 0).toLocaleString()} EA</span>
-                                                            {item.TotalPrice > 0 && <span className="text-[10px] text-emerald-600 font-black">₩{(item.TotalPrice || 0).toLocaleString()}</span>}
-                                                            <span className="text-[10px] text-slate-400 ml-auto">{formatDate(item.CreatedAt)}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    }
-
-                                    if (item.type === 'TX') {
-                                        const isIn = item.Type === 'In';
-                                        return (
-                                            <div key={item.id + i} className="bg-white border border-slate-200 rounded-xl p-3 hover:border-blue-200 hover:bg-blue-50/30 transition-all">
-                                                <div className="flex items-start gap-2">
-                                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${isIn ? 'bg-blue-100' : 'bg-orange-100'}`}>
-                                                        {isIn ? <ArrowDownCircle size={15} className="text-blue-600" /> : <ArrowUpCircle size={15} className="text-orange-600" />}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center justify-between">
-                                                            <span className={`text-xs font-black ${isIn ? 'text-blue-600' : 'text-orange-600'}`}>
-                                                                {isIn ? '입고' : '출고'} {isIn ? '+' : '-'}{(item.Quantity || 0).toLocaleString()} EA
-                                                            </span>
-                                                            <span className="text-[10px] text-slate-400">{formatDate(item.Date)}</span>
-                                                        </div>
-                                                        <p className="text-sm font-bold text-slate-700 mt-0.5">
-                                                            [{item.PartID}] {item.PartName || item.PartID}
-                                                        </p>
-                                                        <div className="flex items-center gap-3 mt-1">
-                                                            {item.LotNumber && <span className="text-[10px] font-mono text-slate-400">LOT: {item.LotNumber}</span>}
-                                                            {item.Reason && <span className="text-[10px] text-slate-500 truncate">{item.Reason}</span>}
-                                                        </div>
-                                                        {item.RefDoc && (
-                                                            <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded mt-1 inline-block">{item.RefDoc}</span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    }
-
-                                    if (item.type === 'QUOT') {
-                                        return (
-                                            <div key={item.id + i} className="bg-white border border-slate-200 rounded-xl p-3 hover:border-amber-200 hover:bg-amber-50/30 transition-all">
-                                                <div className="flex items-start gap-2">
-                                                    <div className="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
-                                                        <FileText size={15} className="text-amber-600" />
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="text-xs font-black text-amber-700">견적 요청</span>
-                                                            <span className="text-[10px] text-slate-400">{formatDate(item.createdAt || item.CreatedAt)}</span>
-                                                        </div>
-                                                        <p className="text-sm font-bold text-slate-700 mt-0.5 truncate">{item.partName || item.PartName || '품목 정보 없음'}</p>
-                                                        {item.Status && (
-                                                            <span className="mt-1 inline-block text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">{item.Status}</span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    }
-
-                                    return null;
-                                })}
-                            </div>
-                        )}
+                        ))}
                     </div>
                 )}
             </div>

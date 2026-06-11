@@ -107,6 +107,13 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
         setPartIdPreview('[자동 생성 대기]');
     }, [formData.Category, formData.Class, formData.PartTypeCode, formData.Rev, isEdit]);
 
+    // QA Settings State
+    const [qaSettings, setQaSettings] = useState({
+        isTarget: false,
+        useDocument: false,
+        inspectionItems: []
+    });
+
     useEffect(() => {
         async function loadPartsForSubs() {
             try {
@@ -123,7 +130,27 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                 console.error("Failed to load parts for substitutes:", err);
             }
         }
+        
+        async function loadQaSettings() {
+            if (isEdit && initialData?.id) {
+                try {
+                    const qaDoc = await getDoc(doc(db, 'qa_target_parts', initialData.id));
+                    if (qaDoc.exists()) {
+                        const data = qaDoc.data();
+                        setQaSettings({
+                            isTarget: true,
+                            useDocument: data.useDocument || false,
+                            inspectionItems: data.inspectionItems || []
+                        });
+                    }
+                } catch (e) {
+                    console.error("Failed to load QA settings:", e);
+                }
+            }
+        }
+
         loadPartsForSubs();
+        loadQaSettings();
         fetchCustomFields();
 
         if (isEdit && initialData) {
@@ -305,9 +332,11 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
             if (isEdit) {
                 const batch = writeBatch(db);
                 const partRef = doc(db, 'parts', initialData.id);
+                const qaRef = doc(db, 'qa_target_parts', initialData.id);
+
                 if (isRevisionUp) {
                     const newRev = getNextRevision(formData.Rev);
-                    const newPartID = formData.PartID; // 리비전을 덧붙이지 않고 원본 ID를 그대로 유지
+                    const newPartID = formData.PartID; 
 
                     const newPartData = { 
                         ...formData, 
@@ -319,9 +348,39 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                     delete newPartData.id;
                     batch.set(doc(db, 'parts', newPartID), newPartData);
                     batch.update(partRef, { IsLatestRevision: false });
+                    
+                    // QA Settings Sync
+                    if (qaSettings.isTarget) {
+                        batch.set(qaRef, {
+                            partId: newPartID,
+                            partName: formData.Name,
+                            spec: formData.Spec || '',
+                            useDocument: qaSettings.useDocument,
+                            inspectionItems: qaSettings.inspectionItems,
+                            updatedAt: new Date()
+                        });
+                    } else {
+                        batch.delete(qaRef);
+                    }
+                    
                     await batch.commit();
                 } else {
                     batch.update(partRef, formData);
+                    
+                    // QA Settings Sync
+                    if (qaSettings.isTarget) {
+                        batch.set(qaRef, {
+                            partId: initialData.PartID,
+                            partName: formData.Name,
+                            spec: formData.Spec || '',
+                            useDocument: qaSettings.useDocument,
+                            inspectionItems: qaSettings.inspectionItems,
+                            updatedAt: new Date()
+                        });
+                    } else {
+                        batch.delete(qaRef);
+                    }
+                    
                     await batch.commit();
                 }
                 // 공급사/제조사 자동 등록 (편집 후)
@@ -402,6 +461,19 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                     
                     transaction.set(newDocRef, finalPartData);
                     transaction.set(counterRef, { ...countersData, [prefix]: nextSeqNum }, { merge: true });
+
+                    // QA Settings Sync (New Part)
+                    if (qaSettings.isTarget) {
+                        const qaRef = doc(db, 'qa_target_parts', newPartID);
+                        transaction.set(qaRef, {
+                            partId: newPartID,
+                            partName: formData.Name,
+                            spec: formData.Spec || '',
+                            useDocument: qaSettings.useDocument,
+                            inspectionItems: qaSettings.inspectionItems,
+                            updatedAt: new Date()
+                        });
+                    }
                 });
                 // 공급사/제조사 자동 등록 (신규 등록 후)
                 try { await autoRegisterFromPart(formData); } catch (e) { console.warn('[AutoReg] 공급사/제조사 자동 등록 오류(무시):', e); }
@@ -872,6 +944,92 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                                 {visibleFields.map(label => renderDynamicField(label))}
                             </div>
                         </div>
+                    </div>
+
+                    {/* Section 5: QA & Quality Standards */}
+                    <div className="bg-slate-50/50 p-4 rounded-3xl border border-slate-100 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h3 className={sectionTitleClass}><ShieldCheck size={14} className="text-teal-600" /> QA & Quality Standards (수입검사 기준)</h3>
+                            <button 
+                                type="button" 
+                                onClick={() => setQaSettings(p => ({ ...p, isTarget: !p.isTarget }))}
+                                className={`px-4 py-1.5 rounded-xl text-[10px] font-black transition-all border ${qaSettings.isTarget ? 'bg-teal-600 border-teal-600 text-white shadow-lg shadow-teal-100' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'}`}
+                            >
+                                {qaSettings.isTarget ? '✓ 수입검사 대상 품목' : '수입검사 미대상'}
+                            </button>
+                        </div>
+
+                        {qaSettings.isTarget && (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in slide-in-from-top-2">
+                                {/* Doc Replacement Toggle */}
+                                <div className="lg:col-span-2">
+                                    <label className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-2xl cursor-pointer hover:bg-teal-50/30 transition-all group">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={qaSettings.useDocument}
+                                            onChange={e => setQaSettings(p => ({ ...p, useDocument: e.target.checked }))}
+                                            className="w-5 h-5 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                                        />
+                                        <div className="flex flex-col">
+                                            <span className="text-[11px] font-black text-slate-800 group-hover:text-teal-600 transition-colors">도면 또는 Datasheet/Specsheet로 대체</span>
+                                            <span className="text-[9px] font-bold text-slate-400">개별 검사 항목 대신 첨부된 문서를 기준으로 검사합니다.</span>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                {!qaSettings.useDocument && (
+                                    <div className="lg:col-span-2 space-y-3">
+                                        <div className="flex items-center justify-between px-1">
+                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">세부 검사항목 및 기준값</span>
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setQaSettings(p => ({ ...p, inspectionItems: [...p.inspectionItems, { id: Date.now(), name: '', standard: '' }] }))}
+                                                className="flex items-center gap-1.5 px-3 py-1 bg-white border border-teal-200 text-teal-600 rounded-lg text-[10px] font-black hover:bg-teal-50 transition-all"
+                                            >
+                                                <Plus size={12} /> 항목 추가
+                                            </button>
+                                        </div>
+
+                                        {qaSettings.inspectionItems.length === 0 ? (
+                                            <div className="py-8 bg-white border border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center text-slate-350">
+                                                <ClipboardList size={24} className="mb-2 opacity-30" />
+                                                <p className="text-[10px] font-bold">등록된 검사 항목이 없습니다.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {qaSettings.inspectionItems.map(item => (
+                                                    <div key={item.id} className="flex gap-2 animate-in slide-in-from-left-1">
+                                                        <div className="flex-1 grid grid-cols-2 gap-2 bg-white border border-slate-200 p-2 rounded-xl">
+                                                            <input 
+                                                                type="text" 
+                                                                placeholder="검사항목 (예: 외관)" 
+                                                                value={item.name}
+                                                                onChange={e => setQaSettings(p => ({ ...p, inspectionItems: p.inspectionItems.map(i => i.id === item.id ? { ...i, name: e.target.value } : i) }))}
+                                                                className="w-full bg-transparent text-[11px] font-bold text-slate-700 outline-none"
+                                                            />
+                                                            <input 
+                                                                type="text" 
+                                                                placeholder="기준값 (예: 스크래치 없을 것)" 
+                                                                value={item.standard}
+                                                                onChange={e => setQaSettings(p => ({ ...p, inspectionItems: p.inspectionItems.map(i => i.id === item.id ? { ...i, standard: e.target.value } : i) }))}
+                                                                className="w-full bg-transparent text-[11px] font-bold text-slate-700 outline-none border-l border-slate-100 pl-2"
+                                                            />
+                                                        </div>
+                                                        <button 
+                                                            type="button" 
+                                                            onClick={() => setQaSettings(p => ({ ...p, inspectionItems: p.inspectionItems.filter(i => i.id !== item.id) }))}
+                                                            className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Section 6: Documentation & Notes */}

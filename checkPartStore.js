@@ -1,4 +1,4 @@
-import { initializeApp } from "firebase/app";
+ㄴ 텟mport { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, getDocs } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -30,7 +30,7 @@ async function check() {
             "IREAB1007", "IREIB1007",
             "IREAB1014", "IREIB1014"
         ];
-        
+
         for (const id of list) {
             const ref = doc(db, 'parts', id);
             const snap = await getDoc(ref);

@@ -431,12 +431,12 @@ export default function MasterDataGrid({
             {/* Header control block (Integrated Search / Filters / View Mode Toggle) */}
             {(enableSearch || enableFilter || enableViewModeToggle) ? (
                 <div className="px-5 py-3 flex flex-col gap-3 flex-none border-b border-slate-100 dark:border-slate-800/50 bg-white/40 dark:bg-slate-900/40 z-30 relative">
-                    <div className="flex gap-4 items-center justify-between">
+                    <div className="flex flex-wrap gap-4 items-center justify-between">
                         
                         {/* Left: Search & Total Count */}
-                        <div className="flex gap-5 items-center flex-1">
+                        <div className="flex flex-wrap gap-4 items-center flex-1 min-w-0">
                             {enableSearch && (
-                                <div className="relative w-64 md:w-80">
+                                <div className="relative min-w-[200px] max-w-sm flex-1">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                                     <input
                                         type="text"
@@ -448,28 +448,29 @@ export default function MasterDataGrid({
                                 </div>
                             )}
                             <div className="text-xs text-slate-450 font-bold whitespace-nowrap">
-                                총 <span className="text-indigo-650 dark:text-indigo-400 font-black">{finalFilteredData.length}</span>건 조회됨
+                                총 <span className="text-indigo-650 dark:text-indigo-400 font-black">{finalFilteredData.length}</span>건
                             </div>
                         </div>
 
                         {/* Right: Action Controls */}
-                        <div className="flex gap-2.5 items-center justify-end">
+                        <div className="flex flex-wrap gap-2 items-center justify-end ml-auto">
                             {extraHeaderActions}
                             
                             {enableFilter && (
                                 <button
                                     onClick={() => setIsFilterOpen(!isFilterOpen)}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg font-black text-xs transition-all ${isFilterOpen || activeFilters.length > 0 ? 'bg-indigo-50 text-indigo-600 border-indigo-200/70' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-50 shadow-sm'}`}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg font-black text-xs transition-all whitespace-nowrap ${isFilterOpen || activeFilters.length > 0 ? 'bg-indigo-50 text-indigo-600 border-indigo-200/70' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-50 shadow-sm'}`}
                                 >
                                     <SlidersHorizontal size={13} />
-                                    <span>고급 필터 {activeFilters.length > 0 ? `(${activeFilters.length})` : ''}</span>
+                                    <span className="hidden sm:inline">고급 필터</span>
+                                    {activeFilters.length > 0 && <span className="bg-indigo-600 text-white px-1.5 py-0.5 rounded-full text-[9px]">{activeFilters.length}</span>}
                                 </button>
                             )}
 
                             {columnSelectorUI}
 
                             {enableViewModeToggle && (
-                                <div className="flex bg-slate-100/80 dark:bg-slate-800/60 p-0.5 rounded-lg border border-slate-200/50 shadow-sm">
+                                <div className="flex bg-slate-100/80 dark:bg-slate-800/60 p-0.5 rounded-lg border border-slate-200/50 shadow-sm shrink-0">
                                     <button
                                         onClick={() => onViewModeChange('card')}
                                         className={`p-1.5 rounded transition-all ${viewMode === 'card' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm border border-slate-200/50' : 'text-slate-400 hover:text-slate-700'}`}

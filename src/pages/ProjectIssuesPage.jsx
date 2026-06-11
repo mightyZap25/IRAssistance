@@ -225,7 +225,7 @@ export default function ProjectIssuesPage() {
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 bg-slate-50/30">
+                <div className={`flex-1 ${viewMode === 'kanban' ? 'overflow-hidden' : 'overflow-y-auto'} p-4 bg-slate-50/30`}>
                     {loading ? <div className="flex items-center justify-center h-full"><RefreshCw className="animate-spin text-indigo-600" size={24} /></div> : filteredIssues.length === 0 ? <div className="flex flex-col items-center justify-center h-full text-slate-300"><p className="text-xs font-black">데이터가 없습니다.</p></div> : 
                         viewMode === 'list' ? <MondayBoard tasks={filteredIssues} onSelect={setSelectedIssue} onUpdateTask={handleUpdateIssue} onAddTask={() => setIsCreateOpen(true)} /> : 
                         viewMode === 'kanban' ? <IssueKanbanView issues={filteredIssues} allCategories={allCategories} STATUS_MAP={STATUS_MAP} PRIORITY_MAP={PRIORITY_MAP} KANBAN_COLUMNS={KANBAN_COLUMNS} userProfile={userProfile} onSelect={setSelectedIssue} onStatusChange={(id, ns, ps) => handleUpdateIssue(id, { Status: ns }, { previousStatus: ps, newStatus: ns, message: `칸반 이동: ${ps} ➔ ${ns}` })} /> :
@@ -267,51 +267,225 @@ function IssueDetailPanel({ isOpen, onClose, issue, users, userProfile, currentU
     const [editForm, setEditForm] = useState({ TargetDept: '', AssigneeUid: '', Priority: '', Difficulty: '', DueDate: '', AnalysisNotes: '', ResolutionNotes: '', LinkedECNId: '', Documents: [] });
     const [newComment, setNewComment] = useState('');
     const [loading, setLoading] = useState(false);
-    useEffect(() => { if (isOpen && issue) setEditForm({ TargetDept: issue.TargetDept || '개발', AssigneeUid: issue.AssigneeUid || '', Priority: issue.Priority || 'Medium', Difficulty: issue.Difficulty || 'Medium', DueDate: issue.DueDate || '', AnalysisNotes: issue.AnalysisNotes || '', ResolutionNotes: issue.ResolutionNotes || '', LinkedECNId: issue.LinkedECNId || '', Documents: issue.Documents || [] }); }, [isOpen, issue]);
+    const [activeTab, setActiveTab] = useState('info'); // 'info', 'erp', 'history'
+
+    useEffect(() => { 
+        if (isOpen && issue) {
+            setEditForm({ 
+                TargetDept: issue.TargetDept || '개발', 
+                AssigneeUid: issue.AssigneeUid || '', 
+                Priority: issue.Priority || 'Medium', 
+                Difficulty: issue.Difficulty || 'Medium', 
+                DueDate: issue.DueDate || '', 
+                AnalysisNotes: issue.AnalysisNotes || '', 
+                ResolutionNotes: issue.ResolutionNotes || '', 
+                LinkedECNId: issue.LinkedECNId || '', 
+                Documents: issue.Documents || [] 
+            });
+            setActiveTab('info');
+        }
+    }, [isOpen, issue]);
+
     if (!isOpen || !issue) return null;
+
     const deptMembers = users.filter(u => u.department === editForm.TargetDept);
-    const handleSave = async () => { setLoading(true); const assignee = users.find(u => u.uid === editForm.AssigneeUid); await onUpdateIssue(issue.id, { ...editForm, AssigneeName: assignee ? assignee.name : '' }, { previousStatus: '수정', newStatus: '수정됨' }); setLoading(false); alert("저장됨"); };
-    const handleStatus = async (ns, sn) => { setLoading(true); const assignee = users.find(u => u.uid === editForm.AssigneeUid); await onUpdateIssue(issue.id, { Status: ns, ...editForm, AssigneeName: assignee ? assignee.name : '' }, { previousStatus: issue.Status, newStatus: ns, message: `상태 변경: ${ns} (${sn})` }); setLoading(false); };
-    const handleCommentSubmit = async (e) => { e.preventDefault(); if (!newComment.trim()) return; await onAddComment(issue.id, newComment.trim()); setNewComment(''); };
+
+    const handleSave = async () => { 
+        setLoading(true); 
+        const assignee = users.find(u => u.uid === editForm.AssigneeUid); 
+        await onUpdateIssue(issue.id, { ...editForm, AssigneeName: assignee ? assignee.name : '' }, { previousStatus: '수정', newStatus: '수정됨' }); 
+        setLoading(false); 
+        alert("저장됨"); 
+    };
+
+    const handleStatus = async (ns, sn) => { 
+        setLoading(true); 
+        const assignee = users.find(u => u.uid === editForm.AssigneeUid); 
+        await onUpdateIssue(issue.id, { Status: ns, ...editForm, AssigneeName: assignee ? assignee.name : '' }, { previousStatus: issue.Status, newStatus: ns, message: `상태 변경: ${ns} (${sn})` }); 
+        setLoading(false); 
+    };
+
+    const handleCommentSubmit = async (e) => { 
+        e.preventDefault(); 
+        if (!newComment.trim()) return; 
+        await onAddComment(issue.id, newComment.trim()); 
+        setNewComment(''); 
+    };
+
     return createPortal(
-        <div className='relative z-[9999]'><div className='fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-[140]' onClick={onClose} />
-            <div className='fixed inset-y-0 right-0 w-full md:w-[500px] bg-slate-50 shadow-2xl z-[150] flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-300'>
-                <div className='bg-white px-5 py-4 border-b border-slate-200 flex justify-between items-start shrink-0'>
+        <div className='relative z-[9999]'>
+            <div className='fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-[140]' onClick={onClose} />
+            <div className='fixed inset-y-0 right-0 w-full md:w-[520px] bg-slate-50 shadow-2xl z-[150] flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-300'>
+                {/* Header */}
+                <div className='bg-white px-6 py-5 border-b border-slate-200 flex justify-between items-start shrink-0 text-left'>
                     <div>
-                        <div className='flex gap-1.5 mb-1'><span className={`px-2 py-0.5 rounded-full text-[9px] font-black border ${allCategories[issue.Category]?.color}`}>{allCategories[issue.Category]?.label}</span><span className={`px-2 py-0.5 rounded-full text-[9px] font-black border ${STATUS_MAP[issue.Status]?.color}`}>{STATUS_MAP[issue.Status]?.label}</span></div>
-                        <h2 className='text-sm font-black text-slate-900'>{issue.Title}</h2>
-                    </div>
-                    <button onClick={onClose} className='p-1.5 text-slate-400 hover:text-slate-700'><X size={18}/></button>
-                </div>
-                <div className='flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar'>
-                    <div className='bg-white border border-slate-200 rounded-xl p-4 space-y-3'>
-                        <div className='flex items-center gap-2 text-slate-400 border-b border-slate-50 pb-2'><FileText size={14}/><span className='text-[10px] font-black uppercase tracking-widest'>Description</span></div>
-                        <div className='text-xs text-slate-700 leading-relaxed whitespace-pre-wrap'>{issue.Description}</div>
-                        {(issue.TargetProductName) && <div className='pt-2 border-t border-slate-50'><span className='text-[9px] font-bold text-slate-400 uppercase mr-2'>Product</span><span className='text-xs font-black text-indigo-600 border-b-2 border-indigo-100'>{issue.TargetProductName}</span></div>}
-                    </div>
-                    <div className='bg-white border border-slate-200 rounded-xl p-4 space-y-4'>
-                        <div className='flex items-center gap-2 text-slate-400 border-b border-slate-50 pb-2'><Users size={14}/><span className='text-[10px] font-black uppercase tracking-widest'>Management</span></div>
-                        <div className='grid grid-cols-2 gap-3'>
-                            <select value={editForm.TargetDept} onChange={e => setEditForm({...editForm, TargetDept: e.target.value, AssigneeUid: ''})} className='w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold'>{DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}</select>
-                            <select value={editForm.AssigneeUid} onChange={e => setEditForm({...editForm, AssigneeUid: e.target.value})} className='w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold'><option value=''>미지정</option>{deptMembers.map(u => <option key={u.uid} value={u.uid}>{u.name}</option>)}</select>
+                        <div className='flex gap-1.5 mb-1.5'>
+                            <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-black border ${allCategories[issue.Category]?.color}`}>
+                                {allCategories[issue.Category]?.label}
+                            </span>
+                            <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-black border ${STATUS_MAP[issue.Status]?.color}`}>
+                                {STATUS_MAP[issue.Status]?.label}
+                            </span>
                         </div>
-                        <div className='flex gap-2'>{issue.Status === 'Pending' && <button onClick={() => handleStatus('InProgress', '시작')} className='flex-1 bg-indigo-600 text-white text-[10px] py-2 rounded-lg font-black'>START WORK</button>}{issue.Status === 'InProgress' && <button onClick={() => handleStatus('Resolved', '완료')} className='flex-1 bg-emerald-600 text-white text-[10px] py-2 rounded-lg font-black'>COMPLETE</button>}</div>
+                        <h2 className='text-lg font-black text-slate-900 tracking-tight'>{issue.Title}</h2>
                     </div>
-                    <div className='bg-white border border-slate-200 rounded-xl p-4 space-y-4'>
-                        <div className='flex items-center gap-2 text-slate-400 border-b border-slate-100 pb-2'><FileText size={14}/><span className='text-[10px] font-black uppercase tracking-widest'>Report</span></div>
-                        <textarea rows={3} value={editForm.AnalysisNotes} onChange={e => setEditForm({...editForm, AnalysisNotes: e.target.value})} placeholder='원인 분석...' className='w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none' />
-                        <textarea rows={3} value={editForm.ResolutionNotes} onChange={e => setEditForm({...editForm, ResolutionNotes: e.target.value})} placeholder='조치 결과...' className='w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none' />
-                        <div className='flex gap-2'><select value={editForm.LinkedECNId} onChange={e => setEditForm({...editForm, LinkedECNId: e.target.value})} className='flex-1 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] font-black'><option value=''>LINK ECN...</option>{ecnList.map(e => <option key={e.id} value={e.id}>{e.Title}</option>)}</select>{editForm.LinkedECNId && <a href={`/ecn?id=${editForm.LinkedECNId}`} target='_blank' rel='noreferrer' className='p-2 bg-slate-100 rounded-lg'><ExternalLink size={14}/></a>}</div>
-                        <button onClick={handleSave} disabled={loading} className='w-full bg-slate-900 text-white py-2 rounded-lg text-[10px] font-black uppercase'>{loading ? 'SAVING...' : 'Save Changes'}</button>
-                    </div>
-                    <div className='bg-white border border-slate-200 rounded-xl p-4 space-y-3 mb-4'>
-                        <div className='flex items-center gap-2 text-slate-400 border-b border-slate-100 pb-2'><MessageSquare size={14} /><span className='text-[10px] font-black uppercase tracking-widest'>Feedback</span></div>
-                        <form onSubmit={handleCommentSubmit} className='flex gap-2 mb-3'>
-                            <input type='text' placeholder='의견...' value={newComment} onChange={e => setNewComment(e.target.value)} className='flex-1 bg-slate-50 border border-slate-100 rounded-lg px-3 py-1.5 text-xs outline-none' />
-                            <button type='submit' className='px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black'>POST</button>
-                        </form>
-                        <div className='space-y-1.5 max-h-[200px] overflow-y-auto pr-1 custom-scrollbar'>{(() => { const list = []; (issue.Comments || []).forEach(c => list.push({ type: 'comment', ...c, date: new Date(c.timestamp) })); (issue.History || []).forEach(h => list.push({ type: 'history', author: h.updatedBy, text: h.message, date: new Date(h.timestamp) })); list.sort((a, b) => b.date - a.date); return list.map((item, idx) => ( <div key={idx} className={`p-2 rounded-lg border ${item.type === 'comment' ? 'bg-white border-slate-50' : 'bg-slate-50/50 border-transparent text-slate-400'}`}><div className='flex justify-between items-center mb-0.5 font-black text-[9px]'><span>{item.author}</span><span>{item.date.toLocaleDateString()}</span></div><p className='text-[10px] font-medium leading-snug'>{item.text}</p></div> )); })()}</div>
-                    </div>
+                    <button onClick={onClose} className='p-2 text-slate-400 hover:text-slate-700 bg-slate-50 rounded-xl transition-colors'><X size={20}/></button>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex border-b border-slate-200 bg-white shrink-0 px-2">
+                    {[
+                        { id: 'info', label: '상세 정보', icon: ClipboardList },
+                        { id: 'erp', label: 'ERP 연동', icon: Package },
+                        { id: 'history', label: '활동 이력', icon: History }
+                    ].map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-xs font-black transition-all border-b-2 ${
+                                activeTab === tab.id 
+                                    ? 'border-indigo-600 text-indigo-600 bg-indigo-50/30' 
+                                    : 'border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+                            }`}
+                        >
+                            <tab.icon size={14} />
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+
+                <div className='flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar text-left'>
+                    {activeTab === 'info' && (
+                        <>
+                            <div className='bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm'>
+                                <div className='flex items-center gap-2 text-slate-400 border-b border-slate-50 pb-2'>
+                                    <FileText size={14}/><span className='text-[10px] font-black uppercase tracking-widest'>Description</span>
+                                </div>
+                                <div className='text-sm text-slate-700 leading-relaxed whitespace-pre-wrap font-medium'>{issue.Description}</div>
+                                {issue.TargetProductName && (
+                                    <div className='pt-3 border-t border-slate-50 flex items-center justify-between'>
+                                        <span className='text-[10px] font-black text-slate-400 uppercase tracking-tighter'>Target Product</span>
+                                        <span className='text-xs font-black text-indigo-600 px-2 py-1 bg-indigo-50 rounded-lg'>{issue.TargetProductName}</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className='bg-white border border-slate-200 rounded-2xl p-5 space-y-5 shadow-sm'>
+                                <div className='flex items-center gap-2 text-slate-400 border-b border-slate-50 pb-2'>
+                                    <Users size={14}/><span className='text-[10px] font-black uppercase tracking-widest'>Management & Workflow</span>
+                                </div>
+                                <div className='grid grid-cols-2 gap-4'>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase ml-1">배정 부서</label>
+                                        <select value={editForm.TargetDept} onChange={e => setEditForm({...editForm, TargetDept: e.target.value, AssigneeUid: ''})} className='w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all'>{DEPARTMENTS.map(d => <option key={d} value={d}>{d}부서</option>)}</select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase ml-1">담당자</label>
+                                        <select value={editForm.AssigneeUid} onChange={e => setEditForm({...editForm, AssigneeUid: e.target.value})} className='w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all'><option value=''>미지정</option>{deptMembers.map(u => <option key={u.uid} value={u.uid}>{u.name}</option>)}</select>
+                                    </div>
+                                </div>
+                                <div className='flex gap-3 pt-2'>
+                                    {issue.Status === 'Pending' && <button onClick={() => handleStatus('InProgress', '시작')} className='flex-1 bg-indigo-600 text-white text-xs py-3 rounded-xl font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all'>작업 시작 (START)</button>}
+                                    {issue.Status === 'InProgress' && <button onClick={() => handleStatus('Resolved', '완료')} className='flex-1 bg-emerald-600 text-white text-xs py-3 rounded-xl font-black shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all'>조치 완료 (RESOLVE)</button>}
+                                    {['Resolved', 'Rejected', 'Archived'].includes(issue.Status) && <button onClick={() => handleStatus('InProgress', '재개')} className='flex-1 bg-slate-800 text-white text-xs py-3 rounded-xl font-black hover:bg-slate-900 transition-all'>다시 시작 (REOPEN)</button>}
+                                </div>
+                            </div>
+
+                            <div className='bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm'>
+                                <div className='flex items-center gap-2 text-slate-400 border-b border-slate-100 pb-2'>
+                                    <FileText size={14}/><span className='text-[10px] font-black uppercase tracking-widest'>Analysis & Resolution Report</span>
+                                </div>
+                                <div className="space-y-3">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase ml-1">원인 분석 (Root Cause)</label>
+                                        <textarea rows={3} value={editForm.AnalysisNotes} onChange={e => setEditForm({...editForm, AnalysisNotes: e.target.value})} placeholder='원인 및 현상 분석 내용을 입력하세요...' className='w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-medium outline-none focus:ring-2 focus:ring-indigo-500 transition-all' />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase ml-1">조치 결과 (Resolution)</label>
+                                        <textarea rows={3} value={editForm.ResolutionNotes} onChange={e => setEditForm({...editForm, ResolutionNotes: e.target.value})} placeholder='최종 조치 결과 및 재발 방지 대책을 입력하세요...' className='w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-medium outline-none focus:ring-2 focus:ring-indigo-500 transition-all' />
+                                    </div>
+                                </div>
+                                <button onClick={handleSave} disabled={loading} className='w-full bg-slate-900 text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-md'>{loading ? 'SAVING...' : 'Save Detailed Report'}</button>
+                            </div>
+                        </>
+                    )}
+
+                    {activeTab === 'erp' && (
+                        <div className="space-y-4">
+                            <div className='bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm'>
+                                <div className='flex items-center gap-2 text-slate-400 border-b border-slate-100 pb-2'>
+                                    <Layers size={14}/><span className='text-[10px] font-black uppercase tracking-widest'>Linked ERP Data</span>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase mb-2">연관 설계 변경 (ECN)</p>
+                                        <div className='flex gap-2'>
+                                            <select value={editForm.LinkedECNId} onChange={e => setEditForm({...editForm, LinkedECNId: e.target.value})} className='flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-black outline-none'>
+                                                <option value=''>연관 ECN 선택...</option>
+                                                {ecnList.map(e => <option key={e.id} value={e.id}>[{e.ECNNumber}] {e.Title}</option>)}
+                                            </select>
+                                            {editForm.LinkedECNId && (
+                                                <button onClick={() => window.open(`/ecn?id=${editForm.LinkedECNId}`, '_blank')} className='p-2 bg-white border border-slate-200 rounded-xl text-indigo-600 hover:bg-indigo-50 transition-colors shadow-sm'>
+                                                    <ExternalLink size={16}/>
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="p-4 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center py-10 text-slate-400">
+                                        <Package size={24} className="mb-2 opacity-20" />
+                                        <p className="text-xs font-black">품목 재고 및 생산 정보</p>
+                                        <p className="text-[10px] font-bold mt-1">이슈와 연관된 품목의 실시간 데이터를 불러옵니다.</p>
+                                        <button className="mt-4 px-4 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black hover:bg-slate-200 transition-colors">데이터 동기화</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className='bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm'>
+                                <div className='flex items-center gap-2 text-slate-400 border-b border-slate-100 pb-2'>
+                                    <Bookmark size={14}/><span className='text-[10px] font-black uppercase tracking-widest'>Attachments & Checklists</span>
+                                </div>
+                                <div className="border-2 border-dashed border-slate-100 rounded-xl p-8 text-center hover:bg-slate-50 transition-colors cursor-pointer group">
+                                    <Plus size={20} className="mx-auto mb-2 text-slate-300 group-hover:text-indigo-500" />
+                                    <p className="text-[10px] font-black text-slate-400 group-hover:text-slate-600">파일을 드래그하거나 클릭하여 업로드</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'history' && (
+                        <div className="space-y-4">
+                            <div className='bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm'>
+                                <div className='flex items-center gap-2 text-slate-400 border-b border-slate-100 pb-2'>
+                                    <MessageSquare size={14} /><span className='text-[10px] font-black uppercase tracking-widest'>Team Collaboration</span>
+                                </div>
+                                <form onSubmit={handleCommentSubmit} className='flex gap-2'>
+                                    <input type='text' placeholder='의견이나 피드백을 입력하세요...' value={newComment} onChange={e => setNewComment(e.target.value)} className='flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-medium outline-none focus:ring-2 focus:ring-indigo-500' />
+                                    <button type='submit' className='px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black shadow-md hover:bg-indigo-700 transition-all'>POST</button>
+                                </form>
+                                <div className='space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar'>
+                                    {(() => { 
+                                        const list = []; 
+                                        (issue.Comments || []).forEach(c => list.push({ type: 'comment', ...c, date: new Date(c.timestamp) })); 
+                                        (issue.History || []).forEach(h => list.push({ type: 'history', author: h.updatedBy, text: h.message, date: new Date(h.timestamp) })); 
+                                        list.sort((a, b) => b.date - a.date); 
+                                        
+                                        return list.length > 0 ? list.map((item, idx) => ( 
+                                            <div key={idx} className={`p-3 rounded-xl border ${item.type === 'comment' ? 'bg-white border-slate-100 shadow-sm' : 'bg-slate-50/50 border-transparent text-slate-400'}`}>
+                                                <div className='flex justify-between items-center mb-1.5 font-black text-[10px]'>
+                                                    <span className={item.type === 'comment' ? 'text-indigo-600' : ''}>{item.author}</span>
+                                                    <span className="opacity-50 font-bold tabular-nums">{item.date.toLocaleString()}</span>
+                                                </div>
+                                                <p className='text-xs font-bold leading-relaxed text-slate-700'>{item.text}</p>
+                                            </div> 
+                                        )) : (
+                                            <div className="py-10 text-center text-[10px] font-black text-slate-300 uppercase tracking-widest">No Activity Yet</div>
+                                        ); 
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>, document.body

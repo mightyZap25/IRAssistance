@@ -27,7 +27,7 @@ export const getDoc = mockFirestore.getDoc;
 export const setDoc = mockFirestore.setDoc;
 export const addDoc = mockFirestore.addDoc;
 export const deleteDoc = mockFirestore.deleteDoc;
-export const updateDoc = mockFirestore.setDoc; // Set acts as update in local DB
+export const updateDoc = (docRef, data) => mockFirestore.setDoc(docRef, data, { merge: true }); // Ensure update always merges
 export const writeBatch = mockFirestore.writeBatch;
 export const collection = mockFirestore.collection;
 export const getDocs = mockFirestore.getDocs;

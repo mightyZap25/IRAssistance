@@ -29,6 +29,8 @@ import MeetingsPage from './pages/MeetingsPage'
 import LeaveManagementPage from './pages/LeaveManagementPage'
 import QAConfigPage from './pages/QAConfigPage'
 import QAProcessPage from './pages/QAProcessPage'
+import QualityDashboardPage from './pages/QualityDashboardPage'
+import DevelopmentTestingPage from './pages/DevelopmentTestingPage'
 import ProjectDashboardPage from './pages/ProjectDashboardPage'
 import ProjectIssuesPage from './pages/ProjectIssuesPage'
 import TasksPage from './pages/TasksPage'
@@ -159,6 +161,22 @@ function AppContent() {
                 <PrivateRoute>
                     <Layout>
                         <QAProcessPage />
+                    </Layout>
+                </PrivateRoute>
+            } />
+
+            <Route path="/qa/dashboard" element={
+                <PrivateRoute>
+                    <Layout>
+                        <QualityDashboardPage />
+                    </Layout>
+                </PrivateRoute>
+            } />
+
+            <Route path="/qa/dev-testing" element={
+                <PrivateRoute>
+                    <Layout>
+                        <DevelopmentTestingPage />
                     </Layout>
                 </PrivateRoute>
             } />

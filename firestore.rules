@@ -47,7 +47,7 @@ service cloud.firestore {
     }
     match /vendors/{docId} {
       allow read: if isAuthenticated();
-      allow write: if isManagerOrAbove() || hasRole('sales');
+      allow write: if isManagerOrAbove() || hasRole('sales') || hasRole('production');
     }
     match /customers/{docId} {
       allow read: if isAuthenticated();
@@ -55,21 +55,25 @@ service cloud.firestore {
     }
     match /inventory/{docId} {
       allow read: if isAuthenticated();
-      allow write: if isManagerOrAbove() || hasRole('engineer');
+      allow write: if isManagerOrAbove() || hasRole('engineer') || hasRole('production');
     }
     match /transactions/{docId} {
       allow read: if isAuthenticated();
-      allow write: if isManagerOrAbove() || hasRole('sales') || hasRole('engineer');
+      allow write: if isManagerOrAbove() || hasRole('sales') || hasRole('engineer') || hasRole('production');
     }
 
-    // Production (ProductionRequests, receiving, ECN)
-    match /ProductionRequests/{docId} {
+    // Production (production_requests, receiving, ECN, purchasing)
+    match /production_requests/{docId} {
       allow read: if isAuthenticated();
-      allow write: if isManagerOrAbove() || hasRole('sales') || hasRole('engineer');
+      allow write: if isManagerOrAbove() || hasRole('sales') || hasRole('engineer') || hasRole('production');
+    }
+    match /purchasing/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isManagerOrAbove() || hasRole('sales') || hasRole('production');
     }
     match /receiving/{docId} {
       allow read: if isAuthenticated();
-      allow write: if isManagerOrAbove() || hasRole('engineer');
+      allow write: if isManagerOrAbove() || hasRole('engineer') || hasRole('production');
     }
     match /ecn/{docId} {
       allow read: if isAuthenticated();

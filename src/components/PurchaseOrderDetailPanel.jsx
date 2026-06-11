@@ -274,16 +274,41 @@ IR Assistant (주) 드림
                                         <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider text-right">금액 (₩)</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody className="divide-y divide-slate-100">
                                     {items.map(item => (
-                                        <tr key={item.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
-                                            <td className="px-4 py-3 text-xs font-mono font-bold text-indigo-600">{item.PartID}</td>
-                                            <td className="px-4 py-3 text-sm font-bold text-slate-800">{item.PartName}</td>
-                                            <td className="px-4 py-3 text-xs font-medium text-slate-500 text-right">{item.Rev || '-'}</td>
-                                            <td className="px-4 py-3 text-xs font-black text-slate-700 text-right">{item.Qty.toLocaleString()}</td>
-                                            <td className="px-4 py-3 text-xs font-medium text-slate-500 text-right">{item.UnitPrice.toLocaleString()}</td>
-                                            <td className="px-4 py-3 text-xs font-black text-indigo-700 text-right">{(item.Qty * item.UnitPrice).toLocaleString()}</td>
-                                        </tr>
+                                        <React.Fragment key={item.id}>
+                                            <tr className="hover:bg-slate-50/50 transition-colors">
+                                                <td className="px-4 py-3 text-xs font-mono font-bold text-indigo-600">{item.PartID}</td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-sm font-bold text-slate-800">{item.PartName}</span>
+                                                        {item.Schedules && item.Schedules.length > 1 && (
+                                                            <span className="text-[10px] font-black text-indigo-500">분할 {item.Schedules.length}회</span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-xs font-medium text-slate-500 text-right">{item.Rev || '-'}</td>
+                                                <td className="px-4 py-3 text-xs font-black text-slate-700 text-right">{item.Qty.toLocaleString()}</td>
+                                                <td className="px-4 py-3 text-xs font-medium text-slate-500 text-right">{item.UnitPrice.toLocaleString()}</td>
+                                                <td className="px-4 py-3 text-xs font-black text-indigo-700 text-right">{(item.Qty * item.UnitPrice).toLocaleString()}</td>
+                                            </tr>
+                                            {item.Schedules && item.Schedules.length > 0 && (
+                                                <tr className="bg-slate-50/30">
+                                                    <td colSpan="6" className="px-4 py-2 border-b border-slate-100">
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {item.Schedules.map((s, idx) => (
+                                                                <div key={idx} className="flex items-center gap-2 bg-white px-2 py-1 rounded-lg border border-slate-200 text-[10px] font-bold">
+                                                                    <span className="text-slate-400">{idx+1}차:</span>
+                                                                    <span className="text-slate-700">{s.date}</span>
+                                                                    <span className="text-indigo-600">{s.qty} EA</span>
+                                                                    {s.shippedQty > 0 && <span className="text-emerald-500 ml-1">✓ {s.shippedQty}</span>}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </React.Fragment>
                                     ))}
                                 </tbody>
                             </table>

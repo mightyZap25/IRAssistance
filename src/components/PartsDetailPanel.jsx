@@ -89,7 +89,7 @@ function ImpactTreeNode({ node }) {
 export default function PartsDetailPanel({ partId, parts, filteredParts = [], onPartSelect = () => {}, allBoms, onClose, onEdit, onStatusChange, inline = false }) {
     const { userProfile } = useAuth();
     const [activeTab, setActiveTab] = useState('substitutes');
-    const [detailData, setDetailData] = useState({ usedIn: [], transactions: [], history: [], revisions: [], substitutes: [], impactTree: [] });
+    const [detailData, setDetailData] = useState({ usedIn: [], transactions: [], history: [], revisions: [], substitutes: [], impactTree: [], qaStandards: null });
     const [isDetailLoading, setIsDetailLoading] = useState(false);
     const [selectedRevId, setSelectedRevId] = useState(null);
     const [expandedEcnId, setExpandedEcnId] = useState(null);
@@ -209,6 +209,16 @@ export default function PartsDetailPanel({ partId, parts, filteredParts = [], on
             // 7. Derivative Models (Shared BasePartID)
             const derivatives = partSnap.BasePartID ? parts.filter(p => p.BasePartID === partSnap.BasePartID && p.PartID !== partSnap.PartID) : [];
 
+            // 8. QA Standards
+            let qaData = null;
+            const qaDoc = await getDoc(doc(db, 'qa_target_parts', targetId));
+            if (qaDoc.exists()) {
+                qaData = qaDoc.data();
+            } else {
+                const qSnap = await getDocs(query(collection(db, 'qa_target_parts'), where('partId', '==', targetId)));
+                if (!qSnap.empty) qaData = qSnap.docs[0].data();
+            }
+
             setDetailData({
                 usedIn: resolvedUsedIn,
                 transactions: txList,
@@ -216,7 +226,8 @@ export default function PartsDetailPanel({ partId, parts, filteredParts = [], on
                 revisions: revList,
                 substitutes: resolvedSubs,
                 impactTree: impactTreeData,
-                derivatives: derivatives
+                derivatives: derivatives,
+                qaStandards: qaData
             });
 
         } catch (e) {
@@ -574,6 +585,7 @@ export default function PartsDetailPanel({ partId, parts, filteredParts = [], on
                         {/* Interactive HSL Tab Headers */}
                         <div className="flex flex-wrap p-1.5 bg-slate-100 dark:bg-slate-800/40 rounded-2xl mb-4 gap-1 flex-shrink-0">
                             {[
+                                { id: 'qa', label: '품질 기준' },
                                 { id: 'substitutes', label: '대체품' },
                                 { id: 'impact', label: '파급 효과' },
                                 { id: 'derivatives', label: '파생 모델' },
@@ -596,6 +608,87 @@ export default function PartsDetailPanel({ partId, parts, filteredParts = [], on
                             {isDetailLoading && (
                                 <div className="absolute inset-0 bg-white/70 dark:bg-slate-950/70 backdrop-blur-sm z-10 flex items-center justify-center text-slate-500 text-sm font-bold">
                                     Loading details...
+                                </div>
+                            )}
+
+                            {/* QA Standards Tab */}
+                            {activeTab === 'qa' && (
+                                <div className="p-5 flex-1 overflow-y-auto custom-scrollbar">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                                            <ShieldCheck size={16} className="text-teal-600" /> Receiving Inspection Standards
+                                        </h4>
+                                        {detailData.qaStandards?.isTarget && (
+                                            <span className="px-2.5 py-1 bg-teal-100 text-teal-700 text-[9px] font-black rounded-lg border border-teal-200 shadow-sm animate-pulse">
+                                                검사 대상
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {!detailData.qaStandards ? (
+                                        <div className="flex flex-col items-center justify-center py-16 bg-slate-50 dark:bg-slate-900/40 rounded-[2rem] border border-dashed border-slate-200 dark:border-slate-800 text-slate-400">
+                                            <AlertTriangle size={32} className="mb-3 opacity-20" />
+                                            <p className="text-xs font-bold text-slate-500">수입검사 미대상 품목입니다.</p>
+                                            <p className="text-[10px] mt-1 opacity-60">별도의 품질 검사 기준이 정의되지 않았습니다.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-6">
+                                            {/* Summary Banner */}
+                                            <div className="p-5 bg-gradient-to-br from-teal-50 to-teal-100/30 dark:from-teal-950/20 dark:to-teal-900/10 rounded-[2rem] border border-teal-200/50 flex items-center gap-4">
+                                                <div className="w-12 h-12 rounded-2xl bg-white dark:bg-slate-900 flex items-center justify-center text-teal-600 shadow-md">
+                                                    <FileText size={24} />
+                                                </div>
+                                                <div>
+                                                    <div className="text-[10px] font-black text-teal-600 uppercase tracking-widest">검사 방식</div>
+                                                    <div className="text-sm font-black text-slate-800 dark:text-slate-100 mt-0.5">
+                                                        {detailData.qaStandards.useDocument ? '도면 및 Specsheet 기준 검사' : '직접 정의된 검사항목 기준'}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {!detailData.qaStandards.useDocument && (
+                                                <div className="space-y-3">
+                                                    <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] px-1">세부 검사 항목 (Inspection Items)</h5>
+                                                    {detailData.qaStandards.inspectionItems?.length > 0 ? (
+                                                        <div className="bg-white dark:bg-slate-900/60 rounded-2xl border border-slate-150/70 dark:border-slate-850 overflow-hidden shadow-sm">
+                                                            <table className="w-full text-left">
+                                                                <thead>
+                                                                    <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
+                                                                        <th className="px-4 py-2.5 text-[9px] font-black text-slate-400 uppercase tracking-tighter">검사 항목</th>
+                                                                        <th className="px-4 py-2.5 text-[9px] font-black text-slate-400 uppercase tracking-tighter text-right">기준값 (Spec)</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                                                                    {detailData.qaStandards.inspectionItems.map((item, idx) => (
+                                                                        <tr key={idx} className="hover:bg-teal-50/10 transition-colors">
+                                                                            <td className="px-4 py-3 text-[11px] font-black text-slate-700 dark:text-slate-300">{item.name}</td>
+                                                                            <td className="px-4 py-3 text-[11px] font-bold text-teal-600 dark:text-teal-400 text-right">{item.standard}</td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="p-8 text-center bg-slate-50 dark:bg-slate-900/40 rounded-2xl border border-slate-100 dark:border-slate-800 text-[10px] font-bold text-slate-400 italic">
+                                                            정의된 세부 항목이 없습니다.
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                            
+                                            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-blue-500 flex items-center justify-center">
+                                                    <Clock size={16} />
+                                                </div>
+                                                <div>
+                                                    <div className="text-[9px] font-black text-slate-400 uppercase">최종 기준 업데이트</div>
+                                                    <div className="text-[10px] font-bold text-slate-600 dark:text-slate-400">
+                                                        {detailData.qaStandards.updatedAt ? (detailData.qaStandards.updatedAt.seconds ? new Date(detailData.qaStandards.updatedAt.seconds * 1000).toLocaleString() : new Date(detailData.qaStandards.updatedAt).toLocaleString()) : '-'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
