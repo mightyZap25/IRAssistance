@@ -40,11 +40,21 @@ export default function SettingsPage() {
     });
 
     const [dbSettings, setDbSettings] = useState({
-        host: '',
-        port: '15432',
-        user: '',
-        password: '',
-        database: ''
+        currentProfile: 'local',
+        local: {
+            host: '',
+            port: '15432',
+            user: '',
+            password: '',
+            database: ''
+        },
+        remote: {
+            host: '',
+            port: '15432',
+            user: '',
+            password: '',
+            database: ''
+        }
     });
     const [dbTesting, setDbTesting] = useState(false);
     const [dbSaving, setDbSaving] = useState(false);
@@ -54,13 +64,23 @@ export default function SettingsPage() {
             fetch('/api/config/db')
                 .then(res => res.json())
                 .then(data => {
-                    if (data) {
+                    if (data && data.local && data.remote) {
                         setDbSettings({
-                            host: data.host || '',
-                            port: data.port || '15432',
-                            user: data.user || '',
-                            database: data.database || '',
-                            password: ''
+                            currentProfile: data.currentProfile || 'local',
+                            local: {
+                                host: data.local.host || '',
+                                port: data.local.port || '15432',
+                                user: data.local.user || '',
+                                database: data.local.database || '',
+                                password: ''
+                            },
+                            remote: {
+                                host: data.remote.host || '',
+                                port: data.remote.port || '15432',
+                                user: data.remote.user || '',
+                                database: data.remote.database || '',
+                                password: ''
+                            }
                         });
                     }
                 })
@@ -68,13 +88,17 @@ export default function SettingsPage() {
         }
     }, [activeTab]);
 
-    const handleTestDB = async () => {
+    const handleTestDB = async (profileType) => {
         setDbTesting(true);
         try {
+            const targetConfig = dbSettings[profileType];
             const res = await fetch('/api/config/db/test', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(dbSettings)
+                body: JSON.stringify({
+                    ...targetConfig,
+                    profileType
+                })
             });
             
             let result;
@@ -85,9 +109,9 @@ export default function SettingsPage() {
             }
 
             if (res.ok && result.success) {
-                alert('연결 테스트 성공: ' + result.message);
+                alert(`[${profileType === 'local' ? '사내 로컬' : '외부 원격'}] 연결 테스트 성공: ` + result.message);
             } else {
-                alert('연결 테스트 실패: ' + (result?.error || result?.message || '알 수 없는 오류'));
+                alert(`[${profileType === 'local' ? '사내 로컬' : '외부 원격'}] 연결 테스트 실패: ` + (result?.error || result?.message || '알 수 없는 오류'));
             }
         } catch (err) {
             alert('연결 테스트 에러: ' + err.message);
@@ -114,9 +138,27 @@ export default function SettingsPage() {
             }
 
             if (res.ok && result.success) {
-                alert('데이터베이스 설정이 성공적으로 저장 및 적용되었습니다.');
+                alert('설정이 성공적으로 저장되었습니다.');
+                // Refresh settings state from server to update password placeholders securely
+                fetch('/api/config/db')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data && data.local && data.remote) {
+                            setDbSettings({
+                                currentProfile: data.currentProfile || 'local',
+                                local: {
+                                    ...data.local,
+                                    password: '' // Clear input field while holding server side state
+                                },
+                                remote: {
+                                    ...data.remote,
+                                    password: ''
+                                }
+                            });
+                        }
+                    });
             } else {
-                alert('데이터베이스 설정 저장 실패: ' + (result?.error || result?.message || '알 수 없는 오류'));
+                alert('설정 저장 실패: ' + (result?.error || result?.message || '알 수 없는 오류'));
             }
         } catch (err) {
             alert('설정 저장 중 오류가 발생했습니다: ' + err.message);
@@ -223,41 +265,146 @@ export default function SettingsPage() {
                     <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-y-auto p-8 relative">
                         
                         {activeTab === 'database' && (
-                            <div className="max-w-2xl animate-fade-in">
+                            <div className="max-w-3xl animate-fade-in">
                                 <h2 className="text-lg font-black text-slate-900 mb-2">NAS PostgreSQL 데이터베이스 연동 설정</h2>
-                                <p className="text-sm text-slate-500 font-medium mb-8">Synology NAS 등에 설치된 PostgreSQL 데이터베이스와의 실시간 동기화를 설정합니다. 설정을 변경하면 실시간으로 접속 풀이 갱신됩니다.</p>
+                                <p className="text-sm text-slate-500 font-medium mb-6">Synology NAS 등에 설치된 PostgreSQL 데이터베이스와의 실시간 동기화를 설정합니다. 설정을 변경하면 실시간으로 접속 풀이 갱신됩니다.</p>
                                 
-                                <form onSubmit={handleSaveDB} className="space-y-5">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-1.5">
-                                            <label className="text-xs font-black text-slate-700">호스트 IP (Host)</label>
-                                            <input type="text" value={dbSettings.host} onChange={e => setDbSettings({...dbSettings, host: e.target.value})} placeholder="192.168.0.7" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500" required />
+                                <form onSubmit={handleSaveDB} className="space-y-6">
+                                    {/* Profile Switcher */}
+                                    <div className="flex justify-between items-center mb-6">
+                                        <div className="bg-slate-100 p-1.5 rounded-xl flex gap-1 w-fit">
+                                            <button
+                                                type="button"
+                                                onClick={() => setDbSettings({ ...dbSettings, currentProfile: 'local' })}
+                                                className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${dbSettings.currentProfile === 'local' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                                            >
+                                                사내 로컬 접속 Profile
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setDbSettings({ ...dbSettings, currentProfile: 'remote' })}
+                                                className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${dbSettings.currentProfile === 'remote' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                                            >
+                                                외부 원격(Tailscale) 접속 Profile
+                                            </button>
                                         </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-xs font-black text-slate-700">포트 (Port)</label>
-                                            <input type="text" value={dbSettings.port} onChange={e => setDbSettings({...dbSettings, port: e.target.value})} placeholder="15432" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500" required />
+                                        
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setDbSettings({
+                                                    ...dbSettings,
+                                                    remote: {
+                                                        ...dbSettings.local,
+                                                        host: dbSettings.remote.host // Keep remote host
+                                                    }
+                                                })}
+                                                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-all"
+                                            >
+                                                사내 설정을 외부로 복사 📋
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setDbSettings({
+                                                    ...dbSettings,
+                                                    local: {
+                                                        ...dbSettings.remote,
+                                                        host: dbSettings.local.host // Keep local host
+                                                    }
+                                                })}
+                                                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-all"
+                                            >
+                                                외부 설정을 사내로 복사 📋
+                                            </button>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-1.5">
-                                            <label className="text-xs font-black text-slate-700">접속 계정 (Username)</label>
-                                            <input type="text" value={dbSettings.user} onChange={e => setDbSettings({...dbSettings, user: e.target.value})} placeholder="postgres" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500" required />
+
+                                    {/* Local Connection Profile Forms */}
+                                    {dbSettings.currentProfile === 'local' && (
+                                        <div className="space-y-5 border border-indigo-200 rounded-2xl p-6 bg-slate-50/50 ring-2 ring-indigo-500/10">
+                                            <div className="flex justify-between items-center pb-3 border-b border-slate-200/60">
+                                                <h3 className="text-sm font-black text-slate-800">1. 사내 로컬 접속 설정 (Local Presets)</h3>
+                                                <span className="px-2 py-0.5 rounded text-[10px] font-black bg-indigo-100 text-indigo-800">
+                                                    활성 상태
+                                                </span>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-black text-slate-700">호스트 IP (Host)</label>
+                                                    <input type="text" value={dbSettings.local.host} onChange={e => setDbSettings({...dbSettings, local: {...dbSettings.local, host: e.target.value}})} placeholder="192.168.0.7" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500" required />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-black text-slate-700">포트 (Port)</label>
+                                                    <input type="text" value={dbSettings.local.port} onChange={e => setDbSettings({...dbSettings, local: {...dbSettings.local, port: e.target.value}})} placeholder="15432" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500" required />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-black text-slate-700">접속 계정 (Username)</label>
+                                                    <input type="text" value={dbSettings.local.user} onChange={e => setDbSettings({...dbSettings, local: {...dbSettings.local, user: e.target.value}})} placeholder="postgres" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500" required />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-black text-slate-700">데이터베이스 이름 (Database)</label>
+                                                    <input type="text" value={dbSettings.local.database} onChange={e => setDbSettings({...dbSettings, local: {...dbSettings.local, database: e.target.value}})} placeholder="postgres" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500" required />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs font-black text-slate-700">비밀번호 (Password)</label>
+                                                <input type="password" value={dbSettings.local.password} onChange={e => setDbSettings({...dbSettings, local: {...dbSettings.local, password: e.target.value}})} placeholder="변경시에만 입력하세요 (기존 암호 보존됨)" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500" />
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button type="button" onClick={() => handleTestDB('local')} disabled={dbTesting || dbSaving} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black">
+                                                    로컬 연결 테스트
+                                                </button>
+                                            </div>
                                         </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-xs font-black text-slate-700">데이터베이스 이름 (Database)</label>
-                                            <input type="text" value={dbSettings.database} onChange={e => setDbSettings({...dbSettings, database: e.target.value})} placeholder="ir_assistant" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500" required />
+                                    )}
+
+                                    {/* Remote Connection Profile Forms */}
+                                    {dbSettings.currentProfile === 'remote' && (
+                                        <div className="space-y-5 border border-indigo-200 rounded-2xl p-6 bg-slate-50/50 ring-2 ring-indigo-500/10">
+                                            <div className="flex justify-between items-center pb-3 border-b border-slate-200/60">
+                                                <h3 className="text-sm font-black text-slate-800">2. 외부 원격 접속 설정 (Remote/Tailscale Presets)</h3>
+                                                <span className="px-2 py-0.5 rounded text-[10px] font-black bg-indigo-100 text-indigo-800">
+                                                    활성 상태
+                                                </span>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-black text-slate-700">호스트 IP (Host/Tailscale IP)</label>
+                                                    <input type="text" value={dbSettings.remote.host} onChange={e => setDbSettings({...dbSettings, remote: {...dbSettings.remote, host: e.target.value}})} placeholder="100.x.y.z" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500" required />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-black text-slate-700">포트 (Port)</label>
+                                                    <input type="text" value={dbSettings.remote.port} onChange={e => setDbSettings({...dbSettings, remote: {...dbSettings.remote, port: e.target.value}})} placeholder="15432" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500" required />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-black text-slate-700">접속 계정 (Username)</label>
+                                                    <input type="text" value={dbSettings.remote.user} onChange={e => setDbSettings({...dbSettings, remote: {...dbSettings.remote, user: e.target.value}})} placeholder="postgres" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500" required />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-black text-slate-700">데이터베이스 이름 (Database)</label>
+                                                    <input type="text" value={dbSettings.remote.database} onChange={e => setDbSettings({...dbSettings, remote: {...dbSettings.remote, database: e.target.value}})} placeholder="postgres" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500" required />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs font-black text-slate-700">비밀번호 (Password)</label>
+                                                <input type="password" value={dbSettings.remote.password} onChange={e => setDbSettings({...dbSettings, remote: {...dbSettings.remote, password: e.target.value}})} placeholder="변경시에만 입력하세요 (기존 암호 보존됨)" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500" />
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button type="button" onClick={() => handleTestDB('remote')} disabled={dbTesting || dbSaving} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black">
+                                                    원격 연결 테스트
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-xs font-black text-slate-700">비밀번호 (Password)</label>
-                                        <input type="password" value={dbSettings.password} onChange={e => setDbSettings({...dbSettings, password: e.target.value})} placeholder="변경시에만 입력하세요 (기존 암호 보존됨)" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500" />
-                                    </div>
+                                    )}
+
+                                    {/* Action Buttons */}
                                     <div className="pt-4 border-t border-slate-100 flex gap-3">
-                                        <button type="button" onClick={handleTestDB} disabled={dbTesting || dbSaving} className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-black flex items-center gap-2">
-                                            {dbTesting ? '테스트 중...' : '연결 테스트'}
-                                        </button>
                                         <button type="submit" disabled={dbTesting || dbSaving} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-black flex items-center gap-2 shadow-sm">
-                                            <Save size={16} /> 설정 저장 및 적용
+                                            <Save size={16} /> 설정 저장 및 활성 프로필 적용
                                         </button>
                                     </div>
                                 </form>

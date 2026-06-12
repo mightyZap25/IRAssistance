@@ -227,7 +227,7 @@ export default function QualityDashboardPage() {
                             <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-indigo-500" /> 실적 불량률</div>
                         </div>
                     </div>
-                    <div className="flex-1 min-h-[250px]">
+                    <div className="flex-1 min-h-[180px]">
                         <ResponsiveContainer width="100%" height="100%">
                             <ComposedChart data={quarterlyTrend}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -253,7 +253,7 @@ export default function QualityDashboardPage() {
                         <div className="p-2 bg-rose-50 text-rose-600 rounded-xl"><Layers size={20} /></div>
                         모델별 완제품 불량률 (%)
                     </h2>
-                    <div className="h-[300px]">
+                    <div className="h-[220px]">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={modelStats} layout="vertical">
                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
@@ -272,14 +272,14 @@ export default function QualityDashboardPage() {
                         <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><PieIcon size={20} /></div>
                         전체 불량 유형 분포
                     </h2>
-                    <div className="h-[300px] flex items-center">
+                    <div className="h-[220px] flex items-center">
                         <div className="flex-1 h-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                     <Pie 
                                         data={defectTypeDistribution} 
-                                        innerRadius={60} 
-                                        outerRadius={90} 
+                                        innerRadius={50} 
+                                        outerRadius={75} 
                                         paddingAngle={8} 
                                         dataKey="value"
                                     >

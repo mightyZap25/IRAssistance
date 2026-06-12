@@ -8,7 +8,7 @@ import { qualityService } from '../services/qualityService';
 const INSPECTION_TYPES = {
     INCOMING: { label: '수입검사', icon: Truck, color: 'text-blue-600', bg: 'bg-blue-50' },
     PROCESS:  { label: '공정검사', icon: Settings, color: 'text-amber-600', bg: 'bg-amber-50' },
-    FINAL:    { label: '최종검사', icon: Package, color: 'text-emerald-600', bg: 'bg-emerald-50' }
+    FINAL:    { label: '출하검사', icon: Package, color: 'text-emerald-600', bg: 'bg-emerald-50' }
 };
 
 const INSPECTION_STATUS = {
@@ -38,8 +38,8 @@ export default function QualityProcessPage() {
         return inspections.filter(item => {
             const matchesSearch = item.PartName?.toLowerCase().includes(searchTerm.toLowerCase()) || item.ID?.toLowerCase().includes(searchTerm.toLowerCase());
             if (activeTab === 'ALL') return matchesSearch;
-            if (activeTab === 'INCOMING') return item.Type === 'INCOMING' && matchesSearch;
-            if (activeTab === 'PRODUCTION') return (item.Type === 'PROCESS' || item.Type === 'FINAL') && matchesSearch;
+            if (activeTab === 'FINAL') return item.Type === 'FINAL' && matchesSearch;
+            if (activeTab === 'PROCESS') return item.Type === 'PROCESS' && matchesSearch;
             return matchesSearch;
         });
     }, [inspections, searchTerm, activeTab]);
@@ -61,8 +61,8 @@ export default function QualityProcessPage() {
             <div className="flex gap-1 bg-white/50 p-1 rounded-2xl border border-slate-200/50 self-start ml-1">
                 {[
                     { id: 'ALL', label: '전체 검사' },
-                    { id: 'INCOMING', label: '수입검사 (Purchasing)' },
-                    { id: 'PRODUCTION', label: '공정/최종검사 (Production)' }
+                    { id: 'FINAL', label: '출하 검사 (Production)' },
+                    { id: 'PROCESS', label: '공정 검사 (In-Process)' }
                 ].map(tab => (
                     <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white'}`}>
                         {tab.label}

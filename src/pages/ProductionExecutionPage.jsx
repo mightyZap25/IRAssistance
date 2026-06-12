@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { collection, query, getDocs, updateDoc, doc, serverTimestamp, orderBy, where, writeBatch, addDoc } from '../firebase';
+import { collection, query, getDocs, updateDoc, doc, serverTimestamp, orderBy, where, writeBatch, addDoc, getDoc } from '../firebase';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Factory, AlertTriangle, CheckCircle2, Clock, X, ChevronRight, Zap, List, LayoutGrid, Package, AlertCircle, ShieldAlert, TrendingUp, RotateCcw, History, Calendar, BarChart2, ClipboardList, Send } from 'lucide-react';
 import ProjectGanttChart from '../components/ProjectGanttChart';
 import BOMCheckTree from '../components/BOMCheckTree';
-import PRTimelineGraph from '../components/PRTimelineGraph';
 import { productionService } from '../services/productionService';
 
 // ─────────────────────────────────────────────────────────────
@@ -29,7 +28,7 @@ const PR_STATUS = {
     ARCHIVED:        { label: '아카이브',     color: 'bg-slate-50 text-slate-400 border-slate-100',     step: 12 },
 };
 
-const EXECUTION_STATUSES = ['PROD_WAITING', 'PROD_PLANNING', 'WORK_ORDER', 'IN_PRODUCTION', 'PROD_COMPLETE', 'QA_WAITING', 'QA_COMPLETE', 'SHIP_READY'];
+const EXECUTION_STATUSES = ['PROD_WAITING', 'PROD_PLANNING', 'WORK_ORDER', 'IN_PRODUCTION', 'PROD_COMPLETE', 'QA_WAITING', 'QA_COMPLETE', 'SHIP_READY', 'WAITING_FOR_PARTS', 'CONFIRMED'];
 
 const KANBAN_COLUMNS = [
     { key: 'PROD_WAITING',  label: '생산 대기',  color: 'border-indigo-100 bg-indigo-50/30', headColor: 'bg-indigo-100 text-indigo-700' },
@@ -46,15 +45,6 @@ const GANTT_STAGES = [
     { id: 'shipping', label: '출하' }
 ];
 
-const NEXT_STATUS_MAP = {
-    PROD_WAITING:  { next: 'PROD_PLANNING', label: '계획 수립 시작' },
-    PROD_PLANNING: { next: 'WORK_ORDER',    label: '작업 지시 발행' },
-    WORK_ORDER:    { next: 'IN_PRODUCTION', label: '생산 시작' },
-    IN_PRODUCTION: { next: 'PROD_COMPLETE', label: '생산 완료 처리' },
-    QA_COMPLETE:   { next: 'SHIP_READY',    label: '출하 준비 완료' },
-    SHIP_READY:    { next: 'SHIPPED',       label: '출하 완료' },
-};
-
 function isDelayed(dueDate) {
     if (!dueDate) return false;
     return new Date(dueDate) < new Date();
@@ -62,7 +52,6 @@ function isDelayed(dueDate) {
 
 function ProductionCalendar({ prs, onCardClick }) {
     const [currentDate, setCurrentDate] = useState(new Date());
-    
     const calendarDays = useMemo(() => {
         const year = currentDate.getFullYear();
         const month = currentDate.getMonth();
@@ -83,49 +72,27 @@ function ProductionCalendar({ prs, onCardClick }) {
         return days;
     }, [currentDate]);
 
-    const getPrsForDate = (date) => {
-        const dStr = date.toISOString().split('T')[0];
-        return prs.flatMap(p => {
-            const events = [];
-            if (p.ProdEndDate === dStr) events.push({ ...p, evType: 'PROD_END', evLabel: '생산마감' });
-            if (p.DueDate === dStr) events.push({ ...p, evType: 'DUE', evLabel: '납기일' });
-            return events;
-        });
-    };
-
     return (
-        <div className="flex-1 bg-white rounded-3xl border border-slate-200 overflow-hidden flex flex-col min-h-0">
+        <div className="flex-1 bg-white rounded-3xl border border-slate-200 overflow-hidden flex flex-col min-h-0 text-left">
             <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <h3 className="text-sm font-black text-slate-700 flex items-center gap-2"><Calendar size={16} className="text-indigo-600"/> 생산 일정 캘린더</h3>
                 <div className="flex items-center gap-4">
-                    <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1))} className="p-1.5 hover:bg-white rounded-lg shadow-sm border border-slate-200 text-slate-500"><ChevronRight className="rotate-180" size={16}/></button>
-                    <span className="text-sm font-black text-slate-800">{currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월</span>
-                    <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1))} className="p-1.5 hover:bg-white rounded-lg shadow-sm border border-slate-200 text-slate-500"><ChevronRight size={16}/></button>
+                    <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1))} className="p-1.5 hover:bg-white rounded-lg border border-slate-200"><ChevronRight className="rotate-180" size={16}/></button>
+                    <span className="text-sm font-black">{currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월</span>
+                    <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1))} className="p-1.5 hover:bg-white rounded-lg border border-slate-200"><ChevronRight size={16}/></button>
                 </div>
             </div>
             <div className="flex-1 grid grid-cols-7 overflow-y-auto divide-x divide-y divide-slate-100 custom-scrollbar">
-                {['일', '월', '화', '수', '목', '금', '토'].map(d => <div key={d} className="py-2 text-center text-[10px] font-black text-slate-400 bg-slate-50/30 uppercase tracking-widest">{d}</div>)}
+                {['일', '월', '화', '수', '목', '금', '토'].map(d => <div key={d} className="py-2 text-center text-[10px] font-black text-slate-400 bg-slate-50/30 uppercase">{d}</div>)}
                 {calendarDays.map((day, idx) => {
-                    const dayPrs = getPrsForDate(day.date);
-                    const isToday = new Date().toDateString() === day.date.toDateString();
+                    const dStr = day.date.toISOString().split('T')[0];
+                    const dayPrs = prs.filter(p => p.DueDate === dStr || p.ProdEndDate === dStr);
                     return (
-                        <div key={idx} className={`min-h-[120px] p-1.5 ${day.currentMonth ? 'bg-white' : 'bg-slate-50/30'} flex flex-col gap-1.5 transition-colors hover:bg-slate-50/50`}>
-                            <span className={`text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-500'}`}>{day.date.getDate()}</span>
-                            <div className="flex-1 overflow-y-auto space-y-1.5 no-scrollbar">
+                        <div key={idx} className={`min-h-[100px] p-1.5 ${day.currentMonth ? 'bg-white' : 'bg-slate-50/30'} flex flex-col gap-1`}>
+                            <span className={`text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full ${day.date.toDateString() === new Date().toDateString() ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500'}`}>{day.date.getDate()}</span>
+                            <div className="flex-1 overflow-y-auto space-y-1 no-scrollbar">
                                 {dayPrs.map((p, pIdx) => (
-                                    <div 
-                                        key={`${p.id}-${pIdx}`} 
-                                        onClick={() => onCardClick(p)} 
-                                        className={`p-1.5 rounded-xl border text-left cursor-pointer transition-all hover:scale-[1.02] shadow-sm ${p.evType === 'DUE' ? 'bg-rose-50 border-rose-100' : 'bg-indigo-50 border-indigo-100'}`}
-                                    >
-                                        <div className="flex justify-between items-start mb-1">
-                                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-md uppercase ${p.evType === 'DUE' ? 'bg-rose-500 text-white' : 'bg-indigo-500 text-white'}`}>
-                                                {p.evLabel}
-                                            </span>
-                                        </div>
-                                        <p className="text-[10px] font-black text-slate-800 leading-tight truncate">{p.PartName}</p>
-                                        <p className="text-[9px] font-bold text-slate-500 truncate mt-0.5">{p.CustomerName}</p>
-                                    </div>
+                                    <div key={pIdx} onClick={() => onCardClick(p)} className="p-1 rounded-lg border text-[9px] font-black cursor-pointer shadow-sm bg-indigo-50 border-indigo-100 text-indigo-700 truncate">{p.PartName}</div>
                                 ))}
                             </div>
                         </div>
@@ -141,8 +108,6 @@ function WODetailModal({ pr, onClose, onRefresh }) {
     const [loading, setLoading] = useState(false);
     const [actualQty, setActualQty] = useState(pr?.TargetQty || 0);
     const [defectQty, setDefectQty] = useState(0);
-    const [defectReason, setDefectReason] = useState('');
-    const [shortageCheck, setShortageCheck] = useState(null);
     const [bomItems, setBomItems] = useState([]);
     const [inventory, setInventory] = useState({});
 
@@ -153,73 +118,85 @@ function WODetailModal({ pr, onClose, onRefresh }) {
                 getDocs(query(collection(db, 'bom'), where('ParentID', '==', pr.PartID))),
                 getDocs(collection(db, 'inventory')),
             ]);
-            const boms = bomSnap.docs.map(d => d.data());
+            setBomItems(bomSnap.docs.map(d => d.data()));
             const inv = {};
             invSnap.docs.forEach(d => { inv[d.data().PartID] = { onHand: d.data().OnHand || 0, ref: d.ref }; });
-            setBomItems(boms);
             setInventory(inv);
-
-            const shortages = boms.map(b => {
-                const req = (b.Quantity || 1) * pr.TargetQty;
-                const onHand = inv[b.ChildID]?.onHand || 0;
-                return { partID: b.ChildID, req, onHand, shortage: Math.max(0, req - onHand), ok: onHand >= req };
-            });
-            setShortageCheck(shortages);
         })();
     }, [pr]);
 
     const handleComplete = async () => {
-        const badShortages = shortageCheck?.filter(s => !s.ok) || [];
-        if (badShortages.length > 0) {
-            const msg = badShortages.map(s => `- ${s.partID}: 부족 ${s.shortage}개`).join('\n');
-            if (!window.confirm(`⚠ 자재 부족 경고!\n\n${msg}\n\n재고 부족 상태로 진행하면 마이너스 재고가 발생합니다.\n정말 생산 완료 처리하시겠습니까?`)) return;
-        } else {
-            if (!window.confirm(`${actualQty}개 생산 완료 처리하시겠습니까?\nBOM 기반 원자재가 창고에서 자동 차감되고 QA 검사 대기열로 이관됩니다.`)) return;
-        }
-
+        if (!window.confirm(`${actualQty}개 생산 완료 처리하시겠습니까?`)) return;
         setLoading(true);
         try {
             const batch = writeBatch(db);
-            batch.update(doc(db, 'production_requests', pr.id), {
-                Status: 'QA_WAITING', ActualQty: actualQty, DefectQty: defectQty, DefectReason: defectReason,
-                CompletedAt: serverTimestamp(), UpdatedBy: userProfile?.uid,
-                Logs: [{ from: pr.Status, to: 'QA_WAITING', message: `생산 완료 처리: 양품 ${actualQty} / 불량 ${defectQty}`, user: userProfile?.displayName || 'Unknown', timestamp: new Date().toISOString() }, ...(pr.Logs || [])]
+            const nextStatus = 'QA_WAITING';
+            const logEntry = { 
+                from: pr.Status, to: nextStatus, 
+                message: `생산 완료: 양품 ${actualQty} / 불량 ${defectQty}`, 
+                user: userProfile?.displayName || 'Unknown', 
+                timestamp: new Date().toISOString(),
+                scope: pr.isSplit ? `${pr.PartName} ${pr.scheduleIdx + 1}차` : '전체'
+            };
+
+            const parentRef = doc(db, 'production_requests', pr.id);
+            const parentSnap = await getDoc(parentRef);
+            if (parentSnap.exists()) {
+                const parentData = parentSnap.data();
+                const newItems = [...(parentData.Items || [])];
+                if (pr.isSplit && newItems[pr.itemIdx]) {
+                    if (!newItems[pr.itemIdx].Schedules) newItems[pr.itemIdx].Schedules = [{ date: newItems[pr.itemIdx].DueDate || pr.DueDate, qty: newItems[pr.itemIdx].TargetQty || pr.TargetQty }];
+                    newItems[pr.itemIdx].Schedules[pr.scheduleIdx] = { ...newItems[pr.itemIdx].Schedules[pr.scheduleIdx], status: nextStatus, actualQty, defectQty };
+                    if (newItems[pr.itemIdx].Schedules.every(s => s.status === nextStatus)) newItems[pr.itemIdx].Status = nextStatus;
+                }
+                const allPRDone = newItems.every(item => (item.Schedules || []).every(s => ['PROD_COMPLETE', 'QA_WAITING', 'QA_COMPLETE', 'SHIP_READY', 'SHIPPED'].includes(s.status)));
+                batch.update(parentRef, { Items: newItems, Status: allPRDone ? 'PROD_COMPLETE' : 'IN_PRODUCTION', UpdatedAt: serverTimestamp(), Logs: [logEntry, ...(parentData.Logs || [])] });
+            }
+
+            /* 
+               기존에 receiving 컬렉션에 저장하던 로직을 제거합니다. 
+               생산 제품은 수입검사 대상이 아니므로 qa_shipping_inspections 로만 이관됩니다.
+            */
+
+            // 품질 검사 요청 추가 (품질 공정 관리 페이지 - 출하검사 탭 연동)
+            const inspectionRef = doc(collection(db, 'qa_shipping_inspections'));
+            batch.set(inspectionRef, {
+                PR_ID: pr.id,
+                PRNumber: pr.PRNumber,
+                RefPRID: pr.PRNumber,
+                PartID: pr.PartID,
+                PartName: pr.PartName,
+                CustomerName: pr.CustomerName || '일반고객', // 고객사 정보 추가
+                Qty: actualQty,
+                Status: 'WAITING_INSPECTION',
+                createdAt: serverTimestamp(), // QAProcessPage에서 사용하는 필드명
+                ScheduleIdx: pr.isSplit ? pr.scheduleIdx : undefined
             });
 
-            const receivingRef = doc(collection(db, 'receiving'));
-            batch.set(receivingRef, { PR_ID: pr.id, PRNumber: pr.PRNumber, PartID: pr.PartID, PartName: pr.PartName, Qty: actualQty, Status: 'WAITING_INSPECTION', Type: 'SHIPPING', CustomerName: pr.CustomerName, ReceivedAt: serverTimestamp(), SourceType: 'PRODUCTION' });
-
-            for (const bom of bomItems) {
+            bomItems.forEach(bom => {
                 const deductQty = (bom.Quantity || 1) * actualQty;
                 const invData = inventory[bom.ChildID];
                 if (invData?.ref) batch.update(invData.ref, { OnHand: (invData.onHand || 0) - deductQty, UpdatedAt: serverTimestamp() });
-            }
+            });
+
             await batch.commit();
-            alert('생산 완료 처리 및 QA 이관 완료!');
-            onRefresh(); onClose();
-        } catch (err) { console.error(err); alert('처리 중 오류 발생'); } finally { setLoading(false); }
+            alert('완료되었습니다.'); onRefresh(); onClose();
+        } catch (err) { console.error(err); alert('오류 발생'); } finally { setLoading(false); }
     };
 
-    if (!pr) return null;
-
     return createPortal(
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 text-left">
-            <div className="bg-white rounded-[32px] w-full max-w-xl shadow-2xl overflow-hidden">
-                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                    <div><h2 className="text-xl font-black text-slate-800 flex items-center gap-2"><Factory className="text-orange-500"/> 생산 완료 보고</h2><p className="text-xs font-bold text-slate-400 mt-1">{pr.PRNumber} | {pr.PartName}</p></div>
-                    <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-700 bg-slate-100 rounded-xl"><X size={20}/></button>
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-[10000] flex items-center justify-center p-4">
+            <div className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
+                    <div><h2 className="text-lg font-black text-slate-800 flex items-center gap-2"><Factory size={20} className="text-orange-500"/> 생산 완료 보고</h2><p className="text-[10px] font-bold text-slate-400 mt-0.5">{pr.PartName}</p></div>
+                    <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-700 bg-white rounded-xl shadow-sm"><X size={18}/></button>
                 </div>
-                <div className="p-6 space-y-6">
-                    <div className="bg-orange-50 border border-orange-100 rounded-2xl p-5">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div><label className="text-xs font-bold text-slate-500 mb-1 block">실제 수량</label><input type="number" value={actualQty} onChange={e => setActualQty(parseInt(e.target.value) || 0)} className="w-full bg-white border border-orange-200 rounded-xl px-4 py-2.5 text-sm font-black outline-none focus:ring-2 focus:ring-orange-400 shadow-sm" /></div>
-                            <div><label className="text-xs font-bold text-slate-500 mb-1 block">불량 수량</label><input type="number" value={defectQty} onChange={e => setDefectQty(parseInt(e.target.value) || 0)} className="w-full bg-white border border-orange-200 rounded-xl px-4 py-2.5 text-sm font-black outline-none focus:ring-2 focus:ring-orange-400 shadow-sm" /></div>
-                        </div>
+                <div className="p-6 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1 text-left"><label className="text-[10px] font-black text-slate-400 uppercase">양품 수량</label><input type="number" value={actualQty} onChange={e => setActualQty(parseInt(e.target.value) || 0)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-black outline-none focus:ring-2 focus:ring-orange-400" /></div>
+                        <div className="space-y-1 text-left"><label className="text-[10px] font-black text-slate-400 uppercase">불량 수량</label><input type="number" value={defectQty} onChange={e => setDefectQty(parseInt(e.target.value) || 0)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-black outline-none focus:ring-2 focus:ring-orange-400" /></div>
                     </div>
-                    <div className="flex gap-3 pt-2">
-                        <button onClick={onClose} className="flex-1 py-3.5 rounded-2xl text-sm font-black bg-slate-100 text-slate-600 hover:bg-slate-200">취소</button>
-                        <button onClick={handleComplete} disabled={loading} className="flex-[2] py-3.5 rounded-2xl text-sm font-black bg-orange-500 text-white hover:bg-orange-600 shadow-lg shadow-orange-100 disabled:opacity-50">{loading ? '처리 중...' : '생산 완료 보고 및 QA 이관'}</button>
-                    </div>
+                    <div className="flex gap-2 pt-2"><button onClick={onClose} className="flex-1 py-3 rounded-xl text-xs font-black bg-slate-100 text-slate-600">취소</button><button onClick={handleComplete} disabled={loading} className="flex-[2] py-3 rounded-xl text-xs font-black bg-orange-500 text-white shadow-lg shadow-orange-100 disabled:opacity-50">{loading ? '처리 중...' : '생산 완료 보고'}</button></div>
                 </div>
             </div>
         </div>, document.body
@@ -229,11 +206,11 @@ function WODetailModal({ pr, onClose, onRefresh }) {
 function KanbanCard({ pr, onClick }) {
     const delayed = isDelayed(pr.DueDate);
     return (
-        <div onClick={() => onClick(pr)} className={`bg-white rounded-xl p-3 border shadow-sm cursor-pointer hover:shadow-md transition-all hover:-translate-y-0.5 ${delayed ? 'border-rose-300 ring-1 ring-rose-200' : 'border-slate-200'} text-left`}>
-            <div className="flex justify-between items-start mb-2"><span className="text-[10px] font-mono font-black text-slate-500">{pr.PRNumber}</span>{pr.Urgent && <AlertCircle size={11} className="text-rose-500 animate-pulse"/>}</div>
-            <p className="text-sm font-black text-slate-800 mb-1 leading-tight">{pr.PartName}</p>
-            <p className="text-[11px] font-bold text-slate-500 mb-2">{pr.CustomerName}</p>
-            <div className="flex justify-between items-center pt-2 border-t border-slate-50"><span className="text-[11px] font-black text-slate-600">{pr.TargetQty} EA</span><span className={`text-[10px] font-black ${delayed ? 'text-rose-600' : 'text-slate-400'}`}>{pr.DueDate}</span></div>
+        <div onClick={() => onClick(pr)} className={`bg-white rounded-xl p-3 border shadow-sm cursor-pointer hover:shadow-md transition-all ${delayed ? 'border-rose-300 ring-1 ring-rose-100' : 'border-slate-200'} text-left`}>
+            <div className="flex justify-between items-start mb-1.5"><span className="text-[9px] font-black text-slate-400 uppercase">{pr.PRNumber}</span>{pr.Urgent && <AlertCircle size={10} className="text-rose-500"/>}</div>
+            <p className="text-xs font-black text-slate-800 leading-tight mb-1 truncate">{pr.PartName}</p>
+            <p className="text-[10px] font-bold text-slate-400 mb-2 truncate">{pr.CustomerName}</p>
+            <div className="flex justify-between items-center pt-2 border-t border-slate-50"><span className="text-[10px] font-black text-slate-600">{pr.TargetQty} EA</span><span className={`text-[9px] font-black ${delayed ? 'text-rose-600' : 'text-slate-400'}`}>{pr.DueDate}</span></div>
         </div>
     );
 }
@@ -244,11 +221,9 @@ export default function ProductionExecutionPage() {
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState('SPLIT'); 
     const [selectedPR, setSelectedPR] = useState(null);
-    const [groupBy, setGroupBy] = useState('ORDER'); // 'ORDER' | 'DELIVERY'
+    const [groupBy, setGroupBy] = useState('ORDER');
     const [isWOModalOpen, setIsWOModalOpen] = useState(false);
     const [woPR, setWoPR] = useState(null);
-    const [scheduleForm, setScheduleForm] = useState({ startDate: '', endDate: '' });
-
     const [detailTab, setDetailTab] = useState('basic'); 
     const [selectedPRBOM, setSelectedPRBOM] = useState([]);
     const [inventory, setInventory] = useState({});
@@ -257,27 +232,14 @@ export default function ProductionExecutionPage() {
 
     const processedData = useMemo(() => {
         if (groupBy === 'ORDER') return prs;
-        
-        // Flatten PRs into individual delivery items
         const flattened = [];
         prs.forEach(pr => {
-            const items = pr.Items || [{ PartID: pr.PartID, PartName: pr.PartName, TargetQty: pr.TargetQty, DueDate: pr.DueDate }];
+            const items = pr.Items || [{ PartID: pr.PartID, PartName: pr.PartName, TargetQty: pr.TargetQty, DueDate: pr.DueDate, Status: pr.Status }];
             items.forEach((item, itemIdx) => {
-                const schedules = item.Schedules && item.Schedules.length > 0 
-                    ? item.Schedules 
-                    : [{ date: item.DueDate || pr.DueDate, qty: item.TargetQty || pr.TargetQty }];
-                
+                const schedules = item.Schedules && item.Schedules.length > 0 ? item.Schedules : [{ date: item.DueDate || pr.DueDate, qty: item.TargetQty || pr.TargetQty, status: item.Status || pr.Status }];
                 schedules.forEach((sched, sIdx) => {
-                    flattened.push({
-                        ...pr,
-                        displayID: `${pr.PRNumber}-${itemIdx + 1}-${sIdx + 1}`,
-                        PartID: item.PartID,
-                        PartName: item.PartName,
-                        TargetQty: Number(sched.qty || item.TargetQty || 0),
-                        DueDate: sched.date || item.DueDate || pr.DueDate,
-                        isSplit: true,
-                        parentPR: pr
-                    });
+                    const currentStatus = sched.status || item.Status || pr.Status || 'PROD_WAITING';
+                    flattened.push({ ...pr, displayID: `${pr.PRNumber}-${itemIdx+1}-${sIdx+1}`, itemIdx, scheduleIdx: sIdx, PartID: item.PartID, PartName: item.PartName, TargetQty: Number(sched.qty || 0), DueDate: sched.date, Status: currentStatus, isSplit: true });
                 });
             });
         });
@@ -285,432 +247,318 @@ export default function ProductionExecutionPage() {
     }, [prs, groupBy]);
 
     useEffect(() => { fetchPRs(); }, []);
-    useEffect(() => { if (selectedPR) {
-        setScheduleForm({ startDate: selectedPR.ProdStartDate || '', endDate: selectedPR.ProdEndDate || '' });
-        fetchSelectedPRDetails(selectedPR);
-    } }, [selectedPR]);
+    useEffect(() => { if (selectedPR) fetchSelectedPRDetails(selectedPR); }, [selectedPR]);
 
     const fetchPRs = async () => {
         setLoading(true);
         try {
             const snap = await getDocs(query(collection(db, 'production_requests'), orderBy('CreatedAt', 'desc')));
-            const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            setPrs(all.filter(pr => EXECUTION_STATUSES.includes(pr.Status)));
+            setPrs(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(pr => EXECUTION_STATUSES.includes(pr.Status)));
         } catch (err) { console.error(err); } finally { setLoading(false); }
     };
 
     const fetchSelectedPRDetails = async (pr) => {
         if (!pr) return;
-        setActiveScheduleTab(0);
         try {
-            const items = pr.Items || [{ PartID: pr.PartID, TargetQty: pr.TargetQty, PartName: pr.PartName }];
-            const [invSnap, partsSnap, allBomSnap, allActivePrSnap] = await Promise.all([
-                getDocs(collection(db, 'inventory')),
-                getDocs(collection(db, 'parts')),
-                getDocs(collection(db, 'bom')),
-                getDocs(query(collection(db, 'production_requests'), where('Status', 'in', ['WAITING_FOR_PARTS', 'PROD_WAITING', 'IN_PRODUCTION'])))
-            ]);
-            
-            const partsMap = {};
-            const partsFullMap = {};
-            partsSnap.docs.forEach(d => { 
-                const data = d.data();
-                partsMap[data.PartID] = data.Name;
-                partsFullMap[data.PartID] = data;
-            });
-            
-            const inventoryMap = {};
-            invSnap.docs.forEach(d => { inventoryMap[d.data().PartID] = Number(d.data().OnHand || 0); });
+            const [invSnap, partsSnap, allBomSnap] = await Promise.all([getDocs(collection(db, 'inventory')), getDocs(collection(db, 'parts')), getDocs(collection(db, 'bom'))]);
+            const partsFullMap = {}; partsSnap.docs.forEach(d => { partsFullMap[d.data().PartID] = d.data(); });
+            const inventoryMap = {}; invSnap.docs.forEach(d => { inventoryMap[d.data().PartID] = Number(d.data().OnHand || 0); });
             setInventory(inventoryMap);
-
-            const bomDataByParent = {};
-            allBomSnap.docs.forEach(d => {
-                const data = d.data();
-                if (!bomDataByParent[data.ParentID]) bomDataByParent[data.ParentID] = [];
-                bomDataByParent[data.ParentID].push(data);
-            });
-
-            const reserved = await productionService.fetchReservedMap(pr.id);
-            setReservedMap(reserved);
-
+            const bomDataByParent = {}; allBomSnap.docs.forEach(d => { const data = d.data(); if (!bomDataByParent[data.ParentID]) bomDataByParent[data.ParentID] = []; bomDataByParent[data.ParentID].push(data); });
+            const reserved = await productionService.fetchReservedMap(pr.id); setReservedMap(reserved);
             const structuredData = [];
-            items.forEach((item, itemIdx) => {
+            (pr.Items || [{ PartID: pr.PartID, TargetQty: pr.TargetQty, PartName: pr.PartName }]).forEach((item, itemIdx) => {
                 const schedules = (item.Schedules && item.Schedules.length > 0) ? item.Schedules : [{ date: item.DueDate || pr.DueDate, qty: item.TargetQty || pr.TargetQty }];
-                
                 const bomTree = productionService.buildBOMTree(item.PartID, bomDataByParent, partsFullMap);
-                
-                schedules.forEach((sched, sIdx) => {
-                    structuredData.push({
-                        id: `${item.PartID}-${sIdx}`,
-                        PartID: item.PartID,
-                        PartName: item.PartName,
-                        ScheduleIdx: sIdx + 1,
-                        ScheduleDate: sched.date || item.DueDate || pr.DueDate,
-                        SetQty: Number(sched.qty || item.TargetQty || 0),
-                        BOMTree: bomTree
-                    });
-                });
+                schedules.forEach((sched, sIdx) => { structuredData.push({ id: `${item.PartID}-${sIdx}`, PartName: item.PartName, ScheduleIdx: sIdx + 1, ScheduleDate: sched.date, SetQty: Number(sched.qty || 0), BOMTree: bomTree }); });
             });
             setSelectedPRBOM(structuredData);
         } catch (err) { console.error(err); }
     };
 
-    // Gantt Data Mapping (Ensuring all required fields for ProjectGanttChart)
-    const ganttData = useMemo(() => prs.map(pr => {
-        const schedules = {};
-        const startDate = pr.ProdStartDate || pr.CreatedAt?.toDate?.().toISOString().split('T')[0] || new Date().toISOString().split('T')[0];
-        const endDate = pr.ProdEndDate || pr.DueDate || startDate;
+    const handleStatusChange = async (prId, nextStatus, logMessage = '', itemIdx = undefined, sIdx = undefined) => {
+        const pr = prs.find(p => p.id === prId) || selectedPR; if (!pr) return;
+        const isSplit = itemIdx !== undefined && sIdx !== undefined;
+        const currentStatus = isSplit ? (pr.Items?.[itemIdx]?.Schedules?.[sIdx]?.status || pr.Items?.[itemIdx]?.Status || pr.Status || '') : pr.Status;
         
-        // Map PR stages to Gantt stages
-        GANTT_STAGES.forEach(s => {
-            schedules[s.id] = {
-                start: startDate,
-                end: endDate,
-                status: pr.Status.toLowerCase().includes(s.id) ? 'in_progress' : 
-                        (PR_STATUS[pr.Status]?.step > 7 ? 'completed' : 'pending')
-            };
-        });
-
-        return {
-            id: pr.id,
-            name: pr.PartName,
-            code: pr.PRNumber,
-            progress: Math.min(100, (PR_STATUS[pr.Status]?.step || 0) * 10),
-            startDate: startDate,
-            endDate: endDate,
-            schedules: schedules,
-            tests: {} // Required by component
-        };
-    }), [prs]);
-
-    const handleStatusChange = async (prId, nextStatus, logMessage = '', reason = '') => {
-        const pr = prs.find(p => p.id === prId) || selectedPR;
-        if (!pr) return;
-        const currentStep = PR_STATUS[pr.Status]?.step || 0;
+        const currentStep = PR_STATUS[currentStatus]?.step || 0;
         const nextStep = PR_STATUS[nextStatus]?.step || 0;
-        if (nextStep < currentStep && !reason) {
-            const userReason = window.prompt('되돌리는 사유:');
-            if (!userReason) return; reason = userReason;
+
+        // 1. 상태 변경 경고창
+        if (!window.confirm(`상태를 [${PR_STATUS[nextStatus]?.label || nextStatus}] 단계로 변경하시겠습니까?`)) return;
+
+        let reason = '';
+        // 2. 이전 단계로 되돌리는 경우 사유 입력
+        if (nextStep < currentStep && currentStatus !== '') {
+            const userReason = window.prompt('이전 단계로 되돌리는 사유를 입력해주세요:');
+            if (!userReason) {
+                alert('사유를 입력해야 상태 변경이 가능합니다.');
+                return;
+            }
+            reason = userReason;
         }
-        const logEntry = { from: pr.Status, to: nextStatus, message: logMessage || (nextStep < currentStep ? `복구: ${reason}` : '상태 변경'), user: userProfile?.displayName || 'Unknown', timestamp: new Date().toISOString() };
+
+        const logEntry = { 
+            from: currentStatus, 
+            to: nextStatus, 
+            message: logMessage || (reason ? `상태 복구: ${reason}` : '상태 변경'), 
+            user: userProfile?.displayName || 'Unknown', 
+            timestamp: new Date().toISOString(), 
+            scope: isSplit ? `${pr.Items?.[itemIdx]?.PartName || pr.PartName} ${sIdx+1}차` : '전체' 
+        };
+
         try {
-            await updateDoc(doc(db, 'production_requests', prId), { Status: nextStatus, UpdatedAt: serverTimestamp(), Logs: [logEntry, ...(pr.Logs || [])] });
-            await fetchPRs(); setSelectedPR(null);
-        } catch (err) { console.error(err); }
+            const updateData = { UpdatedAt: serverTimestamp(), Logs: [logEntry, ...(pr.Logs || [])] };
+            if (isSplit) {
+                const newItems = pr.Items && pr.Items.length > 0 ? [...pr.Items] : [{ PartID: pr.PartID, PartName: pr.PartName, Rev: pr.Rev || '0.0', TargetQty: pr.TargetQty, DueDate: pr.DueDate, Status: pr.Status, Schedules: [{ date: pr.DueDate, qty: pr.TargetQty, status: pr.Status }] }];
+                if (newItems[itemIdx]) {
+                    if (!newItems[itemIdx].Schedules) newItems[itemIdx].Schedules = [{ date: newItems[itemIdx].DueDate || pr.DueDate, qty: newItems[itemIdx].TargetQty || pr.TargetQty, status: newItems[itemIdx].Status || pr.Status }];
+                    newItems[itemIdx].Schedules[sIdx].status = nextStatus;
+                    newItems[itemIdx].Status = newItems[itemIdx].Schedules.every(s => s.status === nextStatus) ? nextStatus : 'IN_PRODUCTION';
+                }
+                updateData.Items = newItems;
+                const allPRDone = newItems.every(item => (item.Schedules || []).every(s => ['PROD_COMPLETE', 'QA_WAITING', 'QA_COMPLETE', 'SHIP_READY', 'SHIPPED'].includes(s.status)));
+                updateData.Status = allPRDone ? 'PROD_COMPLETE' : 'IN_PRODUCTION';
+            } else {
+                updateData.Status = nextStatus;
+                if (pr.Items) updateData.Items = pr.Items.map(item => ({ ...item, Status: nextStatus, Schedules: (item.Schedules || []).map(s => ({ ...s, status: nextStatus })) }));
+            }
+            await updateDoc(doc(db, 'production_requests', prId), updateData);
+            await fetchPRs(); if (selectedPR?.id === prId) setSelectedPR(prev => ({ ...prev, ...updateData, UpdatedAt: new Date() }));
+        } catch (err) { console.error(err); alert('상태 변경 실패'); }
     };
 
-    const handleUpdateSchedule = async () => {
+    const handleUpdateScheduleItem = async (itemIdx, sIdx, updates, logMessage = '') => {
         if (!selectedPR) return;
-        try {
-            await updateDoc(doc(db, 'production_requests', selectedPR.id), { ProdStartDate: scheduleForm.startDate, ProdEndDate: scheduleForm.endDate, UpdatedAt: serverTimestamp(), Logs: [{ from: selectedPR.Status, to: selectedPR.Status, message: `생산 일정 수정: ${scheduleForm.startDate} ~ ${scheduleForm.endDate}`, user: userProfile?.displayName || 'Unknown', timestamp: new Date().toISOString() }, ...(selectedPR.Logs || [])] });
-            alert('일정 수정 완료'); await fetchPRs(); setSelectedPR(null);
-        } catch (err) { console.error(err); }
-    };
-
-    const handleCardClick = (pr) => setSelectedPR(pr);
-
-    const stats = useMemo(() => {
-        const inProd = prs.filter(p => p.Status === 'IN_PRODUCTION').length;
-        const delayed = prs.filter(p => isDelayed(p.DueDate)).length;
-        const waiting = prs.filter(p => ['PROD_WAITING', 'PROD_PLANNING'].includes(p.Status)).length;
-        const qaWaiting = prs.filter(p => p.Status === 'QA_WAITING').length;
-        return { inProd, delayed, waiting, qaWaiting };
-    }, [prs]);
-
-    const waitingPRs = processedData.filter(p => ['PROD_WAITING', 'PROD_PLANNING'].includes(p.Status));
-    const activePRs = processedData.filter(p => ['WORK_ORDER', 'IN_PRODUCTION'].includes(p.Status));
-
-    const handleUpdateScheduleItem = async (itemIdx, sIdx, start, end) => {
-        if (!selectedPR) return;
-        const newItems = [...(selectedPR.Items || [{ PartID: selectedPR.PartID, PartName: selectedPR.PartName, TargetQty: selectedPR.TargetQty, DueDate: selectedPR.DueDate }])];
-        if (!newItems[itemIdx].Schedules) {
-            newItems[itemIdx].Schedules = [{ date: newItems[itemIdx].DueDate, qty: newItems[itemIdx].TargetQty }];
-        }
-        newItems[itemIdx].Schedules[sIdx] = { ...newItems[itemIdx].Schedules[sIdx], startDate: start, endDate: end };
+        const newItems = selectedPR.Items && selectedPR.Items.length > 0 ? [...selectedPR.Items] : [{ PartID: selectedPR.PartID, PartName: selectedPR.PartName, Rev: selectedPR.Rev || '0.0', TargetQty: selectedPR.TargetQty, DueDate: selectedPR.DueDate, Status: selectedPR.Status, Schedules: [{ date: selectedPR.DueDate, qty: selectedPR.TargetQty, status: selectedPR.Status }] }];
+        if (!newItems[itemIdx].Schedules) newItems[itemIdx].Schedules = [{ date: newItems[itemIdx].DueDate || selectedPR.DueDate, qty: newItems[itemIdx].TargetQty || selectedPR.TargetQty }];
         
+        newItems[itemIdx].Schedules[sIdx] = { ...newItems[itemIdx].Schedules[sIdx], ...updates };
+        
+        // 수정 모드 플래그 제거 (DB 저장용 아님)
+        delete newItems[itemIdx].Schedules[sIdx]._editingStart;
+        delete newItems[itemIdx].Schedules[sIdx]._editingEnd;
+
+        const logEntry = {
+            from: selectedPR.Status,
+            to: selectedPR.Status,
+            message: logMessage || `일정 정보 수정: ${newItems[itemIdx].PartName} ${sIdx+1}차`,
+            user: userProfile?.displayName || 'Unknown',
+            timestamp: new Date().toISOString()
+        };
+
         try {
             await updateDoc(doc(db, 'production_requests', selectedPR.id), { 
                 Items: newItems, 
-                UpdatedAt: serverTimestamp(), 
-                Logs: [{ from: selectedPR.Status, to: selectedPR.Status, message: `분할 일정 수정: ${newItems[itemIdx].PartName} ${sIdx+1}차 (${start} ~ ${end})`, user: userProfile?.displayName || 'Unknown', timestamp: new Date().toISOString() }, ...(selectedPR.Logs || [])] 
+                UpdatedAt: serverTimestamp(),
+                Logs: [logEntry, ...(selectedPR.Logs || [])]
             });
             await fetchPRs();
-            setSelectedPR({ ...selectedPR, Items: newItems });
-        } catch (err) { console.error(err); }
+            setSelectedPR(prev => ({ ...prev, Items: newItems, Logs: [logEntry, ...(prev.Logs || [])] }));
+        } catch (err) { console.error(err); alert('수정 실패'); }
     };
 
+    const stats = useMemo(() => ({ inProd: prs.filter(p => p.Status === 'IN_PRODUCTION').length, delayed: prs.filter(p => isDelayed(p.DueDate)).length, waiting: prs.filter(p => ['PROD_WAITING', 'PROD_PLANNING'].includes(p.Status)).length, qaWaiting: prs.filter(p => p.Status === 'QA_WAITING').length }), [prs]);
+    const waitingPRs = processedData.filter(p => ['PROD_WAITING', 'PROD_PLANNING'].includes(p.Status));
+    const activePRs = processedData.filter(p => ['WORK_ORDER', 'IN_PRODUCTION'].includes(p.Status));
+
+    const ganttData = useMemo(() => prs.map(pr => ({ id: pr.id, name: pr.PartName, code: pr.PRNumber, progress: Math.min(100, (PR_STATUS[pr.Status]?.step || 0) * 10), startDate: pr.ProdStartDate || pr.DueDate, endDate: pr.ProdEndDate || pr.DueDate, schedules: {}, tests: {} })), [prs]);
+
     return (
-        <div className="h-full flex flex-col space-y-5">
+        <div className="h-full flex flex-col space-y-5 text-left custom-scrollbar">
             <div className="flex justify-between items-end shrink-0">
                 <div className="flex items-end gap-6">
-                    <div><h1 className="text-3xl font-black text-slate-900 tracking-tight">생산 계획 관리</h1><p className="text-sm font-bold text-slate-500 mt-1.5">통합 관리 대시보드</p></div>
-                    <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1 mb-1">
+                    <div><h1 className="text-2xl font-black text-slate-900 tracking-tight">생산 계획 관리</h1></div>
+                    <div className="flex bg-slate-100 p-1 rounded-xl border gap-1 mb-0.5">
                         <button onClick={() => setGroupBy('ORDER')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${groupBy === 'ORDER' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>주문서별</button>
                         <button onClick={() => setGroupBy('DELIVERY')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${groupBy === 'DELIVERY' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>납기기준별</button>
                     </div>
                 </div>
-                <div className="flex bg-white p-1 rounded-2xl border border-slate-200 shadow-sm gap-1">
+                <div className="flex bg-white p-1 rounded-2xl border shadow-sm gap-1">
                     {[ { id: 'SPLIT', icon: List, label: '리스트' }, { id: 'KANBAN', icon: LayoutGrid, label: '칸반' }, { id: 'GANTT', icon: BarChart2, label: '간트' }, { id: 'CALENDAR', icon: Calendar, label: '캘린더' } ].map(tab => (
-                        <button key={tab.id} onClick={() => setViewMode(tab.id)} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${viewMode === tab.id ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}><tab.icon size={15}/> {tab.label}</button>
+                        <button key={tab.id} onClick={() => setViewMode(tab.id)} className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-black transition-all ${viewMode === tab.id ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}><tab.icon size={14}/> {tab.label}</button>
                     ))}
                 </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-4 shrink-0 text-left">
+            <div className="grid grid-cols-4 gap-4 shrink-0">
                 {[ { l: '계획 대기', v: stats.waiting, c: 'text-indigo-600', b: 'bg-indigo-50', i: Clock }, { l: '생산 중', v: stats.inProd, c: 'text-orange-600', b: 'bg-orange-50', i: Factory }, { l: '납기 지연', v: stats.delayed, c: 'text-rose-600', b: 'bg-rose-50', i: AlertTriangle }, { l: 'QA 대기', v: stats.qaWaiting, c: 'text-purple-600', b: 'bg-purple-50', i: TrendingUp } ].map((s, idx) => (
-                    <div key={idx} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center gap-4">
-                        <div className={`p-3 rounded-xl ${s.b}`}><s.i size={22} className={s.c}/></div>
-                        <div><p className="text-[10px] font-black text-slate-400 mb-0.5">{s.l}</p><p className={`text-2xl font-black ${s.c}`}>{s.v}</p></div>
+                    <div key={idx} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center gap-3">
+                        <div className={`p-2 rounded-xl ${s.b}`}><s.i size={18} className={s.c}/></div>
+                        <div><p className="text-[9px] font-black text-slate-400 mb-0.5 uppercase">{s.l}</p><p className={`text-xl font-black ${s.c}`}>{s.v}</p></div>
                     </div>
                 ))}
             </div>
 
-            {loading ? <div className="flex-1 flex items-center justify-center animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"/> : 
+            {loading ? <div className="flex-1 flex items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"/></div> : 
                 viewMode === 'SPLIT' ? (
-                    <div className="flex-1 grid grid-cols-2 gap-5 min-h-0 text-left">
-                        <div className="bg-white rounded-2xl border border-slate-200 flex flex-col overflow-hidden">
-                            <div className="px-5 py-4 border-b bg-indigo-50/50 shrink-0"><h2 className="text-sm font-black text-indigo-700">계획 대기 ({waitingPRs.length})</h2></div>
-                            <div className="flex-1 overflow-y-auto p-4 space-y-3">{waitingPRs.map(pr => <KanbanCard key={pr.displayID || pr.id} pr={pr} onClick={handleCardClick}/>)}</div>
-                        </div>
-                        <div className="bg-white rounded-2xl border border-slate-200 flex flex-col overflow-hidden">
-                            <div className="px-5 py-4 border-b bg-orange-50/50 shrink-0"><h2 className="text-sm font-black text-orange-700">생산 진행 중 ({activePRs.length})</h2></div>
-                            <div className="flex-1 overflow-y-auto p-4 space-y-3">{activePRs.map(pr => <KanbanCard key={pr.displayID || pr.id} pr={pr} onClick={handleCardClick}/>)}</div>
-                        </div>
+                    <div className="flex-1 grid grid-cols-2 gap-5 min-h-0">
+                        <div className="bg-white rounded-2xl border flex flex-col overflow-hidden"><div className="px-5 py-3 border-b bg-indigo-50/30 shrink-0"><h2 className="text-xs font-black text-indigo-700">계획 대기 ({waitingPRs.length})</h2></div><div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">{waitingPRs.map(pr => <KanbanCard key={pr.displayID || pr.id} pr={pr} onClick={setSelectedPR}/>)}</div></div>
+                        <div className="bg-white rounded-2xl border flex flex-col overflow-hidden"><div className="px-5 py-3 border-b bg-orange-50/30 shrink-0"><h2 className="text-xs font-black text-orange-700">생산 진행 중 ({activePRs.length})</h2></div><div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">{activePRs.map(pr => <KanbanCard key={pr.displayID || pr.id} pr={pr} onClick={setSelectedPR}/>)}</div></div>
                     </div>
                 ) : viewMode === 'KANBAN' ? (
                     <div className="flex-1 flex gap-4 min-h-0 overflow-x-auto pb-4 custom-scrollbar">
-                        {KANBAN_COLUMNS.map(col => <div key={col.key} className={`flex-shrink-0 w-56 rounded-2xl border-2 ${col.color} flex flex-col min-h-0 shadow-sm`}>
-                            <div className={`px-4 py-3 rounded-t-xl ${col.headColor} flex justify-between items-center`}><span className="text-[11px] font-black uppercase tracking-wider">{col.label}</span><span className="text-[10px] font-bold bg-white/50 px-2 py-0.5 rounded-full">{processedData.filter(p => p.Status === col.key).length}</span></div>
-                            <div className="flex-1 overflow-y-auto p-3 space-y-3">{processedData.filter(p => p.Status === col.key).map(pr => <KanbanCard key={pr.displayID || pr.id} pr={pr} onClick={handleCardClick}/>)}</div>
+                        {KANBAN_COLUMNS.map(col => <div key={col.key} className={`flex-shrink-0 w-60 rounded-2xl border-2 ${col.color} flex flex-col min-h-0 shadow-sm`}>
+                            <div className={`px-4 py-3 rounded-t-xl ${col.headColor} flex justify-between items-center`}><span className="text-[10px] font-black uppercase tracking-wider">{col.label}</span><span className="text-[10px] font-bold bg-white/50 px-2 py-0.5 rounded-full">{processedData.filter(p => p.Status === col.key).length}</span></div>
+                            <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">{processedData.filter(p => p.Status === col.key).map(pr => <KanbanCard key={pr.displayID || pr.id} pr={pr} onClick={setSelectedPR}/>)}</div>
                         </div>)}
                     </div>
-                ) : viewMode === 'GANTT' ? <div className="flex-1 min-h-0"><ProjectGanttChart projects={ganttData} stages={GANTT_STAGES} /></div> : <ProductionCalendar prs={processedData} onCardClick={handleCardClick} />
+                ) : viewMode === 'GANTT' ? <div className="flex-1 min-h-0 bg-white rounded-2xl border p-4"><ProjectGanttChart projects={ganttData} stages={GANTT_STAGES} /></div> : <ProductionCalendar prs={processedData} onCardClick={setSelectedPR} />
             }
 
             {selectedPR && createPortal(
-                <div className="relative z-[9999]">
+                <div className="relative z-[9999] text-left">
                     <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-[140]" onClick={() => setSelectedPR(null)}/>
-                    <div className="fixed inset-y-0 right-0 w-full md:w-[520px] bg-slate-50 shadow-2xl z-[150] flex flex-col border-l border-slate-200 text-left">
-                        <div className="bg-white px-6 py-5 border-b border-slate-200 flex justify-between items-start shrink-0">
-                            <div>
-                                <div className="flex items-center gap-2 mb-1">{selectedPR.Urgent && <span className="px-2 py-0.5 bg-rose-50 text-rose-600 rounded text-xs font-bold animate-pulse">긴급</span>}<span className={`px-2.5 py-0.5 rounded-md text-xs font-black border ${PR_STATUS[selectedPR.Status]?.color}`}>{PR_STATUS[selectedPR.Status]?.label}</span></div>
-                                <h2 className="text-xl font-black text-slate-900">{selectedPR.PRNumber}</h2><p className="text-sm font-bold text-slate-500">{selectedPR.PartName}</p>
-                            </div>
-                            <button onClick={() => setSelectedPR(null)} className="p-2 text-slate-400 hover:text-slate-700 bg-slate-50 rounded-xl"><X size={18}/></button>
+                    <div className="fixed inset-y-0 right-0 w-full md:w-[480px] bg-slate-50 shadow-2xl z-[150] flex flex-col border-l border-slate-200">
+                        <div className="bg-white px-5 py-4 border-b flex justify-between items-start shrink-0">
+                            <div><div className="flex items-center gap-2 mb-1">{selectedPR.Urgent && <span className="px-1.5 py-0.5 bg-rose-50 text-rose-600 rounded text-[9px] font-black animate-pulse">긴급</span>}<span className={`px-2 py-0.5 rounded-md text-[9px] font-black border ${PR_STATUS[selectedPR.Status]?.color}`}>{PR_STATUS[selectedPR.Status]?.label}</span></div><h2 className="text-lg font-black text-slate-900 leading-tight">{selectedPR.PRNumber}</h2><p className="text-xs font-bold text-slate-500 truncate">{selectedPR.PartName}</p></div>
+                            <button onClick={() => setSelectedPR(null)} className="p-1.5 text-slate-400 hover:text-slate-700 bg-slate-50 rounded-lg transition-colors"><X size={18}/></button>
                         </div>
                         
                         <div className="flex-1 overflow-hidden flex flex-col">
-                            {/* 사이드바 탭 헤더 */}
                             <div className="flex border-b border-slate-200 bg-white shrink-0 px-2">
-                                {[
-                                    { id: 'basic', label: '기본 정보', icon: ClipboardList },
-                                    { id: 'materials', label: 'BOM/소요자재', icon: Package },
-                                    { id: 'history', label: '활동 로그', icon: History }
-                                ].map(tab => (
-                                    <button
-                                        key={tab.id}
-                                        onClick={() => setDetailTab(tab.id)}
-                                        className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-black transition-all border-b-2 ${
-                                            detailTab === tab.id 
-                                                ? 'border-blue-600 text-blue-600 bg-blue-50/30' 
-                                                : 'border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50'
-                                        }`}
-                                    >
-                                        <tab.icon size={14} />
-                                        {tab.label}
-                                    </button>
+                                {[ { id: 'basic', label: '공정 제어', icon: ClipboardList }, { id: 'materials', label: '자재 현황', icon: Package }, { id: 'history', label: '활동 이력', icon: History } ].map(tab => (
+                                    <button key={tab.id} onClick={() => setDetailTab(tab.id)} className={`flex-1 flex items-center justify-center gap-2 py-3 text-[11px] font-black transition-all border-b-2 ${detailTab === tab.id ? 'border-blue-600 text-blue-600 bg-blue-50/30' : 'border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}><tab.icon size={13} /> {tab.label}</button>
                                 ))}
                             </div>
 
-                            <div className="flex-1 overflow-y-auto p-5 space-y-4 text-left custom-scrollbar">
+                            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                                 {detailTab === 'basic' && (
-                                    <div className="space-y-4">
-                                        {/* 상단 주문 정보 */}
-                                        <div className="bg-white rounded-2xl p-5 border border-slate-200 space-y-4 shadow-sm text-xs">
-                                            <h3 className="text-xs font-black text-slate-800 flex items-center gap-1.5 border-b pb-2"><ClipboardList size={14} className="text-blue-500"/> 고객사 주문 정보</h3>
-                                            <div className="grid grid-cols-2 gap-y-4 gap-x-3">
-                                                <div className="col-span-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                                                    <p className="font-bold text-slate-400 mb-1 uppercase tracking-tighter text-[9px]">고객사 (Customer)</p>
-                                                    <p className="font-black text-indigo-700 text-sm">{selectedPR.CustomerName || '미지정'}</p>
-                                                </div>
-                                                <div className="pl-1">
-                                                    <p className="font-bold text-slate-400 mb-1 uppercase tracking-tighter text-[9px]">납기 희망일</p>
-                                                    <p className="font-black text-rose-600 text-sm">{selectedPR.DueDate}</p>
-                                                </div>
-                                                <div className="pl-1">
-                                                    <p className="font-bold text-slate-400 mb-1 uppercase tracking-tighter text-[9px]">등록일</p>
-                                                    <p className="font-black text-slate-500 text-sm">{selectedPR.CreatedAt?.toDate ? selectedPR.CreatedAt.toDate().toLocaleDateString() : '-'}</p>
-                                                </div>
-                                                {selectedPR.Remarks && (
-                                                    <div className="col-span-2 mt-2 p-3 bg-amber-50/50 rounded-xl border border-amber-200/50">
-                                                        <p className="font-black text-amber-800 mb-1 uppercase tracking-tighter text-[9px]">비고 사항</p>
-                                                        <p className="font-bold text-slate-700 whitespace-pre-line leading-relaxed">{selectedPR.Remarks}</p>
-                                                    </div>
-                                                )}
+                                    <div className="space-y-3">
+                                        <div className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-sm space-y-2.5">
+                                            <div className="flex justify-between items-center border-b border-slate-100 pb-2"><h3 className="text-[11px] font-black text-slate-800 flex items-center gap-1.5"><ClipboardList size={13} className="text-blue-500"/> 주문 정보 요약</h3></div>
+                                            <div className="grid grid-cols-2 gap-2 text-[10px]">
+                                                <div className="col-span-2 px-2.5 py-1.5 bg-slate-50 rounded-lg border border-slate-100 flex justify-between items-center"><span className="font-bold text-slate-400 uppercase tracking-tighter">고객사</span><span className="font-black text-indigo-700">{selectedPR.CustomerName || '미지정'}</span></div>
+                                                <div className="px-2.5 py-1.5 bg-slate-50 rounded-lg border border-slate-100 flex justify-between items-center"><span className="font-bold text-slate-400 uppercase tracking-tighter">납기일</span><span className="font-black text-rose-600">{selectedPR.DueDate}</span></div>
+                                                <div className="px-2.5 py-1.5 bg-slate-50 rounded-lg border border-slate-100 flex justify-between items-center"><span className="font-bold text-slate-400 uppercase tracking-tighter">등록일</span><span className="font-black text-slate-500">{selectedPR.CreatedAt?.toDate ? selectedPR.CreatedAt.toDate().toLocaleDateString() : '-'}</span></div>
                                             </div>
                                         </div>
 
-                                        {/* 프로세스 제어 (상태 변경) */}
-                                        <div className="bg-white rounded-2xl p-5 border border-slate-200 space-y-3 shadow-sm">
-                                            <h3 className="text-xs font-black text-slate-800 flex items-center gap-1.5 border-b pb-2"><Zap size={14} className="text-orange-500"/> 공정 단계 제어</h3>
-                                            <div className="flex gap-2">
-                                                {NEXT_STATUS_MAP[selectedPR.Status] && selectedPR.Status !== 'IN_PRODUCTION' && (
-                                                    <button onClick={() => handleStatusChange(selectedPR.id, NEXT_STATUS_MAP[selectedPR.Status].next)} className="flex-1 py-3 bg-emerald-600 text-white rounded-xl text-xs font-black flex items-center justify-center gap-2 shadow-lg shadow-emerald-100 transition-all hover:bg-emerald-700">
-                                                        <Zap size={14}/> {NEXT_STATUS_MAP[selectedPR.Status].label}
-                                                    </button>
-                                                )}
-                                                {selectedPR.Status === 'IN_PRODUCTION' && (
-                                                    <button onClick={() => { setWoPR(selectedPR); setIsWOModalOpen(true); }} className="flex-1 py-3 bg-orange-500 text-white rounded-xl text-xs font-black flex items-center justify-center gap-2 shadow-lg shadow-orange-100 transition-all hover:bg-orange-600">
-                                                        <Factory size={14}/> 생산 완료 보고
-                                                    </button>
-                                                )}
-                                            </div>
-                                            {PR_STATUS[selectedPR.Status]?.step > 3 && (
-                                                <button onClick={() => { const steps = Object.entries(PR_STATUS).sort((a,b) => a[1].step - b[1].step); const idx = steps.findIndex(s => s[0] === selectedPR.Status); if (idx > 0) handleStatusChange(selectedPR.id, steps[idx - 1][0]); }} className="w-full py-2.5 bg-white border border-rose-200 text-rose-500 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-colors hover:bg-rose-50">
-                                                    <RotateCcw size={12}/> 이전 단계로 복구
-                                                </button>
-                                            )}
-                                        </div>
-
-                                        {/* 하단 분할 납기 및 모델별 일정 계획 */}
-                                        <div className="bg-white rounded-2xl p-5 border border-slate-200 space-y-4 shadow-sm">
-                                            <h3 className="text-xs font-black text-slate-700 flex items-center gap-2 uppercase tracking-widest"><Calendar size={14} className="text-blue-500"/> 완제품별 분할 납기 계획</h3>
-                                            <div className="space-y-4">
-                                                {(selectedPR.Items || [{ PartID: selectedPR.PartID, PartName: selectedPR.PartName, TargetQty: selectedPR.TargetQty, DueDate: selectedPR.DueDate }]).map((item, itemIdx) => {
-                                                    const schedules = item.Schedules && item.Schedules.length > 0 
-                                                        ? item.Schedules 
-                                                        : [{ date: item.DueDate, qty: item.TargetQty, startDate: selectedPR.ProdStartDate, endDate: selectedPR.ProdEndDate }];
-                                                    
-                                                    return (
-                                                        <div key={itemIdx} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
-                                                            <div className="flex justify-between items-start">
-                                                                <div>
-                                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Model: {item.PartID}</p>
-                                                                    <p className="text-xs font-black text-slate-700">{item.PartName}</p>
-                                                                </div>
-                                                                <span className="text-[10px] font-black px-2 py-0.5 bg-white border border-slate-200 rounded text-slate-500">총 {item.TargetQty} EA</span>
-                                                            </div>
-                                                            <div className="space-y-2.5">
-                                                                {schedules.map((sched, sIdx) => (
-                                                                    <div key={sIdx} className="bg-white p-3 rounded-xl border border-slate-200/60 shadow-sm">
-                                                                        <div className="flex justify-between items-center mb-2">
-                                                                            <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded uppercase">{sIdx + 1}차 납기 ({sched.qty} EA)</span>
-                                                                            <span className="text-[9px] font-bold text-rose-500">배송희망일: {sched.date}</span>
-                                                                        </div>
-                                                                        <div className="grid grid-cols-2 gap-3">
-                                                                            <div>
-                                                                                <label className="text-[8px] font-bold text-slate-400 block mb-1 uppercase">작업 시작일</label>
-                                                                                <input 
-                                                                                    type="date" 
-                                                                                    defaultValue={sched.startDate || ''} 
-                                                                                    onBlur={e => handleUpdateScheduleItem(itemIdx, sIdx, e.target.value, sched.endDate)}
-                                                                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-[10px] font-black outline-none focus:ring-1 focus:ring-blue-500"
-                                                                                />
-                                                                            </div>
-                                                                            <div>
-                                                                                <label className="text-[8px] font-bold text-slate-400 block mb-1 uppercase">작업 종료일</label>
-                                                                                <input 
-                                                                                    type="date" 
-                                                                                    defaultValue={sched.endDate || ''} 
-                                                                                    onBlur={e => handleUpdateScheduleItem(itemIdx, sIdx, sched.startDate, e.target.value)}
-                                                                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-[10px] font-black outline-none focus:ring-1 focus:ring-blue-500"
-                                                                                />
+                                        <div className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-sm space-y-3">
+                                            <h3 className="text-[11px] font-black text-slate-700 flex items-center gap-2 uppercase tracking-widest border-b border-slate-100 pb-2"><Calendar size={13} className="text-blue-500"/> 납기별 공정 제어</h3>
+                                            {(selectedPR.Items && selectedPR.Items.length > 0 ? selectedPR.Items : [{ PartID: selectedPR.PartID, PartName: selectedPR.PartName, TargetQty: selectedPR.TargetQty, DueDate: selectedPR.DueDate, Status: selectedPR.Status }]).map((item, itemIdx) => {
+                                                const schedules = (item.Schedules && item.Schedules.length > 0) ? item.Schedules : [{ date: item.DueDate || selectedPR.DueDate, qty: item.TargetQty || selectedPR.TargetQty, status: item.Status || selectedPR.Status }];
+                                                return (
+                                                    <div key={itemIdx} className="space-y-3 pb-2 border-b last:border-0">
+                                                        <div className="px-1 flex justify-between items-end"><div><p className="text-[8px] font-black text-slate-400 leading-none mb-0.5 uppercase tracking-tighter">MODEL: {item.PartID}</p><p className="text-[10px] font-black text-slate-700 truncate">{item.PartName}</p></div><span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">총 {item.TargetQty} EA</span></div>
+                                                        {schedules.map((sched, sIdx) => {
+                                                            const currentStatus = sched.status || item.Status || selectedPR.Status || '';
+                                                            const isLocked = currentStatus === 'QA_WAITING';
+                                                            
+                                                            // 로컬 선택 상태 관리를 위한 임시 키 (컴포넌트 내부에 상태를 두기엔 루프 안이라서 ref나 데이터 속성 활용 권장되나 여기선 즉시 반영 방식에서 '저장' 버튼 클릭 방식으로 로직만 분리)
+                                                            return (
+                                                                <div key={sIdx} className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200 space-y-3 shadow-inner">
+                                                                    <div className="flex justify-between items-center gap-3">
+                                                                        <div className="flex items-center gap-2 flex-1">
+                                                                            <span className="text-[8px] font-black text-white bg-slate-800 px-1.5 py-0.5 rounded uppercase whitespace-nowrap">{sIdx + 1}차 납기</span>
+                                                                            <div className="flex flex-1 gap-1">
+                                                                                <select 
+                                                                                    id={`select-${itemIdx}-${sIdx}`}
+                                                                                    defaultValue={currentStatus} 
+                                                                                    disabled={isLocked}
+                                                                                    className={`flex-1 text-[10px] font-black p-1.5 rounded-lg border shadow-sm outline-none transition-all ${isLocked ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-white text-slate-700 border-slate-300 focus:ring-1 focus:ring-indigo-500'}`}
+                                                                                >
+                                                                                    {!currentStatus && <option value="">알수없음</option>}
+                                                                                    {currentStatus && !['PROD_PLANNING', 'IN_PRODUCTION', 'PROD_COMPLETE', 'QA_WAITING', 'SHIPPED'].includes(currentStatus) && (
+                                                                                        <option value={currentStatus}>{PR_STATUS[currentStatus]?.label || currentStatus}</option>
+                                                                                    )}
+                                                                                    <option value="PROD_PLANNING">생산계획 저장</option>
+                                                                                    <option value="IN_PRODUCTION">작업지시(생산중)</option>
+                                                                                    <option value="PROD_COMPLETE">생산완료</option>
+                                                                                    <option value="QA_WAITING">출하검사중</option>
+                                                                                    <option value="SHIPPED">영업 이관(발송)</option>
+                                                                                </select>
+                                                                                {!isLocked && (
+                                                                                    <button 
+                                                                                        onClick={() => {
+                                                                                            const nextVal = document.getElementById(`select-${itemIdx}-${sIdx}`).value;
+                                                                                            if (!nextVal || nextVal === currentStatus) return;
+                                                                                            if (nextVal === 'PROD_COMPLETE') {
+                                                                                                setWoPR({...selectedPR, isSplit: true, itemIdx, scheduleIdx: sIdx, PartID: item.PartID, PartName: item.PartName, TargetQty: sched.qty, Status: currentStatus});
+                                                                                                setIsWOModalOpen(true);
+                                                                                            } else {
+                                                                                                handleStatusChange(selectedPR.id, nextVal, '상태 변경 (저장)', itemIdx, sIdx);
+                                                                                            }
+                                                                                        }}
+                                                                                        className="px-2 py-1.5 bg-indigo-600 text-white rounded-lg text-[9px] font-black hover:bg-indigo-700 shadow-sm"
+                                                                                    >
+                                                                                        저장
+                                                                                    </button>
+                                                                                )}
                                                                             </div>
                                                                         </div>
+                                                                        <span className="text-[9px] font-bold text-rose-500 whitespace-nowrap">{sched.date}</span>
                                                                     </div>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
+                                                                    <div className="flex items-end gap-2">
+                                                                        <div className="grid grid-cols-2 gap-2 flex-1">
+                                                                            <div className="bg-white p-1.5 rounded-lg border border-slate-200">
+                                                                                <label className="text-[7px] font-black text-slate-400 block mb-0.5 uppercase tracking-tighter">작업 시작</label>
+                                                                                <input 
+                                                                                    type="date" 
+                                                                                    id={`start-${itemIdx}-${sIdx}`}
+                                                                                    defaultValue={sched.startDate || ''} 
+                                                                                    disabled={!sched._editing}
+                                                                                    className={`w-full text-[10px] font-black outline-none bg-transparent ${!sched._editing ? 'text-slate-400' : 'text-slate-900'}`} 
+                                                                                />
+                                                                            </div>
+                                                                            <div className="bg-white p-1.5 rounded-lg border border-slate-200">
+                                                                                <label className="text-[7px] font-black text-slate-400 block mb-0.5 uppercase tracking-tighter">작업 종료</label>
+                                                                                <input 
+                                                                                    type="date" 
+                                                                                    id={`end-${itemIdx}-${sIdx}`}
+                                                                                    defaultValue={sched.endDate || ''} 
+                                                                                    disabled={!sched._editing}
+                                                                                    className={`w-full text-[10px] font-black outline-none bg-transparent ${!sched._editing ? 'text-slate-400' : 'text-slate-900'}`} 
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                        <button 
+                                                                            onClick={async () => {
+                                                                                const startInput = document.getElementById(`start-${itemIdx}-${sIdx}`);
+                                                                                const endInput = document.getElementById(`end-${itemIdx}-${sIdx}`);
+                                                                                if (!sched._editing) {
+                                                                                    const newItems = [...selectedPR.Items];
+                                                                                    newItems[itemIdx].Schedules[sIdx]._editing = true;
+                                                                                    setSelectedPR({...selectedPR, Items: newItems});
+                                                                                } else {
+                                                                                    const newStart = startInput.value;
+                                                                                    const newEnd = endInput.value;
+                                                                                    if (newStart === sched.startDate && newEnd === sched.endDate) {
+                                                                                        const newItems = [...selectedPR.Items];
+                                                                                        newItems[itemIdx].Schedules[sIdx]._editing = false;
+                                                                                        setSelectedPR({...selectedPR, Items: newItems});
+                                                                                        return;
+                                                                                    }
+                                                                                    const reason = window.prompt('일정 변경 사유를 입력하세요:');
+                                                                                    if (!reason) return;
+                                                                                    await handleUpdateScheduleItem(itemIdx, sIdx, { startDate: newStart, endDate: newEnd }, `일정 변경: ${newStart}~${newEnd} (${reason})`);
+                                                                                }
+                                                                            }}
+                                                                            className={`px-3 py-2.5 rounded-lg text-[10px] font-black transition-all ${sched._editing ? 'bg-green-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                                                                        >
+                                                                            {sched._editing ? '저장' : '수정'}
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 )}
-
                                 {detailTab === 'materials' && (
-                                    <div className="bg-white rounded-[32px] p-6 border border-slate-200 flex flex-col h-[600px] shadow-sm text-left overflow-hidden">
-                                        <div className="flex justify-between items-center mb-6 shrink-0">
-                                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight flex items-center gap-3">
-                                                <Package size={18} className="text-amber-500"/> 실시간 자재 가용성 현황
-                                            </h3>
-                                            <button onClick={() => fetchSelectedPRDetails(selectedPR)} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 hover:text-indigo-600 transition-colors border border-slate-100" title="새로고침">
-                                                <RotateCcw size={16}/>
-                                            </button>
-                                        </div>
-
-                                        {/* 납기 회차별 서브 탭 */}
-                                        <div className="flex gap-1 mb-4 overflow-x-auto pb-2 no-scrollbar border-b border-slate-100 shrink-0">
-                                            {selectedPRBOM.map((group, idx) => (
-                                                <button
-                                                    key={idx}
-                                                    onClick={() => setActiveScheduleTab(idx)}
-                                                    className={`px-3 py-1.5 rounded-xl text-left transition-all border-2 shrink-0 flex flex-col gap-0.5 min-w-[120px] ${
-                                                        activeScheduleTab === idx
-                                                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
-                                                            : 'bg-white border-slate-100 text-slate-400 hover:border-indigo-100'
-                                                    }`}
-                                                >
-                                                    <div className="flex items-center gap-1.5 overflow-hidden">
-                                                        <span className={`px-1 py-0.5 rounded text-[7px] font-black ${activeScheduleTab === idx ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                                                            {group.ScheduleIdx}차
-                                                        </span>
-                                                        <span className="text-[9px] font-black truncate max-w-[90px]">
-                                                            {group.PartName}
-                                                        </span>
-                                                        <span className={`text-[7px] font-bold ${activeScheduleTab === idx ? 'text-indigo-200' : 'text-indigo-600/60'}`}>
-                                                            ({group.SetQty} SET)
-                                                        </span>
-                                                    </div>
-                                                </button>
-                                            ))}
-                                        </div>
-
-                                        <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar relative text-left">
-                                            {selectedPRBOM.length > 0 && selectedPRBOM[activeScheduleTab] ? (
-                                                <div className="animate-in fade-in duration-300">
-                                                    <BOMCheckTree 
-                                                        data={selectedPRBOM[activeScheduleTab].BOMTree}
-                                                        targetQty={selectedPRBOM[activeScheduleTab].SetQty}
-                                                        inventoryMap={Object.fromEntries(
-                                                            Object.entries(inventory).map(([id, onHand]) => {
-                                                                const pid = id.trim().toUpperCase();
-                                                                return [
-                                                                    pid, 
-                                                                    onHand - (reservedMap[pid] || 0)
-                                                                ];
-                                                            })
-                                                        )}
-                                                        className="h-auto"
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <div className="py-24 text-center text-xs font-bold text-slate-300 uppercase tracking-[0.2em]">BOM 데이터 로드 중...</div>
-                                            )}
-                                        </div>
+                                    <div className="bg-white rounded-[32px] p-5 border border-slate-200 flex flex-col h-[550px] shadow-sm text-left overflow-hidden">
+                                        <div className="flex justify-between items-center mb-4 shrink-0"><h3 className="text-xs font-black text-slate-900 uppercase tracking-tight flex items-center gap-2"><Package size={16} className="text-amber-500"/> 실시간 자재 현황</h3><button onClick={() => fetchSelectedPRDetails(selectedPR)} className="p-1.5 hover:bg-slate-50 rounded-xl text-slate-400 hover:text-indigo-600 transition-colors border border-slate-100"><RotateCcw size={14}/></button></div>
+                                        <div className="flex gap-1 mb-4 overflow-x-auto pb-2 no-scrollbar border-b shrink-0">{selectedPRBOM.map((group, idx) => (<button key={idx} onClick={() => setActiveScheduleTab(idx)} className={`px-3 py-1.5 rounded-xl text-left transition-all border-2 shrink-0 flex flex-col gap-0.5 min-w-[110px] ${activeScheduleTab === idx ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-400'}`}><div className="flex items-center gap-1.5 overflow-hidden"><span className={`px-1 py-0.5 rounded text-[7px] font-black ${activeScheduleTab === idx ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{group.ScheduleIdx}차</span><span className="text-[9px] font-black truncate max-w-[80px]">{group.PartName}</span></div></button>))}</div>
+                                        <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">{selectedPRBOM.length > 0 && selectedPRBOM[activeScheduleTab] ? <div className="animate-in fade-in duration-300"><BOMCheckTree data={selectedPRBOM[activeScheduleTab].BOMTree} targetQty={selectedPRBOM[activeScheduleTab].SetQty} inventoryMap={Object.fromEntries(Object.entries(inventory).map(([id, onHand]) => [id.trim().toUpperCase(), onHand - (reservedMap[id.trim().toUpperCase()] || 0)]))} className="h-auto"/></div> : <div className="py-20 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">데이터 로드 중...</div>}</div>
                                     </div>
                                 )}
-
                                 {detailTab === 'history' && (
-                                    <div className="bg-white rounded-[32px] p-6 border border-slate-200 shadow-sm min-h-[500px] text-left">
-                                        <h3 className="text-sm font-black text-slate-800 flex items-center gap-2 mb-6 uppercase tracking-tight"><History size={16} className="text-indigo-600"/> 생산 진행 이력</h3>
-                                        <div className="space-y-1">
-                                            {selectedPR.Logs && selectedPR.Logs.length > 0 ? selectedPR.Logs.map((log, lidx) => (
-                                                <div key={lidx} className="relative pl-6 pb-4 border-l-2 border-slate-100 last:border-0 last:pb-0 flex flex-col group hover:bg-slate-50/50 rounded-r-lg transition-colors p-2">
-                                                    <div className="absolute left-[-9px] top-4 w-4 h-4 rounded-full bg-white border-2 border-indigo-500 flex items-center justify-center">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
-                                                    </div>
-                                                    <div className="flex items-center justify-between mb-1">
-                                                        <span className="text-[10px] font-black text-indigo-600 px-1.5 py-0.5 bg-indigo-50 rounded border border-indigo-100 uppercase">{PR_STATUS[log.to]?.label || log.to}</span>
-                                                        <span className="text-[9px] text-slate-300 font-bold tabular-nums">{new Date(log.timestamp).toLocaleString()}</span>
-                                                    </div>
-                                                    <p className="text-xs font-bold text-slate-700">{log.message}</p>
-                                                    <p className="text-[9px] font-black text-slate-400 mt-1 uppercase tracking-tighter">BY: {log.user}</p>
-                                                </div>
-                                            )) : (
-                                                <div className="py-24 text-center text-xs font-bold text-slate-300 uppercase tracking-widest">이력이 없습니다.</div>
-                                            )}
-                                        </div>
+                                    <div className="bg-white rounded-[32px] p-5 border border-slate-200 shadow-sm min-h-[450px] text-left">
+                                        <h3 className="text-xs font-black text-slate-800 flex items-center gap-2 mb-5 uppercase tracking-tight"><History size={16} className="text-indigo-600"/> 생산 진행 이력</h3>
+                                        <div className="space-y-1">{selectedPR.Logs && selectedPR.Logs.length > 0 ? selectedPR.Logs.map((log, lidx) => (<div key={lidx} className="relative pl-6 pb-4 border-l-2 border-slate-100 last:border-0 last:pb-0 flex flex-col group p-2"><div className="absolute left-[-9px] top-4 w-4 h-4 rounded-full bg-white border-2 border-indigo-500 flex items-center justify-center"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div></div><div className="flex items-center justify-between mb-1"><span className="text-[9px] font-black text-indigo-600 px-1.5 py-0.5 bg-indigo-50 rounded border border-indigo-100 uppercase">{PR_STATUS[log.to]?.label || log.to}</span><span className="text-[8px] text-slate-300 font-bold tabular-nums">{new Date(log.timestamp).toLocaleString()}</span></div><p className="text-[11px] font-bold text-slate-700">{log.message}</p><p className="text-[8px] font-black text-slate-400 mt-1 uppercase tracking-tighter">BY: {log.user}</p></div>)) : <div className="py-20 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">이력이 없습니다.</div>}</div>
                                     </div>
                                 )}
                             </div>

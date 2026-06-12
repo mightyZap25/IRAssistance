@@ -1,0 +1,4932 @@
+[
+    {
+        "timestamp": "2026-06-12T04:33:44.314Z",
+        "day": 0,
+        "date": "2026-06-11",
+        "level": "SYSTEM",
+        "message": "대상 완제품 선정 완료: IRMAA0039 (12Lf-12F-27)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:44.315Z",
+        "day": 0,
+        "date": "2026-06-11",
+        "level": "PLANNING",
+        "message": "안전재고 부족 감지 (현재고: 0, 진행중: 0). 생산의뢰 PR-INT-0-1781238824315 생성 (+20 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:44.397Z",
+        "day": 0,
+        "date": "2026-06-11",
+        "level": "PLANNING",
+        "message": "생산 의뢰 PR-INT-0-1781238824315 자재 부족 발생. 부족량에 따른 구매 조달 발주 기안 작성.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:44.397Z",
+        "day": 0,
+        "date": "2026-06-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-0-1781238824397 작성 (품목: IROIL0002, 수량: 60 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:44.506Z",
+        "day": 0,
+        "date": "2026-06-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-0-1781238824506 작성 (품목: IROIX0003, 수량: 80 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:44.594Z",
+        "day": 0,
+        "date": "2026-06-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-0-1781238824594 작성 (품목: IRMIT0022, 수량: 60 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:44.707Z",
+        "day": 0,
+        "date": "2026-06-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-0-1781238824707 작성 (품목: IROIX0001, 수량: 60 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:44.771Z",
+        "day": 0,
+        "date": "2026-06-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-0-1781238824771 작성 (품목: IRMIP0012, 수량: 60 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:44.861Z",
+        "day": 0,
+        "date": "2026-06-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-0-1781238824861 작성 (품목: IROIX0006, 수량: 70 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:44.948Z",
+        "day": 0,
+        "date": "2026-06-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-0-1781238824948 작성 (품목: IRMIT0055, 수량: 60 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:45.073Z",
+        "day": 0,
+        "date": "2026-06-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-0-1781238825073 작성 (품목: IROIX0007, 수량: 80 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:45.206Z",
+        "day": 0,
+        "date": "2026-06-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-0-1781238825206 작성 (품목: IROIX0008, 수량: 70 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:45.346Z",
+        "day": 0,
+        "date": "2026-06-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-0-1781238825346 작성 (품목: IROIX0009, 수량: 70 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:45.412Z",
+        "day": 0,
+        "date": "2026-06-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-0-1781238825412 작성 (품목: IROIQ0016, 수량: 240 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:45.502Z",
+        "day": 0,
+        "date": "2026-06-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-0-1781238825502 작성 (품목: IROIQ0019, 수량: 70 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:45.569Z",
+        "day": 0,
+        "date": "2026-06-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-0-1781238825569 작성 (품목: IROIQ0027, 수량: 60 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:45.690Z",
+        "day": 0,
+        "date": "2026-06-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-0-1781238825690 작성 (품목: IROIQ0028, 수량: 160 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:45.755Z",
+        "day": 0,
+        "date": "2026-06-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-0-1781238825755 작성 (품목: IROIW0029, 수량: 70 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:45.854Z",
+        "day": 0,
+        "date": "2026-06-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-0-1781238825854 작성 (품목: IROIX0010, 수량: 70 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:45.912Z",
+        "day": 2,
+        "date": "2026-06-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-0-1781238825854 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:46.011Z",
+        "day": 2,
+        "date": "2026-06-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-0-1781238825755 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:46.076Z",
+        "day": 2,
+        "date": "2026-06-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-0-1781238825690 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:46.199Z",
+        "day": 2,
+        "date": "2026-06-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-0-1781238825569 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:46.265Z",
+        "day": 2,
+        "date": "2026-06-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-0-1781238825502 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:46.365Z",
+        "day": 2,
+        "date": "2026-06-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-0-1781238825412 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:46.420Z",
+        "day": 2,
+        "date": "2026-06-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-0-1781238825346 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:46.508Z",
+        "day": 2,
+        "date": "2026-06-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-0-1781238825206 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:46.585Z",
+        "day": 2,
+        "date": "2026-06-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-0-1781238825073 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:46.707Z",
+        "day": 2,
+        "date": "2026-06-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-0-1781238824948 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:46.774Z",
+        "day": 2,
+        "date": "2026-06-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-0-1781238824861 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:46.895Z",
+        "day": 2,
+        "date": "2026-06-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-0-1781238824771 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:47.106Z",
+        "day": 2,
+        "date": "2026-06-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-0-1781238824707 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:47.260Z",
+        "day": 2,
+        "date": "2026-06-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-0-1781238824594 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:47.338Z",
+        "day": 2,
+        "date": "2026-06-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-0-1781238824506 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:47.460Z",
+        "day": 2,
+        "date": "2026-06-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-0-1781238824397 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:47.536Z",
+        "day": 5,
+        "date": "2026-06-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIX0010, 수량: 70 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:47.725Z",
+        "day": 5,
+        "date": "2026-06-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIW0029, 수량: 70 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:47.890Z",
+        "day": 5,
+        "date": "2026-06-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIQ0028, 수량: 160 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:48.068Z",
+        "day": 5,
+        "date": "2026-06-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIQ0027, 수량: 60 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:48.300Z",
+        "day": 5,
+        "date": "2026-06-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIQ0019, 수량: 70 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:48.499Z",
+        "day": 5,
+        "date": "2026-06-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIQ0016, 수량: 240 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:48.664Z",
+        "day": 5,
+        "date": "2026-06-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIX0009, 수량: 70 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:48.831Z",
+        "day": 5,
+        "date": "2026-06-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIX0008, 수량: 70 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:48.963Z",
+        "day": 5,
+        "date": "2026-06-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIX0007, 수량: 80 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:49.150Z",
+        "day": 5,
+        "date": "2026-06-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IRMIT0055, 수량: 60 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:49.307Z",
+        "day": 5,
+        "date": "2026-06-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIX0006, 수량: 70 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:49.482Z",
+        "day": 5,
+        "date": "2026-06-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IRMIP0012, 수량: 60 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:49.660Z",
+        "day": 5,
+        "date": "2026-06-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIX0001, 수량: 60 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:49.825Z",
+        "day": 5,
+        "date": "2026-06-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IRMIT0022, 수량: 60 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:50.036Z",
+        "day": 5,
+        "date": "2026-06-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIX0003, 수량: 80 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:50.246Z",
+        "day": 5,
+        "date": "2026-06-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIL0002, 수량: 60 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:50.423Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIL0002 (60 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:50.633Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIL0002: 30 -> 90 (+60 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIL0002",
+            "oldQty": 30,
+            "newQty": 90,
+            "changeQty": 60,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:50.721Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIX0003 (80 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:50.887Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0003: 50 -> 130 (+80 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIX0003",
+            "oldQty": 50,
+            "newQty": 130,
+            "changeQty": 80,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:50.963Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IRMIT0022 (60 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:51.196Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0022: 50 -> 110 (+60 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IRMIT0022",
+            "oldQty": 50,
+            "newQty": 110,
+            "changeQty": 60,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:51.308Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIX0001 (60 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:51.451Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0001: 30 -> 90 (+60 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIX0001",
+            "oldQty": 30,
+            "newQty": 90,
+            "changeQty": 60,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:51.517Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IRMIP0012 (60 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:51.805Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0012: 30 -> 90 (+60 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IRMIP0012",
+            "oldQty": 30,
+            "newQty": 90,
+            "changeQty": 60,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:51.916Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIX0006 (70 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:52.126Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0006: 20 -> 90 (+70 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIX0006",
+            "oldQty": 20,
+            "newQty": 90,
+            "changeQty": 70,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:52.213Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IRMIT0055 (60 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:52.424Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0055: 50 -> 110 (+60 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IRMIT0055",
+            "oldQty": 50,
+            "newQty": 110,
+            "changeQty": 60,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:52.535Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIX0007 (80 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:52.778Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0007: 50 -> 130 (+80 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIX0007",
+            "oldQty": 50,
+            "newQty": 130,
+            "changeQty": 80,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:52.845Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIX0008 (70 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:53.023Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0008: 20 -> 90 (+70 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIX0008",
+            "oldQty": 20,
+            "newQty": 90,
+            "changeQty": 70,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:53.132Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIX0009 (70 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:53.309Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0009: 20 -> 90 (+70 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIX0009",
+            "oldQty": 20,
+            "newQty": 90,
+            "changeQty": 70,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:53.395Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIQ0016 (240 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:53.574Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0016: 50 -> 290 (+240 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIQ0016",
+            "oldQty": 50,
+            "newQty": 290,
+            "changeQty": 240,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:53.696Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIQ0019 (70 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:53.904Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0019: 20 -> 90 (+70 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIQ0019",
+            "oldQty": 20,
+            "newQty": 90,
+            "changeQty": 70,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:53.983Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIQ0027 (60 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:54.160Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0027: 50 -> 110 (+60 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIQ0027",
+            "oldQty": 50,
+            "newQty": 110,
+            "changeQty": 60,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:54.259Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIQ0028 (160 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:54.471Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0028: 50 -> 210 (+160 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIQ0028",
+            "oldQty": 50,
+            "newQty": 210,
+            "changeQty": 160,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:54.547Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIW0029 (70 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:54.800Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIW0029: 20 -> 90 (+70 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIW0029",
+            "oldQty": 20,
+            "newQty": 90,
+            "changeQty": 70,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:54.901Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIX0010 (70 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:55.090Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0010: 20 -> 90 (+70 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIX0010",
+            "oldQty": 20,
+            "newQty": 90,
+            "changeQty": 70,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:55.157Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "PRODUCTION",
+        "message": "생산 의뢰 PR-INT-0-1781238824315 자재 확보 성공. 원자재 출고 차감 후 생산라인 투입 (Status -> IN_PRODUCTION)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:33:55.343Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0001: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIP0001",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:55.520Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIC0003: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIC0003",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:55.697Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIW0016: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIW0016",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:55.863Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIW0017: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIW0017",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:56.052Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIW0018: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIW0018",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:56.270Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIL0002: 90 -> 50 (-40 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIL0002",
+            "oldQty": 90,
+            "newQty": 50,
+            "changeQty": -40,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:56.459Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0001: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIT0001",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:56.646Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0008: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIT0008",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:56.858Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIB0001: 499.0700000000001 -> 498.9900000000001 (-0.08 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIB0001",
+            "oldQty": 499.0700000000001,
+            "newQty": 498.9900000000001,
+            "changeQty": -0.08,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:57.056Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0018: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIT0018",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:57.222Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0006: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIP0006",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:57.366Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0003: 130 -> 50 (-80 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIX0003",
+            "oldQty": 130,
+            "newQty": 50,
+            "changeQty": -80,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:57.508Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0021: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIT0021",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:57.653Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0022: 110 -> 50 (-60 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIT0022",
+            "oldQty": 110,
+            "newQty": 50,
+            "changeQty": -60,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:57.863Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0009: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIP0009",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:58.028Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIL0001: 497.68 -> 497.48 (-0.2 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIL0001",
+            "oldQty": 497.68,
+            "newQty": 497.48,
+            "changeQty": -0.2,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:58.207Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0054: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIT0054",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:58.395Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0001: 90 -> 50 (-40 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIX0001",
+            "oldQty": 90,
+            "newQty": 50,
+            "changeQty": -40,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:58.627Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0025: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIT0025",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:58.781Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0012: 90 -> 50 (-40 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIP0012",
+            "oldQty": 90,
+            "newQty": 50,
+            "changeQty": -40,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:58.950Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0008: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIP0008",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:59.146Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0029: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIT0029",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:59.456Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIC0001: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIC0001",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:59.631Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIB0002: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIB0002",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:59.810Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0021: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIP0021",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:33:59.965Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0006: 90 -> 50 (-40 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIX0006",
+            "oldQty": 90,
+            "newQty": 50,
+            "changeQty": -40,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:00.153Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0055: 110 -> 50 (-60 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIT0055",
+            "oldQty": 110,
+            "newQty": 50,
+            "changeQty": -60,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:00.329Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0022: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIP0022",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:00.550Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0023: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIP0023",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:00.727Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0025: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIP0025",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:00.915Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0026: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIP0026",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:01.092Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0027: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIP0027",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:01.280Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0007: 130 -> 50 (-80 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIX0007",
+            "oldQty": 130,
+            "newQty": 50,
+            "changeQty": -80,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:01.502Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0057: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIT0057",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:01.656Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0024: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIP0024",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:01.923Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0056: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIT0056",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:02.132Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0028: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIP0028",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:02.309Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0029: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIP0029",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:02.475Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0052: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIT0052",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:02.651Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0008: 90 -> 50 (-40 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIX0008",
+            "oldQty": 90,
+            "newQty": 50,
+            "changeQty": -40,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:02.817Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0009: 90 -> 50 (-40 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIX0009",
+            "oldQty": 90,
+            "newQty": 50,
+            "changeQty": -40,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:03.049Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0001: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0001",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:03.225Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0002: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0002",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:03.380Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0005: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0005",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:03.559Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0007: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0007",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:03.757Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0008: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0008",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:03.912Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0009: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0009",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:04.067Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0010: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0010",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:04.242Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0012: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0012",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:04.408Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0013: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0013",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:04.564Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0014: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0014",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:04.730Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0015: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0015",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:04.918Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0016: 290 -> 50 (-240 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0016",
+            "oldQty": 290,
+            "newQty": 50,
+            "changeQty": -240,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:05.083Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0017: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0017",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:05.283Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0018: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0018",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:05.448Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0019: 90 -> 50 (-40 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0019",
+            "oldQty": 90,
+            "newQty": 50,
+            "changeQty": -40,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:05.725Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0020: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0020",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:05.967Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0040: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0040",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:06.134Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0023: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0023",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:06.333Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0027: 110 -> 50 (-60 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0027",
+            "oldQty": 110,
+            "newQty": 50,
+            "changeQty": -60,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:06.487Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0028: 210 -> 50 (-160 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0028",
+            "oldQty": 210,
+            "newQty": 50,
+            "changeQty": -160,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:06.676Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0029: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0029",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:06.853Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0030: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0030",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:07.019Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0033: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0033",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:07.196Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0034: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0034",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:07.408Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIW0029: 90 -> 50 (-40 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIW0029",
+            "oldQty": 90,
+            "newQty": 50,
+            "changeQty": -40,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:07.595Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IREIB0008: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IREIB0008",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:07.782Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIL0003: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIL0003",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:07.947Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0032: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0032",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:08.113Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0031: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIQ0031",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:08.312Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0030: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIP0030",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:08.511Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0031: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIP0031",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:08.710Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0032: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMIP0032",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:08.877Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0010: 90 -> 50 (-40 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIX0010",
+            "oldQty": 90,
+            "newQty": 50,
+            "changeQty": -40,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:09.097Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0011: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIX0011",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:09.274Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIV0040: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIV0040",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:09.429Z",
+        "day": 6,
+        "date": "2026-06-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIV0041: 260 -> 240 (-20 EA, 사유: 생산 투입 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IROIV0041",
+            "oldQty": 260,
+            "newQty": 240,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:09.495Z",
+        "day": 9,
+        "date": "2026-06-20",
+        "level": "PRODUCTION",
+        "message": "생산 의뢰 PR-INT-0-1781238824315 제조 조립 공정 완료. 완제품 출하 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:09.595Z",
+        "day": 10,
+        "date": "2026-06-21",
+        "level": "SALES",
+        "message": "신규 고객사(Simulated Corp A) 소량 주문 접수. 생산의뢰 PR-SALES-10-1781238849595 발행 (수량: 5 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:09.661Z",
+        "day": 10,
+        "date": "2026-06-21",
+        "level": "PLANNING",
+        "message": "생산 의뢰 PR-SALES-10-1781238849595 자재 부족 발생. 부족량에 따른 구매 조달 발주 기안 작성.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:09.661Z",
+        "day": 10,
+        "date": "2026-06-21",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-10-1781238849661 작성 (품목: IROIQ0016, 수량: 60 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:09.772Z",
+        "day": 10,
+        "date": "2026-06-21",
+        "level": "QA",
+        "message": "출하 검사 적합 판정 (PR-INT-0-1781238824315). 완제품 적재 승인 (수량: 20 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:09.948Z",
+        "day": 10,
+        "date": "2026-06-21",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMAA0039: 0 -> 20 (+20 EA, 사유: 생산 완료 (PR-INT-0-1781238824315))",
+        "detail": {
+            "partId": "IRMAA0039",
+            "oldQty": 0,
+            "newQty": 20,
+            "changeQty": 20,
+            "reason": "생산 완료 (PR-INT-0-1781238824315)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:10.136Z",
+        "day": 12,
+        "date": "2026-06-23",
+        "level": "PURCHASING",
+        "message": "발주서 PO-10-1781238849661 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:10.192Z",
+        "day": 15,
+        "date": "2026-06-26",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIQ0016, 수량: 60 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:10.379Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIQ0016 (60 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:10.557Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0016: 50 -> 110 (+60 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIQ0016",
+            "oldQty": 50,
+            "newQty": 110,
+            "changeQty": 60,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:10.755Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "PRODUCTION",
+        "message": "생산 의뢰 PR-SALES-10-1781238849595 자재 확보 성공. 원자재 출고 차감 후 생산라인 투입 (Status -> IN_PRODUCTION)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:10.933Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0001: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIP0001",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:11.110Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIC0003: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIC0003",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:11.308Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIW0016: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIW0016",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:11.563Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIW0017: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIW0017",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:11.729Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIW0018: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIW0018",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:11.895Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIL0002: 50 -> 40 (-10 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIL0002",
+            "oldQty": 50,
+            "newQty": 40,
+            "changeQty": -10,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:12.072Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0001: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIT0001",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:12.261Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0008: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIT0008",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:12.415Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIB0001: 498.9900000000001 -> 498.97000000000014 (-0.02 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIB0001",
+            "oldQty": 498.9900000000001,
+            "newQty": 498.97000000000014,
+            "changeQty": -0.02,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:12.591Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0018: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIT0018",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:12.790Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0006: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIP0006",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:13.002Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0003: 50 -> 30 (-20 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIX0003",
+            "oldQty": 50,
+            "newQty": 30,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:13.200Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0021: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIT0021",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:13.376Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0022: 50 -> 35 (-15 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIT0022",
+            "oldQty": 50,
+            "newQty": 35,
+            "changeQty": -15,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:13.553Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0009: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIP0009",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:13.764Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIL0001: 497.48 -> 497.43 (-0.05 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIL0001",
+            "oldQty": 497.48,
+            "newQty": 497.43,
+            "changeQty": -0.05,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:13.929Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0054: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIT0054",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:14.095Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0001: 50 -> 40 (-10 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIX0001",
+            "oldQty": 50,
+            "newQty": 40,
+            "changeQty": -10,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:14.271Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0025: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIT0025",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:14.427Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0012: 50 -> 40 (-10 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIP0012",
+            "oldQty": 50,
+            "newQty": 40,
+            "changeQty": -10,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:14.638Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0008: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIP0008",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:14.849Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0029: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIT0029",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:15.057Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIC0001: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIC0001",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:15.223Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIB0002: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIB0002",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:15.376Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0021: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIP0021",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:15.556Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0006: 50 -> 40 (-10 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIX0006",
+            "oldQty": 50,
+            "newQty": 40,
+            "changeQty": -10,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:15.732Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0055: 50 -> 35 (-15 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIT0055",
+            "oldQty": 50,
+            "newQty": 35,
+            "changeQty": -15,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:15.875Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0022: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIP0022",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:16.074Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0023: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIP0023",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:16.239Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0025: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIP0025",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:16.373Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0026: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIP0026",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:16.505Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0027: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIP0027",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:16.627Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0007: 50 -> 30 (-20 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIX0007",
+            "oldQty": 50,
+            "newQty": 30,
+            "changeQty": -20,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:16.804Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0057: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIT0057",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:16.968Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0024: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIP0024",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:17.290Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0056: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIT0056",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:17.489Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0028: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIP0028",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:17.655Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0029: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIP0029",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:17.788Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0052: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIT0052",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:17.954Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0008: 50 -> 40 (-10 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIX0008",
+            "oldQty": 50,
+            "newQty": 40,
+            "changeQty": -10,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:18.109Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0009: 50 -> 40 (-10 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIX0009",
+            "oldQty": 50,
+            "newQty": 40,
+            "changeQty": -10,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:18.295Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0001: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0001",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:18.440Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0002: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0002",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:18.628Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0005: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0005",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:18.772Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0007: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0007",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:18.950Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0008: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0008",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:19.104Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0009: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0009",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:19.247Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0010: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0010",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:19.424Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0012: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0012",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:19.579Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0013: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0013",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:19.734Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0014: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0014",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:19.878Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0015: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0015",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:20.043Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0016: 110 -> 50 (-60 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0016",
+            "oldQty": 110,
+            "newQty": 50,
+            "changeQty": -60,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:20.243Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0017: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0017",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:20.397Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0018: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0018",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:20.575Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0019: 50 -> 40 (-10 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0019",
+            "oldQty": 50,
+            "newQty": 40,
+            "changeQty": -10,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:20.750Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0020: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0020",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:20.917Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0040: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0040",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:21.094Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0023: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0023",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:21.283Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0027: 50 -> 35 (-15 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0027",
+            "oldQty": 50,
+            "newQty": 35,
+            "changeQty": -15,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:21.470Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0028: 50 -> 10 (-40 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0028",
+            "oldQty": 50,
+            "newQty": 10,
+            "changeQty": -40,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:21.625Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0029: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0029",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:21.822Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0030: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0030",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:22.012Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0033: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0033",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:22.201Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0034: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0034",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:22.343Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIW0029: 50 -> 40 (-10 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIW0029",
+            "oldQty": 50,
+            "newQty": 40,
+            "changeQty": -10,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:22.532Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IREIB0008: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IREIB0008",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:22.685Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIL0003: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIL0003",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:22.840Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0032: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0032",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:23.051Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0031: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIQ0031",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:23.206Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0030: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIP0030",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:23.372Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0031: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIP0031",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:23.526Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0032: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMIP0032",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:23.759Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0010: 50 -> 40 (-10 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIX0010",
+            "oldQty": 50,
+            "newQty": 40,
+            "changeQty": -10,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:23.924Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0011: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIX0011",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:24.090Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIV0040: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIV0040",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:24.256Z",
+        "day": 16,
+        "date": "2026-06-27",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIV0041: 240 -> 235 (-5 EA, 사유: 생산 투입 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IROIV0041",
+            "oldQty": 240,
+            "newQty": 235,
+            "changeQty": -5,
+            "reason": "생산 투입 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:24.344Z",
+        "day": 19,
+        "date": "2026-06-30",
+        "level": "PRODUCTION",
+        "message": "생산 의뢰 PR-SALES-10-1781238849595 제조 조립 공정 완료. 완제품 출하 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:24.411Z",
+        "day": 20,
+        "date": "2026-07-01",
+        "level": "QA",
+        "message": "출하 검사 적합 판정 (PR-SALES-10-1781238849595). 완제품 적재 승인 (수량: 5 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:24.533Z",
+        "day": 20,
+        "date": "2026-07-01",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMAA0039: 20 -> 25 (+5 EA, 사유: 생산 완료 (PR-SALES-10-1781238849595))",
+        "detail": {
+            "partId": "IRMAA0039",
+            "oldQty": 20,
+            "newQty": 25,
+            "changeQty": 5,
+            "reason": "생산 완료 (PR-SALES-10-1781238849595)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:24.709Z",
+        "day": 30,
+        "date": "2026-07-11",
+        "level": "SALES",
+        "message": "신규 고객사(Simulated Big Corp) 대량 주문 접수. 생산의뢰 PR-SALES-30-1781238864709 발행 (수량: 100 EA, 재고 부족 유발 시나리오)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:24.787Z",
+        "day": 30,
+        "date": "2026-07-11",
+        "level": "PLANNING",
+        "message": "생산 의뢰 PR-SALES-30-1781238864709 자재 부족 발생. 부족량에 따른 구매 조달 발주 기안 작성.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:24.787Z",
+        "day": 30,
+        "date": "2026-07-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-30-1781238864787 작성 (품목: IROIL0002, 수량: 210 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:24.875Z",
+        "day": 30,
+        "date": "2026-07-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-30-1781238864875 작성 (품목: IROIX0003, 수량: 420 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:24.951Z",
+        "day": 30,
+        "date": "2026-07-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-30-1781238864951 작성 (품목: IRMIT0022, 수량: 315 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:25.008Z",
+        "day": 30,
+        "date": "2026-07-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-30-1781238865008 작성 (품목: IROIX0001, 수량: 210 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:25.108Z",
+        "day": 30,
+        "date": "2026-07-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-30-1781238865107 작성 (품목: IRMIP0012, 수량: 210 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:25.173Z",
+        "day": 30,
+        "date": "2026-07-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-30-1781238865173 작성 (품목: IROIX0006, 수량: 210 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:25.262Z",
+        "day": 30,
+        "date": "2026-07-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-30-1781238865262 작성 (품목: IRMIT0055, 수량: 315 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:25.329Z",
+        "day": 30,
+        "date": "2026-07-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-30-1781238865329 작성 (품목: IROIX0007, 수량: 420 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:25.416Z",
+        "day": 30,
+        "date": "2026-07-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-30-1781238865416 작성 (품목: IROIX0008, 수량: 210 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:25.493Z",
+        "day": 30,
+        "date": "2026-07-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-30-1781238865493 작성 (품목: IROIX0009, 수량: 210 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:25.583Z",
+        "day": 30,
+        "date": "2026-07-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-30-1781238865583 작성 (품목: IROIQ0016, 수량: 1200 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:25.649Z",
+        "day": 30,
+        "date": "2026-07-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-30-1781238865649 작성 (품목: IROIQ0019, 수량: 210 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:25.749Z",
+        "day": 30,
+        "date": "2026-07-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-30-1781238865749 작성 (품목: IROIQ0027, 수량: 315 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:25.804Z",
+        "day": 30,
+        "date": "2026-07-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-30-1781238865804 작성 (품목: IROIQ0028, 수량: 840 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:25.883Z",
+        "day": 30,
+        "date": "2026-07-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-30-1781238865883 작성 (품목: IROIW0029, 수량: 210 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:25.948Z",
+        "day": 30,
+        "date": "2026-07-11",
+        "level": "PURCHASING",
+        "message": "[BOM 부족 자재 조달] 발주서 PO-30-1781238865948 작성 (품목: IROIX0010, 수량: 210 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:26.026Z",
+        "day": 32,
+        "date": "2026-07-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-30-1781238865948 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:26.103Z",
+        "day": 32,
+        "date": "2026-07-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-30-1781238865883 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:26.180Z",
+        "day": 32,
+        "date": "2026-07-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-30-1781238865804 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:26.256Z",
+        "day": 32,
+        "date": "2026-07-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-30-1781238865749 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:26.346Z",
+        "day": 32,
+        "date": "2026-07-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-30-1781238865649 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:26.423Z",
+        "day": 32,
+        "date": "2026-07-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-30-1781238865583 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:26.523Z",
+        "day": 32,
+        "date": "2026-07-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-30-1781238865493 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:26.602Z",
+        "day": 32,
+        "date": "2026-07-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-30-1781238865416 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:26.695Z",
+        "day": 32,
+        "date": "2026-07-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-30-1781238865329 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:26.766Z",
+        "day": 32,
+        "date": "2026-07-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-30-1781238865262 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:26.865Z",
+        "day": 32,
+        "date": "2026-07-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-30-1781238865173 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:26.931Z",
+        "day": 32,
+        "date": "2026-07-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-30-1781238865107 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:27.043Z",
+        "day": 32,
+        "date": "2026-07-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-30-1781238865008 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:27.121Z",
+        "day": 32,
+        "date": "2026-07-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-30-1781238864951 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:27.210Z",
+        "day": 32,
+        "date": "2026-07-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-30-1781238864875 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:27.308Z",
+        "day": 32,
+        "date": "2026-07-13",
+        "level": "PURCHASING",
+        "message": "발주서 PO-30-1781238864787 기안 승인 완료 및 이메일 모의 전송 (Status -> WAITING_DELIVERY)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:27.419Z",
+        "day": 35,
+        "date": "2026-07-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIX0010, 수량: 210 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:27.573Z",
+        "day": 35,
+        "date": "2026-07-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIW0029, 수량: 210 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:27.728Z",
+        "day": 35,
+        "date": "2026-07-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIQ0028, 수량: 840 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:27.926Z",
+        "day": 35,
+        "date": "2026-07-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIQ0027, 수량: 315 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:28.060Z",
+        "day": 35,
+        "date": "2026-07-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIQ0019, 수량: 210 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:28.203Z",
+        "day": 35,
+        "date": "2026-07-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIQ0016, 수량: 1200 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:28.370Z",
+        "day": 35,
+        "date": "2026-07-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIX0009, 수량: 210 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:28.527Z",
+        "day": 35,
+        "date": "2026-07-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIX0008, 수량: 210 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:28.734Z",
+        "day": 35,
+        "date": "2026-07-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIX0007, 수량: 420 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:28.933Z",
+        "day": 35,
+        "date": "2026-07-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IRMIT0055, 수량: 315 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:29.100Z",
+        "day": 35,
+        "date": "2026-07-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIX0006, 수량: 210 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:29.265Z",
+        "day": 35,
+        "date": "2026-07-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IRMIP0012, 수량: 210 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:29.442Z",
+        "day": 35,
+        "date": "2026-07-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIX0001, 수량: 210 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:29.608Z",
+        "day": 35,
+        "date": "2026-07-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IRMIT0022, 수량: 315 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:29.751Z",
+        "day": 35,
+        "date": "2026-07-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIX0003, 수량: 420 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:29.906Z",
+        "day": 35,
+        "date": "2026-07-16",
+        "level": "WAREHOUSE",
+        "message": "발주품 자재(품번: IROIL0002, 수량: 210 EA) 현장 입고 완료. 입고 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:30.061Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIL0002 (210 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:30.227Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIL0002: 40 -> 250 (+210 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIL0002",
+            "oldQty": 40,
+            "newQty": 250,
+            "changeQty": 210,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:30.293Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIX0003 (420 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:30.448Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0003: 30 -> 450 (+420 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIX0003",
+            "oldQty": 30,
+            "newQty": 450,
+            "changeQty": 420,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:30.546Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IRMIT0022 (315 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:30.691Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0022: 35 -> 350 (+315 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IRMIT0022",
+            "oldQty": 35,
+            "newQty": 350,
+            "changeQty": 315,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:30.780Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIX0001 (210 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:30.946Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0001: 40 -> 250 (+210 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIX0001",
+            "oldQty": 40,
+            "newQty": 250,
+            "changeQty": 210,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:31.023Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IRMIP0012 (210 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:31.200Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0012: 40 -> 250 (+210 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IRMIP0012",
+            "oldQty": 40,
+            "newQty": 250,
+            "changeQty": 210,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:31.266Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIX0006 (210 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:31.454Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0006: 40 -> 250 (+210 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIX0006",
+            "oldQty": 40,
+            "newQty": 250,
+            "changeQty": 210,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:31.543Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IRMIT0055 (315 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:31.797Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0055: 35 -> 350 (+315 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IRMIT0055",
+            "oldQty": 35,
+            "newQty": 350,
+            "changeQty": 315,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:31.862Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIX0007 (420 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:32.028Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0007: 30 -> 450 (+420 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIX0007",
+            "oldQty": 30,
+            "newQty": 450,
+            "changeQty": 420,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:32.118Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIX0008 (210 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:32.284Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0008: 40 -> 250 (+210 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIX0008",
+            "oldQty": 40,
+            "newQty": 250,
+            "changeQty": 210,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:32.350Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIX0009 (210 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:32.503Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0009: 40 -> 250 (+210 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIX0009",
+            "oldQty": 40,
+            "newQty": 250,
+            "changeQty": 210,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:32.604Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIQ0016 (1200 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:32.792Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0016: 50 -> 1250 (+1200 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIQ0016",
+            "oldQty": 50,
+            "newQty": 1250,
+            "changeQty": 1200,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:32.858Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIQ0019 (210 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:33.079Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0019: 40 -> 250 (+210 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIQ0019",
+            "oldQty": 40,
+            "newQty": 250,
+            "changeQty": 210,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:33.168Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIQ0027 (315 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:33.323Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0027: 35 -> 350 (+315 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIQ0027",
+            "oldQty": 35,
+            "newQty": 350,
+            "changeQty": 315,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:33.400Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIQ0028 (840 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:33.555Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0028: 10 -> 850 (+840 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIQ0028",
+            "oldQty": 10,
+            "newQty": 850,
+            "changeQty": 840,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:33.643Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIW0029 (210 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:33.820Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIW0029: 40 -> 250 (+210 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIW0029",
+            "oldQty": 40,
+            "newQty": 250,
+            "changeQty": 210,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:33.885Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "QA",
+        "message": "자재 수입 검사 통과: IROIX0010 (210 EA). 창고 적재 및 원장 재고 입고 갱신.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:34.052Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0010: 40 -> 250 (+210 EA, 사유: 입고 적재)",
+        "detail": {
+            "partId": "IROIX0010",
+            "oldQty": 40,
+            "newQty": 250,
+            "changeQty": 210,
+            "reason": "입고 적재"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:34.152Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "PRODUCTION",
+        "message": "생산 의뢰 PR-SALES-30-1781238864709 자재 확보 성공. 원자재 출고 차감 후 생산라인 투입 (Status -> IN_PRODUCTION)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:34.319Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0001: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIP0001",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:34.507Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIC0003: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIC0003",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:34.673Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIW0016: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIW0016",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:34.826Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIW0017: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIW0017",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:35.081Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIW0018: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIW0018",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:35.270Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIL0002: 250 -> 50 (-200 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIL0002",
+            "oldQty": 250,
+            "newQty": 50,
+            "changeQty": -200,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:35.457Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0001: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIT0001",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:35.634Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0008: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIT0008",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:35.845Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIB0001: 498.97000000000014 -> 498.57000000000016 (-0.4 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIB0001",
+            "oldQty": 498.97000000000014,
+            "newQty": 498.57000000000016,
+            "changeQty": -0.4,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:36.043Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0018: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIT0018",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:36.241Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0006: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIP0006",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:36.507Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0003: 450 -> 50 (-400 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIX0003",
+            "oldQty": 450,
+            "newQty": 50,
+            "changeQty": -400,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:36.675Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0021: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIT0021",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:36.872Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0022: 350 -> 50 (-300 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIT0022",
+            "oldQty": 350,
+            "newQty": 50,
+            "changeQty": -300,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:37.071Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0009: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIP0009",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:37.226Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIL0001: 497.43 -> 496.43 (-1 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIL0001",
+            "oldQty": 497.43,
+            "newQty": 496.43,
+            "changeQty": -1,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:37.381Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0054: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIT0054",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:37.547Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0001: 250 -> 50 (-200 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIX0001",
+            "oldQty": 250,
+            "newQty": 50,
+            "changeQty": -200,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:37.723Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0025: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIT0025",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:37.933Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0012: 250 -> 50 (-200 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIP0012",
+            "oldQty": 250,
+            "newQty": 50,
+            "changeQty": -200,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:38.099Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0008: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIP0008",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:38.254Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0029: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIT0029",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:38.409Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIC0001: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIC0001",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:38.619Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIB0002: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIB0002",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:38.752Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0021: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIP0021",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:38.906Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0006: 250 -> 50 (-200 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIX0006",
+            "oldQty": 250,
+            "newQty": 50,
+            "changeQty": -200,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:39.073Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0055: 350 -> 50 (-300 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIT0055",
+            "oldQty": 350,
+            "newQty": 50,
+            "changeQty": -300,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:39.248Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0022: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIP0022",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:39.503Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0023: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIP0023",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:39.703Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0025: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIP0025",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:39.878Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0026: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIP0026",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:40.088Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0027: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIP0027",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:40.299Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0007: 450 -> 50 (-400 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIX0007",
+            "oldQty": 450,
+            "newQty": 50,
+            "changeQty": -400,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:40.542Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0057: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIT0057",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:40.753Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0024: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIP0024",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:40.908Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0056: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIT0056",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:41.085Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0028: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIP0028",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:41.239Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0029: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIP0029",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:41.406Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIT0052: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIT0052",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:41.605Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0008: 250 -> 50 (-200 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIX0008",
+            "oldQty": 250,
+            "newQty": 50,
+            "changeQty": -200,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:41.792Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0009: 250 -> 50 (-200 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIX0009",
+            "oldQty": 250,
+            "newQty": 50,
+            "changeQty": -200,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:41.980Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0001: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0001",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:42.181Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0002: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0002",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:42.389Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0005: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0005",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:42.578Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0007: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0007",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:42.777Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0008: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0008",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:42.920Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0009: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0009",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:43.097Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0010: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0010",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:43.274Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0012: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0012",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:43.461Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0013: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0013",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:43.650Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0014: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0014",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:43.848Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0015: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0015",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:44.004Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0016: 1250 -> 50 (-1200 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0016",
+            "oldQty": 1250,
+            "newQty": 50,
+            "changeQty": -1200,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:44.147Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0017: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0017",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:44.313Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0018: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0018",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:44.513Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0019: 250 -> 50 (-200 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0019",
+            "oldQty": 250,
+            "newQty": 50,
+            "changeQty": -200,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:44.657Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0020: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0020",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:44.844Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0040: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0040",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:45.010Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0023: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0023",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:45.209Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0027: 350 -> 50 (-300 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0027",
+            "oldQty": 350,
+            "newQty": 50,
+            "changeQty": -300,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:45.364Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0028: 850 -> 50 (-800 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0028",
+            "oldQty": 850,
+            "newQty": 50,
+            "changeQty": -800,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:45.540Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0029: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0029",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:45.829Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0030: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0030",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:45.994Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0033: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0033",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:46.149Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0034: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0034",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:46.338Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIW0029: 250 -> 50 (-200 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIW0029",
+            "oldQty": 250,
+            "newQty": 50,
+            "changeQty": -200,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:46.570Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IREIB0008: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IREIB0008",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:46.724Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIL0003: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIL0003",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:46.857Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0032: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0032",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:47.166Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIQ0031: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIQ0031",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:47.455Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0030: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIP0030",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:47.609Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0031: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIP0031",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:47.807Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMIP0032: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMIP0032",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:47.974Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0010: 250 -> 50 (-200 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIX0010",
+            "oldQty": 250,
+            "newQty": 50,
+            "changeQty": -200,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:48.151Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIX0011: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIX0011",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:48.351Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIV0040: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIV0040",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:48.549Z",
+        "day": 36,
+        "date": "2026-07-17",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IROIV0041: 235 -> 135 (-100 EA, 사유: 생산 투입 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IROIV0041",
+            "oldQty": 235,
+            "newQty": 135,
+            "changeQty": -100,
+            "reason": "생산 투입 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:48.614Z",
+        "day": 39,
+        "date": "2026-07-20",
+        "level": "PRODUCTION",
+        "message": "생산 의뢰 PR-SALES-30-1781238864709 제조 조립 공정 완료. 완제품 출하 검사(QA) 대기열 이송.",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:48.715Z",
+        "day": 40,
+        "date": "2026-07-21",
+        "level": "QA",
+        "message": "출하 검사 적합 판정 (PR-SALES-30-1781238864709). 완제품 적재 승인 (수량: 100 EA)",
+        "detail": {}
+    },
+    {
+        "timestamp": "2026-06-12T04:34:48.926Z",
+        "day": 40,
+        "date": "2026-07-21",
+        "level": "INVENTORY",
+        "message": "[재고 변동] 품목 IRMAA0039: 25 -> 125 (+100 EA, 사유: 생산 완료 (PR-SALES-30-1781238864709))",
+        "detail": {
+            "partId": "IRMAA0039",
+            "oldQty": 25,
+            "newQty": 125,
+            "changeQty": 100,
+            "reason": "생산 완료 (PR-SALES-30-1781238864709)"
+        }
+    },
+    {
+        "timestamp": "2026-06-12T04:34:49.058Z",
+        "day": 61,
+        "date": "2026-08-11",
+        "level": "SYSTEM",
+        "message": "시뮬레이션 정상 완료. 최종 완제품 재고량: 125 EA",
+        "detail": {}
+    }
+]

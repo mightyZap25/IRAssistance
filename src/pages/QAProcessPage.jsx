@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, query, orderBy, where, onSnapshot } from '../firebase';
+import { collection, getDocs, query, orderBy, where, onSnapshot, doc, writeBatch, serverTimestamp } from '../firebase';
 import { 
     ShieldCheck, Activity, Search, AlertCircle, FileText, 
     CheckCircle2, TrendingUp, BarChart2, PieChart as PieChartIcon, 
@@ -12,6 +12,7 @@ import {
     PieChart, Cell, Pie
 } from 'recharts';
 import QAProcessModal from '../components/QAProcessModal';
+import QAItemReportModal from '../components/QAItemReportModal';
 
 const TABS = [
     { key: 'receiving', label: '수입 검사 (In)', icon: ShieldCheck },
@@ -20,12 +21,14 @@ const TABS = [
 ];
 
 export default function QAProcessPage() {
-    const [activeTab, setActiveTab] = useState('receiving');
+    const [activeTab, setActiveTab] = useState('shipping');
     const [loading, setLoading] = useState(false);
     
     // Modal states
     const [selectedItem, setSelectedItem] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isReportOpen, setIsReportOpen] = useState(false);
+    const [reportItem, setReportItem] = useState(null);
 
     // Data states
     const [inspections, setInspections] = useState([]);
@@ -39,29 +42,84 @@ export default function QAProcessPage() {
     const fetchData = () => {
         setLoading(true);
         try {
+            // [자동 복구 로직] 수입검사(receiving)에 잘못 들어간 생산 데이터 이관
+            (async () => {
+                const recSnap = await getDocs(query(collection(db, 'receiving'), where('SourceType', '==', 'PRODUCTION')));
+                if (!recSnap.empty) {
+                    const batch = writeBatch(db);
+                    for (const d of recSnap.docs) {
+                        const data = d.data();
+                        const newRef = doc(collection(db, 'qa_shipping_inspections'));
+                        batch.set(newRef, {
+                            PR_ID: data.PR_ID || '',
+                            PRNumber: data.PRNumber || '',
+                            PartID: data.PartID || '',
+                            PartName: data.PartName || '',
+                            CustomerName: data.CustomerName || '미지정 고객',
+                            Qty: data.Qty || 0,
+                            Status: 'WAITING_INSPECTION',
+                            createdAt: data.ReceivedAt || serverTimestamp(),
+                            ScheduleIdx: data.ScheduleIdx !== undefined ? data.ScheduleIdx : null,
+                            migrated: true
+                        });
+                        batch.delete(d.ref);
+                    }
+                    await batch.commit();
+                }
+            })();
+
             let collectionName = '';
             if (activeTab === 'receiving') collectionName = 'receiving';
             else if (activeTab === 'shipping') collectionName = 'qa_shipping_inspections';
             else collectionName = 'qa_middle_inspections';
 
-            const q = query(collection(db, collectionName), orderBy('CreatedAt', 'desc'));
-            const unsubscribe = onSnapshot(q, (snap) => {
+            const q = query(collection(db, collectionName), orderBy('createdAt', 'desc'));
+            const unsubscribe = onSnapshot(q, async (snap) => {
                 const list = [];
                 let pCount = 0;
                 let fCount = 0;
                 
-                snap.forEach(d => {
+                const [prSnap, partsSnap] = await Promise.all([
+                    getDocs(collection(db, 'production_requests')),
+                    getDocs(collection(db, 'parts'))
+                ]);
+                const prMap = {};
+                prSnap.docs.forEach(d => {
+                    const pr = d.data();
+                    if (pr.PRNumber) prMap[pr.PRNumber] = pr;
+                });
+                const partsMap = {};
+                partsSnap.docs.forEach(d => {
+                    const p = d.data();
+                    if (p.PartID) partsMap[p.PartID] = p;
+                });
+
+                for (const d of snap.docs) {
                     const data = { id: d.id, ...d.data() };
+                    
+                    if (activeTab === 'shipping' && data.PRNumber) {
+                        const matchingPR = prMap[data.PRNumber];
+                        if (matchingPR) {
+                            if (!data.CustomerName) data.CustomerName = matchingPR.CustomerName || '확인 필요';
+                            if (!data.PartID) data.PartID = matchingPR.PartID || '';
+                            if (!data.Qty) data.Qty = data.PassedQty || data.DefectQty || matchingPR.TargetQty || 0;
+                            
+                            if (matchingPR.PartID && !data.PartName) {
+                                const partInfo = partsMap[matchingPR.PartID];
+                                data.PartName = partInfo ? partInfo.Name : '';
+                            }
+                        }
+                    }
+
                     list.push(data);
                     
-                    // Stats calculation
                     if (data.Status === 'INSPECTION_COMPLETE' || data.Status === 'QA_COMPLETE' || data.result === 'Pass' || data.result === 'Fail') {
-                        const passed = data.PassedQty || (data.result === 'Pass' ? data.lotQty : 0) || 0;
-                        const failed = data.FailedQty || (data.result === 'Fail' ? data.lotQty : 0) || 0;
+                        const passed = data.PassedQty || (data.result === 'Pass' ? (data.Qty || 0) : 0) || 0;
+                        const failed = data.FailedQty || (data.result === 'Fail' ? (data.Qty || 0) : 0) || 0;
                         pCount += passed;
                         fCount += failed;
                     }
-                });
+                }
                 
                 setInspections(list);
                 const total = pCount + fCount;
@@ -84,6 +142,12 @@ export default function QAProcessPage() {
     const handleRowClick = (item) => {
         setSelectedItem(item);
         setIsModalOpen(true);
+    };
+
+    const handleOpenReport = (e, item) => {
+        e.stopPropagation();
+        setReportItem(item);
+        setIsReportOpen(true);
     };
 
     // Chart Data Generation
@@ -137,35 +201,31 @@ export default function QAProcessPage() {
             </div>
 
             {/* Dashboard Stats Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6 shrink-0">
-                <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col justify-between relative overflow-hidden">
-                    <div className="absolute -right-4 -top-4 w-24 h-24 bg-teal-50 rounded-full blur-2xl opacity-60"></div>
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-4 shrink-0">
+                <div className="bg-white p-4 rounded-[1.5rem] border border-slate-200 shadow-sm flex flex-col justify-between relative overflow-hidden">
+                    <div className="absolute -right-4 -top-4 w-20 h-24 bg-teal-50 rounded-full blur-2xl opacity-60"></div>
                     <div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">월간 검사 총량</p>
-                        <h3 className="text-2xl font-black text-slate-800">{stats.total.toLocaleString()} <span className="text-xs text-slate-400">EA</span></h3>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">월간 검사 총량</p>
+                        <h3 className="text-xl font-black text-slate-800">{stats.total.toLocaleString()} <span className="text-[10px] text-slate-400">EA</span></h3>
                     </div>
-                    <div className="mt-4 flex items-center gap-2">
-                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                    <div className="mt-2 flex items-center gap-2">
+                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                             <div className="bg-teal-500 h-full" style={{ width: '70%' }}></div>
                         </div>
-                        <span className="text-[10px] font-black text-teal-600">70%</span>
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col justify-between relative overflow-hidden">
-                    <div className="absolute -right-4 -top-4 w-24 h-24 bg-rose-50 rounded-full blur-2xl opacity-60"></div>
+                <div className="bg-white p-4 rounded-[1.5rem] border border-slate-200 shadow-sm flex flex-col justify-between relative overflow-hidden">
+                    <div className="absolute -right-4 -top-4 w-20 h-24 bg-rose-50 rounded-full blur-2xl opacity-60"></div>
                     <div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">불량률 (PPM)</p>
-                        <h3 className="text-2xl font-black text-rose-600">{stats.rate.toFixed(2)}%</h3>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">불량률 (PPM)</p>
+                        <h3 className="text-xl font-black text-rose-600">{stats.rate.toFixed(2)}%</h3>
                     </div>
-                    <p className="text-[9px] text-slate-400 font-bold mt-4 flex items-center gap-1">
-                        <TrendingUp size={10} className="text-rose-500" /> 전월 대비 0.5% 감소
-                    </p>
                 </div>
 
                 {/* Charts Area */}
-                <div className="lg:col-span-2 bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex items-center gap-6">
-                    <div className="flex-1 h-32">
+                <div className="lg:col-span-2 bg-white p-4 rounded-[1.5rem] border border-slate-200 shadow-sm flex items-center gap-4">
+                    <div className="flex-1 h-24">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={chartData}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -179,10 +239,10 @@ export default function QAProcessPage() {
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
-                    <div className="w-32 h-32 shrink-0">
+                    <div className="w-24 h-24 shrink-0">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
-                                <Pie data={pieData} innerRadius={35} outerRadius={50} paddingAngle={5} dataKey="value">
+                                <Pie data={pieData} innerRadius={25} outerRadius={35} paddingAngle={5} dataKey="value">
                                     {pieData.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={index === 0 ? '#0d9488' : '#f43f5e'} />
                                     ))}
@@ -223,21 +283,21 @@ export default function QAProcessPage() {
                         data={inspections}
                         columnDefs={
                             activeTab === 'receiving' ? {
-                                PONumber: { label: '발주 번호 (ID)', width: '150px' },
+                                PONumber: { label: '문서번호', width: '150px' },
                                 ReceivedAt: { label: '요청일', width: '120px' },
                                 PartID: { label: '품목 ID', width: '130px' },
                                 PartName: { label: '품명', width: '200px' },
-                                VendorName: { label: '공급사', width: '150px' },
-                                Qty: { label: '입고 수량', width: '100px' },
-                                Status: { label: '상태', width: '120px' }
+                                VendorName: { label: '거래처', width: '150px' },
+                                Qty: { label: '수량', width: '100px' },
+                                Status: { label: '상태', width: '150px' }
                             } : {
-                                RefPRID: { label: '생산 의뢰 ID', width: '150px' },
-                                PRNumber: { label: '작업 지시 번호', width: '150px' },
+                                PRNumber: { label: '문서번호', width: '150px' },
+                                CustomerName: { label: '거래처', width: '150px' },
                                 createdAt: { label: '요청일', width: '120px' },
                                 PartID: { label: '품목 ID', width: '130px' },
                                 PartName: { label: '품명', width: '200px' },
-                                Qty: { label: '생산 수량', width: '100px' },
-                                result: { label: '상태/결과', width: '120px' }
+                                Qty: { label: '수량', width: '100px' },
+                                result: { label: '상태/결과', width: '150px' }
                             }
                         }
                         rowKey="id"
@@ -245,26 +305,41 @@ export default function QAProcessPage() {
                         cellRenderer={{
                             ReceivedAt: (val) => val?.toDate ? val.toDate().toLocaleDateString() : val || '-',
                             createdAt: (val) => val?.seconds ? new Date(val.seconds * 1000).toLocaleDateString() : val || '-',
-                            Status: (val) => (
-                                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter ${val === 'WAITING_INSPECTION' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
-                                    {val === 'WAITING_INSPECTION' ? '검사 대기' : '검사 완료'}
-                                </span>
+                            Status: (val, row) => (
+                                <div className="flex items-center justify-between gap-2 w-full">
+                                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter ${val === 'WAITING_INSPECTION' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
+                                        {val === 'WAITING_INSPECTION' ? '검사 대기' : '검사 완료'}
+                                    </span>
+                                    {(val === 'QA_COMPLETE' || val === 'INSPECTION_COMPLETE') && (
+                                        <button 
+                                            onClick={(e) => handleOpenReport(e, row)}
+                                            className="p-1.5 bg-slate-100 text-slate-500 hover:bg-teal-50 hover:text-teal-600 rounded-lg transition-all"
+                                            title="성적서 출력"
+                                        >
+                                            <FileText size={14} />
+                                        </button>
+                                    )}
+                                </div>
                             ),
-                            result: (val) => (
-                                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter ${val === 'Pass' ? 'bg-emerald-50 text-emerald-600' : val === 'Fail' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>
-                                    {val || '대기 중'}
-                                </span>
+                            result: (val, row) => (
+                                <div className="flex items-center justify-between gap-2 w-full">
+                                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter ${val === 'Pass' ? 'bg-emerald-50 text-emerald-600' : val === 'Fail' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>
+                                        {val || '대기 중'}
+                                    </span>
+                                    {(row.Status === 'QA_COMPLETE' || row.Status === 'INSPECTION_COMPLETE') && (
+                                        <button 
+                                            onClick={(e) => handleOpenReport(e, row)}
+                                            className="p-1.5 bg-slate-100 text-slate-500 hover:bg-teal-50 hover:text-teal-600 rounded-lg transition-all"
+                                            title="성적서 출력"
+                                        >
+                                            <FileText size={14} />
+                                        </button>
+                                    )}
+                                </div>
                             )
                         }}
                     />
                 </div>
-                
-                {inspections.length === 0 && !loading && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-40">
-                        <AlertCircle size={48} className="text-slate-300 mb-2" />
-                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">No quality tasks found for this category</p>
-                    </div>
-                )}
             </div>
 
             {/* Quality Inspection Modal */}
@@ -275,6 +350,16 @@ export default function QAProcessPage() {
                     isOpen={isModalOpen}
                     onClose={() => setIsModalOpen(false)}
                     onSave={() => fetchData()}
+                />
+            )}
+
+            {/* Individual Inspection Report Modal */}
+            {isReportOpen && reportItem && (
+                <QAItemReportModal
+                    item={reportItem}
+                    type={activeTab}
+                    isOpen={isReportOpen}
+                    onClose={() => setIsReportOpen(false)}
                 />
             )}
         </div>

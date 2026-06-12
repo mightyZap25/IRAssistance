@@ -4,11 +4,12 @@ import {
     X, CheckCircle, XCircle, AlertTriangle, ClipboardList, 
     FileText, Plus, Trash2, Save, Info, Gauge, Zap
 } from 'lucide-react';
-import { db } from '../firebase';
-import { 
+import { db, 
     doc, getDoc, updateDoc, addDoc, collection, 
     serverTimestamp, writeBatch, query, where, getDocs 
-} from 'firebase/firestore';
+} from '../firebase';
+import { autoRegisterDefect } from '../services/defectAutoRegister';
+import QAItemReportModal from './QAItemReportModal';
 
 export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) {
     function InfoRow({ label, value, highlight = false }) {
@@ -26,6 +27,7 @@ export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) 
     const [defects, setDefects] = useState([]); // { code, name, qty, value, note }
     const [inspectionMethod, setInspectionMethod] = useState('Full');
     const [remarks, setRemarks] = useState('');
+    const [handlingType, setHandlingType] = useState('Rework'); // 'Rework' | 'Additional' | 'None'
     
     // Master data
     const [defectCodes, setDefectCodes] = useState([]);
@@ -36,24 +38,35 @@ export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) 
     const [tempDefectQty, setTempDefectQty] = useState(1);
     const [tempDefectValue, setTempDefectValue] = useState('');
 
+    // Report modal state
+    const [isReportOpen, setIsReportOpen] = useState(false);
+
     useEffect(() => {
         if (isOpen && item) {
-            setPassedQty(item.Qty || 0);
-            setFailedQty(0);
-            setDefects([]);
-            setRemarks('');
+            setPassedQty(item.PassedQty !== undefined ? item.PassedQty : item.Qty || 0);
+            setFailedQty(item.FailedQty || 0);
+            setDefects(item.Defects || []);
+            setRemarks(item.Remarks || '');
+            setInspectionMethod(item.InspectionMethod || 'Full');
             fetchMasterData();
         }
     }, [isOpen, item]);
 
     const fetchMasterData = async () => {
         try {
-            // 1. Load Defect Codes for the current category
+            // 1. Load Defect Codes - Fetch all and filter manually for mock compatibility
+            const dSnap = await getDocs(collection(db, 'qa_defect_codes'));
             const categoryMap = { 'receiving': 'Receiving', 'shipping': 'Shipping', 'middle': 'Middle' };
-            const q = query(collection(db, 'qa_defect_codes'), where('category', '==', categoryMap[type]));
-            const dSnap = await getDocs(q);
+            const targetCategory = categoryMap[type] || type;
+            
             const dList = [];
-            dSnap.forEach(d => dList.push({ id: d.id, ...d.data() }));
+            dSnap.forEach(d => {
+                const data = d.data();
+                if (!targetCategory || (data.category && data.category.toLowerCase() === targetCategory.toLowerCase())) {
+                    dList.push({ id: d.id || data.code, ...data });
+                }
+            });
+            
             setDefectCodes(dList);
 
             // 2. Load QA Standards for the part
@@ -62,7 +75,6 @@ export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) 
                 if (qaDoc.exists()) {
                     setQaStandards(qaDoc.data());
                 } else {
-                    // Fallback search by partId field
                     const q2 = query(collection(db, 'qa_target_parts'), where('partId', '==', String(item.PartID)));
                     const q2Snap = await getDocs(q2);
                     if (!q2Snap.empty) setQaStandards(q2Snap.docs[0].data());
@@ -73,15 +85,55 @@ export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) 
         }
     };
 
-    const handleAddDefect = () => {
-        if (!selectedDefectCode) return;
-        const codeObj = defectCodes.find(c => c.code === selectedDefectCode);
+    const handlePassedQtyChange = (val) => {
+        if (item.Status === 'QA_COMPLETE' || item.Status === 'INSPECTION_COMPLETE') return;
+        const p = Math.min(item.Qty, Math.max(0, parseInt(val) || 0));
+        setPassedQty(p);
+        setFailedQty(item.Qty - p);
+    };
+
+    const handleFailedQtyChange = (val) => {
+        if (item.Status === 'QA_COMPLETE' || item.Status === 'INSPECTION_COMPLETE') return;
+        const f = Math.min(item.Qty, Math.max(0, parseInt(val) || 0));
+        setFailedQty(f);
+        setPassedQty(item.Qty - f);
+        const alreadyAssigned = defects.reduce((sum, d) => sum + d.qty, 0);
+        setTempDefectQty(Math.max(1, f - alreadyAssigned));
+    };
+
+    // New state for manual entry mode
+    const [isAddingNewType, setIsAddingNewType] = useState(false);
+    const [newTypeName, setNewTypeName] = useState('');
+
+    const handleAddDefect = async () => {
+        if (item.Status === 'QA_COMPLETE' || item.Status === 'INSPECTION_COMPLETE') return;
+        let defectName = '';
+        let codeObj = null;
+
+        if (isAddingNewType) {
+            if (!newTypeName) return alert('신규 불량 유형명을 입력해주세요.');
+            const categoryMap = { 'receiving': 'Receiving', 'shipping': 'Shipping', 'middle': 'Middle' };
+            const registered = await autoRegisterDefect(newTypeName, categoryMap[type]);
+            if (registered) {
+                codeObj = registered;
+                setDefectCodes(prev => [...prev, registered]);
+                setIsAddingNewType(false);
+                setNewTypeName('');
+            } else {
+                return alert('불량 코드 등록 중 오류가 발생했습니다.');
+            }
+        } else {
+            if (!selectedDefectCode) return alert('불량 유형을 선택해주세요.');
+            codeObj = defectCodes.find(c => c.code === selectedDefectCode);
+        }
+
         if (!codeObj) return;
 
+        const qtyToAdd = parseInt(tempDefectQty) || 0;
         const newDefect = {
             code: codeObj.code,
             name: codeObj.name,
-            qty: parseInt(tempDefectQty) || 0,
+            qty: qtyToAdd,
             value: tempDefectValue,
             id: Date.now()
         };
@@ -89,18 +141,20 @@ export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) 
         const updatedDefects = [...defects, newDefect];
         setDefects(updatedDefects);
         
-        // Auto-calculate failed qty
-        const totalFailed = updatedDefects.reduce((sum, d) => sum + d.qty, 0);
-        setFailedQty(totalFailed);
-        setPassedQty(Math.max(0, (item.Qty || 0) - totalFailed));
+        const totalDetailFailed = updatedDefects.reduce((sum, d) => sum + d.qty, 0);
+        if (totalDetailFailed > failedQty) {
+            setFailedQty(totalDetailFailed);
+            setPassedQty(Math.max(0, (item.Qty || 0) - totalDetailFailed));
+        }
 
-        // Reset temps
         setSelectedDefectCode('');
-        setTempDefectQty(1);
+        const remaining = Math.max(1, (totalDetailFailed > failedQty ? totalDetailFailed : failedQty) - totalDetailFailed);
+        setTempDefectQty(Math.max(1, remaining));
         setTempDefectValue('');
     };
 
     const handleRemoveDefect = (id) => {
+        if (item.Status === 'QA_COMPLETE' || item.Status === 'INSPECTION_COMPLETE') return;
         const updated = defects.filter(d => d.id !== id);
         setDefects(updated);
         const totalFailed = updated.reduce((sum, d) => sum + d.qty, 0);
@@ -119,7 +173,6 @@ export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) 
             const result = failedQty === 0 ? 'Pass' : 'Fail';
             const timestamp = serverTimestamp();
 
-            // 1. Update the inspection record
             let collectionName = '';
             if (type === 'receiving') collectionName = 'receiving';
             else if (type === 'shipping') collectionName = 'qa_shipping_inspections';
@@ -130,7 +183,7 @@ export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) 
                 PassedQty: passedQty,
                 FailedQty: failedQty,
                 Defects: defects,
-                Status: 'QA_COMPLETE', // or INSPECTION_COMPLETE
+                Status: 'QA_COMPLETE',
                 result: result,
                 InspectionMethod: inspectionMethod,
                 Remarks: remarks,
@@ -138,13 +191,83 @@ export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) 
             };
             batch.update(recordRef, updateData);
 
-            // 2. If production-related, update Production Request status
-            if (item.RefPRID) {
-                const prRef = doc(db, 'production_requests', item.RefPRID);
-                batch.update(prRef, {
-                    Status: 'QA_COMPLETE',
-                    UpdatedAt: timestamp
-                });
+            // 2. If production-related, update ONLY the specific schedule status
+            if (item.PR_ID) {
+                const prRef = doc(db, 'production_requests', item.PR_ID);
+                const prSnap = await getDoc(prRef);
+                
+                if (prSnap.exists()) {
+                    const prData = prSnap.data();
+                    const updatedItems = [...(prData.Items || [])];
+                    let updated = false;
+
+                    // Find the item and schedule to update using PartID and ScheduleIdx
+                    updatedItems.forEach((pItem) => {
+                        if (pItem.PartID === item.PartID) {
+                            if (pItem.Schedules && item.ScheduleIdx !== undefined && pItem.Schedules[item.ScheduleIdx]) {
+                                // ─────────────────────────────────────────────────────────────
+                                // [부적합품 조치 핵심 로직]
+                                // ─────────────────────────────────────────────────────────────
+                                if (failedQty > 0) {
+                                    if (handlingType === 'Rework') {
+                                        // 방안 A: 재작업 - 상태를 다시 생산중으로 롤백
+                                        pItem.Schedules[item.ScheduleIdx].status = 'IN_PRODUCTION';
+                                        pItem.Schedules[item.ScheduleIdx].remarks = `[QA재작업지시] ${remarks}`;
+                                        updated = true;
+                                    } else if (handlingType === 'Additional') {
+                                        // 방안 B: 추가 생산 - 현재 차수는 완료, 부족분 신규 차수 생성
+                                        pItem.Schedules[item.ScheduleIdx].status = 'QA_COMPLETE';
+                                        
+                                        // 신규 차수 일정 추가
+                                        const nextDate = new Date();
+                                        nextDate.setDate(nextDate.getDate() + 3); // 기본 3일 후로 세팅
+                                        const newSchedule = {
+                                            date: nextDate.toISOString().split('T')[0],
+                                            qty: failedQty,
+                                            status: 'PROD_WAITING',
+                                            isAdditional: true,
+                                            parentScheduleIdx: item.ScheduleIdx,
+                                            remarks: `[QA불량보충] 원본차수: ${item.ScheduleIdx + 1}차`
+                                        };
+                                        pItem.Schedules.push(newSchedule);
+                                        updated = true;
+                                    } else {
+                                        // 방안 C: 부족 승인 (None) - 그냥 완료
+                                        pItem.Schedules[item.ScheduleIdx].status = 'QA_COMPLETE';
+                                        updated = true;
+                                    }
+                                } else {
+                                    // 불량 없는 경우 정상 완료
+                                    pItem.Schedules[item.ScheduleIdx].status = 'QA_COMPLETE';
+                                    updated = true;
+                                }
+                                
+                                // Aggregated item status
+                                if (pItem.Schedules.every(s => ['QA_COMPLETE', 'SHIP_READY', 'SHIPPED'].includes(s.status))) {
+                                    pItem.Status = 'QA_COMPLETE';
+                                }
+                            } else if (!pItem.Schedules && !updated) {
+                                pItem.Status = 'QA_COMPLETE';
+                                updated = true;
+                            }
+                        }
+                    });
+
+                    const updatePayload = { UpdatedAt: timestamp };
+                    if (updated) {
+                        updatePayload.Items = updatedItems;
+                        // Overall PR status: only QA_COMPLETE if every schedule of every item is done
+                        const allDone = updatedItems.every(pItem => 
+                            (pItem.Schedules || [{ status: pItem.Status }]).every(s => ['QA_COMPLETE', 'SHIP_READY', 'SHIPPED'].includes(s.status))
+                        );
+                        updatePayload.Status = allDone ? 'QA_COMPLETE' : 'IN_PRODUCTION';
+                    } else {
+                        // If no specific schedule was found/updated, but it is a PR, update main status as fallback
+                        updatePayload.Status = 'QA_COMPLETE';
+                    }
+
+                    batch.update(prRef, updatePayload);
+                }
             }
 
             await batch.commit();
@@ -159,6 +282,8 @@ export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) 
     };
 
     if (!isOpen) return null;
+
+    const isViewMode = item.Status === 'QA_COMPLETE' || item.Status === 'INSPECTION_COMPLETE';
 
     return createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[1100] flex items-center justify-center p-4">
@@ -176,7 +301,17 @@ export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) 
                             </p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-xl text-slate-400 transition-all"><X size={20} /></button>
+                    <div className="flex items-center gap-2">
+                        {isViewMode && (
+                            <button 
+                                onClick={() => setIsReportOpen(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-teal-50 text-teal-700 border border-teal-100 rounded-xl text-xs font-black hover:bg-teal-600 hover:text-white transition-all shadow-sm"
+                            >
+                                <FileText size={14} /> 성적서 출력
+                            </button>
+                        )}
+                        <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-xl text-slate-400 transition-all"><X size={20} /></button>
+                    </div>
                 </div>
 
                 <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
@@ -246,7 +381,8 @@ export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) 
                                     <input 
                                         type="number" 
                                         value={passedQty}
-                                        onChange={e => setPassedQty(parseInt(e.target.value) || 0)}
+                                        onChange={e => handlePassedQtyChange(e.target.value)}
+                                        readOnly={isViewMode}
                                         className="text-3xl font-black text-teal-700 bg-transparent outline-none w-full"
                                     />
                                     <span className="text-sm font-bold text-teal-500 pb-1">EA</span>
@@ -258,7 +394,8 @@ export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) 
                                     <input 
                                         type="number" 
                                         value={failedQty}
-                                        readOnly
+                                        onChange={e => handleFailedQtyChange(e.target.value)}
+                                        readOnly={isViewMode}
                                         className="text-3xl font-black text-rose-700 bg-transparent outline-none w-full"
                                     />
                                     <span className="text-sm font-bold text-rose-500 pb-1">EA</span>
@@ -269,6 +406,7 @@ export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) 
                                 <select 
                                     value={inspectionMethod}
                                     onChange={e => setInspectionMethod(e.target.value)}
+                                    disabled={isViewMode}
                                     className="w-full bg-transparent text-lg font-black text-slate-700 outline-none mt-2"
                                 >
                                     <option value="Full">전수 검사</option>
@@ -285,46 +423,77 @@ export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) 
                                 </h4>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-3xl border border-slate-100">
-                                <div className="md:col-span-2">
-                                    <label className="text-[9px] font-black text-slate-400 uppercase ml-2 mb-1 block">불량 유형 선택</label>
-                                    <select 
-                                        value={selectedDefectCode}
-                                        onChange={e => setSelectedDefectCode(e.target.value)}
-                                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold outline-none focus:ring-2 focus:ring-teal-500 transition-all shadow-sm"
-                                    >
-                                        <option value="">유형 선택...</option>
-                                        {defectCodes.map(c => <option key={c.id} value={c.code}>{c.name} ({c.code})</option>)}
-                                    </select>
+                            {!isViewMode && (
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-3xl border border-slate-100">
+                                    <div className="md:col-span-2">
+                                        <div className="flex justify-between items-center mb-1 ml-2">
+                                            <label className="text-[9px] font-black text-slate-400 uppercase block">
+                                                {isAddingNewType ? '신규 불량 유형명 직접 입력' : '불량 유형 선택'}
+                                            </label>
+                                            <button 
+                                                type="button"
+                                                onClick={() => { setIsAddingNewType(!isAddingNewType); setSelectedDefectCode(''); setNewTypeName(''); }}
+                                                className="text-[9px] font-black text-teal-600 hover:text-teal-800 transition-colors uppercase tracking-tighter"
+                                            >
+                                                {isAddingNewType ? '취소 및 목록에서 선택' : '+ 신규 유형 추가'}
+                                            </button>
+                                        </div>
+                                        
+                                        {isAddingNewType ? (
+                                            <div className="relative">
+                                                <input 
+                                                    type="text"
+                                                    value={newTypeName}
+                                                    onChange={e => setNewTypeName(e.target.value)}
+                                                    placeholder="새로운 불량 사유 입력..."
+                                                    className="w-full bg-white border-2 border-teal-500 rounded-xl px-4 py-2.5 text-xs font-black outline-none shadow-md animate-in zoom-in-95"
+                                                    autoFocus
+                                                />
+                                                <Zap size={14} className="absolute right-3 top-3 text-teal-500 animate-pulse" />
+                                            </div>
+                                        ) : (
+                                            <select 
+                                                value={selectedDefectCode}
+                                                onChange={e => setSelectedDefectCode(e.target.value)}
+                                                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold outline-none focus:ring-2 focus:ring-teal-500 transition-all shadow-sm"
+                                            >
+                                                <option value="">유형 선택 (목록)...</option>
+                                                {defectCodes.map(c => (
+                                                    <option key={c.id} value={c.code}>{c.name} ({c.code})</option>
+                                                ))}
+                                            </select>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] font-black text-slate-400 uppercase ml-2 mb-1 block">불량 수량</label>
+                                        <input 
+                                            type="number" 
+                                            value={tempDefectQty}
+                                            onChange={e => setTempDefectQty(parseInt(e.target.value) || 1)}
+                                            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold outline-none focus:ring-2 focus:ring-teal-500 transition-all shadow-sm"
+                                        />
+                                    </div>
+                                    <div className="flex items-end">
+                                        <button 
+                                            onClick={handleAddDefect}
+                                            className={`w-full ${isAddingNewType ? 'bg-teal-600 hover:bg-teal-700' : 'bg-slate-900 hover:bg-black'} text-white py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-lg`}
+                                        >
+                                            {isAddingNewType ? <Zap size={14} /> : <Plus size={14} />}
+                                            {isAddingNewType ? '등록 후 추가' : '추가하기'}
+                                        </button>
+                                    </div>
+                                    <div className="md:col-span-4 mt-1">
+                                        <label className="text-[9px] font-black text-slate-400 uppercase ml-2 mb-1 block">측정 데이터값 (Optional)</label>
+                                        <input 
+                                            type="text" 
+                                            placeholder="예: 실측값 98.5mm"
+                                            value={tempDefectValue}
+                                            onChange={e => setTempDefectValue(e.target.value)}
+                                            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold outline-none focus:ring-2 focus:ring-teal-500 transition-all shadow-sm"
+                                        />
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="text-[9px] font-black text-slate-400 uppercase ml-2 mb-1 block">불량 수량</label>
-                                    <input 
-                                        type="number" 
-                                        value={tempDefectQty}
-                                        onChange={e => setTempDefectQty(parseInt(e.target.value) || 1)}
-                                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold outline-none focus:ring-2 focus:ring-teal-500 transition-all shadow-sm"
-                                    />
-                                </div>
-                                <div className="flex items-end">
-                                    <button 
-                                        onClick={handleAddDefect}
-                                        className="w-full bg-slate-900 text-white py-2.5 rounded-xl text-xs font-black hover:bg-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-slate-100"
-                                    >
-                                        <Plus size={14} /> 추가하기
-                                    </button>
-                                </div>
-                                <div className="md:col-span-4 mt-1">
-                                    <label className="text-[9px] font-black text-slate-400 uppercase ml-2 mb-1 block">측정 데이터값 (Optional)</label>
-                                    <input 
-                                        type="text" 
-                                        placeholder="예: 실측값 98.5mm"
-                                        value={tempDefectValue}
-                                        onChange={e => setTempDefectValue(e.target.value)}
-                                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold outline-none focus:ring-2 focus:ring-teal-500 transition-all shadow-sm"
-                                    />
-                                </div>
-                            </div>
+                            )}
 
                             {/* Defects List */}
                             {defects.length > 0 && (
@@ -346,24 +515,54 @@ export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) 
                                                     </div>
                                                 </div>
                                             </div>
-                                            <button 
-                                                onClick={() => handleRemoveDefect(d.id)}
-                                                className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
+                                            {!isViewMode && (
+                                                <button 
+                                                    onClick={() => handleRemoveDefect(d.id)}
+                                                    className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
                             )}
                         </div>
 
-                        {/* 3. Remarks */}
+                        {/* 3. Disposition (Only if failedQty > 0) */}
+                        {!isViewMode && failedQty > 0 && (
+                            <div className="bg-rose-50 border border-rose-100 rounded-3xl p-6 space-y-4 animate-in slide-in-from-top-2">
+                                <div className="flex items-center gap-3 border-b border-rose-100 pb-3">
+                                    <RotateCcw size={18} className="text-rose-600" />
+                                    <h4 className="text-xs font-black text-rose-800 uppercase tracking-tight">부적합품 조치 방안 선택 (Disposition)</h4>
+                                </div>
+                                <div className="grid grid-cols-3 gap-3">
+                                    {[
+                                        { id: 'Rework', label: '재작업 (Rework)', desc: '상태를 생산중으로 되돌림' },
+                                        { id: 'Additional', label: '추가생산 (New)', desc: '부족분 신규 일정 생성' },
+                                        { id: 'None', label: '부족승인 (Accept)', desc: '부족한 대로 마감' }
+                                    ].map(type => (
+                                        <button
+                                            key={type.id}
+                                            type="button"
+                                            onClick={() => setHandlingType(type.id)}
+                                            className={`p-4 rounded-2xl border-2 transition-all text-left flex flex-col gap-1 ${handlingType === type.id ? 'bg-rose-600 border-rose-600 text-white shadow-lg' : 'bg-white border-rose-100 text-slate-400 hover:border-rose-300'}`}
+                                        >
+                                            <span className="text-[11px] font-black">{type.label}</span>
+                                            <span className={`text-[9px] font-bold ${handlingType === type.id ? 'text-rose-100' : 'text-slate-400'}`}>{type.desc}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 4. Remarks */}
                         <div>
                             <label className="text-[11px] font-black text-slate-800 uppercase mb-3 block">검사 비고 (Remarks)</label>
                             <textarea 
                                 value={remarks}
                                 onChange={e => setRemarks(e.target.value)}
+                                readOnly={isViewMode}
                                 placeholder="검사 과정에서의 특이사항이나 조치 내용을 입력하세요."
                                 className="w-full bg-slate-50 border border-slate-200 rounded-3xl p-5 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-teal-500 outline-none transition-all min-h-[100px]"
                             />
@@ -377,17 +576,29 @@ export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) 
                         onClick={onClose}
                         className="px-6 py-2.5 bg-white border border-slate-200 text-slate-500 font-black text-xs rounded-2xl hover:bg-slate-50 transition-all"
                     >
-                        취소
+                        {isViewMode ? '닫기' : '취소'}
                     </button>
-                    <button 
-                        onClick={handleSubmit}
-                        disabled={loading}
-                        className="px-10 py-2.5 bg-slate-900 text-white font-black text-xs rounded-2xl shadow-xl shadow-slate-200 hover:bg-black transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
-                    >
-                        {loading ? '저장 중...' : <><Save size={16} /> 판정 결과 저장</>}
-                    </button>
+                    {!isViewMode && (
+                        <button 
+                            onClick={handleSubmit}
+                            disabled={loading}
+                            className="px-10 py-2.5 bg-slate-900 text-white font-black text-xs rounded-2xl shadow-xl shadow-slate-200 hover:bg-black transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
+                        >
+                            {loading ? '저장 중...' : <><Save size={16} /> 판정 결과 저장</>}
+                        </button>
+                    )}
                 </div>
             </div>
+
+            {/* Individual Inspection Report Modal */}
+            {isReportOpen && (
+                <QAItemReportModal
+                    item={item}
+                    type={type}
+                    isOpen={isReportOpen}
+                    onClose={() => setIsReportOpen(false)}
+                />
+            )}
         </div>,
         document.body
     );

@@ -174,7 +174,7 @@ export default function PurchasingPage() {
                                 </div>
                             );
                         },
-                        TotalPrice: (val) => <span className="font-bold">₩ {val.toLocaleString()}</span>,
+                        TotalPrice: (val) => <span className="font-bold">₩ {val !== undefined && val !== null ? val.toLocaleString() : '0'}</span>,
                         CreatedAt: (val) => <span className="text-xs text-slate-400">{val?.toDate ? val.toDate().toLocaleDateString() : '-'}</span>
                     }}
                 />

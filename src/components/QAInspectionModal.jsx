@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, CheckCircle, XCircle, AlertTriangle, Camera, Package, Info, CheckCircle2, Cloud, ExternalLink, FileText, ClipboardList } from 'lucide-react';
+import { X, CheckCircle, XCircle, AlertTriangle, Camera, Package, Info, CheckCircle2, Cloud, ExternalLink, FileText, ClipboardList, Trash2, Plus } from 'lucide-react';
 import { updateDoc, doc, collection, getDocs, addDoc, serverTimestamp, writeBatch, getDoc, query, where } from '../firebase';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { autoRegisterDefect } from '../services/defectAutoRegister';
 import clsx from 'clsx';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
@@ -115,10 +116,19 @@ export default function QAInspectionModal({ item, isOpen, onClose, onRefresh }) 
         setPassedQty(Math.max(0, item.Qty - val).toString());
     };
 
-    const addDefect = () => {
+    const addDefect = async () => {
         if (!currentDefectType) return alert('불량 종류를 선택해주세요.');
         const dq = parseInt(currentDefectQty) || 0;
         if (dq <= 0) return alert('불량 수량을 1개 이상 입력해주세요.');
+        
+        // Auto-register if new
+        if (!dbDefectTypes.includes(currentDefectType)) {
+            const registered = await autoRegisterDefect(currentDefectType, 'Receiving');
+            if (registered) {
+                setDbDefectTypes(prev => [...prev, registered.name]);
+            }
+        }
+
         setDefects([...defects, { type: currentDefectType, qty: dq, note: currentDefectNote }]);
         setCurrentDefectType(''); setCurrentDefectNote(''); setCurrentDefectQty('');
     };
@@ -243,6 +253,71 @@ export default function QAInspectionModal({ item, isOpen, onClose, onRefresh }) 
                                     <input type="number" value={failedQty} onChange={handleFailedQtyChange} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-lg font-black text-rose-600 text-center" required />
                                 </div>
                             </div>
+
+                            {parseInt(failedQty) > 0 && (
+                                <div className="bg-white p-4 rounded-xl border border-rose-100 space-y-3">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <AlertTriangle size={16} className="text-rose-500" />
+                                        <h4 className="text-[10px] font-black text-rose-700 uppercase">불량 내역 등록 (Defect Details)</h4>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-3">
+                                        <div className="flex gap-2">
+                                            <div className="flex-1">
+                                                <input 
+                                                    list="inspection-defect-types"
+                                                    value={currentDefectType}
+                                                    onChange={e => setCurrentDefectType(e.target.value)}
+                                                    placeholder="불량 종류 입력 또는 선택"
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold outline-none focus:ring-2 focus:ring-rose-400"
+                                                />
+                                                <datalist id="inspection-defect-types">
+                                                    {dbDefectTypes.map((t, idx) => <option key={idx} value={t} />)}
+                                                </datalist>
+                                            </div>
+                                            <input 
+                                                type="number" 
+                                                value={currentDefectQty}
+                                                onChange={e => setCurrentDefectQty(e.target.value)}
+                                                placeholder="수량"
+                                                className="w-20 bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-center"
+                                            />
+                                            <button 
+                                                type="button"
+                                                onClick={addDefect}
+                                                className="bg-rose-600 text-white px-3 rounded-lg hover:bg-rose-700 transition-colors"
+                                            >
+                                                <Plus size={16} />
+                                            </button>
+                                        </div>
+                                        <input 
+                                            type="text"
+                                            value={currentDefectNote}
+                                            onChange={e => setCurrentDefectNote(e.target.value)}
+                                            placeholder="불량 상세 내용 (선택 사항)"
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-[11px] font-bold outline-none focus:ring-2 focus:ring-rose-400"
+                                        />
+                                    </div>
+
+                                    {defects.length > 0 && (
+                                        <div className="mt-4 space-y-2 border-t border-rose-50 pt-3">
+                                            {defects.map((def, idx) => (
+                                                <div key={idx} className="flex items-center justify-between bg-rose-50/50 p-2 rounded-lg border border-rose-100">
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[11px] font-black text-rose-700">{def.type}</span>
+                                                            <span className="text-[10px] font-bold text-rose-500 bg-white px-1.5 rounded-full border border-rose-100">{def.qty} EA</span>
+                                                        </div>
+                                                        {def.note && <p className="text-[10px] text-slate-500 truncate mt-0.5">{def.note}</p>}
+                                                    </div>
+                                                    <button onClick={() => removeDefect(idx)} className="p-1 text-slate-400 hover:text-rose-600 transition-colors">
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </form>

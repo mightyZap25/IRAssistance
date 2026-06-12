@@ -445,8 +445,8 @@ export default function TransactionsPage() {
         }
 
         // 탭 필터
-        if (activeTab === 'IN')    result = result.filter(t => t.Type === 'In');
-        if (activeTab === 'OUT')   result = result.filter(t => t.Type === 'Out');
+        if (activeTab === 'IN')    result = result.filter(t => String(t.Type).toUpperCase() === 'IN');
+        if (activeTab === 'OUT')   result = result.filter(t => String(t.Type).toUpperCase() === 'OUT');
         if (activeTab === 'SALES') result = result.filter(t => t.CustomerName || t.Reason?.includes('출하') || t.Reason?.includes('고객'));
 
         // 검색 필터
@@ -467,9 +467,12 @@ export default function TransactionsPage() {
     }, [transactions, activeTab, period, searchTerm]);
 
     const cellRenderer = {
-        Type: (val, row) => row.Type === 'In'
-            ? <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200"><ArrowDownCircle size={11}/> 입고</span>
-            : <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-orange-50 text-orange-700 border border-orange-200"><ArrowUpCircle size={11}/> 출고</span>,
+        Type: (val, row) => {
+            const isIncoming = String(row.Type).toUpperCase() === 'IN';
+            return isIncoming
+                ? <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200"><ArrowDownCircle size={11}/> 입고</span>
+                : <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-orange-50 text-orange-700 border border-orange-200"><ArrowUpCircle size={11}/> 출고</span>;
+        },
         Date: (val, row) => {
             const dateObj = val?.toDate ? val.toDate() : (val ? new Date(val) : null);
             const dateStr = dateObj ? dateObj.toLocaleDateString('ko-KR') : '-';
@@ -500,11 +503,15 @@ export default function TransactionsPage() {
                 {val}
             </button>
         ),
-        Quantity: (val, row) => (
-            <span className={`text-sm font-black ${row.Type === 'In' ? 'text-blue-600' : 'text-orange-600'}`}>
-                {row.Type === 'In' ? '+' : '-'}{(val || 0).toLocaleString()}
-            </span>
-        ),
+        Quantity: (val, row) => {
+            const displayVal = val !== undefined && val !== null ? val : (row.Qty !== undefined && row.Qty !== null ? row.Qty : 0);
+            const isIncoming = String(row.Type).toUpperCase() === 'IN';
+            return (
+                <span className={`text-sm font-black ${isIncoming ? 'text-blue-600' : 'text-orange-600'}`}>
+                    {isIncoming ? '+' : '-'}{Number(displayVal).toLocaleString()}
+                </span>
+            );
+        },
         RefDoc: (val) => val ? <span className="font-mono text-[10px] bg-slate-100 px-2 py-0.5 rounded font-bold text-slate-600">{val}</span> : <span className="text-slate-300 text-xs">-</span>,
         Reason: (val) => <span className="text-xs text-slate-600 font-medium">{val || '-'}</span>,
         CreatedBy: (val) => <span className="text-[10px] text-slate-400 font-medium">{val || 'System'}</span>,

@@ -16,7 +16,6 @@ import VendorsPage from './pages/VendorsPage'
 import ProductionRequestsPage from './pages/ProductionRequestsPage'
 import ProductionExecutionPage from './pages/ProductionExecutionPage'
 import PurchasingPage from './pages/PurchasingPage'
-import ReceivingInspectionPage from './pages/ReceivingInspectionPage'
 import TransactionsPage from './pages/TransactionsPage'
 import OutsourcingPage from './pages/OutsourcingPage'
 import WarehousePlacementPage from './pages/WarehousePlacementPage'
@@ -137,14 +136,6 @@ function AppContent() {
                 <PrivateRoute>
                     <Layout>
                         <PurchasingPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/receiving/inspection" element={
-                <PrivateRoute>
-                    <Layout>
-                        <ReceivingInspectionPage />
                     </Layout>
                 </PrivateRoute>
             } />

@@ -31,17 +31,45 @@ const loadDbConfig = () => {
     try {
         if (fs.existsSync(CONFIG_FILE)) {
             const raw = fs.readFileSync(CONFIG_FILE, 'utf8');
-            return JSON.parse(raw);
+            const parsed = JSON.parse(raw);
+            // If it is in the new multi-profile format
+            if (parsed.currentProfile && parsed[parsed.currentProfile]) {
+                return parsed;
+            } else {
+                // Legacy format migration
+                return {
+                    currentProfile: 'local',
+                    local: {
+                        host: parsed.host || '192.168.0.7',
+                        port: parsed.port || '15432',
+                        user: parsed.user || 'postgres',
+                        password: parsed.password || 'postgres',
+                        database: parsed.database || 'ir_assistant'
+                    },
+                    remote: {
+                        host: parsed.host || '192.168.0.7',
+                        port: parsed.port || '15432',
+                        user: parsed.user || 'postgres',
+                        password: parsed.password || 'postgres',
+                        database: parsed.database || 'ir_assistant'
+                    }
+                };
+            }
         }
     } catch (err) {
         console.error("Failed to load db_config.json, falling back to environment variables:", err);
     }
-    return {
+    const defaultProfile = {
         host: process.env.PGHOST || '192.168.0.7',
         port: process.env.PGPORT || '15432',
         user: process.env.PGUSER || 'postgres',
         password: process.env.PGPASSWORD || 'postgres',
         database: process.env.PGDATABASE || 'ir_assistant',
+    };
+    return {
+        currentProfile: 'local',
+        local: { ...defaultProfile },
+        remote: { ...defaultProfile }
     };
 };
 
@@ -49,20 +77,22 @@ let currentConfig = loadDbConfig();
 let pool = null;
 
 // Initialize or Reinitialize PostgreSQL Connection Pool
-const initPgPool = (config) => {
+const initPgPool = (configObj) => {
     if (pool) {
         console.log('[PG Pool] Closing old connection pool...');
         pool.end().catch(err => console.error("Error closing PG pool:", err));
     }
     
-    const pgPort = isNaN(parseInt(config.port)) ? 15432 : parseInt(config.port);
+    const activeProfile = configObj.currentProfile || 'local';
+    const activeConfig = configObj[activeProfile];
+    const pgPort = isNaN(parseInt(activeConfig.port)) ? 15432 : parseInt(activeConfig.port);
     
     pool = new pg.Pool({
-        host: config.host,
+        host: activeConfig.host,
         port: pgPort,
-        user: config.user,
-        password: config.password,
-        database: config.database,
+        user: activeConfig.user,
+        password: activeConfig.password,
+        database: activeConfig.database,
         connectionTimeoutMillis: 5000,
     });
     
@@ -70,7 +100,7 @@ const initPgPool = (config) => {
         console.error('[PG Pool] Unexpected error on idle client:', err.message);
     });
     
-    console.log(`[PG Pool] Initialized PG Pool for ${config.user}@${config.host}:${pgPort}/${config.database}`);
+    console.log(`[PG Pool] Initialized PG Pool for [${activeProfile}] ${activeConfig.user}@${activeConfig.host}:${pgPort}/${activeConfig.database}`);
 };
 
 // Start default connection pool
@@ -96,24 +126,38 @@ const ensureTableExists = async (collection) => {
     await pool.query(queryText);
 };
 
-// API: Get current DB Config (excluding sensitive password details completely or masking them)
+// API: Get current DB Config with profiles (excluding sensitive password details completely or masking them)
 app.get('/api/config/db', (req, res) => {
-    // Hide password for security
+    // Hide passwords for security
     const safeConfig = {
-        host: currentConfig.host,
-        port: currentConfig.port,
-        user: currentConfig.user,
-        database: currentConfig.database,
-        hasPassword: !!currentConfig.password
+        currentProfile: currentConfig.currentProfile || 'local',
+        local: {
+            host: currentConfig.local?.host || '',
+            port: currentConfig.local?.port || '15432',
+            user: currentConfig.local?.user || '',
+            database: currentConfig.local?.database || '',
+            hasPassword: !!currentConfig.local?.password
+        },
+        remote: {
+            host: currentConfig.remote?.host || '',
+            port: currentConfig.remote?.port || '15432',
+            user: currentConfig.remote?.user || '',
+            database: currentConfig.remote?.database || '',
+            hasPassword: !!currentConfig.remote?.password
+        }
     };
     res.json(safeConfig);
 });
 
 // API: Test a DB Config temporarily without saving it
 app.post('/api/config/db/test', async (req, res) => {
-    const { host, port, user, password, database } = req.body;
+    const { host, port, user, password, database, profileType } = req.body;
     
-    const effectivePassword = password || currentConfig.password;
+    // Fallback password if not supplied in test
+    let effectivePassword = password;
+    if (!effectivePassword && profileType && currentConfig[profileType]) {
+        effectivePassword = currentConfig[profileType].password;
+    }
     const pgPort = isNaN(parseInt(port)) ? 15432 : parseInt(port);
 
     console.log(`[DB Config Test] Initiating connection test to ${user}@${host}:${pgPort}/${database}`);
@@ -143,39 +187,42 @@ app.post('/api/config/db/test', async (req, res) => {
     }
 });
 
-// API: Save and Apply DB configuration
+// API: Save and Apply DB configuration (handles dual profile saving and switching)
 app.post('/api/config/db', async (req, res) => {
-    const { host, port, user, password, database } = req.body;
+    const { currentProfile, local, remote } = req.body;
     
-    const effectivePassword = password !== undefined ? password : currentConfig.password;
-    const pgPort = isNaN(parseInt(port)) ? 15432 : parseInt(port);
-    
+    if (!currentProfile || !local || !remote) {
+        return res.status(400).json({ success: false, error: 'Invalid config format' });
+    }
+
+    // Capture passwords from current configuration if not provided (not modified)
     const newConfig = {
-        host,
-        port: pgPort,
-        user,
-        password: effectivePassword,
-        database
+        currentProfile,
+        local: {
+            host: local.host,
+            port: isNaN(parseInt(local.port)) ? 15432 : parseInt(local.port),
+            user: local.user,
+            password: (local.password !== undefined && local.password !== '') 
+                ? local.password 
+                : (currentConfig.local?.password || ''),
+            database: local.database
+        },
+        remote: {
+            host: remote.host,
+            port: isNaN(parseInt(remote.port)) ? 15432 : parseInt(remote.port),
+            user: remote.user,
+            password: (remote.password !== undefined && remote.password !== '') 
+                ? remote.password 
+                : (currentConfig.remote?.password || ''),
+            database: remote.database
+        }
     };
     
-    console.log(`[DB Config Save] Saving config for ${user}@${host}:${pgPort}/${database}`);
+    const activeProfile = newConfig.currentProfile;
+    
+    console.log(`[DB Config Save] Saving config for active profile: [${activeProfile}]`);
     
     try {
-        const tempPool = new pg.Pool({
-            host: newConfig.host,
-            port: pgPort,
-            user: newConfig.user,
-            password: newConfig.password,
-            database: newConfig.database,
-            connectionTimeoutMillis: 5000,
-        });
-
-        tempPool.on('error', (err) => {
-            console.error('[DB Config Save Pool] Unexpected idle client error:', err.message);
-        });
-        await tempPool.query('SELECT 1');
-        await tempPool.end();
-        
         // Write to local json config file
         fs.writeFileSync(CONFIG_FILE, JSON.stringify(newConfig, null, 4), 'utf8');
         
@@ -183,10 +230,10 @@ app.post('/api/config/db', async (req, res) => {
         currentConfig = newConfig;
         initPgPool(currentConfig);
         
-        res.json({ success: true, message: '설정이 저장되고 성공적으로 적용되었습니다.' });
+        res.json({ success: true, message: `설정이 저장되고 [${activeProfile}] 프로필로 연결되었습니다.` });
     } catch (err) {
-        console.error('[DB Config Save] Failed to apply config:', err);
-        res.status(500).json({ success: false, error: `설정 검증 실패: ${err.message}` });
+        console.error('[DB Config Save] Failed to write config file:', err);
+        res.status(500).json({ success: false, error: `설정 저장 실패: ${err.message}` });
     }
 });
 
