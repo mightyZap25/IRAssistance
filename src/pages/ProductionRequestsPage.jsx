@@ -5,7 +5,7 @@ import {
     Send, Trash2, Box, Tag, Settings
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
-import { db, collection, getDocs, doc, updateDoc, addDoc, setDoc, serverTimestamp, query, orderBy, where } from '../firebase';
+import { db, collection, getDocs, doc, updateDoc, addDoc, setDoc, serverTimestamp, query, orderBy, where, writeBatch } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import MasterDataGrid from '../components/common/MasterDataGrid';
 
@@ -27,13 +27,15 @@ const PR_STATUS = {
     QA_COMPLETE:     { label: 'QA검사완료',   color: 'bg-emerald-50 text-emerald-600 border-emerald-200', step: 9 },
     SHIP_READY:      { label: '출하준비',     color: 'bg-cyan-50 text-cyan-600 border-cyan-200',        step: 10 },
     SHIPPED:         { label: '출하완료',     color: 'bg-green-50 text-green-600 border-green-200',     step: 11 },
+    COMPLETED:       { label: '출하완료',     color: 'bg-green-50 text-green-600 border-green-200',     step: 11 },
+    completed:       { label: '출하완료',     color: 'bg-green-50 text-green-600 border-green-200',     step: 11 },
     ARCHIVED:        { label: '아카이브',     color: 'bg-slate-50 text-slate-400 border-slate-100',     step: 12 },
     CANCELLED:       { label: '의뢰취소',     color: 'bg-red-50 text-red-600 border-red-200',        step: -1 },
 };
 
 const ACTIVE_STATUSES = ['DRAFT', 'QUOTE_ISSUING', 'REVIEW', 'CONFIRMED', 'WAITING_FOR_PARTS'];
 const PRODUCTION_STATUSES = ['PROD_WAITING', 'PROD_PLANNING', 'WORK_ORDER', 'IN_PRODUCTION', 'PROD_COMPLETE', 'QA_WAITING', 'QA_COMPLETE', 'SHIP_READY'];
-const HISTORY_STATUSES = ['SHIPPED', 'ARCHIVED', 'CANCELLED'];
+const HISTORY_STATUSES = ['SHIPPED', 'COMPLETED', 'completed', 'ARCHIVED', 'CANCELLED'];
 
 const COLUMN_DEFS = {
     PRNumber:    { label: 'PR 번호',    default: true },
@@ -63,6 +65,7 @@ const generatePRNumber = () => {
 };
 
 import { productionService } from '../services/productionService';
+import { inventoryService } from '../services/inventoryService';
 import BOMCheckTree from '../components/BOMCheckTree';
 import PRTimelineGraph from '../components/PRTimelineGraph';
 
@@ -1226,6 +1229,65 @@ export default function ProductionRequestsPage() {
         } catch (err) { console.error(err); }
     };
 
+    const handlePaymentComplete = async (prId, totalAmount) => {
+        try {
+            const updateData = { 
+                PaymentStatus: 'PAID', 
+                AmountPaid: totalAmount,
+                PaymentDate: new Date().toISOString(),
+                UpdatedAt: serverTimestamp() 
+            };
+            await updateDoc(doc(db, 'production_requests', prId), updateData);
+            await fetchPRs();
+            if (selectedPR?.id === prId) setSelectedPR(prev => ({ ...prev, ...updateData }));
+        } catch (err) { console.error(err); }
+    };
+
+    const handleShipment = async (prId) => {
+        const pr = prs.find(p => p.id === prId);
+        if (!pr) return;
+        
+        try {
+            const batch = writeBatch(db);
+            const updateData = { Status: 'SHIPPED', UpdatedAt: serverTimestamp() };
+            
+            const logEntry = {
+                from: pr.Status, to: 'SHIPPED',
+                message: '제품 출하 완료',
+                user: userProfile?.displayName || 'Unknown',
+                timestamp: new Date().toISOString()
+            };
+            updateData.Logs = [logEntry, ...(pr.Logs || [])];
+            
+            const prRef = doc(db, 'production_requests', prId);
+            batch.update(prRef, updateData);
+            
+            if (pr.Items && pr.Items.length > 0) {
+                for (const item of pr.Items) {
+                    await inventoryService.addTransaction({
+                        PartID: item.PartID,
+                        Type: 'Out',
+                        Quantity: item.TargetQty,
+                        Reason: '완제품 출하',
+                        RefDoc: pr.PRNumber || pr.id
+                    }, batch);
+                }
+            } else {
+                await inventoryService.addTransaction({
+                    PartID: pr.PartID,
+                    Type: 'Out',
+                    Quantity: pr.TargetQty,
+                    Reason: '완제품 출하',
+                    RefDoc: pr.PRNumber || pr.id
+                }, batch);
+            }
+            
+            await batch.commit();
+            await fetchPRs();
+            if (selectedPR?.id === prId) setSelectedPR(prev => ({ ...prev, ...updateData }));
+        } catch (err) { console.error(err); }
+    };
+
     const handleSavePR = async (formData) => {
         const prNumber = generatePRNumber();
         await setDoc(doc(db, 'production_requests', prNumber), { ...formData, PRNumber: prNumber, CreatedAt: serverTimestamp() });
@@ -1332,12 +1394,86 @@ export default function ProductionRequestsPage() {
                                         <div className="flex justify-between text-xs"><span className="text-slate-400 font-bold">총 수량</span><span className="font-black text-blue-600">{selectedPR.TargetQty} EA</span></div>
                                     </div>
 
+
+                                    {/* ─── 추가된 납기 안전도 및 결제 정보 ─── */}
+                                    <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
+                                        {/* 안전도 */}
+                                        <div className="flex flex-col gap-1.5">
+                                            <span className="text-[10px] font-black text-slate-400 uppercase">배송 예정일 안전도</span>
+                                            {(() => {
+                                                const diffTime = new Date(selectedPR.DueDate).getTime() - new Date().getTime();
+                                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                                let safeStatus = { label: '여유', color: 'bg-emerald-50 text-emerald-600 border-emerald-200', icon: <CheckCircle2 size={14}/> };
+                                                if (diffDays < 0) safeStatus = { label: '지연 (위험)', color: 'bg-rose-50 text-rose-600 border-rose-200', icon: <AlertCircle size={14}/> };
+                                                else if (diffDays <= 3) safeStatus = { label: '임박 (주의)', color: 'bg-amber-50 text-amber-600 border-amber-200', icon: <ShieldAlert size={14}/> };
+                                                
+                                                return (
+                                                    <div className="flex items-center gap-3">
+                                                        <span className={`px-2.5 py-1 rounded-lg text-[11px] font-black border flex items-center gap-1.5 ${safeStatus.color}`}>
+                                                            {safeStatus.icon} {safeStatus.label}
+                                                        </span>
+                                                        <span className="text-xs font-bold text-slate-500">
+                                                            {diffDays < 0 ? `납기일로부터 ${Math.abs(diffDays)}일 지남` : `납기일까지 ${diffDays}일 남음`}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+
+                                        <div className="h-px bg-slate-100" />
+
+                                        {/* 입금 정보 */}
+                                        <div className="flex flex-col gap-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-1"><DollarSign size={12}/> 대금 입금 여부</span>
+                                                {selectedPR.PaymentStatus !== 'PAID' && (
+                                                    <button 
+                                                        onClick={() => {
+                                                            if (window.confirm('대금 입금 처리를 완료하시겠습니까?')) {
+                                                                handlePaymentComplete(selectedPR.id, selectedPR.TotalAmount || 0);
+                                                            }
+                                                        }}
+                                                        className="px-2.5 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 rounded-lg text-[10px] font-black transition-colors"
+                                                    >
+                                                        입금 확인 처리
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center justify-between bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`w-2 h-2 rounded-full ${selectedPR.PaymentStatus === 'PAID' ? 'bg-blue-500' : 'bg-slate-300'}`} />
+                                                    <span className={`text-xs font-black ${selectedPR.PaymentStatus === 'PAID' ? 'text-blue-700' : 'text-slate-500'}`}>
+                                                        {selectedPR.PaymentStatus === 'PAID' ? '입금 완료' : '미입금 (대기중)'}
+                                                    </span>
+                                                </div>
+                                                <div className="text-sm font-black text-slate-800">
+                                                    {(selectedPR.AmountPaid || 0).toLocaleString()} <span className="text-[10px] text-slate-400 font-bold">{selectedPR.Currency || 'KRW'}</span>
+                                                    <span className="mx-2 text-slate-300">/</span>
+                                                    <span className="text-xs text-slate-400">총 {(selectedPR.TotalAmount || 0).toLocaleString()}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     {selectedPR.Status === 'QUOTE_ISSUING' && (
                                         <button 
                                             onClick={() => handleStatusChange(selectedPR.id, 'REVIEW')}
                                             className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-black flex items-center justify-center gap-2 shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all animate-in zoom-in-95"
                                         >
                                             <TrendingUp size={18}/> 생산 검토 요청
+                                        </button>
+                                    )}
+
+                                    {selectedPR.Status === 'QA_COMPLETE' && (
+                                        <button 
+                                            onClick={() => {
+                                                if (window.confirm('출하를 진행하시겠습니까?\n(상태가 출하 완료로 변경되며 이력으로 이동됩니다)')) {
+                                                    handleShipment(selectedPR.id);
+                                                }
+                                            }}
+                                            className="w-full py-3 bg-teal-600 text-white rounded-xl text-sm font-black flex items-center justify-center gap-2 shadow-lg shadow-teal-100 hover:bg-teal-700 transition-all animate-in zoom-in-95"
+                                        >
+                                            <Package size={18}/> 출하 진행 (SHIPPING)
                                         </button>
                                     )}
 

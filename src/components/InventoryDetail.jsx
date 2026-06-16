@@ -2,12 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { collection, query, getDocs, orderBy, where, doc, getDoc } from '../firebase';
 import { db } from '../firebase';
-import { X, History, ArrowUpRight, ArrowDownRight, Package, User, FileText, ExternalLink, Info, AlertCircle, Link as LinkIcon, Factory } from 'lucide-react';
+import { X, History, ArrowUpRight, ArrowDownRight, Package, User, FileText, ExternalLink, Info, AlertCircle, Link as LinkIcon, Factory, Ban } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { inventoryService } from '../services/inventoryService';
 
 const InventoryDetail = ({ item, isOpen, onClose, onRefresh }) => {
     const [history, setHistory] = useState([]);
     const [usageInBoms, setUsageInBoms] = useState([]);
     const [loading, setLoading] = useState(true);
+    const { userProfile } = useAuth();
+    
+    // Cancellation state
+    const [cancelingLog, setCancelingLog] = useState(null);
+    const [cancelReason, setCancelReason] = useState('');
+    const [isCanceling, setIsCanceling] = useState(false);
 
     useEffect(() => {
         if (isOpen && item) {
@@ -19,11 +27,18 @@ const InventoryDetail = ({ item, isOpen, onClose, onRefresh }) => {
         setLoading(true);
         try {
             // 1. 입출고 히스토리 조회
-            const histSnap = await getDocs(query(
-                collection(db, 'inventory_history'),
-                where('PartID', '==', item.PartID),
-                orderBy('Timestamp', 'desc')
-            ));
+            const [histSnap, txSnap] = await Promise.all([
+                getDocs(query(
+                    collection(db, 'inventory_history'),
+                    where('PartID', '==', item.PartID),
+                    orderBy('Timestamp', 'desc')
+                )),
+                getDocs(query(
+                    collection(db, 'transactions'),
+                    where('PartID', '==', item.PartID),
+                    orderBy('Date', 'desc')
+                ))
+            ]);
             
             // 2. 해당 부품을 사용하는 상위 BOM(조립품) 조회
             const bomSnap = await getDocs(query(
@@ -31,9 +46,54 @@ const InventoryDetail = ({ item, isOpen, onClose, onRefresh }) => {
                 where('ChildID', '==', item.PartID)
             ));
 
-            setHistory(histSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            const combined = [
+                ...histSnap.docs.map(d => ({ ...d.data(), id: d.id, _isFromHistoryTable: true })),
+                ...txSnap.docs.map(d => {
+                    const dt = d.data();
+                    return {
+                        ...dt,
+                        id: d.id,
+                        _isFromHistoryTable: false,
+                        Timestamp: dt.Date,
+                        Change: dt.Type === 'In' ? Number(dt.Quantity || 0) : -Number(dt.Quantity || 0),
+                        SourceType: dt.Reason || dt.Type || 'ETC',
+                        PRNumber: dt.RefDoc
+                    };
+                })
+            ].sort((a, b) => {
+                const ta = a.Timestamp?.seconds || 0;
+                const tb = b.Timestamp?.seconds || 0;
+                return tb - ta;
+            });
+
+            setHistory(combined);
             setUsageInBoms(bomSnap.docs.map(d => d.data()));
         } catch (err) { console.error(err); } finally { setLoading(false); }
+    };
+
+    const handleCancelTransaction = async () => {
+        if (!cancelReason.trim()) {
+            alert('취소 사유서를 반드시 작성해야 합니다.');
+            return;
+        }
+        setIsCanceling(true);
+        try {
+            await inventoryService.cancelTransaction(
+                cancelingLog.id, 
+                cancelingLog._isFromHistoryTable, 
+                cancelReason, 
+                userProfile
+            );
+            setCancelingLog(null);
+            setCancelReason('');
+            fetchDetailData(); // Refresh history
+            if (onRefresh) onRefresh(); // Refresh parent list
+        } catch (err) {
+            console.error(err);
+            alert('취소 처리 중 오류가 발생했습니다: ' + err.message);
+        } finally {
+            setIsCanceling(false);
+        }
     };
 
     if (!isOpen || !item) return null;
@@ -94,32 +154,44 @@ const InventoryDetail = ({ item, isOpen, onClose, onRefresh }) => {
                             {loading ? (
                                 <div className="py-20 text-center animate-pulse text-slate-300 font-bold">히스토리 로드 중...</div>
                             ) : history.length > 0 ? history.map((log) => {
+                                const isCancelled = log.Status === 'CANCELLED';
                                 const isPlus = log.Type === 'IN' || log.Change > 0;
                                 return (
-                                    <div key={log.id} className="bg-white border-2 border-slate-50 rounded-[24px] p-5 hover:border-indigo-100 transition-all shadow-sm">
+                                    <div key={log.id} className={`bg-white border-2 border-slate-50 rounded-[24px] p-5 hover:border-indigo-100 transition-all shadow-sm ${isCancelled ? 'opacity-60 grayscale' : ''}`}>
                                         <div className="flex justify-between items-start mb-3">
                                             <div className="flex items-center gap-3">
-                                                <div className={`p-2 rounded-xl ${isPlus ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                                                    {isPlus ? <ArrowUpRight size={18}/> : <ArrowDownRight size={18}/>}
+                                                <div className={`p-2 rounded-xl ${isCancelled ? 'bg-slate-100 text-slate-400' : (isPlus ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600')}`}>
+                                                    {isCancelled ? <Ban size={18}/> : (isPlus ? <ArrowUpRight size={18}/> : <ArrowDownRight size={18}/>)}
                                                 </div>
                                                 <div className="text-left">
-                                                    <p className={`text-sm font-black ${isPlus ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                                    <p className={`text-sm font-black ${isCancelled ? 'text-slate-500 line-through' : (isPlus ? 'text-emerald-700' : 'text-rose-700')}`}>
                                                         {isPlus ? '+' : ''}{log.Change?.toLocaleString()} EA
                                                         <span className="ml-2 text-xs font-bold text-slate-400">({log.Type === 'IN' ? '입고' : '출고'})</span>
                                                     </p>
-                                                    <p className="text-[10px] font-bold text-slate-300 uppercase tracking-tighter">{new Date(log.Timestamp?.seconds * 1000).toLocaleString()}</p>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{new Date(log.Timestamp?.seconds * 1000).toLocaleString()}</p>
                                                 </div>
                                             </div>
-                                            <div className="text-right">
+                                            <div className="text-right flex flex-col items-end gap-2">
                                                 <span className={`px-2 py-0.5 rounded text-[9px] font-black border ${
+                                                    isCancelled ? 'bg-rose-50 text-rose-600 border-rose-100' :
                                                     log.SourceType === 'PRODUCTION' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 
                                                     log.SourceType === 'SHIPPING' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-slate-50 text-slate-400 border-slate-100'
                                                 }`}>
-                                                    {log.SourceType === 'PRODUCTION' ? '생산 재고확보' : 
+                                                    {isCancelled ? '취소됨' : log.SourceType === 'PRODUCTION' ? '생산 재고확보' : 
                                                      log.SourceType === 'SHIPPING' ? '고객 출하' : log.Reason || '기타'}
                                                 </span>
+                                                {!isCancelled && (
+                                                    <button onClick={() => setCancelingLog(log)} className="text-[10px] font-bold text-slate-400 hover:text-rose-600 underline underline-offset-2">취소/수정(롤백)</button>
+                                                )}
                                             </div>
                                         </div>
+                                        
+                                        {isCancelled && log.CancelReason && (
+                                            <div className="mt-2 p-3 bg-rose-50/50 rounded-xl border border-rose-100/50 flex flex-col gap-1">
+                                                <span className="text-[10px] font-black text-rose-500 flex items-center gap-1"><AlertCircle size={10}/> 취소 사유</span>
+                                                <p className="text-xs font-bold text-slate-600">{log.CancelReason}</p>
+                                            </div>
+                                        )}
                                         
                                         {(log.SourceType === 'SHIPPING' || log.PRNumber) && (
                                             <div className="mt-3 pt-3 border-t border-slate-50 flex items-center justify-between">
@@ -159,6 +231,34 @@ const InventoryDetail = ({ item, isOpen, onClose, onRefresh }) => {
                     </div>
                 )}
             </div>
+
+            {/* Cancel Prompt Modal */}
+            {cancelingLog && (
+                <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm z-[10002] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+                        <h3 className="text-lg font-black text-slate-900 mb-2">재고 트랜잭션 취소(롤백)</h3>
+                        <p className="text-xs text-slate-500 font-bold mb-4">
+                            이 작업을 수행하면 기존에 증감되었던 재고 수량이 반대로 복구되며, 해당 내역은 취소 처리됩니다. <span className="text-rose-500">사유서 작성이 필수입니다.</span>
+                        </p>
+                        <div className="mb-4 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">취소 대상</p>
+                            <p className="text-sm font-black text-slate-800">{cancelingLog.Change > 0 ? '+' : ''}{cancelingLog.Change} EA ({cancelingLog.SourceType})</p>
+                        </div>
+                        <textarea
+                            value={cancelReason}
+                            onChange={(e) => setCancelReason(e.target.value)}
+                            placeholder="취소 사유를 상세히 적어주세요 (예: 입고 수량 중복 입력 정정)"
+                            className="w-full h-24 p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-rose-500 focus:bg-white resize-none mb-4"
+                        />
+                        <div className="flex gap-2 justify-end">
+                            <button onClick={() => { setCancelingLog(null); setCancelReason(''); }} className="px-4 py-2 font-black text-slate-400 hover:text-slate-600 rounded-xl transition-colors">취소</button>
+                            <button onClick={handleCancelTransaction} disabled={isCanceling} className="px-5 py-2 font-black text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-xl transition-all shadow-sm">
+                                {isCanceling ? '처리 중...' : '롤백 실행'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>, document.body
     );
 };

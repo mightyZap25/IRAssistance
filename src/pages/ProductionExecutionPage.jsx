@@ -7,12 +7,14 @@ import { Factory, AlertTriangle, CheckCircle2, Clock, X, ChevronRight, Zap, List
 import ProjectGanttChart from '../components/ProjectGanttChart';
 import BOMCheckTree from '../components/BOMCheckTree';
 import { productionService } from '../services/productionService';
+import { inventoryService } from '../services/inventoryService';
 
 // ─────────────────────────────────────────────────────────────
 // 상태 정의
 // ─────────────────────────────────────────────────────────────
 const PR_STATUS = {
     DRAFT:           { label: '임시저장',     color: 'bg-slate-100 text-slate-500 border-slate-200',    step: 0 },
+    PENDING:         { label: '계획 대기',    color: 'bg-slate-100 text-slate-600 border-slate-200',    step: 0.2 },
     QUOTE_ISSUING:   { label: '견적발행중',   color: 'bg-amber-50 text-amber-600 border-amber-200',     step: 0.5 },
     REVIEW:          { label: '생산검토',     color: 'bg-yellow-50 text-yellow-600 border-yellow-200',  step: 1 },
     CONFIRMED:       { label: '의뢰확정',     color: 'bg-blue-50 text-blue-600 border-blue-200',        step: 2 },
@@ -27,6 +29,7 @@ const PR_STATUS = {
     SHIP_READY:      { label: '출하준비',     color: 'bg-cyan-50 text-cyan-600 border-cyan-200',        step: 10 },
     SHIPPED:         { label: '출하완료',     color: 'bg-green-50 text-green-600 border-green-200',     step: 11 },
     ARCHIVED:        { label: '아카이브',     color: 'bg-slate-50 text-slate-400 border-slate-100',     step: 12 },
+    CANCELLED:       { label: '주문폐기',     color: 'bg-red-50 text-red-600 border-red-200',           step: -1 },
 };
 
 const EXECUTION_STATUSES = ['REVIEW', 'CONFIRMED', 'WAITING_FOR_PARTS', 'PROD_WAITING', 'PROD_PLANNING', 'WORK_ORDER', 'IN_PRODUCTION', 'PROD_COMPLETE', 'QA_WAITING', 'QA_COMPLETE', 'SHIP_READY'];
@@ -104,105 +107,7 @@ function ProductionCalendar({ prs, onCardClick }) {
     );
 }
 
-function WODetailModal({ pr, onClose, onRefresh }) {
-    const { userProfile } = useAuth();
-    const [loading, setLoading] = useState(false);
-    const [actualQty, setActualQty] = useState(pr?.TargetQty || 0);
-    const [defectQty, setDefectQty] = useState(0);
-    const [bomItems, setBomItems] = useState([]);
-    const [inventory, setInventory] = useState({});
-
-    useEffect(() => {
-        if (!pr) return;
-        (async () => {
-            const [bomSnap, invSnap] = await Promise.all([
-                getDocs(query(collection(db, 'bom'), where('ParentID', '==', pr.PartID))),
-                getDocs(collection(db, 'inventory')),
-            ]);
-            setBomItems(bomSnap.docs.map(d => d.data()));
-            const inv = {};
-            invSnap.docs.forEach(d => { inv[d.data().PartID] = { onHand: d.data().OnHand || 0, ref: d.ref }; });
-            setInventory(inv);
-        })();
-    }, [pr]);
-
-    const handleComplete = async () => {
-        if (!window.confirm(`${actualQty}개 생산 완료 처리하시겠습니까?`)) return;
-        setLoading(true);
-        try {
-            const batch = writeBatch(db);
-            const nextStatus = 'QA_WAITING';
-            const logEntry = { 
-                from: pr.Status, to: nextStatus, 
-                message: `생산 완료: 양품 ${actualQty} / 불량 ${defectQty}`, 
-                user: userProfile?.displayName || 'Unknown', 
-                timestamp: new Date().toISOString(),
-                scope: pr.isSplit ? `${pr.PartName} ${pr.scheduleIdx + 1}차` : '전체'
-            };
-
-            const parentRef = doc(db, 'production_requests', pr.id);
-            const parentSnap = await getDoc(parentRef);
-            if (parentSnap.exists()) {
-                const parentData = parentSnap.data();
-                const newItems = [...(parentData.Items || [])];
-                if (pr.isSplit && newItems[pr.itemIdx]) {
-                    if (!newItems[pr.itemIdx].Schedules) newItems[pr.itemIdx].Schedules = [{ date: newItems[pr.itemIdx].DueDate || pr.DueDate, qty: newItems[pr.itemIdx].TargetQty || pr.TargetQty }];
-                    newItems[pr.itemIdx].Schedules[pr.scheduleIdx] = { ...newItems[pr.itemIdx].Schedules[pr.scheduleIdx], status: nextStatus, actualQty, defectQty };
-                    if (newItems[pr.itemIdx].Schedules.every(s => s.status === nextStatus)) newItems[pr.itemIdx].Status = nextStatus;
-                }
-                const allPRDone = newItems.every(item => (item.Schedules || []).every(s => ['PROD_COMPLETE', 'QA_WAITING', 'QA_COMPLETE', 'SHIP_READY', 'SHIPPED'].includes(s.status)));
-                batch.update(parentRef, { Items: newItems, Status: allPRDone ? 'PROD_COMPLETE' : 'IN_PRODUCTION', UpdatedAt: serverTimestamp(), Logs: [logEntry, ...(parentData.Logs || [])] });
-            }
-
-            /* 
-               기존에 receiving 컬렉션에 저장하던 로직을 제거합니다. 
-               생산 제품은 수입검사 대상이 아니므로 qa_shipping_inspections 로만 이관됩니다.
-            */
-
-            // 품질 검사 요청 추가 (품질 공정 관리 페이지 - 출하검사 탭 연동)
-            const inspectionRef = doc(collection(db, 'qa_shipping_inspections'));
-            batch.set(inspectionRef, {
-                PR_ID: pr.id,
-                PRNumber: pr.PRNumber,
-                RefPRID: pr.PRNumber,
-                PartID: pr.PartID,
-                PartName: pr.PartName,
-                CustomerName: pr.CustomerName || '일반고객', // 고객사 정보 추가
-                Qty: actualQty,
-                Status: 'WAITING_INSPECTION',
-                createdAt: serverTimestamp(), // QAProcessPage에서 사용하는 필드명
-                ScheduleIdx: pr.isSplit ? pr.scheduleIdx : undefined
-            });
-
-            bomItems.forEach(bom => {
-                const deductQty = (bom.Quantity || 1) * actualQty;
-                const invData = inventory[bom.ChildID];
-                if (invData?.ref) batch.update(invData.ref, { OnHand: (invData.onHand || 0) - deductQty, UpdatedAt: serverTimestamp() });
-            });
-
-            await batch.commit();
-            alert('완료되었습니다.'); onRefresh(); onClose();
-        } catch (err) { console.error(err); alert('오류 발생'); } finally { setLoading(false); }
-    };
-
-    return createPortal(
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-[10000] flex items-center justify-center p-4">
-            <div className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-                <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
-                    <div><h2 className="text-lg font-black text-slate-800 flex items-center gap-2"><Factory size={20} className="text-orange-500"/> 생산 완료 보고</h2><p className="text-[10px] font-bold text-slate-400 mt-0.5">{pr.PartName}</p></div>
-                    <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-700 bg-white rounded-xl shadow-sm"><X size={18}/></button>
-                </div>
-                <div className="p-6 space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1 text-left"><label className="text-[10px] font-black text-slate-400 uppercase">양품 수량</label><input type="number" value={actualQty} onChange={e => setActualQty(parseInt(e.target.value) || 0)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-black outline-none focus:ring-2 focus:ring-orange-400" /></div>
-                        <div className="space-y-1 text-left"><label className="text-[10px] font-black text-slate-400 uppercase">불량 수량</label><input type="number" value={defectQty} onChange={e => setDefectQty(parseInt(e.target.value) || 0)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-black outline-none focus:ring-2 focus:ring-orange-400" /></div>
-                    </div>
-                    <div className="flex gap-2 pt-2"><button onClick={onClose} className="flex-1 py-3 rounded-xl text-xs font-black bg-slate-100 text-slate-600">취소</button><button onClick={handleComplete} disabled={loading} className="flex-[2] py-3 rounded-xl text-xs font-black bg-orange-500 text-white shadow-lg shadow-orange-100 disabled:opacity-50">{loading ? '처리 중...' : '생산 완료 보고'}</button></div>
-                </div>
-            </div>
-        </div>, document.body
-    );
-}
+// WODetailModal removed. Production completes directly to QA_WAITING.
 
 function KanbanCard({ pr, onClick }) {
     const delayed = isDelayed(pr.DueDate);
@@ -261,8 +166,6 @@ export default function ProductionExecutionPage() {
     const [viewMode, setViewMode] = useState('SPLIT'); 
     const [selectedPR, setSelectedPR] = useState(null);
     const [groupBy, setGroupBy] = useState('ORDER');
-    const [isWOModalOpen, setIsWOModalOpen] = useState(false);
-    const [woPR, setWoPR] = useState(null);
     const [detailTab, setDetailTab] = useState('basic'); 
     const [selectedPRBOM, setSelectedPRBOM] = useState([]);
     const [inventory, setInventory] = useState({});
@@ -332,24 +235,31 @@ export default function ProductionExecutionPage() {
         const currentStep = PR_STATUS[currentStatus]?.step || 0;
         const nextStep = PR_STATUS[nextStatus]?.step || 0;
 
-        // 1. 상태 변경 경고창
-        if (!window.confirm(`상태를 [${PR_STATUS[nextStatus]?.label || nextStatus}] 단계로 변경하시겠습니까?`)) return;
-
         let reason = '';
-        // 2. 이전 단계로 되돌리는 경우 사유 입력
-        if (nextStep < currentStep && currentStatus !== '') {
-            const userReason = window.prompt('이전 단계로 되돌리는 사유를 입력해주세요:');
+        if (nextStatus === 'CANCELLED') {
+            const userReason = window.prompt('정말 주문을 삭제/폐기하시겠습니까? 사유를 반드시 입력해주세요:');
             if (!userReason) {
-                alert('사유를 입력해야 상태 변경이 가능합니다.');
+                alert('사유를 입력해야 폐기가 가능합니다.');
                 return;
             }
             reason = userReason;
+        } else {
+            if (!window.confirm(`상태를 [${PR_STATUS[nextStatus]?.label || nextStatus}] 단계로 변경하시겠습니까?`)) return;
+
+            if (nextStep < currentStep && currentStatus !== '') {
+                const userReason = window.prompt('이전 단계로 되돌리는 사유를 입력해주세요:');
+                if (!userReason) {
+                    alert('사유를 입력해야 상태 변경이 가능합니다.');
+                    return;
+                }
+                reason = userReason;
+            }
         }
 
         const logEntry = { 
             from: currentStatus, 
             to: nextStatus, 
-            message: logMessage || (reason ? `상태 복구: ${reason}` : '상태 변경'), 
+            message: logMessage ? `${logMessage} (사유: ${reason})` : (reason ? `상태 변경 사유: ${reason}` : '상태 변경'), 
             user: userProfile?.displayName || 'Unknown', 
             timestamp: new Date().toISOString(), 
             scope: isSplit ? `${pr.Items?.[itemIdx]?.PartName || pr.PartName} ${sIdx+1}차` : '전체' 
@@ -376,6 +286,110 @@ export default function ProductionExecutionPage() {
         } catch (err) { console.error(err); alert('상태 변경 실패'); }
     };
 
+    const handleDirectComplete = async (pr, itemIdx, sIdx, item, sched) => {
+        const actualQty = sched?.qty || pr.TargetQty || 0;
+        if (!window.confirm(`[${item?.PartName || pr.PartName}] ${actualQty}개 생산 완료 처리하시겠습니까?\n(완료 후 즉시 QA 출하검사로 이관됩니다)`)) return;
+        
+        try {
+            const bomSnap = await getDocs(query(collection(db, 'bom'), where('ParentID', '==', item?.PartID || pr.PartID)));
+            const bomItems = bomSnap.docs.map(d => d.data());
+
+            // 자재 부족 여부 체크
+            if (bomItems.length > 0) {
+                const invSnap = await getDocs(collection(db, 'inventory'));
+                const invMap = {};
+                invSnap.forEach(d => invMap[d.data().PartID] = d.data().OnHand || 0);
+                
+                const shortageItems = [];
+                for (const bom of bomItems) {
+                    const reqQty = (bom.Quantity || 1) * actualQty;
+                    const curQty = invMap[bom.ChildID] || 0;
+                    if (curQty < reqQty) {
+                        shortageItems.push(`- ${bom.ChildName || bom.ChildID} (필요: ${reqQty}, 현재: ${curQty})`);
+                    }
+                }
+                
+                if (shortageItems.length > 0) {
+                    alert('자재가 부족하여 생산을 완료할 수 없습니다.\n\n[부족 자재 목록]\n' + shortageItems.join('\n'));
+                    return;
+                }
+            }
+
+            const batch = writeBatch(db);
+            const nextStatus = 'QA_WAITING';
+            const logEntry = { 
+                from: pr.Status, to: nextStatus, 
+                message: `생산 완료: 양품 ${actualQty} / 불량 0`, 
+                user: userProfile?.displayName || 'Unknown', 
+                timestamp: new Date().toISOString(),
+                scope: itemIdx !== undefined && sIdx !== undefined ? `${item?.PartName || pr.PartName} ${sIdx + 1}차` : '전체'
+            };
+
+            const parentRef = doc(db, 'production_requests', pr.id);
+            const parentSnap = await getDoc(parentRef);
+            if (parentSnap.exists()) {
+                const parentData = parentSnap.data();
+                const newItems = [...(parentData.Items || [])];
+                if (itemIdx !== undefined && sIdx !== undefined && newItems[itemIdx]) {
+                    if (!newItems[itemIdx].Schedules) newItems[itemIdx].Schedules = [{ date: newItems[itemIdx].DueDate || pr.DueDate, qty: newItems[itemIdx].TargetQty || pr.TargetQty }];
+                    newItems[itemIdx].Schedules[sIdx] = { ...newItems[itemIdx].Schedules[sIdx], status: nextStatus, actualQty, defectQty: 0 };
+                    if (newItems[itemIdx].Schedules.every(s => s.status === nextStatus)) newItems[itemIdx].Status = nextStatus;
+                } else {
+                    if (newItems.length > 0) {
+                        newItems.forEach((it, idx) => {
+                            it.Status = nextStatus;
+                            it.Schedules = (it.Schedules || []).map(s => ({ ...s, status: nextStatus, actualQty, defectQty: 0 }));
+                        });
+                    }
+                }
+                const allPRDone = newItems.length > 0 ? newItems.every(i => (i.Schedules || []).every(s => ['PROD_COMPLETE', 'QA_WAITING', 'QA_COMPLETE', 'SHIP_READY', 'SHIPPED'].includes(s.status))) : true;
+                batch.update(parentRef, { Items: newItems, Status: allPRDone ? 'PROD_COMPLETE' : 'IN_PRODUCTION', UpdatedAt: serverTimestamp(), Logs: [logEntry, ...(parentData.Logs || [])] });
+            }
+
+            const inspectionRef = doc(collection(db, 'qa_shipping_inspections'));
+            batch.set(inspectionRef, {
+                PR_ID: pr.id,
+                PRNumber: pr.PRNumber,
+                RefPRID: pr.PRNumber,
+                PartID: item?.PartID || pr.PartID,
+                PartName: item?.PartName || pr.PartName,
+                CustomerName: pr.CustomerName || '일반고객',
+                Qty: actualQty,
+                Status: 'WAITING_INSPECTION',
+                createdAt: serverTimestamp(),
+                ScheduleIdx: sIdx !== undefined ? sIdx : undefined
+            });
+
+            for (const bom of bomItems) {
+                const deductQty = (bom.Quantity || 1) * actualQty;
+                await inventoryService.addTransaction({
+                    PartID: bom.ChildID,
+                    Type: 'Out',
+                    Quantity: deductQty,
+                    Reason: '생산 자재 투입 (백플러시)',
+                    RefDoc: pr.PRNumber || pr.id
+                }, batch);
+            }
+
+            await inventoryService.addTransaction({
+                PartID: item?.PartID || pr.PartID,
+                Type: 'In',
+                Quantity: actualQty,
+                Reason: '생산 완료 (완제품 입고)',
+                RefDoc: pr.PRNumber || pr.id
+            }, batch);
+
+            await batch.commit();
+            alert('생산 완료 처리되었으며, 출하 검사(QA) 대기열로 즉시 이송되었습니다.');
+            await fetchPRs();
+            setSelectedPR(null);
+        } catch (err) {
+            console.error(err);
+            alert('오류가 발생했습니다.');
+        }
+    };
+
+
     const handleUpdateScheduleItem = async (itemIdx, sIdx, updates, logMessage = '') => {
         if (!selectedPR) return;
         const newItems = selectedPR.Items && selectedPR.Items.length > 0 ? [...selectedPR.Items] : [{ PartID: selectedPR.PartID, PartName: selectedPR.PartName, Rev: selectedPR.Rev || '0.0', TargetQty: selectedPR.TargetQty, DueDate: selectedPR.DueDate, Status: selectedPR.Status, Schedules: [{ date: selectedPR.DueDate, qty: selectedPR.TargetQty, status: selectedPR.Status }] }];
@@ -383,9 +397,7 @@ export default function ProductionExecutionPage() {
         
         newItems[itemIdx].Schedules[sIdx] = { ...newItems[itemIdx].Schedules[sIdx], ...updates };
         
-        // 수정 모드 플래그 제거 (DB 저장용 아님)
-        delete newItems[itemIdx].Schedules[sIdx]._editingStart;
-        delete newItems[itemIdx].Schedules[sIdx]._editingEnd;
+        delete newItems[itemIdx].Schedules[sIdx]._editing;
 
         const logEntry = {
             from: selectedPR.Status,
@@ -466,8 +478,16 @@ export default function ProductionExecutionPage() {
                     <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-[140]" onClick={() => setSelectedPR(null)}/>
                     <div className="fixed inset-y-0 right-0 w-full md:w-[480px] bg-slate-50 shadow-2xl z-[150] flex flex-col border-l border-slate-200">
                         <div className="bg-white px-5 py-4 border-b flex justify-between items-start shrink-0">
-                            <div><div className="flex items-center gap-2 mb-1">{selectedPR.Urgent && <span className="px-1.5 py-0.5 bg-rose-50 text-rose-600 rounded text-[9px] font-black animate-pulse">긴급</span>}<span className={`px-2 py-0.5 rounded-md text-[9px] font-black border ${PR_STATUS[selectedPR.Status]?.color}`}>{PR_STATUS[selectedPR.Status]?.label}</span></div><h2 className="text-lg font-black text-slate-900 leading-tight">{selectedPR.PRNumber}</h2><p className="text-xs font-bold text-slate-500 truncate">{selectedPR.PartName}</p></div>
-                            <button onClick={() => setSelectedPR(null)} className="p-1.5 text-slate-400 hover:text-slate-700 bg-slate-50 rounded-lg transition-colors"><X size={18}/></button>
+                            <div><div className="flex items-center gap-2 mb-1">{selectedPR.Urgent && <span className="px-1.5 py-0.5 bg-rose-50 text-rose-600 rounded text-[9px] font-black animate-pulse">긴급</span>}<span className={`px-2 py-0.5 rounded-md text-[9px] font-black border ${PR_STATUS[selectedPR.Status]?.color || 'bg-slate-100'}`}>{PR_STATUS[selectedPR.Status]?.label || selectedPR.Status}</span></div><h2 className="text-lg font-black text-slate-900 leading-tight">{selectedPR.PRNumber}</h2><p className="text-xs font-bold text-slate-500 truncate">{selectedPR.PartName}</p></div>
+                            <div className="flex flex-col items-end gap-2">
+                                <button onClick={() => setSelectedPR(null)} className="p-1.5 text-slate-400 hover:text-slate-700 bg-slate-50 rounded-lg transition-colors"><X size={18}/></button>
+                                <button 
+                                    onClick={() => handleStatusChange(selectedPR.id, 'CANCELLED', '주문서 삭제/폐기')}
+                                    className="px-2.5 py-1 bg-red-50 text-red-600 hover:bg-red-100 rounded text-[10px] font-black transition-colors border border-red-200 shadow-sm"
+                                >
+                                    주문서 삭제
+                                </button>
+                            </div>
                         </div>
                         
                         <div className="flex-1 overflow-hidden flex flex-col">
@@ -499,50 +519,94 @@ export default function ProductionExecutionPage() {
                                                         {schedules.map((sched, sIdx) => {
                                                             const currentStatus = sched.status || item.Status || selectedPR.Status || '';
                                                             const isLocked = currentStatus === 'QA_WAITING';
+                                                            const hasShortage = item.Status === 'WAITING_FOR_PARTS' || selectedPR.Status === 'WAITING_FOR_PARTS';
                                                             
-                                                            // 로컬 선택 상태 관리를 위한 임시 키 (컴포넌트 내부에 상태를 두기엔 루프 안이라서 ref나 데이터 속성 활용 권장되나 여기선 즉시 반영 방식에서 '저장' 버튼 클릭 방식으로 로직만 분리)
+                                                            let safeStatus = { label: '일정미정', color: 'bg-slate-100 text-slate-500 border-slate-200' };
+                                                            if (sched.endDate) {
+                                                                const diffDays = Math.ceil((new Date(sched.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                                                                if (diffDays < 0) safeStatus = { label: '지연', color: 'bg-rose-50 text-rose-600 border-rose-200' };
+                                                                else if (diffDays <= 2) safeStatus = { label: '긴급', color: 'bg-amber-50 text-amber-600 border-amber-200' };
+                                                                else safeStatus = { label: '여유', color: 'bg-emerald-50 text-emerald-600 border-emerald-200' };
+                                                            } else {
+                                                                const diffDays = Math.ceil((new Date(sched.date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                                                                if (diffDays < 0) safeStatus = { label: '미정 (지연)', color: 'bg-rose-50 text-rose-600 border-rose-200' };
+                                                                else if (diffDays <= 3) safeStatus = { label: '미정 (임박)', color: 'bg-amber-50 text-amber-600 border-amber-200' };
+                                                            }
+                                                            
                                                             return (
                                                                 <div key={sIdx} className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200 space-y-3 shadow-inner">
                                                                     <div className="flex justify-between items-center gap-3">
                                                                         <div className="flex items-center gap-2 flex-1">
                                                                             <span className="text-[8px] font-black text-white bg-slate-800 px-1.5 py-0.5 rounded uppercase whitespace-nowrap">{sIdx + 1}차 납기</span>
-                                                                            <div className="flex flex-1 gap-1">
-                                                                                <select 
-                                                                                    id={`select-${itemIdx}-${sIdx}`}
-                                                                                    defaultValue={currentStatus} 
-                                                                                    disabled={isLocked}
-                                                                                    className={`flex-1 text-[10px] font-black p-1.5 rounded-lg border shadow-sm outline-none transition-all ${isLocked ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-white text-slate-700 border-slate-300 focus:ring-1 focus:ring-indigo-500'}`}
-                                                                                >
-                                                                                    {!currentStatus && <option value="">알수없음</option>}
-                                                                                    {currentStatus && !['PROD_PLANNING', 'IN_PRODUCTION', 'PROD_COMPLETE', 'QA_WAITING', 'SHIPPED'].includes(currentStatus) && (
-                                                                                        <option value={currentStatus}>{PR_STATUS[currentStatus]?.label || currentStatus}</option>
-                                                                                    )}
-                                                                                    <option value="PROD_PLANNING">생산계획 저장</option>
-                                                                                    <option value="IN_PRODUCTION">작업지시(생산중)</option>
-                                                                                    <option value="PROD_COMPLETE">생산완료</option>
-                                                                                    <option value="QA_WAITING">출하검사중</option>
-                                                                                    <option value="SHIPPED">영업 이관(발송)</option>
-                                                                                </select>
-                                                                                {!isLocked && (
-                                                                                    <button 
-                                                                                        onClick={() => {
-                                                                                            const nextVal = document.getElementById(`select-${itemIdx}-${sIdx}`).value;
-                                                                                            if (!nextVal || nextVal === currentStatus) return;
-                                                                                            if (nextVal === 'PROD_COMPLETE') {
-                                                                                                setWoPR({...selectedPR, isSplit: true, itemIdx, scheduleIdx: sIdx, PartID: item.PartID, PartName: item.PartName, TargetQty: sched.qty, Status: currentStatus});
-                                                                                                setIsWOModalOpen(true);
-                                                                                            } else {
-                                                                                                handleStatusChange(selectedPR.id, nextVal, '상태 변경 (저장)', itemIdx, sIdx);
-                                                                                            }
-                                                                                        }}
-                                                                                        className="px-2 py-1.5 bg-indigo-600 text-white rounded-lg text-[9px] font-black hover:bg-indigo-700 shadow-sm"
-                                                                                    >
-                                                                                        저장
-                                                                                    </button>
-                                                                                )}
+                                                                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border whitespace-nowrap ${safeStatus.color}`}>{safeStatus.label}</span>
+                                                                            <div className="flex flex-1 gap-2 items-center justify-end">
+                                                                                <span className={`px-2.5 py-1.5 rounded-lg text-[11px] font-black border whitespace-nowrap ${PR_STATUS[currentStatus]?.color || 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                                                                    {PR_STATUS[currentStatus]?.label || currentStatus || '대기 중'}
+                                                                                </span>
+                                                                                {(() => {
+                                                                                    let btnLabel = '';
+                                                                                    let btnClass = '';
+                                                                                    let onClickFn = null;
+                                                                                    let isBtnDisabled = isLocked;
+
+                                                                                    if (['', 'REVIEW', 'CONFIRMED', 'PENDING'].includes(currentStatus)) {
+                                                                                        btnLabel = '작업 계획 ▶';
+                                                                                        btnClass = 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600 shadow-blue-200';
+                                                                                        onClickFn = async () => {
+                                                                                            await handleStatusChange(selectedPR.id, 'PROD_PLANNING', '작업 계획 단계 진입', itemIdx, sIdx);
+                                                                                            setSelectedPR(prev => {
+                                                                                                const newItems = [...prev.Items];
+                                                                                                if (newItems[itemIdx] && newItems[itemIdx].Schedules && newItems[itemIdx].Schedules[sIdx]) {
+                                                                                                    newItems[itemIdx].Schedules[sIdx]._editing = true;
+                                                                                                }
+                                                                                                return { ...prev, Items: newItems };
+                                                                                            });
+                                                                                        };
+                                                                                    } else if (currentStatus === 'PROD_PLANNING') {
+                                                                                        const hasDates = sched.startDate && sched.endDate;
+                                                                                        btnLabel = hasDates ? '작업 지시 ▶' : '일정 입력 필요';
+                                                                                        btnClass = hasDates ? 'bg-fuchsia-600 hover:bg-fuchsia-700 text-white border-fuchsia-600 shadow-fuchsia-200' : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed';
+                                                                                        isBtnDisabled = !hasDates;
+                                                                                        onClickFn = () => handleStatusChange(selectedPR.id, 'WORK_ORDER', '작업 지시 시작', itemIdx, sIdx);
+                                                                                    } else if (['WORK_ORDER', 'PROD_WAITING', 'WAITING_FOR_PARTS'].includes(currentStatus)) {
+                                                                                        btnLabel = '생산 시작 ▶';
+                                                                                        btnClass = 'bg-orange-500 hover:bg-orange-600 text-white border-orange-500 shadow-orange-200';
+                                                                                        onClickFn = () => handleStatusChange(selectedPR.id, 'IN_PRODUCTION', '생산 시작', itemIdx, sIdx);
+                                                                                    } else if (currentStatus === 'IN_PRODUCTION') {
+                                                                                        btnLabel = hasShortage ? '생산 완료 불가(자재부족)' : '생산 완료 ▶';
+                                                                                        btnClass = hasShortage ? 'bg-rose-50 text-rose-400 border-rose-200 cursor-not-allowed' : 'bg-teal-600 hover:bg-teal-700 text-white border-teal-600 shadow-teal-200';
+                                                                                        isBtnDisabled = hasShortage;
+                                                                                        onClickFn = () => handleDirectComplete(selectedPR, itemIdx, sIdx, item, sched);
+                                                                                    } else if (currentStatus === 'PROD_COMPLETE') {
+                                                                                        btnLabel = 'QA 검사 이관 ▶';
+                                                                                        btnClass = 'bg-purple-600 hover:bg-purple-700 text-white border-purple-600 shadow-purple-200';
+                                                                                        onClickFn = () => handleStatusChange(selectedPR.id, 'QA_WAITING', 'QA 검사 대기열 이동', itemIdx, sIdx);
+                                                                                    } else if (currentStatus === 'QA_WAITING') {
+                                                                                        btnLabel = 'QA 검사 진행 중 (잠금)';
+                                                                                        btnClass = 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed';
+                                                                                        isBtnDisabled = true;
+                                                                                    } else if (currentStatus === 'QA_COMPLETE') {
+                                                                                        btnLabel = '영업 이관 ▶';
+                                                                                        btnClass = 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600 shadow-indigo-200';
+                                                                                        onClickFn = () => handleStatusChange(selectedPR.id, 'SHIPPED', '영업 이관', itemIdx, sIdx);
+                                                                                    } else {
+                                                                                        btnLabel = PR_STATUS[currentStatus]?.label || currentStatus;
+                                                                                        btnClass = 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed';
+                                                                                        isBtnDisabled = true;
+                                                                                    }
+
+                                                                                    return (
+                                                                                        <button
+                                                                                            disabled={isBtnDisabled}
+                                                                                            onClick={onClickFn}
+                                                                                            className={`text-[11px] font-black py-1.5 px-3 rounded-lg border shadow-sm outline-none transition-all flex items-center justify-center gap-1 ${btnClass}`}
+                                                                                        >
+                                                                                            {btnLabel}
+                                                                                        </button>
+                                                                                    );
+                                                                                })()}
                                                                             </div>
                                                                         </div>
-                                                                        <span className="text-[9px] font-bold text-rose-500 whitespace-nowrap">{sched.date}</span>
                                                                     </div>
                                                                     <div className="flex items-end gap-2">
                                                                         <div className="grid grid-cols-2 gap-2 flex-1">
@@ -587,19 +651,25 @@ export default function ProductionExecutionPage() {
                                                                                     
                                                                                     const isFirstTime = !sched.startDate && !sched.endDate;
                                                                                     let logMsg = `일정 설정: ${newStart} ~ ${newEnd}`;
+                                                                                    let additionalUpdates = {};
                                                                                     
                                                                                     if (!isFirstTime) {
                                                                                         const reason = window.prompt('일정 변경 사유를 입력하세요:');
                                                                                         if (!reason) return;
                                                                                         logMsg = `일정 변경: ${newStart} ~ ${newEnd} (사유: ${reason})`;
                                                                                     }
+
+                                                                                    if (currentStatus === 'PROD_PLANNING' && newStart && newEnd) {
+                                                                                        additionalUpdates.status = 'WORK_ORDER';
+                                                                                        logMsg += ` (일정 확정 및 작업 지시 자동 전환)`;
+                                                                                    }
                                                                                     
-                                                                                    await handleUpdateScheduleItem(itemIdx, sIdx, { startDate: newStart, endDate: newEnd }, logMsg);
+                                                                                    await handleUpdateScheduleItem(itemIdx, sIdx, { startDate: newStart, endDate: newEnd, ...additionalUpdates }, logMsg);
                                                                                 }
                                                                             }}
                                                                             className={`px-3 py-2.5 rounded-lg text-[10px] font-black transition-all ${sched._editing ? 'bg-green-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
                                                                         >
-                                                                            {sched._editing ? '저장' : '수정'}
+                                                                            {sched._editing ? '저장' : '편집'}
                                                                         </button>
                                                                     </div>
                                                                 </div>
@@ -629,7 +699,6 @@ export default function ProductionExecutionPage() {
                     </div>
                 </div>, document.body
             )}
-            {isWOModalOpen && woPR && <WODetailModal pr={woPR} onClose={() => { setIsWOModalOpen(false); setWoPR(null); }} onRefresh={() => { fetchPRs(); setSelectedPR(null); }}/>}
         </div>
     );
 }

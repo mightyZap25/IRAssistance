@@ -35,7 +35,8 @@ export default function SalesDashboardPage() {
         monthlyRevenue: 0,
         pendingPayments: 0,
         completedDeals: 0,
-        chartData: []
+        chartData: [],
+        topCustomers: []
     });
 
     useEffect(() => {
@@ -45,37 +46,79 @@ export default function SalesDashboardPage() {
     const fetchSalesStats = async () => {
         setLoading(true);
         try {
-            // In a real app, we would aggregate data from 'quotations' (accepted ones) and 'billing'
-            const qSnap = await getDocs(query(collection(db, 'quotations'), where('Status', '==', 'ACCEPTED')));
+            const qSnap = await getDocs(collection(db, 'quotations'));
             const bSnap = await getDocs(collection(db, 'billing'));
             
             let total = 0;
             let pending = 0;
-            let count = qSnap.size;
+            let count = 0;
             
-            qSnap.forEach(doc => {
-                total += (doc.data().TotalAmount || 0);
-            });
+            const monthMap = {};
+            const customerMap = {};
 
-            bSnap.forEach(doc => {
-                if (doc.data().Status !== 'PAID') {
-                    pending += (doc.data().Amount || 0);
+            // Initialize last 6 months
+            for (let i = 5; i >= 0; i--) {
+                const d = new Date();
+                d.setMonth(d.getMonth() - i);
+                monthMap[`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}`] = 0;
+            }
+
+            qSnap.forEach(doc => {
+                const data = doc.data();
+                if (data.Status === 'ACCEPTED' || data.Status === 'CONFIRMED') {
+                    const amount = Number(data.TotalAmount || data.Total || 0);
+                    total += amount;
+                    count++;
+                    
+                    const cName = data.CustomerName || data.ClientName || '기타 고객사';
+                    customerMap[cName] = (customerMap[cName] || 0) + amount;
+                    
+                    const dateVal = data.CreatedAt || data.Date || data.UpdatedAt;
+                    if (dateVal) {
+                        const d = dateVal.toDate ? dateVal.toDate() : new Date(dateVal);
+                        const mKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}`;
+                        if (monthMap[mKey] !== undefined) {
+                            monthMap[mKey] += amount;
+                        }
+                    }
                 }
             });
 
-            // Mocking chart data for visualization
-            const months = ['1월', '2월', '3월', '4월', '5월', '6월'];
-            const mockChart = months.map(m => ({
-                name: m,
-                amount: Math.floor(Math.random() * 50000000) + 10000000
-            }));
+            bSnap.forEach(doc => {
+                const data = doc.data();
+                if (data.Status !== 'PAID' && data.Status !== 'COMPLETED') {
+                    pending += Number(data.TotalAmount || data.Amount || 0);
+                }
+            });
+
+            const chartData = Object.keys(monthMap).sort().map(k => {
+                const parts = k.split('-');
+                return {
+                    name: `${parseInt(parts[1])}월`,
+                    amount: monthMap[k]
+                };
+            });
+
+            const topCustomersRaw = Object.entries(customerMap).sort((a,b) => b[1] - a[1]);
+            const topCustomers = topCustomersRaw.slice(0, 4).map((entries, idx) => {
+                const colors = ['bg-blue-600', 'bg-rose-600', 'bg-orange-600', 'bg-slate-300'];
+                return {
+                    name: entries[0],
+                    share: total > 0 ? Math.round((entries[1] / total) * 100) : 0,
+                    amount: entries[1],
+                    color: colors[idx] || 'bg-slate-200'
+                };
+            });
 
             setSalesData({
                 totalRevenue: total,
-                monthlyRevenue: total / 12, // Dummy average
+                monthlyRevenue: total / 6, // 6 months average
                 pendingPayments: pending,
                 completedDeals: count,
-                chartData: mockChart
+                chartData: chartData,
+                topCustomers: topCustomers.length > 0 ? topCustomers : [
+                    { name: '데이터 없음', share: 100, color: 'bg-slate-200' }
+                ]
             });
         } catch (error) {
             console.error("Failed to fetch sales stats", error);
@@ -108,15 +151,15 @@ export default function SalesDashboardPage() {
             <div className="grid grid-cols-4 gap-6 shrink-0">
                 <StatCard 
                     title="Total Cumulative Revenue" 
-                    value={`₩ ${(salesData.totalRevenue / 100000000).toFixed(2)}억`}
-                    subValue={`총 ${salesData.completedDeals}건의 승인된 견적`}
+                    value={`₩ ${(salesData.totalRevenue / 10000).toLocaleString()}만`}
+                    subValue={`총 ${salesData.completedDeals}건의 승인된 주문/견적`}
                     icon={DollarSign} 
                     color="bg-blue-600"
                     trend={12.5}
                 />
                 <StatCard 
                     title="Average Monthly Sales" 
-                    value={`₩ ${(salesData.monthlyRevenue / 1000000).toFixed(0)}M`}
+                    value={`₩ ${(salesData.monthlyRevenue / 10000).toLocaleString()}만`}
                     subValue="최근 12개월 평균"
                     icon={BarChart2} 
                     color="bg-indigo-600"
@@ -124,7 +167,7 @@ export default function SalesDashboardPage() {
                 />
                 <StatCard 
                     title="Pending Payments" 
-                    value={`₩ ${(salesData.pendingPayments / 1000000).toFixed(1)}M`}
+                    value={`₩ ${(salesData.pendingPayments / 10000).toLocaleString()}만`}
                     subValue="미수금(입금 대기) 총액"
                     icon={CreditCard} 
                     color="bg-amber-600"
@@ -156,21 +199,26 @@ export default function SalesDashboardPage() {
                     </div>
                     
                     <div className="flex-1 flex items-end justify-between gap-4 px-2 pb-6">
-                        {salesData.chartData.map((d, i) => (
-                            <div key={i} className="flex-1 flex flex-col items-center gap-3 group">
-                                <div className="w-full relative flex flex-col items-center">
-                                    <div 
-                                        className="w-full bg-slate-100 rounded-t-xl transition-all group-hover:bg-blue-600 group-hover:shadow-lg group-hover:shadow-blue-100 cursor-pointer" 
-                                        style={{ height: `${(d.amount / 60000000) * 100}%`, minHeight: '10%' }}
-                                    >
-                                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[9px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                                            ₩ {(d.amount / 1000000).toFixed(0)}M
+                        {salesData.chartData.map((d, i) => {
+                            const maxAmount = Math.max(...salesData.chartData.map(cd => cd.amount), 1);
+                            const heightPercentage = Math.max(10, (d.amount / maxAmount) * 100);
+                            
+                            return (
+                                <div key={i} className="flex-1 flex flex-col items-center gap-3 group">
+                                    <div className="w-full relative flex flex-col items-center h-full justify-end">
+                                        <div 
+                                            className="w-full bg-slate-100 rounded-t-xl transition-all group-hover:bg-blue-600 group-hover:shadow-lg group-hover:shadow-blue-100 cursor-pointer" 
+                                            style={{ height: `${heightPercentage}%`, minHeight: '10%' }}
+                                        >
+                                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[9px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                                ₩ {(d.amount / 10000).toLocaleString()}만
+                                            </div>
                                         </div>
                                     </div>
+                                    <span className="text-[10px] font-black text-slate-400">{d.name}</span>
                                 </div>
-                                <span className="text-[10px] font-black text-slate-400">{d.name}</span>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
 
@@ -181,15 +229,10 @@ export default function SalesDashboardPage() {
                     </div>
                     
                     <div className="flex-1 flex flex-col justify-center space-y-6">
-                        {[
-                            { name: 'Samsung Electronics', share: 45, color: 'bg-blue-600' },
-                            { name: 'LG Energy Solution', share: 25, color: 'bg-rose-600' },
-                            { name: 'SK On', share: 15, color: 'bg-orange-600' },
-                            { name: 'Other Clients', share: 15, color: 'bg-slate-200' }
-                        ].map((c, i) => (
+                        {salesData.topCustomers && salesData.topCustomers.map((c, i) => (
                             <div key={i} className="space-y-2">
                                 <div className="flex justify-between items-end">
-                                    <span className="text-xs font-black text-slate-700">{c.name}</span>
+                                    <span className="text-xs font-black text-slate-700 truncate w-32">{c.name}</span>
                                     <span className="text-xs font-black text-slate-900">{c.share}%</span>
                                 </div>
                                 <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">

@@ -1,0 +1,42 @@
+{
+  "model": {
+    "name": "gemma-4-12b"
+  },
+  "experimental": {
+    "dynamicModelConfiguration": true,
+    "gemma": true,
+    "gemmaModelRouter": {
+      "enabled": true,
+      "classifier": {
+        "host": "http://localhost:9379",
+        "model": "gemma3-1b-gpu-custom"
+      }
+    }
+  },
+  "modelConfigs": {
+    "modelDefinitions": {
+      "gemma-4-12b": {
+        "displayName": "Gemma 4 12b",
+        "tier": "custom",
+        "family": "gemma-4",
+        "isPreview": false,
+        "isVisible": true,
+        "features": {
+          "thinking": true,
+          "multimodalToolUse": false
+        }
+      }
+    },
+    "modelIdResolutions": {
+      "gemma-4-12b": {
+        "default": "gemma-4-12b"
+      },
+      "gemma4-12b": {
+        "default": "gemma-4-12b"
+      },
+      "gemma4-12b-thinking": {
+        "default": "gemma-4-12b"
+      }
+    }
+  }
+}

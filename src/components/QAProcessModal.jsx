@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
     X, CheckCircle, XCircle, AlertTriangle, ClipboardList, 
-    FileText, Plus, Trash2, Save, Info, Gauge, Zap
+    FileText, Plus, Trash2, Save, Info, Gauge, Zap, RotateCcw
 } from 'lucide-react';
 import { db, 
     doc, getDoc, updateDoc, addDoc, collection, 
@@ -10,6 +10,7 @@ import { db,
 } from '../firebase';
 import { autoRegisterDefect } from '../services/defectAutoRegister';
 import QAItemReportModal from './QAItemReportModal';
+import { inventoryService } from '../services/inventoryService';
 
 export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) {
     function InfoRow({ label, value, highlight = false }) {
@@ -27,7 +28,7 @@ export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) 
     const [defects, setDefects] = useState([]); // { code, name, qty, value, note }
     const [inspectionMethod, setInspectionMethod] = useState('Full');
     const [remarks, setRemarks] = useState('');
-    const [handlingType, setHandlingType] = useState('Rework'); // 'Rework' | 'Additional' | 'None'
+
     
     // Master data
     const [defectCodes, setDefectCodes] = useState([]);
@@ -130,12 +131,14 @@ export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) 
         if (!codeObj) return;
 
         const qtyToAdd = parseInt(tempDefectQty) || 0;
+        const defaultHandling = type === 'receiving' ? 'RETURN' : 'Rework';
         const newDefect = {
             code: codeObj.code,
             name: codeObj.name,
             qty: qtyToAdd,
             value: tempDefectValue,
-            id: Date.now()
+            id: Date.now(),
+            handlingType: defaultHandling
         };
 
         const updatedDefects = [...defects, newDefect];
@@ -209,21 +212,22 @@ export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) 
                                 // [부적합품 조치 핵심 로직]
                                 // ─────────────────────────────────────────────────────────────
                                 if (failedQty > 0) {
-                                    if (handlingType === 'Rework') {
-                                        // 방안 A: 재작업 - 상태를 다시 생산중으로 롤백
+                                    const hasRework = defects.some(d => d.handlingType === 'Rework');
+                                    const additionalQty = defects.filter(d => d.handlingType === 'Additional').reduce((sum, d) => sum + d.qty, 0);
+
+                                    if (hasRework) {
+                                        // 하나라도 재작업이 있으면 차수 전체를 생산중으로 롤백
                                         pItem.Schedules[item.ScheduleIdx].status = 'IN_PRODUCTION';
                                         pItem.Schedules[item.ScheduleIdx].remarks = `[QA재작업지시] ${remarks}`;
                                         updated = true;
-                                    } else if (handlingType === 'Additional') {
-                                        // 방안 B: 추가 생산 - 현재 차수는 완료, 부족분 신규 차수 생성
+                                    } else if (additionalQty > 0) {
+                                        // 추가 생산 필요수량만큼 신규 차수 생성
                                         pItem.Schedules[item.ScheduleIdx].status = 'QA_COMPLETE';
-                                        
-                                        // 신규 차수 일정 추가
                                         const nextDate = new Date();
-                                        nextDate.setDate(nextDate.getDate() + 3); // 기본 3일 후로 세팅
+                                        nextDate.setDate(nextDate.getDate() + 3);
                                         const newSchedule = {
                                             date: nextDate.toISOString().split('T')[0],
-                                            qty: failedQty,
+                                            qty: additionalQty,
                                             status: 'PROD_WAITING',
                                             isAdditional: true,
                                             parentScheduleIdx: item.ScheduleIdx,
@@ -232,7 +236,6 @@ export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) 
                                         pItem.Schedules.push(newSchedule);
                                         updated = true;
                                     } else {
-                                        // 방안 C: 부족 승인 (None) - 그냥 완료
                                         pItem.Schedules[item.ScheduleIdx].status = 'QA_COMPLETE';
                                         updated = true;
                                     }
@@ -267,6 +270,30 @@ export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) 
                     }
 
                     batch.update(prRef, updatePayload);
+                }
+            }
+
+            if (passedQty > 0 && type === 'receiving') {
+                await inventoryService.addTransaction({
+                    PartID: item.PartID,
+                    Type: 'In',
+                    Quantity: passedQty,
+                    Reason: '수입검사 합격 입고',
+                    RefDoc: item.PONumber || item.PR_ID || item.id,
+                }, batch);
+            }
+
+            if (type === 'receiving' && item.RefPOID) {
+                const purchRef = doc(db, 'purchasing', item.RefPOID);
+                const purchSnap = await getDoc(purchRef);
+                if (purchSnap.exists()) {
+                    batch.update(purchRef, { Status: 'RECEIVED', UpdatedAt: timestamp });
+                } else {
+                    const outRef = doc(db, 'outsourcing', item.RefPOID);
+                    const outSnap = await getDoc(outRef);
+                    if (outSnap.exists()) {
+                        batch.update(outRef, { Status: 'INSPECTION_COMPLETE', UpdatedAt: timestamp });
+                    }
                 }
             }
 
@@ -322,6 +349,8 @@ export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) 
                                 <Info size={14} className="text-blue-500" /> 기본 정보
                             </h4>
                             <div className="space-y-3 bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+                                <InfoRow label="문서번호" value={item.PONumber || item.PRNumber || item.ID} />
+                                <InfoRow label="거래처" value={item.VendorName || item.CustomerName || '-'} />
                                 <InfoRow label="품목 ID" value={item.PartID} />
                                 <InfoRow label="품명" value={item.PartName} />
                                 <InfoRow label="총 수량" value={`${item.Qty} EA`} highlight />
@@ -515,46 +544,49 @@ export default function QAProcessModal({ item, type, isOpen, onClose, onSave }) 
                                                     </div>
                                                 </div>
                                             </div>
-                                            {!isViewMode && (
-                                                <button 
-                                                    onClick={() => handleRemoveDefect(d.id)}
-                                                    className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            )}
+                                            <div className="flex items-center gap-2">
+                                                {!isViewMode ? (
+                                                    <select
+                                                        value={d.handlingType || (type === 'receiving' ? 'RETURN' : 'Rework')}
+                                                        onChange={(e) => {
+                                                            const updated = defects.map(def => def.id === d.id ? { ...def, handlingType: e.target.value } : def);
+                                                            setDefects(updated);
+                                                        }}
+                                                        className="text-[10px] font-bold bg-rose-50 border border-rose-200 text-rose-700 rounded-lg px-2 py-1.5 outline-none cursor-pointer hover:bg-rose-100 transition-colors"
+                                                    >
+                                                        {type === 'receiving' ? (
+                                                            <>
+                                                                <option value="RETURN">반품 (Return)</option>
+                                                                <option value="EXCHANGE">교환 (Exchange)</option>
+                                                                <option value="ACCEPT">특채 승인 (Accept)</option>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <option value="Rework">재작업 (Rework)</option>
+                                                                <option value="Additional">추가 생산 (New)</option>
+                                                                <option value="None">부족 승인 (Accept)</option>
+                                                            </>
+                                                        )}
+                                                    </select>
+                                                ) : (
+                                                    <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-1.5 rounded-lg border border-rose-100">
+                                                        조치: {d.handlingType === 'RETURN' ? '반품' : d.handlingType === 'EXCHANGE' ? '교환' : d.handlingType === 'ACCEPT' ? '특채 승인' : d.handlingType === 'Rework' ? '재작업' : d.handlingType === 'Additional' ? '추가생산' : '부족승인'}
+                                                    </span>
+                                                )}
+                                                {!isViewMode && (
+                                                    <button 
+                                                        onClick={() => handleRemoveDefect(d.id)}
+                                                        className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
                             )}
                         </div>
-
-                        {/* 3. Disposition (Only if failedQty > 0) */}
-                        {!isViewMode && failedQty > 0 && (
-                            <div className="bg-rose-50 border border-rose-100 rounded-3xl p-6 space-y-4 animate-in slide-in-from-top-2">
-                                <div className="flex items-center gap-3 border-b border-rose-100 pb-3">
-                                    <RotateCcw size={18} className="text-rose-600" />
-                                    <h4 className="text-xs font-black text-rose-800 uppercase tracking-tight">부적합품 조치 방안 선택 (Disposition)</h4>
-                                </div>
-                                <div className="grid grid-cols-3 gap-3">
-                                    {[
-                                        { id: 'Rework', label: '재작업 (Rework)', desc: '상태를 생산중으로 되돌림' },
-                                        { id: 'Additional', label: '추가생산 (New)', desc: '부족분 신규 일정 생성' },
-                                        { id: 'None', label: '부족승인 (Accept)', desc: '부족한 대로 마감' }
-                                    ].map(type => (
-                                        <button
-                                            key={type.id}
-                                            type="button"
-                                            onClick={() => setHandlingType(type.id)}
-                                            className={`p-4 rounded-2xl border-2 transition-all text-left flex flex-col gap-1 ${handlingType === type.id ? 'bg-rose-600 border-rose-600 text-white shadow-lg' : 'bg-white border-rose-100 text-slate-400 hover:border-rose-300'}`}
-                                        >
-                                            <span className="text-[11px] font-black">{type.label}</span>
-                                            <span className={`text-[9px] font-bold ${handlingType === type.id ? 'text-rose-100' : 'text-slate-400'}`}>{type.desc}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
 
                         {/* 4. Remarks */}
                         <div>

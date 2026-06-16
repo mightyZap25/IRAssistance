@@ -27,12 +27,12 @@ const PO_STATUS_INFO = {
     WAITING_INSPECTION: { label: '수입 검사 중', color: 'bg-purple-50 text-purple-600 border-purple-200' },
     INSPECTION_COMPLETE: { label: '검사 완료', color: 'bg-teal-50 text-teal-600 border-teal-200' },
     RESOLUTION_SUBMITTED: { label: '지출결의 완료', color: 'bg-slate-900 text-white border-slate-900' },
-    RECEIVED: { label: '재고 적재 완료', color: 'bg-slate-50 text-slate-400 border-slate-100' }
+    RECEIVED: { label: '재고 적재 완료', color: 'bg-slate-50 text-slate-400 border-slate-100' },
+    COMPLETED: { label: '재고 적재 완료', color: 'bg-slate-50 text-slate-400 border-slate-100' }
 };
 
 const COLUMN_DEFS = {
-    PRNumber: { label: '발주 요청 번호', default: true },
-    PONumber: { label: 'PO 번호', default: true },
+    PONumber: { label: '발주 번호', default: true },
     PartName: { label: '품목 요약', default: true },
     VendorName: { label: '공급업체', default: true },
     Qty: { label: '수량', default: true },
@@ -42,10 +42,7 @@ const COLUMN_DEFS = {
     CreatedAt: { label: '등록일', default: false }
 };
 
-const generatePRNumber = () => {
-    const date = new Date();
-    return `PR-${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
-};
+
 
 const generatePONumber = () => {
     const date = new Date();
@@ -58,6 +55,8 @@ export default function PurchasingPage() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: 'CreatedAt', direction: 'desc' });
+    
+    const [activeTab, setActiveTab] = useState('ACTIVE');
     
     // Modals
     const [activePO, setActivePO] = useState(null);
@@ -92,8 +91,7 @@ export default function PurchasingPage() {
             await updateDoc(doc(db, 'purchasing', id), { ...rest, Items, PartName: summaryPartName, Qty: TotalQty, TotalPrice, UpdatedAt: serverTimestamp() });
         } else {
             await addDoc(collection(db, 'purchasing'), {
-                PRNumber: generatePRNumber(),
-                PONumber: '-', // Initially empty until approved/issued
+                PONumber: generatePONumber(),
                 ...restData, Items, PartName: summaryPartName, Qty: TotalQty, ReceivedQty: 0, TotalPrice,
                 Status: 'RFQ_SENT', PaymentStatus: 'PENDING', CreatedAt: serverTimestamp(), CreatedBy: userProfile?.uid
             });
@@ -103,14 +101,7 @@ export default function PurchasingPage() {
 
     const handleStatusUpdate = async (id, status, extra = {}) => {
         try {
-            // When moving to ORDERING, generate PONumber if it's '-'
-            const poToUpdate = orders.find(o => o.id === id);
-            let finalExtra = { ...extra };
-            if (status === 'ORDERING' && (!poToUpdate.PONumber || poToUpdate.PONumber === '-')) {
-                finalExtra.PONumber = generatePONumber();
-            }
-
-            await updateDoc(doc(db, 'purchasing', id), { Status: status, ...finalExtra, UpdatedAt: serverTimestamp() });
+            await updateDoc(doc(db, 'purchasing', id), { Status: status, ...extra, UpdatedAt: serverTimestamp() });
             fetchData();
         } catch (err) { console.error(err); }
     };
@@ -122,21 +113,29 @@ export default function PurchasingPage() {
     };
 
     const sortedList = useMemo(() => {
-        return [...orders].sort((a, b) => {
+        const COMPLETED_STATUSES = ['RECEIVED', 'COMPLETED', 'RESOLUTION_SUBMITTED'];
+        
+        const filtered = orders.filter(o => {
+            const isCompleted = COMPLETED_STATUSES.includes(o.Status);
+            if (activeTab === 'ACTIVE') return !isCompleted;
+            return isCompleted;
+        });
+
+        return filtered.sort((a, b) => {
             if (sortConfig.key === 'CreatedAt') {
                 const getTime = v => v?.seconds ? v.seconds * 1000 : 0;
                 return sortConfig.direction === 'asc' ? getTime(a.CreatedAt) - getTime(b.CreatedAt) : getTime(b.CreatedAt) - getTime(a.CreatedAt);
             }
             return sortConfig.direction === 'asc' ? (a[sortConfig.key] > b[sortConfig.key] ? 1 : -1) : (a[sortConfig.key] < b[sortConfig.key] ? 1 : -1);
         });
-    }, [orders, sortConfig]);
+    }, [orders, sortConfig, activeTab]);
 
     return (
         <div className="flex flex-col h-[calc(100vh-7.5rem)] overflow-hidden gap-3 animate-fade-in text-slate-800 p-3">
             <div className="bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-transparent p-3 rounded-2xl border border-indigo-100/50 flex justify-between items-center shrink-0 relative overflow-hidden">
                 <div className="flex items-center gap-4 text-left">
                     <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-xl shadow-indigo-100"><ShoppingCart size={24} /></div>
-                    <div><h1 className="text-xl font-black tracking-tight text-slate-900">발주 및 조달 통합 관리</h1><p className="text-slate-500 text-xs font-bold uppercase tracking-widest italic">Phase 4: Full Pipeline with Expense Resolution</p></div>
+                    <div><h1 className="text-xl font-black tracking-tight text-slate-900">발주 관리</h1><p className="text-slate-500 text-xs font-bold uppercase tracking-widest italic">Phase 4: Full Pipeline with Expense Resolution</p></div>
                 </div>
                 <button onClick={() => setIsCreateModalOpen(true)} className="flex items-center gap-2 bg-indigo-600 text-white font-extrabold py-3 px-6 rounded-2xl shadow-xl hover:bg-indigo-700 transition-all hover:scale-105">
                     <Plus size={18} /><span>신규 발주 요청서 작성</span>
@@ -144,17 +143,35 @@ export default function PurchasingPage() {
             </div>
 
             <div className="bg-white/60 backdrop-blur-md rounded-2xl border border-slate-200/50 shadow-sm flex-1 flex flex-col min-h-0 relative z-20 overflow-hidden text-left">
+                {/* Tabs */}
+                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+                    <div className="flex space-x-6">
+                        <button 
+                            onClick={() => setActiveTab('ACTIVE')}
+                            className={`text-sm font-black pb-4 -mb-4 border-b-2 transition-colors ${activeTab === 'ACTIVE' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+                            진행 중인 발주
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('COMPLETED')}
+                            className={`text-sm font-black pb-4 -mb-4 border-b-2 transition-colors ${activeTab === 'COMPLETED' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+                            완료된 발주 내역
+                        </button>
+                    </div>
+                </div>
+                
                 <MasterDataGrid
                     data={sortedList} columnDefs={COLUMN_DEFS} sortConfig={sortConfig} onSort={handleSort} rowKey="id" onRowClick={setSelectedPO}
-                    enableSearch={true} searchTerm={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="PR/PO 번호, 업체명 검색..."
+                    enableSearch={true} searchTerm={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="발주 번호, 업체명 검색..."
                     cellRenderer={{
-                        PRNumber: (val) => <span className="font-mono font-black text-slate-600 text-[10px]">{val}</span>,
-                        PONumber: (val, row) => (
-                            <div className="flex items-center gap-2">
-                                <span className="font-mono font-black text-slate-800">{val}</span>
-                                {row.Urgent && <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg bg-rose-100 border border-rose-250 text-rose-700 text-[9px] font-black animate-pulse">🔥 긴급</span>}
-                            </div>
-                        ),
+                        PONumber: (val, row) => {
+                            const displayNum = (val && val !== '-') ? val : (row.PRNumber && row.PRNumber !== '-' ? row.PRNumber : '-');
+                            return (
+                                <div className="flex items-center gap-2">
+                                    <span className="font-mono font-black text-slate-800">{displayNum}</span>
+                                    {row.Urgent && <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg bg-rose-100 border border-rose-250 text-rose-700 text-[9px] font-black animate-pulse">🔥 긴급</span>}
+                                </div>
+                            );
+                        },
                         Status: (val, row) => {
                             const info = PO_STATUS_INFO[val] || { label: val, color: 'bg-slate-50' };
                             return (

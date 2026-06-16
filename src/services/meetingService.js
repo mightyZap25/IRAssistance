@@ -18,11 +18,14 @@ const WEEKLY_MEETINGS_COLLECTION = 'weekly_meetings';
 export const getMeetings = async () => {
     const q = query(collection(db, MEETINGS_COLLECTION), orderBy('dateTime', 'desc'));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        dateTime: doc.data().dateTime?.toDate() || null
-    }));
+    return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+            id: doc.id,
+            ...data,
+            dateTime: data.dateTime?.toDate ? data.dateTime.toDate() : (data.dateTime ? new Date(data.dateTime) : null)
+        };
+    });
 };
 
 export const addMeeting = async (meetingData) => {
@@ -49,11 +52,14 @@ export const deleteMeeting = async (id) => {
 export const getWeeklyMeetings = async () => {
     const q = query(collection(db, WEEKLY_MEETINGS_COLLECTION), orderBy('date', 'desc'));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        date: doc.data().date?.toDate() || null
-    }));
+    return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+            id: doc.id,
+            ...data,
+            date: data.date?.toDate ? data.date.toDate() : (data.date ? new Date(data.date) : null)
+        };
+    });
 };
 
 export const addWeeklyMeeting = async (weeklyData) => {

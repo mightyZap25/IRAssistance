@@ -22,6 +22,7 @@ const TABS = [
 
 export default function QAProcessPage() {
     const [activeTab, setActiveTab] = useState('shipping');
+    const [listTab, setListTab] = useState('PENDING'); // PENDING | COMPLETED
     const [loading, setLoading] = useState(false);
     
     // Modal states
@@ -44,10 +45,11 @@ export default function QAProcessPage() {
         try {
             // [자동 복구 로직] 수입검사(receiving)에 잘못 들어간 생산 데이터 이관
             (async () => {
-                const recSnap = await getDocs(query(collection(db, 'receiving'), where('SourceType', '==', 'PRODUCTION')));
-                if (!recSnap.empty) {
+                const recSnap = await getDocs(query(collection(db, 'receiving')));
+                const productionDocs = recSnap.docs.filter(d => d.data().SourceType === 'PRODUCTION');
+                if (productionDocs.length > 0) {
                     const batch = writeBatch(db);
-                    for (const d of recSnap.docs) {
+                    for (const d of productionDocs) {
                         const data = d.data();
                         const newRef = doc(collection(db, 'qa_shipping_inspections'));
                         batch.set(newRef, {
@@ -167,6 +169,14 @@ export default function QAProcessPage() {
         { name: '불량 (Fail)', value: stats.failed || 0 },
     ];
 
+    const filteredInspections = useMemo(() => {
+        return inspections.filter(data => {
+            const isCompleted = data.Status === 'INSPECTION_COMPLETE' || data.Status === 'QA_COMPLETE' || data.result === 'Pass' || data.result === 'Fail' || data.Status === 'COMPLETED';
+            if (listTab === 'PENDING') return !isCompleted;
+            return isCompleted;
+        });
+    }, [inspections, listTab]);
+
     return (
         <div className="flex flex-col h-[calc(100vh-100px)] animate-in fade-in duration-500">
             {/* Header */}
@@ -261,7 +271,21 @@ export default function QAProcessPage() {
                         <div className="p-2 bg-teal-50 text-teal-600 rounded-xl">
                             <LayoutGrid size={20} />
                         </div>
-                        <h2 className="text-lg font-black text-slate-800 tracking-tight">검사 대기 및 완료 목록</h2>
+                        <h2 className="text-lg font-black text-slate-800 tracking-tight mr-2">검사 관리 목록</h2>
+                        <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+                            <button 
+                                onClick={() => setListTab('PENDING')}
+                                className={`px-5 py-1.5 rounded-lg text-xs font-black transition-all ${listTab === 'PENDING' ? 'bg-white text-teal-600 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
+                            >
+                                검사 대기
+                            </button>
+                            <button 
+                                onClick={() => setListTab('COMPLETED')}
+                                className={`px-5 py-1.5 rounded-lg text-xs font-black transition-all ${listTab === 'COMPLETED' ? 'bg-white text-teal-600 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
+                            >
+                                검사 완료
+                            </button>
+                        </div>
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="relative">
@@ -280,7 +304,8 @@ export default function QAProcessPage() {
 
                 <div className="flex-1 overflow-hidden">
                     <MasterDataGrid
-                        data={inspections}
+                        key={`${activeTab}-${listTab}`}
+                        data={filteredInspections}
                         columnDefs={
                             activeTab === 'receiving' ? {
                                 PONumber: { label: '문서번호', width: '150px' },
@@ -303,8 +328,20 @@ export default function QAProcessPage() {
                         rowKey="id"
                         onRowClick={handleRowClick}
                         cellRenderer={{
-                            ReceivedAt: (val) => val?.toDate ? val.toDate().toLocaleDateString() : val || '-',
-                            createdAt: (val) => val?.seconds ? new Date(val.seconds * 1000).toLocaleDateString() : val || '-',
+                            ReceivedAt: (val) => {
+                                if (!val) return '-';
+                                if (val.toDate) return val.toDate().toLocaleDateString();
+                                if (val.seconds) return new Date(val.seconds * 1000).toLocaleDateString();
+                                const d = new Date(val);
+                                return isNaN(d.getTime()) ? val : d.toLocaleDateString();
+                            },
+                            createdAt: (val) => {
+                                if (!val) return '-';
+                                if (val.toDate) return val.toDate().toLocaleDateString();
+                                if (val.seconds) return new Date(val.seconds * 1000).toLocaleDateString();
+                                const d = new Date(val);
+                                return isNaN(d.getTime()) ? val : d.toLocaleDateString();
+                            },
                             Status: (val, row) => (
                                 <div className="flex items-center justify-between gap-2 w-full">
                                     <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter ${val === 'WAITING_INSPECTION' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
