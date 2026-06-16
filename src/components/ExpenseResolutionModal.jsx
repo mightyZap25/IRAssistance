@@ -19,8 +19,8 @@ const ExpenseResolutionModal = ({ isOpen, onClose, poData, onSubmit }) => {
         if (isOpen && poData) {
             setResolutionData(prev => ({
                 ...prev,
-                ResolutionTitle: `[지출결의] ${poData.VendorName} - ${poData.PONumber} 정산의 건`,
-                Content: `기 승인된 구매 기안(ID: ${poData.LastApprovalID || 'N/A'})에 의거하여, 물품 입고 및 QA 검사가 완료되었으므로 대금 지불을 요청합니다.`
+                ResolutionTitle: `[지출결의] ${poData.VendorName} 정산`,
+                Content: `구매 기안(ID: ${poData.LastApprovalID || 'N/A'}) 의거, 물품 입고 완료에 따른 대금 지불 요청.`
             }));
         }
     }, [isOpen, poData]);
@@ -71,7 +71,7 @@ const ExpenseResolutionModal = ({ isOpen, onClose, poData, onSubmit }) => {
                 LastResolutionID: resolutionID
             });
 
-            alert('지출결의서가 작성되었습니다. 경리 파트로 전송되었습니다.');
+            alert('지출결의서가 작성되었습니다.');
             onSubmit(payload);
             onClose();
         } catch (err) { console.error(err); alert('지출결의 저장 중 오류 발생'); } finally { setLoading(false); }
@@ -80,105 +80,95 @@ const ExpenseResolutionModal = ({ isOpen, onClose, poData, onSubmit }) => {
     if (!isOpen) return null;
 
     return createPortal(
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[10005] flex items-center justify-center p-4 text-left">
-            <div className="bg-white rounded-[32px] w-full max-w-4xl shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh] overflow-hidden">
-                <div className="flex justify-between items-center p-8 border-b border-slate-100 bg-indigo-50/30 shrink-0">
-                    <div>
-                        <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-                            <CreditCard size={28} className="text-indigo-600" />
-                            지출결의서 작성
-                        </h2>
-                        <p className="text-sm font-bold text-slate-400 mt-1 uppercase tracking-widest text-left">Expense Resolution & Payment Request</p>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[10005] flex items-center justify-center p-4 text-left">
+            <div className="bg-white rounded-2xl w-full max-w-2xl shadow-xl flex flex-col max-h-[85vh] overflow-hidden border border-slate-200">
+                {/* Header */}
+                <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                    <div className="flex items-center gap-2">
+                        <CreditCard size={20} className="text-indigo-600" />
+                        <h2 className="text-lg font-black text-slate-800 tracking-tight">지출결의서 작성</h2>
                     </div>
-                    <button onClick={onClose} className="p-3 bg-white rounded-2xl text-slate-400 hover:text-slate-600 shadow-sm border border-slate-200 transition-all"><X size={20} /></button>
+                    <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors"><X size={20} /></button>
                 </div>
 
-                <form onSubmit={handleFormSubmit} className="flex-1 overflow-y-auto custom-scrollbar">
-                    <div className="p-8 grid grid-cols-12 gap-8 text-left">
-                        {/* Left Side: Basic Info */}
-                        <div className="col-span-7 space-y-6 text-left">
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 block">결의서 제목</label>
-                                    <input type="text" value={resolutionData.ResolutionTitle} onChange={e => setResolutionData({...resolutionData, ResolutionTitle: e.target.value})} className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-2.5 text-sm font-black outline-none focus:ring-2 focus:ring-indigo-500" required />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 block">지불 희망일</label>
-                                        <input type="date" value={resolutionData.PaymentDate} onChange={e => setResolutionData({...resolutionData, PaymentDate: e.target.value})} className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-2.5 text-sm font-black outline-none focus:ring-2 focus:ring-indigo-500" required />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 block">지불 수단</label>
-                                        <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-2.5 text-sm font-black outline-none">
-                                            <option value="BANK_TRANSFER">계좌 이체</option>
-                                            <option value="CORPORATE_CARD">법인 카드</option>
-                                            <option value="CASH">현금 지불</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 block">상세 결의 내용</label>
-                                    <textarea value={resolutionData.Content} onChange={e => setResolutionData({...resolutionData, Content: e.target.value})} className="w-full h-32 bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
-                                </div>
-                            </div>
+                <form onSubmit={handleFormSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
+                    {/* Amount Summary - Professional & Compact */}
+                    <div className="bg-slate-900 rounded-xl p-5 text-white flex justify-between items-center shadow-lg">
+                        <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">최종 집행 예산 (VAT 포함)</p>
+                            <p className="text-2xl font-black italic">₩ {Math.floor((poData.TotalPrice || 0) * 1.1).toLocaleString()}</p>
+                        </div>
+                        <div className="text-right border-l border-slate-700 pl-6 space-y-1">
+                            <div className="flex justify-between gap-4 text-[11px] font-bold text-slate-400"><span>공급가</span><span>₩ {(poData.TotalPrice || 0).toLocaleString()}</span></div>
+                            <div className="flex justify-between gap-4 text-[11px] font-bold text-slate-400"><span>부가세</span><span>₩ {Math.floor((poData.TotalPrice || 0) * 0.1).toLocaleString()}</span></div>
+                        </div>
+                    </div>
 
-                            <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100 flex gap-3">
-                                <Info size={18} className="text-amber-500 shrink-0"/>
-                                <p className="text-[11px] font-bold text-amber-700 leading-relaxed">
-                                    이 지출결의서는 사내 경리 시스템에 자동 등록되며, 관련 기안서와 견적서가 함께 전달되어 최종 검토됩니다.
-                                </p>
+                    <div className="grid grid-cols-2 gap-6">
+                        {/* Basic Info */}
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-[11px] font-bold text-slate-400 mb-1 block">결의 제목</label>
+                                <input type="text" value={resolutionData.ResolutionTitle} onChange={e => setResolutionData({...resolutionData, ResolutionTitle: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold outline-none focus:border-indigo-500" required />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[11px] font-bold text-slate-400 mb-1 block">지불 희망일</label>
+                                    <input type="date" value={resolutionData.PaymentDate} onChange={e => setResolutionData({...resolutionData, PaymentDate: e.target.value})} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-2 text-xs font-bold outline-none" required />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] font-bold text-slate-400 mb-1 block">지불 수단</label>
+                                    <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-2 text-xs font-bold outline-none">
+                                        <option value="BANK_TRANSFER">계좌 이체</option>
+                                        <option value="CORPORATE_CARD">법인 카드</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
 
-                        {/* Right Side: Files & Amount */}
-                        <div className="col-span-5 space-y-6">
-                            <section className="bg-slate-900 rounded-[24px] p-8 text-white space-y-4 shadow-xl">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">최종 정산 금액 (VAT 포함)</p>
-                                <p className="text-4xl font-black italic tracking-tighter">₩ {Math.floor((poData.TotalPrice || 0) * 1.1).toLocaleString()}</p>
-                                <div className="pt-4 border-t border-slate-800 space-y-2">
-                                    <div className="flex justify-between text-[11px] font-bold text-slate-400"><span>공급가액</span><span>₩ {(poData.TotalPrice || 0).toLocaleString()}</span></div>
-                                    <div className="flex justify-between text-[11px] font-bold text-slate-400"><span>부가세 (10%)</span><span>₩ {Math.floor((poData.TotalPrice || 0) * 0.1).toLocaleString()}</span></div>
-                                </div>
-                            </section>
+                        {/* File Upload */}
+                        <div>
+                            <label className="text-[11px] font-bold text-rose-500 mb-1 block flex items-center gap-1.5">
+                                <FileText size={12}/> 증빙 서류 (계산서/영수증)
+                            </label>
+                            <div className={`relative border-2 border-dashed rounded-xl h-[104px] transition-all flex flex-col items-center justify-center text-center ${taxInvoiceFile ? 'border-emerald-500 bg-emerald-50/30' : 'border-slate-200 bg-slate-50'}`}>
+                                <input type="file" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" accept=".pdf,image/*" />
+                                {taxInvoiceFile ? (
+                                    <>
+                                        <CheckCircle2 size={24} className="text-emerald-500 mb-1"/>
+                                        <p className="text-[10px] font-black text-emerald-700 truncate w-full px-4">{fileName}</p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Upload size={24} className="text-slate-300 mb-1"/>
+                                        <p className="text-[10px] font-bold text-slate-400">파일 업로드</p>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </div>
 
-                            <section className="space-y-3">
-                                <label className="text-[10px] font-black text-rose-500 uppercase mb-1.5 ml-1 block flex items-center gap-2">
-                                    <FileText size={12}/> 세금계산서 / 영수증 첨부 (필수)
-                                </label>
-                                <div className={`relative border-2 border-dashed rounded-[24px] p-8 transition-all flex flex-col items-center justify-center text-center ${taxInvoiceFile ? 'border-emerald-500 bg-emerald-50/30' : 'border-slate-300 bg-slate-50'}`}>
-                                    <input type="file" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" accept=".pdf,image/*" />
-                                    {taxInvoiceFile ? (
-                                        <>
-                                            <CheckCircle2 size={32} className="text-emerald-500 mb-2"/>
-                                            <p className="text-xs font-black text-emerald-700 truncate w-full px-4">{fileName}</p>
-                                            <p className="text-[9px] font-bold text-emerald-500 mt-1">파일이 정상적으로 첨부되었습니다.</p>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Upload size={32} className="text-slate-300 mb-2"/>
-                                            <p className="text-xs font-black text-slate-500 uppercase tracking-widest">파일 업로드</p>
-                                        </>
-                                    )}
-                                </div>
-                            </section>
+                    {/* Content Section */}
+                    <div>
+                        <label className="text-[11px] font-bold text-slate-400 mb-1 block">상세 결의 내용</label>
+                        <textarea value={resolutionData.Content} onChange={e => setResolutionData({...resolutionData, Content: e.target.value})} className="w-full h-20 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-indigo-500 resize-none" />
+                    </div>
 
-                            <div className="bg-slate-100 rounded-2xl p-4 space-y-3">
-                                <div className="flex items-center justify-between text-[10px] font-black text-slate-400 uppercase">
-                                    <span>승인 방식 선택</span>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button type="button" onClick={() => setResolutionData({...resolutionData, IsElectronic: true})} className={`flex-1 py-2 rounded-xl text-[11px] font-black transition-all ${resolutionData.IsElectronic ? 'bg-indigo-600 text-white' : 'bg-white text-slate-500'}`}>전자결재</button>
-                                    <button type="button" onClick={() => setResolutionData({...resolutionData, IsElectronic: false})} className={`flex-1 py-2 rounded-xl text-[11px] font-black transition-all ${!resolutionData.IsElectronic ? 'bg-amber-500 text-white' : 'bg-white text-slate-500'}`}>수동완료</button>
-                                </div>
+                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
+                        <div className="flex items-center gap-4">
+                            <span className="text-[11px] font-bold text-slate-400">결재 방식</span>
+                            <div className="flex gap-1">
+                                <button type="button" onClick={() => setResolutionData({...resolutionData, IsElectronic: true})} className={`px-4 py-1.5 rounded-md text-[11px] font-black transition-all ${resolutionData.IsElectronic ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-500'}`}>전자결재</button>
+                                <button type="button" onClick={() => setResolutionData({...resolutionData, IsElectronic: false})} className={`px-4 py-1.5 rounded-md text-[11px] font-black transition-all ${!resolutionData.IsElectronic ? 'bg-amber-500 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-500'}`}>수동완료</button>
                             </div>
                         </div>
                     </div>
                 </form>
 
-                <div className="p-8 border-t border-slate-100 bg-slate-50/50 shrink-0 flex justify-end gap-4">
-                    <button onClick={onClose} className="px-8 py-4 rounded-2xl text-sm font-black text-slate-500 bg-white border-2 border-slate-100 hover:bg-slate-50 transition-all">취소</button>
-                    <button onClick={handleFormSubmit} disabled={loading} className="px-10 py-4 rounded-2xl text-sm font-black text-white bg-slate-900 hover:bg-black shadow-xl flex items-center gap-3 transition-all disabled:opacity-50">
-                        {loading ? '처리 중...' : '지출결의서 최종 상신'}
+                <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 shrink-0 flex justify-end gap-3">
+                    <button onClick={onClose} className="px-5 py-2 rounded-lg text-sm font-bold text-slate-500 hover:bg-slate-100 transition-all">닫기</button>
+                    <button onClick={handleFormSubmit} disabled={loading} className="px-6 py-2 rounded-lg text-sm font-black text-white bg-slate-900 hover:bg-black shadow-xl flex items-center gap-2 transition-all disabled:opacity-50">
+                        {loading ? '처리 중...' : '결의서 상신'}
                     </button>
                 </div>
             </div>

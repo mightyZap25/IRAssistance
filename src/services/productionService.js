@@ -199,65 +199,187 @@ export const productionService = {
     },
 
     /**
+     * 전사 생산 대기열을 시뮬레이션하여 특정 PR의 위치와 전체 누적 부족분을 산출합니다.
+     * @param {string} targetPRId - 상세 정보를 확인할 PR ID
+     */
+    getQueueSimulation: async (targetPRId = null) => {
+        try {
+            const activeStatuses = [
+                'CONFIRMED', 'WAITING_FOR_PARTS', 'PROD_WAITING', 
+                'PROD_PLANNING', 'WORK_ORDER', 'IN_PRODUCTION', 
+                'PROD_COMPLETE', 'QA_WAITING', 'QA_COMPLETE', 'SHIP_READY'
+            ];
+
+            const [prSnap, bomSnap, invSnap, partsSnap] = await Promise.all([
+                getDocs(query(collection(db, 'production_requests'), where('Status', 'in', activeStatuses))),
+                getDocs(collection(db, 'bom')),
+                getDocs(collection(db, 'inventory')),
+                getDocs(collection(db, 'parts'))
+            ]);
+
+            const bomMap = {};
+            bomSnap.docs.forEach(d => {
+                const data = d.data();
+                const pid = (data.ParentID || '').toUpperCase();
+                if (!bomMap[pid]) bomMap[pid] = [];
+                bomMap[pid].push({ ...data, ChildID: (data.ChildID || '').toUpperCase() });
+            });
+
+            const inventory = {};
+            invSnap.docs.forEach(d => { inventory[(d.data().PartID || '').toUpperCase()] = Number(d.data().OnHand || 0); });
+
+            const partsFullMap = {};
+            partsSnap.docs.forEach(d => { partsFullMap[(d.data().PartID || '').toUpperCase()] = d.data(); });
+
+            const prs = prSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+            
+            // 등록일 순서 정렬 (FIFO)
+            const sortedPRs = prs.sort((a, b) => {
+                const timeA = a.CreatedAt?.toMillis?.() || (a.CreatedAt ? new Date(a.CreatedAt).getTime() : 0);
+                const timeB = b.CreatedAt?.toMillis?.() || (b.CreatedAt ? new Date(b.CreatedAt).getTime() : 0);
+                return timeA - timeB;
+            });
+
+            const currentInv = { ...inventory };
+            const globalCumulativeShortages = {}; // 전사 누적 부족분 { PartID: qty }
+            
+            let targetPRResult = null;
+
+            // 대기열 순차 처리 시뮬레이션
+            sortedPRs.forEach(pr => {
+                const prItems = pr.Items && Array.isArray(pr.Items) ? pr.Items : [{
+                    PartID: pr.PartID,
+                    PartName: pr.PartName,
+                    TargetQty: pr.TargetQty || 0
+                }];
+
+                // 해당 PR의 품목들을 납기 스케줄 포함하여 펼침
+                const flattened = [];
+                prItems.forEach(item => {
+                    const schedules = item.Schedules && item.Schedules.length > 0 
+                        ? item.Schedules 
+                        : [{ qty: item.TargetQty || 0 }];
+                    schedules.forEach(s => {
+                        flattened.push({ ...item, TargetQty: Number(s.qty || 0) });
+                    });
+                });
+
+                // 자재 가용성 체크 (현재 남은 재고 currentInv에서 차감)
+                const result = productionService.checkMultiItemAvailability(flattened, currentInv, {}, bomMap, partsFullMap);
+                
+                // 전사 누적 부족분 업데이트 (원자재 레벨)
+                result.items.forEach(res => {
+                    res.shortages.forEach(s => {
+                        const sid = s.id.toUpperCase();
+                        globalCumulativeShortages[sid] = (globalCumulativeShortages[sid] || 0) + s.short;
+                    });
+                });
+
+                // 만약 우리가 찾는 PR이라면 시뮬레이션 결과 저장
+                if (pr.id === targetPRId) {
+                    targetPRResult = {
+                        ...pr,
+                        simulationItems: result.items
+                    };
+                }
+            });
+
+            return {
+                targetPR: targetPRResult,
+                globalShortages: globalCumulativeShortages,
+                inventorySnapshot: inventory // 초기 재고 상태
+            };
+        } catch (error) {
+            console.error("Queue simulation error:", error);
+            return null;
+        }
+    },
+
+    /**
      * 여러 품목을 순차적으로 차감하며 전체 가용성을 체크합니다.
      * @param {Array} items - 생산 요청 제품 목록 [{ PartID, TargetQty, ... }]
      * @param {Object} inventory - 현재고 맵
      * @param {Object} reservedMap - 타 공정 예약 맵
      * @param {Object} bomMap - BOM 데이터 맵
      */
-    checkMultiItemAvailability: (items, inventory, reservedMap, bomMap) => {
+    checkMultiItemAvailability: (items, inventory, reservedMap, bomMap, partsFullMap = {}) => {
         // 1. 가상 가용 재고 맵 생성 (OnHand - Reserved)
         const virtualInventory = {};
         Object.keys(inventory).forEach(id => {
             virtualInventory[id] = Math.max(0, Number(inventory[id] || 0) - Number(reservedMap[id] || 0));
         });
 
-        // 2. 자재 소요량을 재귀적으로 계산하고 가상 재고에서 차감하는 내부 함수
-        const deductMaterials = (partID, qty, currentInv) => {
+        // 2. 자재 소요량을 전체 트리 형태로 구성하며 가상 재고에서 차감하는 함수
+        const buildFullAvailabilityTree = (partID, qty, currentInv) => {
+            const partInfo = partsFullMap[partID] || { PartID: partID, Name: partID };
             const available = Number(currentInv[partID] || 0);
-            const useFromStock = Math.min(available, qty);
             
-            // 현재고 차감
+            // 현재 품목에서 재고 사용 (상위 품목일 경우)
+            const useFromStock = Math.min(available, qty);
             currentInv[partID] = available - useFromStock;
             const remainingNeeded = qty - useFromStock;
 
-            // 재고로 모두 충당된 경우
-            if (remainingNeeded <= 0) return [];
-
             const bomItems = bomMap[partID] || [];
-            
-            // BOM이 없는 경우 (최하위 부품인데 재고가 부족한 상태)
-            if (bomItems.length === 0) {
-                return [{ 
-                    id: partID, 
-                    req: qty, 
-                    has: available, 
-                    short: remainingNeeded 
-                }];
+            let children = [];
+
+            if (bomItems.length > 0) {
+                children = bomItems.map(bom => {
+                    const childID = bom.ChildID;
+                    const unitQty = Number(bom.Quantity || bom.qty || 1);
+                    // 상위에서 부족한 만큼만 하위 자재가 필요함
+                    const totalChildNeeded = remainingNeeded * unitQty;
+                    const childNode = buildFullAvailabilityTree(childID, totalChildNeeded, currentInv);
+                    return {
+                        ...childNode,
+                        Quantity: unitQty
+                    };
+                });
             }
 
-            // 조립품인 경우 부족한 수량(remainingNeeded)만큼 하위로 전파
-            const shortages = [];
-            bomItems.forEach(bom => {
-                const childID = bom.ChildID;
-                const unitQty = Number(bom.Quantity || bom.qty || 1);
-                const totalChildNeeded = remainingNeeded * unitQty;
-                const childShorts = deductMaterials(childID, totalChildNeeded, currentInv);
-                shortages.push(...childShorts);
-            });
-
-            return shortages;
+            return {
+                ...partInfo,
+                PartID: partID,
+                Name: partInfo.Name || partID,
+                Quantity: 1, // 부모 노드에서 덮어씌움
+                Children: children,
+                RequiredQty: qty,
+                AvailableStock: available,
+                Shortage: remainingNeeded
+            };
         };
 
         // 3. 아이템별 순차 처리
         const results = items.map(item => {
-            // 현재 아이템 생산 시도 전의 가상 재고 복사본으로 가용성 판단 (이전 단계들에서 차감된 상태임)
-            const shortages = deductMaterials(item.PartID, item.TargetQty, virtualInventory);
+            // 처리 전 인벤토리 스냅샷 (UI에서 해당 시점의 재고를 보여주기 위함)
+            const inventorySnapshot = { ...virtualInventory };
             
+            const bomTree = buildFullAvailabilityTree(item.PartID, item.TargetQty, virtualInventory);
+            
+            // 단층 부족분 리스트 추출 (노티 및 상태 결정용)
+            const flatShortages = [];
+            const collectShortages = (node) => {
+                if (!node) return;
+                // 하위 자재가 없는 '원자재' 레벨에서 실제 부족분 체크
+                if (node.Shortage > 0 && (!node.Children || node.Children.length === 0)) {
+                    flatShortages.push({
+                        id: node.PartID,
+                        req: node.RequiredQty,
+                        has: node.AvailableStock,
+                        short: node.Shortage
+                    });
+                }
+                if (node.Children) {
+                    node.Children.forEach(collectShortages);
+                }
+            };
+            collectShortages(bomTree);
+
             return {
                 ...item,
-                ok: shortages.length === 0,
-                shortages: shortages
+                ok: flatShortages.length === 0,
+                shortages: flatShortages,
+                bomTree: bomTree,
+                inventorySnapshot: inventorySnapshot
             };
         });
 

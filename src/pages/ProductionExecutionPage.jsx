@@ -13,6 +13,7 @@ import { productionService } from '../services/productionService';
 // ─────────────────────────────────────────────────────────────
 const PR_STATUS = {
     DRAFT:           { label: '임시저장',     color: 'bg-slate-100 text-slate-500 border-slate-200',    step: 0 },
+    QUOTE_ISSUING:   { label: '견적발행중',   color: 'bg-amber-50 text-amber-600 border-amber-200',     step: 0.5 },
     REVIEW:          { label: '생산검토',     color: 'bg-yellow-50 text-yellow-600 border-yellow-200',  step: 1 },
     CONFIRMED:       { label: '의뢰확정',     color: 'bg-blue-50 text-blue-600 border-blue-200',        step: 2 },
     WAITING_FOR_PARTS: { label: '자재대기',     color: 'bg-rose-50 text-rose-600 border-rose-200',        step: 2.5 },
@@ -28,7 +29,7 @@ const PR_STATUS = {
     ARCHIVED:        { label: '아카이브',     color: 'bg-slate-50 text-slate-400 border-slate-100',     step: 12 },
 };
 
-const EXECUTION_STATUSES = ['PROD_WAITING', 'PROD_PLANNING', 'WORK_ORDER', 'IN_PRODUCTION', 'PROD_COMPLETE', 'QA_WAITING', 'QA_COMPLETE', 'SHIP_READY', 'WAITING_FOR_PARTS', 'CONFIRMED'];
+const EXECUTION_STATUSES = ['REVIEW', 'CONFIRMED', 'WAITING_FOR_PARTS', 'PROD_WAITING', 'PROD_PLANNING', 'WORK_ORDER', 'IN_PRODUCTION', 'PROD_COMPLETE', 'QA_WAITING', 'QA_COMPLETE', 'SHIP_READY'];
 
 const KANBAN_COLUMNS = [
     { key: 'PROD_WAITING',  label: '생산 대기',  color: 'border-indigo-100 bg-indigo-50/30', headColor: 'bg-indigo-100 text-indigo-700' },
@@ -205,12 +206,50 @@ function WODetailModal({ pr, onClose, onRefresh }) {
 
 function KanbanCard({ pr, onClick }) {
     const delayed = isDelayed(pr.DueDate);
+    const isShortage = pr.Status === 'WAITING_FOR_PARTS' || (pr.Items && pr.Items.some(i => i.Status === 'WAITING_FOR_PARTS'));
+    const items = pr.isSplit ? [] : (pr.Items || []);
+
     return (
-        <div onClick={() => onClick(pr)} className={`bg-white rounded-xl p-3 border shadow-sm cursor-pointer hover:shadow-md transition-all ${delayed ? 'border-rose-300 ring-1 ring-rose-100' : 'border-slate-200'} text-left`}>
-            <div className="flex justify-between items-start mb-1.5"><span className="text-[9px] font-black text-slate-400 uppercase">{pr.PRNumber}</span>{pr.Urgent && <AlertCircle size={10} className="text-rose-500"/>}</div>
-            <p className="text-xs font-black text-slate-800 leading-tight mb-1 truncate">{pr.PartName}</p>
-            <p className="text-[10px] font-bold text-slate-400 mb-2 truncate">{pr.CustomerName}</p>
-            <div className="flex justify-between items-center pt-2 border-t border-slate-50"><span className="text-[10px] font-black text-slate-600">{pr.TargetQty} EA</span><span className={`text-[9px] font-black ${delayed ? 'text-rose-600' : 'text-slate-400'}`}>{pr.DueDate}</span></div>
+        <div onClick={() => onClick(pr)} className={`bg-white rounded-2xl p-4 border shadow-sm cursor-pointer hover:shadow-md transition-all ${delayed ? 'border-rose-300 ring-1 ring-rose-100' : isShortage ? 'border-rose-200 bg-rose-50/10' : 'border-slate-150'} text-left`}>
+            {/* 바디 영역: 상단에 고객사, 하단에 품목 목록과 수량 */}
+            <div className="flex flex-col gap-2">
+                {/* 고객사명 및 자재부족 배지 */}
+                <div className="pt-0.5 flex justify-between items-center">
+                    <h4 className="text-sm font-black text-slate-800 tracking-tight">{pr.CustomerName || '일반고객'}</h4>
+                    {isShortage && (
+                        <span className="px-1.5 py-0.5 bg-rose-50 text-rose-600 border border-rose-150 rounded text-[9px] font-black animate-pulse">
+                            자재부족
+                        </span>
+                    )}
+                </div>
+
+                {/* 품목명 + 수량 + 납기일 */}
+                <div className="flex flex-col space-y-1.5 border-t border-slate-100 pt-2 w-full">
+                    {items.length === 0 ? (
+                        <div className="flex items-center justify-between gap-3 text-[10px] w-full">
+                            <span className="font-bold text-slate-700">{pr.PartName} ({pr.TargetQty} EA)</span>
+                            <span className="font-bold text-slate-400 shrink-0">{pr.DueDate}</span>
+                        </div>
+                    ) : items.length <= 2 ? (
+                        items.map((item, idx) => (
+                            <div key={idx} className="flex items-center justify-between gap-3 text-[10px] w-full">
+                                <span className="font-bold text-slate-700 truncate max-w-[170px]">{item.PartName} ({item.TargetQty} EA)</span>
+                                <span className="font-bold text-slate-450 shrink-0">{item.DueDate || pr.DueDate}</span>
+                            </div>
+                        ))
+                    ) : (
+                        <>
+                            <div className="flex items-center justify-between gap-3 text-[10px] w-full">
+                                <span className="font-bold text-slate-700 truncate max-w-[170px]">{items[0].PartName} ({items[0].TargetQty} EA)</span>
+                                <span className="font-bold text-slate-450 shrink-0">{items[0].DueDate || pr.DueDate}</span>
+                            </div>
+                            <div className="text-[10px] font-black text-slate-400">
+                                외 {items.length - 1}종
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }
@@ -238,7 +277,10 @@ export default function ProductionExecutionPage() {
             items.forEach((item, itemIdx) => {
                 const schedules = item.Schedules && item.Schedules.length > 0 ? item.Schedules : [{ date: item.DueDate || pr.DueDate, qty: item.TargetQty || pr.TargetQty, status: item.Status || pr.Status }];
                 schedules.forEach((sched, sIdx) => {
-                    const currentStatus = sched.status || item.Status || pr.Status || 'PROD_WAITING';
+                    const schedStatus = sched.status;
+                    const currentStatus = (schedStatus && EXECUTION_STATUSES.includes(schedStatus)) 
+                        ? schedStatus 
+                        : (item.Status || pr.Status || 'PROD_WAITING');
                     flattened.push({ ...pr, displayID: `${pr.PRNumber}-${itemIdx+1}-${sIdx+1}`, itemIdx, scheduleIdx: sIdx, PartID: item.PartID, PartName: item.PartName, TargetQty: Number(sched.qty || 0), DueDate: sched.date, Status: currentStatus, isSplit: true });
                 });
             });
@@ -273,6 +315,12 @@ export default function ProductionExecutionPage() {
                 schedules.forEach((sched, sIdx) => { structuredData.push({ id: `${item.PartID}-${sIdx}`, PartName: item.PartName, ScheduleIdx: sIdx + 1, ScheduleDate: sched.date, SetQty: Number(sched.qty || 0), BOMTree: bomTree }); });
             });
             setSelectedPRBOM(structuredData);
+            if (pr.isSplit) {
+                const matchedIndex = structuredData.findIndex(x => x.id === `${pr.PartID}-${pr.scheduleIdx}`);
+                setActiveScheduleTab(matchedIndex !== -1 ? matchedIndex : 0);
+            } else {
+                setActiveScheduleTab(0);
+            }
         } catch (err) { console.error(err); }
     };
 
@@ -358,8 +406,8 @@ export default function ProductionExecutionPage() {
         } catch (err) { console.error(err); alert('수정 실패'); }
     };
 
-    const stats = useMemo(() => ({ inProd: prs.filter(p => p.Status === 'IN_PRODUCTION').length, delayed: prs.filter(p => isDelayed(p.DueDate)).length, waiting: prs.filter(p => ['PROD_WAITING', 'PROD_PLANNING'].includes(p.Status)).length, qaWaiting: prs.filter(p => p.Status === 'QA_WAITING').length }), [prs]);
-    const waitingPRs = processedData.filter(p => ['PROD_WAITING', 'PROD_PLANNING'].includes(p.Status));
+    const stats = useMemo(() => ({ inProd: prs.filter(p => p.Status === 'IN_PRODUCTION').length, delayed: prs.filter(p => isDelayed(p.DueDate)).length, waiting: prs.filter(p => ['REVIEW', 'CONFIRMED', 'WAITING_FOR_PARTS', 'PROD_WAITING', 'PROD_PLANNING'].includes(p.Status)).length, qaWaiting: prs.filter(p => p.Status === 'QA_WAITING').length }), [prs]);
+    const waitingPRs = processedData.filter(p => ['REVIEW', 'CONFIRMED', 'WAITING_FOR_PARTS', 'PROD_WAITING', 'PROD_PLANNING'].includes(p.Status));
     const activePRs = processedData.filter(p => ['WORK_ORDER', 'IN_PRODUCTION'].includes(p.Status));
 
     const ganttData = useMemo(() => prs.map(pr => ({ id: pr.id, name: pr.PartName, code: pr.PRNumber, progress: Math.min(100, (PR_STATUS[pr.Status]?.step || 0) * 10), startDate: pr.ProdStartDate || pr.DueDate, endDate: pr.ProdEndDate || pr.DueDate, schedules: {}, tests: {} })), [prs]);
@@ -399,8 +447,15 @@ export default function ProductionExecutionPage() {
                 ) : viewMode === 'KANBAN' ? (
                     <div className="flex-1 flex gap-4 min-h-0 overflow-x-auto pb-4 custom-scrollbar">
                         {KANBAN_COLUMNS.map(col => <div key={col.key} className={`flex-shrink-0 w-60 rounded-2xl border-2 ${col.color} flex flex-col min-h-0 shadow-sm`}>
-                            <div className={`px-4 py-3 rounded-t-xl ${col.headColor} flex justify-between items-center`}><span className="text-[10px] font-black uppercase tracking-wider">{col.label}</span><span className="text-[10px] font-bold bg-white/50 px-2 py-0.5 rounded-full">{processedData.filter(p => p.Status === col.key).length}</span></div>
-                            <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">{processedData.filter(p => p.Status === col.key).map(pr => <KanbanCard key={pr.displayID || pr.id} pr={pr} onClick={setSelectedPR}/>)}</div>
+                            <div className={`px-4 py-3 rounded-t-xl ${col.headColor} flex justify-between items-center`}>
+                                <span className="text-[10px] font-black uppercase tracking-wider">{col.label}</span>
+                                <span className="text-[10px] font-bold bg-white/50 px-2 py-0.5 rounded-full">
+                                    {processedData.filter(p => col.key === 'PROD_WAITING' ? ['REVIEW', 'CONFIRMED', 'WAITING_FOR_PARTS', 'PROD_WAITING', 'PROD_PLANNING'].includes(p.Status) : p.Status === col.key).length}
+                                </span>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
+                                {processedData.filter(p => col.key === 'PROD_WAITING' ? ['REVIEW', 'CONFIRMED', 'WAITING_FOR_PARTS', 'PROD_WAITING', 'PROD_PLANNING'].includes(p.Status) : p.Status === col.key).map(pr => <KanbanCard key={pr.displayID || pr.id} pr={pr} onClick={setSelectedPR}/>)}
+                            </div>
                         </div>)}
                     </div>
                 ) : viewMode === 'GANTT' ? <div className="flex-1 min-h-0 bg-white rounded-2xl border p-4"><ProjectGanttChart projects={ganttData} stages={GANTT_STAGES} /></div> : <ProductionCalendar prs={processedData} onCardClick={setSelectedPR} />
@@ -529,9 +584,17 @@ export default function ProductionExecutionPage() {
                                                                                         setSelectedPR({...selectedPR, Items: newItems});
                                                                                         return;
                                                                                     }
-                                                                                    const reason = window.prompt('일정 변경 사유를 입력하세요:');
-                                                                                    if (!reason) return;
-                                                                                    await handleUpdateScheduleItem(itemIdx, sIdx, { startDate: newStart, endDate: newEnd }, `일정 변경: ${newStart}~${newEnd} (${reason})`);
+                                                                                    
+                                                                                    const isFirstTime = !sched.startDate && !sched.endDate;
+                                                                                    let logMsg = `일정 설정: ${newStart} ~ ${newEnd}`;
+                                                                                    
+                                                                                    if (!isFirstTime) {
+                                                                                        const reason = window.prompt('일정 변경 사유를 입력하세요:');
+                                                                                        if (!reason) return;
+                                                                                        logMsg = `일정 변경: ${newStart} ~ ${newEnd} (사유: ${reason})`;
+                                                                                    }
+                                                                                    
+                                                                                    await handleUpdateScheduleItem(itemIdx, sIdx, { startDate: newStart, endDate: newEnd }, logMsg);
                                                                                 }
                                                                             }}
                                                                             className={`px-3 py-2.5 rounded-lg text-[10px] font-black transition-all ${sched._editing ? 'bg-green-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}

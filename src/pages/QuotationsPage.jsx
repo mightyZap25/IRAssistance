@@ -8,6 +8,7 @@ import {
     Calculator, Package, User, Calendar, Save, Trash
 } from 'lucide-react';
 import MasterDataGrid from '../components/common/MasterDataGrid';
+import QuoteEmailModal from '../components/QuoteEmailModal';
 
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -447,6 +448,8 @@ export default function QuotationsPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingQuote, setEditingQuote] = useState(null);
+    const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+    const [selectedQuoteForEmail, setSelectedQuoteForEmail] = useState(null);
 
     useEffect(() => {
         fetchQuotes();
@@ -498,6 +501,20 @@ export default function QuotationsPage() {
     const handleEdit = (quote) => {
         setEditingQuote(quote);
         setIsModalOpen(true);
+    };
+
+    const handleOpenEmailModal = (quote) => {
+        setSelectedQuoteForEmail(quote);
+        setIsEmailModalOpen(true);
+    };
+
+    const handleSendQuoteEmail = async ({ subject, content, recipients }) => {
+        if (!selectedQuoteForEmail) return;
+        try {
+            await handleStatusChange(selectedQuoteForEmail.id, 'SENT');
+        } catch (err) {
+            console.error('상태 변경 실패:', err);
+        }
     };
 
     const handleDelete = async (id) => {
@@ -732,8 +749,14 @@ export default function QuotationsPage() {
                             idField="id"
                             actionRenderer={(row) => (
                                 <div className="flex gap-2">
-                                    {row.Status === 'DRAFT' && (
-                                        <button onClick={() => handleStatusChange(row.id, 'SENT')} className="text-slate-400 hover:text-blue-600 transition-colors" title="발송 처리"><Send size={16}/></button>
+                                    {(row.Status === 'DRAFT' || row.Status === 'SENT') && (
+                                        <button
+                                            onClick={() => handleOpenEmailModal(row)}
+                                            className="text-slate-400 hover:text-indigo-600 transition-colors"
+                                            title={row.Status === 'SENT' ? '이메일 재발송' : '견적서 이메일 발행'}
+                                        >
+                                            <Send size={16}/>
+                                        </button>
                                     )}
                                     {row.Status === 'SENT' && (
                                         <button onClick={() => handleStatusChange(row.id, 'ACCEPTED')} className="text-slate-400 hover:text-emerald-600 transition-colors" title="수주 승인"><CheckCircle2 size={16}/></button>
@@ -763,6 +786,12 @@ export default function QuotationsPage() {
                 onSave={handleSaveQuote}
                 currentUser={currentUser}
                 editingQuote={editingQuote}
+            />
+            <QuoteEmailModal
+                isOpen={isEmailModalOpen}
+                onClose={() => { setIsEmailModalOpen(false); setSelectedQuoteForEmail(null); }}
+                quoteData={selectedQuoteForEmail}
+                onSend={handleSendQuoteEmail}
             />
         </div>
     );

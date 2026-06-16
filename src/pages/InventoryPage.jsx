@@ -19,6 +19,8 @@ export default function InventoryPage() {
     // Modals
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
+    const [activeFilter, setActiveFilter] = useState('ALL'); // 'ALL', 'RISK', 'RESERVED', 'INCOMING'
+    const [pos, setPOs] = useState([]);
 
     useEffect(() => {
         setLoading(true);
@@ -40,9 +42,12 @@ export default function InventoryPage() {
             setSettings(snap.docs.map(d => ({ id: d.id, ...d.data() })));
             setLoading(false);
         });
+        const unsubPOs = onSnapshot(collection(db, 'purchasing'), snap => {
+            setPOs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
 
         return () => {
-            unsubInv(); unsubParts(); unsubPRs(); unsubBOM(); unsubSettings();
+            unsubInv(); unsubParts(); unsubPRs(); unsubBOM(); unsubSettings(); unsubPOs();
         };
     }, []);
 
@@ -56,13 +61,70 @@ export default function InventoryPage() {
         return bm;
     }, [boms]);
 
-    // 2. 예약 재고 실시간 계산 (계산형)
-    // 상위 어셈블리 재고가 있을 경우 하위 부품 예약을 자동으로 차감하는 로직 포함
-    const reservedMap = useMemo(() => {
-        const invMap = {};
-        inventory.forEach(i => { invMap[i.PartID] = Number(i.OnHand || 0); });
-        return productionService.calculateReservedMap(prs, bomMap, invMap);
+    // 2. 입고 예정 수량 계산 (계산형)
+    const incomingMap = useMemo(() => {
+        const inc = {};
+        pos.filter(po => ['ORDERING', 'WAITING_DELIVERY', 'WAITING_INSPECTION'].includes(po.Status)).forEach(po => {
+            const items = po.Items || [];
+            items.forEach(item => {
+                const pid = (item.PartID || '').trim().toUpperCase();
+                inc[pid] = (inc[pid] || 0) + Number(item.Qty || item.qty || 0);
+            });
+        });
+        return inc;
+    }, [pos]);
+
+    // 2.5 예약 및 부족 재고 통합 실시간 계산 (계산형)
+    const reservationResults = useMemo(() => {
+        const reserved = {};
+        const shortage = {};
+        const required = {};
+        const virtualInv = {};
+        
+        inventory.forEach(i => {
+            virtualInv[(i.PartID || '').trim().toUpperCase()] = Number(i.OnHand || 0);
+        });
+        
+        const processRequirement = (parentID, qty) => {
+            const pid = (parentID || '').trim().toUpperCase();
+            if (qty <= 0 || !pid) return;
+
+            required[pid] = (required[pid] || 0) + qty;
+
+            const availableInInv = Number(virtualInv[pid] || 0);
+            const takenFromInv = Math.min(availableInInv, qty);
+            
+            if (takenFromInv > 0) {
+                virtualInv[pid] -= takenFromInv;
+                reserved[pid] = (reserved[pid] || 0) + takenFromInv;
+            }
+            
+            const remainingToProduce = qty - takenFromInv;
+            if (remainingToProduce > 0) {
+                shortage[pid] = (shortage[pid] || 0) + remainingToProduce;
+                
+                const children = bomMap[pid] || [];
+                children.forEach(child => {
+                    const childID = (child.ChildID || '').trim().toUpperCase();
+                    const unitQty = Number(child.Quantity || child.qty || 1);
+                    const totalChildNeeded = unitQty * remainingToProduce;
+                    processRequirement(childID, totalChildNeeded);
+                });
+            }
+        };
+
+        prs.forEach(pr => {
+            const items = pr.Items || [{ PartID: pr.PartID, TargetQty: pr.TargetQty }];
+            items.forEach(item => {
+                processRequirement(item.PartID, Number(item.TargetQty || item.Qty || 0));
+            });
+        });
+
+        return { reservedMap: reserved, shortageMap: shortage, requiredMap: required };
     }, [prs, bomMap, inventory]);
+
+    const reservedMap = reservationResults.reservedMap;
+    const shortageMap = reservationResults.shortageMap;
 
     // 3. 안전 재고 계산 (계산형)
     const safetyMap = useMemo(() => {
@@ -95,25 +157,36 @@ export default function InventoryPage() {
             const available = Math.max(0, onHand - reserved);
             const safety = Number(safetyMap[pid] || part.SafetyStock || 0);
             const isRisk = available < safety;
-
+            const shortage = Number(shortageMap[pid] || 0);
+            const incoming = Number(incomingMap[pid] || 0);
             return {
                 ...part,
                 OnHand: onHand,
                 Reserved: reserved,
                 Available: available,
+                Shortage: shortage,
+                Incoming: incoming,
                 Safety: safety,
                 IsRisk: isRisk,
                 Location: invRecord?.Location || '기본 창고'
             };
         });
-    }, [parts, inventory, reservedMap, safetyMap]);
+    }, [parts, inventory, reservedMap, shortageMap, incomingMap, safetyMap]);
 
     const filteredData = useMemo(() => {
-        return displayData.filter(item => 
+        let list = displayData;
+        if (activeFilter === 'RISK') {
+            list = list.filter(item => item.IsRisk);
+        } else if (activeFilter === 'RESERVED') {
+            list = list.filter(item => item.Reserved > 0 || item.Shortage > 0);
+        } else if (activeFilter === 'INCOMING') {
+            list = list.filter(item => item.Incoming > 0);
+        }
+        return list.filter(item => 
             item.PartID.toLowerCase().includes(searchTerm.toLowerCase()) ||
             item.Name.toLowerCase().includes(searchTerm.toLowerCase())
         );
-    }, [displayData, searchTerm]);
+    }, [displayData, searchTerm, activeFilter]);
 
     const fetchInitialData = () => { /* onSnapshot에 의해 자동 업데이트됨 */ };
 
@@ -141,15 +214,22 @@ export default function InventoryPage() {
             {/* Quick Stats */}
             <div className="grid grid-cols-4 gap-3 shrink-0">
                 {[
-                    { label: '전체 품목', value: parts.length, color: 'text-slate-600', icon: ClipboardList },
-                    { label: '위험 재고 (미달)', value: displayData.filter(d => d.IsRisk).length, color: 'text-rose-600', icon: AlertTriangle },
-                    { label: '예약된 자재', value: Object.keys(reservedMap).length, color: 'text-indigo-600', icon: Clock },
-                    { label: '입고 대기', value: '-', color: 'text-emerald-600', icon: TrendingDown }
+                    { id: 'ALL', label: '전체 품목', value: parts.length, color: 'text-slate-600', icon: ClipboardList },
+                    { id: 'RISK', label: '위험 재고 (미달)', value: displayData.filter(d => d.IsRisk).length, color: 'text-rose-600', icon: AlertTriangle },
+                    { id: 'RESERVED', label: '예약된 재고 (부족 포함)', value: displayData.filter(d => d.Reserved > 0 || d.Shortage > 0).length, subValue: displayData.reduce((acc, cur) => acc + (cur.Shortage || 0), 0) > 0 ? `부족: ${displayData.reduce((acc, cur) => acc + (cur.Shortage || 0), 0).toLocaleString()} EA` : null, color: 'text-indigo-600', icon: Clock },
+                    { id: 'INCOMING', label: '입고 예정 품목', value: displayData.filter(d => d.Incoming > 0).length, color: 'text-blue-600', icon: ShieldAlert }
                 ].map((s, idx) => (
-                    <div key={idx} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center justify-between group hover:border-indigo-200 transition-all">
+                    <div 
+                        key={idx} 
+                        onClick={() => setActiveFilter(s.id)}
+                        className={`bg-white rounded-2xl p-4 border shadow-sm flex items-center justify-between group cursor-pointer transition-all hover:scale-[1.02] ${activeFilter === s.id ? 'border-indigo-600 ring-2 ring-indigo-100' : 'border-slate-200 hover:border-indigo-200'}`}
+                    >
                         <div className="text-left">
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{s.label}</p>
-                            <p className={`text-2xl font-black ${s.color} mt-1`}>{s.value}</p>
+                            <div className="flex items-baseline gap-2 mt-1">
+                                <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
+                                {s.subValue && <span className="text-[10px] font-black text-rose-500 bg-rose-50 border border-rose-100 rounded px-1">{s.subValue}</span>}
+                            </div>
                         </div>
                         <div className={`p-2.5 rounded-xl bg-slate-50 group-hover:bg-white transition-colors ${s.color}`}><s.icon size={20}/></div>
                     </div>
@@ -158,6 +238,17 @@ export default function InventoryPage() {
 
             {/* Main Grid */}
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm flex-1 flex flex-col min-h-0 overflow-hidden text-left relative">
+                {/* Dynamic Header Tab */}
+                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+                    <div className="flex space-x-6">
+                        <span className={`text-sm font-black pb-4 -mb-4 border-b-2 ${activeFilter === 'RISK' || activeFilter === 'RESERVED' ? 'border-rose-600 text-rose-600' : 'border-emerald-600 text-emerald-600'}`}>
+                            {activeFilter === 'RISK' && `위험 재고 (${displayData.filter(d => d.IsRisk).length})`}
+                            {activeFilter === 'RESERVED' && `예약된 재고 (부족 포함) (${displayData.filter(d => d.Reserved > 0 || d.Shortage > 0).length})`}
+                            {activeFilter === 'INCOMING' && `입고 예정 품목 (${displayData.filter(d => d.Incoming > 0).length})`}
+                            {activeFilter === 'ALL' && `전체 재고 (${displayData.length})`}
+                        </span>
+                    </div>
+                </div>
                 <MasterDataGrid
                     data={filteredData}
                     rowKey="PartID"
@@ -172,6 +263,7 @@ export default function InventoryPage() {
                         OnHand: { label: '현재고', default: true },
                         Reserved: { label: '예약재고', default: true },
                         Available: { label: '가용재고', default: true },
+                        Incoming: { label: '입고예정', default: true },
                         Safety: { label: '안전재고', default: true },
                         Location: { label: '창고 위치', default: true }
                     }}
@@ -184,12 +276,25 @@ export default function InventoryPage() {
                         ),
                         Name: (val) => <span className="font-bold text-slate-800">{val}</span>,
                         OnHand: (val) => <span className="font-black text-slate-400">{val?.toLocaleString()}</span>,
-                        Reserved: (val) => <span className="font-black text-amber-500">{val > 0 ? `-${val.toLocaleString()}` : '0'}</span>,
+                        Reserved: (val, row) => {
+                            const shortage = row.Shortage || 0;
+                            return (
+                                <div className="flex flex-col items-end">
+                                    <span className="font-black text-amber-500">{val > 0 ? `-${val.toLocaleString()}` : '0'}</span>
+                                    {shortage > 0 && (
+                                        <span className="text-[10px] font-black text-rose-500 bg-rose-50 border border-rose-100 rounded px-1.5 py-0.5 mt-0.5 animate-pulse">
+                                            부족: ${shortage.toLocaleString()}
+                                        </span>
+                                    )}
+                                </div>
+                            );
+                        },
                         Available: (val, row) => (
                             <span className={`font-black text-lg ${row.IsRisk ? 'text-rose-600 underline decoration-rose-200 underline-offset-4' : 'text-emerald-600'}`}>
                                 {val.toLocaleString()}
                             </span>
                         ),
+                        Incoming: (val) => <span className="font-black text-blue-600">{val > 0 ? `+${val.toLocaleString()}` : '0'}</span>,
                         Safety: (val) => <span className="font-black text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{val.toLocaleString()}</span>,
                         Location: (val) => <div className="flex items-center gap-1.5 text-slate-400 font-bold"><MapPin size={12}/> {val}</div>
                     }}

@@ -9,6 +9,7 @@ import CreateOutsourcingModal from '../components/CreateOutsourcingModal';
 import RFQEmailModal from '../components/RFQEmailModal';
 import ApprovalModal from '../components/ApprovalModal';
 import ExpenseResolutionModal from '../components/ExpenseResolutionModal';
+import { createNotification } from '../services/notificationService';
 
 const OUTSOURCING_STATUS = {
     DRAFT: { label: '의뢰초안', color: 'bg-slate-100 text-slate-500 border-slate-200' },
@@ -156,7 +157,25 @@ export default function OutsourcingPage() {
             {/* Modals */}
             <CreateOutsourcingModal isOpen={isCreateModalOpen} onSave={handleSaveOrder} onClose={() => setIsCreateModalOpen(false)} />
             <RFQEmailModal isOpen={isRFQModalOpen} poData={activeOrder} onClose={() => setIsRFQModalOpen(false)} onSend={(d) => handleStatusUpdate(activeOrder.id, 'RFQ_SENT', { RFQEmail: d })} />
-            <ApprovalModal isOpen={isApprovalModalOpen} poData={activeOrder} onClose={() => setIsApprovalModalOpen(false)} onSubmit={(d) => { const id = `APP-${Date.now()}`; setDoc(doc(db, 'approvals', id), { ...d, id }).then(() => handleStatusUpdate(activeOrder.id, 'APPROVAL_PENDING', { LastApprovalID: id })); setIsApprovalModalOpen(false); }} />
+            <ApprovalModal 
+                isOpen={isApprovalModalOpen} 
+                poData={activeOrder} 
+                onClose={() => setIsApprovalModalOpen(false)} 
+                onSubmit={(d) => { 
+                    const id = `APP-${Date.now()}`; 
+                    setDoc(doc(db, 'approvals', id), { ...d, id }).then(() => {
+                        handleStatusUpdate(activeOrder.id, 'APPROVAL_PENDING', { LastApprovalID: id });
+                        // 결재자에게 알림 발송
+                        createNotification(
+                            d.ApproverID,
+                            '신규 외주 결재 요청',
+                            `[${activeOrder.VendorName}] ${activeOrder.TargetPartName} 외 건에 대한 결재가 요청되었습니다.`,
+                            `/outsourcing`
+                        );
+                    }); 
+                    setIsApprovalModalOpen(false); 
+                }} 
+            />
             <ExpenseResolutionModal isOpen={isExpenseModalOpen} poData={activeOrder} onClose={() => setIsExpenseModalOpen(false)} onSubmit={() => fetchData()} />
         </div>
     );

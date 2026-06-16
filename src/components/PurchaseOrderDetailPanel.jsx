@@ -1,22 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ShoppingCart, Calendar, Truck, DollarSign, PackageCheck, ChevronRight, CheckCircle2, Clock, AlertCircle, FileText, Edit, Mail, ShieldCheck } from 'lucide-react';
-import { updateDoc, doc, writeBatch, serverTimestamp, collection } from '../firebase';
+import { X, ShoppingCart, Calendar, Truck, DollarSign, PackageCheck, ChevronRight, CheckCircle2, Clock, AlertCircle, FileText, Edit, Mail, ShieldCheck, CreditCard, Send, Plus, FileCheck } from 'lucide-react';
+import { updateDoc, doc, writeBatch, serverTimestamp, collection, setDoc, getDoc } from '../firebase';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { qualityService } from '../services/qualityService';
+import { createNotification } from '../services/notificationService';
+import ExpenseResolutionModal from './ExpenseResolutionModal';
+import ApprovalModal from './ApprovalModal';
+import RFQEmailModal from './RFQEmailModal';
+import QuotationUploadModal from './QuotationUploadModal';
+import ApprovalReviewModal from './ApprovalReviewModal';
 
 const PO_STATUS_INFO = {
-    ORDERING: { label: '발주중', color: 'bg-blue-50 text-blue-600 border-blue-200' },
-    WAITING_DELIVERY: { label: '입고대기', color: 'bg-amber-50 text-amber-600 border-amber-200' },
-    WAITING_INSPECTION: { label: '검사대기(QA)', color: 'bg-purple-50 text-purple-600 border-purple-200' },
-    INSPECTION_COMPLETE: { label: '검사완료', color: 'bg-teal-50 text-teal-600 border-teal-200' },
-    RECEIVED: { label: '적재완료', color: 'bg-slate-50 text-slate-600 border-slate-200' }
+    DRAFT: { label: '발주 초안', color: 'bg-slate-100 text-slate-500 border-slate-200' },
+    RFQ_SENT: { label: '견적 대기 중', color: 'bg-indigo-50 text-indigo-600 border-indigo-200' },
+    QUOTED: { label: '견적 완료', color: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
+    APPROVAL_PENDING: { label: '기안서 결재 중', color: 'bg-amber-50 text-amber-600 border-amber-200' },
+    APPROVED: { label: '결재 완료', color: 'bg-rose-50 text-rose-600 border-rose-200' },
+    ORDERING: { label: '발주 요청 (PO)', color: 'bg-blue-50 text-blue-600 border-blue-200' },
+    WAITING_DELIVERY: { label: '입고 대기', color: 'bg-cyan-50 text-cyan-600 border-cyan-200' },
+    WAITING_INSPECTION: { label: '수입 검사 중', color: 'bg-purple-50 text-purple-600 border-purple-200' },
+    INSPECTION_COMPLETE: { label: '검사 완료', color: 'bg-teal-50 text-teal-600 border-teal-200' },
+    RESOLUTION_SUBMITTED: { label: '지출결의 완료', color: 'bg-slate-900 text-white border-slate-900' },
+    RECEIVED: { label: '재고 적재 완료', color: 'bg-slate-50 text-slate-400 border-slate-100' }
 };
 
 const PAYMENT_STATUS_INFO = {
-    PENDING: { label: '결제대기', color: 'bg-amber-50 text-amber-600 border-amber-200' },
-    INVOICED: { label: '청구됨', color: 'bg-blue-50 text-blue-600 border-blue-200' },
-    PAID: { label: '지급완료', color: 'bg-emerald-50 text-emerald-600 border-emerald-200' }
+    PENDING: { label: '결제 대기', color: 'bg-amber-50 text-amber-600 border-amber-200' },
+    INVOICED: { label: '청구됨 (지출결의 필요)', color: 'bg-blue-50 text-blue-600 border-blue-200' },
+    PAID: { label: '지급 완료', color: 'bg-emerald-50 text-emerald-600 border-emerald-200' }
+};
+
+const generatePONumber = () => {
+    const date = new Date();
+    return `PO-${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
 };
 
 export default function PurchaseOrderDetailPanel({ po, isOpen, onClose, onRefresh, onEdit }) {
@@ -26,6 +44,15 @@ export default function PurchaseOrderDetailPanel({ po, isOpen, onClose, onRefres
     const [receiveQtys, setReceiveQtys] = useState({});
     const [memo, setMemo] = useState('');
     const [loading, setLoading] = useState(false);
+    
+    // Modals state
+    const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+    const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
+    const [isRFQModalOpen, setIsRFQModalOpen] = useState(false);
+    const [isQuoteUploadOpen, setIsQuoteUploadOpen] = useState(false);
+    const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+    const [rfqMode, setRfqMode] = useState('RFQ'); // 'RFQ' or 'ORDER'
+    const [activeApproval, setActiveApproval] = useState(null);
 
     useEffect(() => {
         if (po && isOpen) {
@@ -44,6 +71,13 @@ export default function PurchaseOrderDetailPanel({ po, isOpen, onClose, onRefres
                 });
             }
             setReceiveQtys(initialQtys);
+
+            // Fetch approval info if pending
+            if (po.Status === 'APPROVAL_PENDING' && po.LastApprovalID) {
+                getDoc(doc(db, 'approvals', po.LastApprovalID)).then(snap => {
+                    if (snap.exists()) setActiveApproval({ id: snap.id, ...snap.data() });
+                });
+            }
         }
     }, [po, isOpen]);
 
@@ -61,6 +95,31 @@ export default function PurchaseOrderDetailPanel({ po, isOpen, onClose, onRefres
     const totalQty = items.reduce((sum, item) => sum + item.Qty, 0);
     const totalReceived = items.reduce((sum, item) => sum + (item.ReceivedQty || 0), 0);
     const totalRemaining = totalQty - totalReceived;
+
+    const handleUpdatePOStatus = async (status, extra = {}) => {
+        setLoading(true);
+        try {
+            let finalExtra = { ...extra };
+            // When moving to ORDERING, generate PONumber if it's missing or '-'
+            if (status === 'ORDERING' && (!po.PONumber || po.PONumber === '-')) {
+                finalExtra.PONumber = generatePONumber();
+            }
+
+            await updateDoc(doc(db, 'purchasing', po.id), { 
+                Status: status, 
+                ...finalExtra, 
+                UpdatedAt: serverTimestamp(),
+                UpdatedBy: userProfile?.uid
+            });
+            
+            if (onRefresh) await onRefresh();
+        } catch (error) {
+            console.error("Status update failed:", error);
+            alert("상태 변경 중 오류가 발생했습니다.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleReceiveSubmit = async (e) => {
         e.preventDefault();
@@ -171,15 +230,14 @@ export default function PurchaseOrderDetailPanel({ po, isOpen, onClose, onRefres
     const handleUpdateStatus = async () => {
         if (po.Status === 'ORDERING') {
             if (!window.confirm('발주를 확정하고 입고 대기 상태로 변경하시겠습니까?')) return;
-            await updateDoc(doc(db, 'purchasing', po.id), { Status: 'WAITING_DELIVERY' });
-            if (onRefresh) await onRefresh();
+            await handleUpdatePOStatus('WAITING_DELIVERY');
         }
     };
 
     const statusInfo = PO_STATUS_INFO[po.Status] || PO_STATUS_INFO.RECEIVED;
     const paymentInfo = PAYMENT_STATUS_INFO[po.PaymentStatus] || PAYMENT_STATUS_INFO.PENDING;
 
-    const handleSendEmail = () => {
+    const handleSendEmailDirect = () => {
         const subject = encodeURIComponent(`[발주서] ${po.PONumber} - IR Assistant (주)`);
         
         let itemsText = items.map((it, idx) => {
@@ -216,7 +274,7 @@ IR Assistant (주) 드림
         <div className="relative z-[9999]">
             <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-[140] transition-opacity" onClick={onClose} />
             <div className="fixed inset-y-0 right-0 w-full md:w-[700px] bg-slate-50 shadow-2xl z-[150] transform transition-transform duration-300 ease-in-out flex flex-col border-l border-slate-200">
-                <div className="bg-white px-6 py-5 border-b border-slate-200 flex justify-between items-start shrink-0 relative overflow-hidden">
+                <div className="bg-white px-6 py-4 border-b border-slate-200 flex justify-between items-start shrink-0 relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
                     <div className="relative z-10">
                         <div className="flex items-center gap-3 mb-2">
@@ -228,11 +286,14 @@ IR Assistant (주) 드림
                                 {paymentInfo.label}
                             </span>
                         </div>
-                        <h2 className="text-2xl font-black text-slate-900 tracking-tight">{po.PONumber}</h2>
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-2xl font-black text-slate-900 tracking-tight">{po.PONumber}</h2>
+                            {po.PRNumber && <span className="text-[10px] font-mono font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded tracking-tighter" title="발주 요청 번호">{po.PRNumber}</span>}
+                        </div>
                         <p className="text-sm text-slate-500 font-bold mt-1">발주일: {po.CreatedAt?.toDate ? po.CreatedAt.toDate().toLocaleDateString() : '-'}</p>
                     </div>
                     <div className="flex items-center gap-2 relative z-10">
-                        {po.Status === 'ORDERING' && (
+                        {(po.Status === 'DRAFT' || po.Status === 'ORDERING') && (
                             <button onClick={() => onEdit && onEdit(po)} className="p-2 text-indigo-500 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-colors" title="발주 정보 수정">
                                 <Edit size={20} />
                             </button>
@@ -243,7 +304,37 @@ IR Assistant (주) 드림
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                    {/* Shortage Reservation Info (Added) */}
+                    {po.ShortageSources && Object.keys(po.ShortageSources).length > 0 && (
+                        <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 shadow-sm space-y-3">
+                            <h3 className="text-xs font-black text-rose-700 flex items-center gap-2">
+                                <AlertCircle size={14}/> 부족 예약 연동 정보 (관련 주문서)
+                            </h3>
+                            <div className="grid grid-cols-1 gap-2">
+                                {Object.entries(po.ShortageSources).map(([partID, sources]) => (
+                                    <div key={partID} className="bg-white/60 rounded-xl p-3 border border-rose-200/50">
+                                        <p className="text-[10px] font-black text-rose-500 mb-2 uppercase tracking-wider underline decoration-rose-200 underline-offset-4">대상 품목: {partID}</p>
+                                        <div className="space-y-2">
+                                            {sources.map((src, idx) => (
+                                                <div key={idx} className="flex flex-col md:flex-row md:items-center justify-between gap-2 text-[11px] border-b border-rose-100 pb-2 last:border-0 last:pb-0">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="font-mono font-black text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded tracking-tighter">{src.PRNumber}</span>
+                                                        <span className="font-bold text-slate-800">{src.TopPartName}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-4 text-slate-500">
+                                                        <span className="flex items-center gap-1 font-bold"><Calendar size={12} className="text-rose-400"/> {src.DueDate}</span>
+                                                        <span className="font-black text-rose-600 bg-rose-100 px-2 py-0.5 rounded-full">부족: {src.ShortQty} EA</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Basic Info */}
                     <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between gap-4">
                         <div>
@@ -292,16 +383,15 @@ IR Assistant (주) 드림
                                                 <td className="px-4 py-3 text-xs font-medium text-slate-500 text-right">{item.UnitPrice.toLocaleString()}</td>
                                                 <td className="px-4 py-3 text-xs font-black text-indigo-700 text-right">{(item.Qty * item.UnitPrice).toLocaleString()}</td>
                                             </tr>
-                                            {item.Schedules && item.Schedules.length > 0 && (
+                                            {item.Schedules && item.Schedules.length > 1 && (
                                                 <tr className="bg-slate-50/30">
                                                     <td colSpan="6" className="px-4 py-2 border-b border-slate-100">
                                                         <div className="flex flex-wrap gap-2">
+                                                            <span className="text-[10px] font-black text-slate-400 mr-1 self-center">납기 스케줄:</span>
                                                             {item.Schedules.map((s, idx) => (
-                                                                <div key={idx} className="flex items-center gap-2 bg-white px-2 py-1 rounded-lg border border-slate-200 text-[10px] font-bold">
-                                                                    <span className="text-slate-400">{idx+1}차:</span>
-                                                                    <span className="text-slate-700">{s.date}</span>
+                                                                <div key={idx} className="flex items-center gap-2 bg-white px-2 py-0.5 rounded border border-slate-200 text-[9px] font-bold shadow-sm">
                                                                     <span className="text-indigo-600">{s.qty} EA</span>
-                                                                    {s.shippedQty > 0 && <span className="text-emerald-500 ml-1">✓ {s.shippedQty}</span>}
+                                                                    <span className="text-slate-500">({s.date})</span>
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -322,11 +412,21 @@ IR Assistant (주) 드림
                                 <h3 className="text-sm font-black text-slate-900 mb-2 flex items-center gap-2"><DollarSign size={16} className="text-emerald-500"/> 총 발주 금액</h3>
                                 <p className="text-2xl font-black text-emerald-600">₩ {po.TotalPrice?.toLocaleString() || 0}</p>
                             </div>
-                            <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
-                                <span className="text-xs text-slate-400 font-bold">결제 상태</span>
-                                <button onClick={handleTogglePayment} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${po.PaymentStatus === 'PAID' ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'}`}>
-                                    {paymentInfo.label} 변경 ➔
-                                </button>
+                            <div className="mt-4 pt-4 border-t border-slate-100 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-slate-400 font-bold">결제 상태</span>
+                                    <button onClick={handleTogglePayment} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${po.PaymentStatus === 'PAID' ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'}`}>
+                                        {paymentInfo.label} 변경 ➔
+                                    </button>
+                                </div>
+                                {po.PaymentStatus === 'INVOICED' && (
+                                    <button 
+                                        onClick={() => setIsExpenseModalOpen(true)}
+                                        className="w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-black hover:bg-blue-700 shadow-md flex items-center justify-center gap-2"
+                                    >
+                                        <CreditCard size={14}/> 지출결의서 작성하기
+                                    </button>
+                                )}
                             </div>
                         </div>
 
@@ -349,23 +449,132 @@ IR Assistant (주) 드림
                         </div>
                     </div>
 
-                    {/* Actions */}
-                    {po.Status === 'ORDERING' && (
-                        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 text-center shadow-sm">
-                            <p className="text-sm font-bold text-indigo-800 mb-4">발주서 전송 및 확정 절차를 진행해주세요.</p>
-                            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                                <button onClick={handleSendEmail} className="bg-white text-indigo-600 border border-indigo-200 px-6 py-2.5 rounded-xl text-sm font-black hover:bg-indigo-50 transition-all shadow-sm flex items-center justify-center gap-2">
-                                    <Mail size={16} /> 공급사로 발주서(이메일) 전송
-                                </button>
-                                <button onClick={handleUpdateStatus} className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl text-sm font-black hover:bg-indigo-700 transition-all shadow-md flex items-center justify-center gap-2">
-                                    <CheckCircle2 size={16} /> 발주 확정 및 입고 대기 전환
+                    {/* Actions Phase-specific */}
+                    <div className="space-y-4">
+                        {po.Status === 'DRAFT' && (
+                            <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 text-center shadow-sm">
+                                <p className="text-sm font-bold text-indigo-800 mb-4">공급사에 견적을 요청하여 단가를 확정해야 합니다.</p>
+                                <button 
+                                    onClick={() => { setRfqMode('RFQ'); setIsRFQModalOpen(true); }}
+                                    className="w-full bg-indigo-600 text-white px-6 py-3 rounded-xl text-sm font-black hover:bg-indigo-700 transition-all shadow-md flex items-center justify-center gap-2"
+                                >
+                                    <Send size={18}/> 견적 요청 (RFQ) 이메일 발송하기
                                 </button>
                             </div>
-                        </div>
-                    )}
+                        )}
+
+                        {po.Status === 'RFQ_SENT' && (
+                            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 text-center shadow-sm">
+                                <p className="text-sm font-bold text-emerald-800 mb-4">공급사로부터 회신받은 견적 단가를 등록하고 파일을 첨부해주세요.</p>
+                                <button 
+                                    onClick={() => setIsQuoteUploadOpen(true)}
+                                    className="w-full bg-emerald-600 text-white px-6 py-3 rounded-xl text-sm font-black hover:bg-emerald-700 transition-all shadow-md flex items-center justify-center gap-2"
+                                >
+                                    <Plus size={18}/> 공급사 견적서 등록 및 단가 확정
+                                </button>
+                            </div>
+                        )}
+
+                        {po.Status === 'QUOTED' && (
+                            <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 text-center shadow-sm">
+                                <p className="text-sm font-bold text-amber-800 mb-4">견적 단가가 확정되었습니다. 내부 결재를 위한 기안서를 작성해주세요.</p>
+                                <button 
+                                    onClick={() => setIsApprovalModalOpen(true)}
+                                    className="w-full bg-amber-500 text-white px-6 py-3 rounded-xl text-sm font-black hover:bg-amber-600 transition-all shadow-md flex items-center justify-center gap-2"
+                                >
+                                    <FileText size={18}/> 내부 결재 기안서 작성 및 상신
+                                </button>
+                            </div>
+                        )}
+
+                        {po.Status === 'APPROVAL_PENDING' && (
+                            <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 text-center shadow-sm">
+                                <ShieldCheck size={32} className="mx-auto text-amber-500 mb-2" />
+                                <p className="text-sm font-bold text-amber-800 mb-2">현재 내부 결재 진행 중입니다.</p>
+                                <p className="text-xs text-amber-600 mb-4 font-black">결재권자: {activeApproval?.ApproverName || '확인 중...'}</p>
+                                
+                                {userProfile?.uid === activeApproval?.ApproverID ? (
+                                    <button 
+                                        onClick={() => setIsReviewModalOpen(true)}
+                                        className="w-full bg-amber-500 text-white px-6 py-3 rounded-xl text-sm font-black hover:bg-amber-600 transition-all shadow-md flex items-center justify-center gap-2 animate-bounce"
+                                    >
+                                        <FileCheck size={18}/> 기안 문서 검토 및 승인하기
+                                    </button>
+                                ) : (
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight italic">Waiting for manager's action...</p>
+                                )}
+                            </div>
+                        )}
+
+                        {po.Status === 'APPROVED' && (
+                            <div className="bg-rose-50 border border-rose-100 rounded-2xl p-5 text-center shadow-sm">
+                                <p className="text-sm font-bold text-rose-800 mb-4">내부 결재가 완료되었습니다. 공급사에 최종 발주서를 발행해주세요.</p>
+                                <button 
+                                    onClick={() => { setRfqMode('ORDER'); setIsRFQModalOpen(true); }}
+                                    className="w-full bg-rose-600 text-white px-6 py-3 rounded-xl text-sm font-black hover:bg-rose-700 transition-all shadow-md flex items-center justify-center gap-2"
+                                >
+                                    <Mail size={18}/> 최종 발주 발행 (Email 전송)
+                                </button>
+                            </div>
+                        )}
+
+                        {po.Status === 'ORDERING' && (
+                            <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 text-center shadow-sm">
+                                <p className="text-sm font-bold text-indigo-800 mb-4">발주서 전송 및 확정 절차를 진행해주세요.</p>
+                                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                                    <button onClick={handleSendEmailDirect} className="flex-1 bg-white text-indigo-600 border border-indigo-200 px-6 py-2.5 rounded-xl text-sm font-black hover:bg-indigo-50 transition-all shadow-sm flex items-center justify-center gap-2">
+                                        <Mail size={16} /> 발주서 재전송 (이메일)
+                                    </button>
+                                    <button onClick={handleUpdateStatus} className="flex-1 bg-indigo-600 text-white px-6 py-2.5 rounded-xl text-sm font-black hover:bg-indigo-700 transition-all shadow-md flex items-center justify-center gap-2">
+                                        <CheckCircle2 size={16} /> 발주 확정 및 입고 대기 전환
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {po.Status === 'WAITING_DELIVERY' && (
+                            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 text-center shadow-sm mb-4">
+                                <p className="text-sm font-bold text-emerald-800 mb-4">자재가 물류센터에 도착하였습니까? 즉시 품질검사(QA)를 요청할 수 있습니다.</p>
+                                <div className="flex justify-center">
+                                    <button 
+                                        onClick={async () => {
+                                            if (!window.confirm('입고 처리를 완료하고 품질검사(QA) 대기열로 이송하시겠습니까?')) return;
+                                            setLoading(true);
+                                            try {
+                                                const res = await qualityService.requestInspection({
+                                                    Type: 'INCOMING',
+                                                    RefPOID: po.id,
+                                                    PONumber: po.PONumber,
+                                                    PartID: items[0]?.PartID || '',
+                                                    PartName: po.PartName,
+                                                    Qty: po.Qty,
+                                                    VendorID: po.VendorID || '',
+                                                    VendorName: po.VendorName
+                                                });
+                                                if (res.success) {
+                                                    await handleUpdatePOStatus('WAITING_INSPECTION');
+                                                    alert('성공적으로 입고 완료 처리되었으며 품질 검사 대기열로 이송되었습니다.');
+                                                } else {
+                                                    alert('QA 검사 요청 중 오류가 발생했습니다.');
+                                                }
+                                            } catch (err) {
+                                                console.error(err);
+                                            } finally {
+                                                setLoading(false);
+                                            }
+                                        }}
+                                        disabled={loading}
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl text-sm font-black transition-all shadow-md flex items-center justify-center gap-2"
+                                    >
+                                        <Truck size={16}/> 입고 완료 및 입고검사 요청
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
 
                     {po.Status === 'WAITING_DELIVERY' && totalRemaining > 0 && (
-                        <div className="bg-white rounded-2xl border-2 border-indigo-100 shadow-sm overflow-hidden">
+                        <div className="bg-white rounded-2xl border-2 border-indigo-100 shadow-sm overflow-hidden mt-6">
                             <div className="bg-indigo-50/50 px-5 py-3 border-b border-indigo-100">
                                 <h3 className="text-sm font-black text-indigo-900 flex items-center gap-2">
                                     <Truck size={16} className="text-indigo-500"/> 
@@ -439,6 +648,65 @@ IR Assistant (주) 드림
                         </div>
                     )}
                 </div>
+
+                {/* Modals integrated into detail panel for easy access */}
+                <ExpenseResolutionModal 
+                    isOpen={isExpenseModalOpen} 
+                    poData={po} 
+                    onClose={() => setIsExpenseModalOpen(false)} 
+                    onSubmit={() => { setIsExpenseModalOpen(false); if (onRefresh) onRefresh(); }} 
+                />
+                
+                <RFQEmailModal 
+                    isOpen={isRFQModalOpen} 
+                    poData={po} 
+                    mode={rfqMode}
+                    onClose={() => setIsRFQModalOpen(false)} 
+                    onSend={(d) => {
+                        if (rfqMode === 'RFQ') {
+                            handleUpdatePOStatus('RFQ_SENT', { RFQEmail: d });
+                        } else {
+                            handleUpdatePOStatus('ORDERING', { OrderEmail: d, OrderedAt: new Date().toISOString() });
+                        }
+                        setIsRFQModalOpen(false);
+                    }} 
+                />
+
+                <QuotationUploadModal 
+                    isOpen={isQuoteUploadOpen} 
+                    poData={po} 
+                    onClose={() => setIsQuoteUploadOpen(false)} 
+                    onSave={(d) => handleUpdatePOStatus('QUOTED', { ...d })} 
+                />
+
+                <ApprovalModal 
+                    isOpen={isApprovalModalOpen} 
+                    poData={po} 
+                    onClose={() => setIsApprovalModalOpen(false)} 
+                    onSubmit={(d) => { 
+                        const id = `APP-${Date.now()}`; 
+                        setDoc(doc(db, 'approvals', id), { ...d, id }).then(() => {
+                            handleUpdatePOStatus('APPROVAL_PENDING', { LastApprovalID: id });
+                            createNotification(
+                                d.ApproverID,
+                                '신규 발주 결재 요청',
+                                `[${po.VendorName}] ${po.PartName} 외 건에 대한 결재가 요청되었습니다.`,
+                                `/purchasing`
+                            );
+                        }); 
+                        setIsApprovalModalOpen(false); 
+                    }} 
+                />
+
+                <ApprovalReviewModal 
+                    isOpen={isReviewModalOpen} 
+                    approvalData={activeApproval} 
+                    onClose={() => setIsReviewModalOpen(false)} 
+                    onRefresh={() => {
+                        setIsReviewModalOpen(false);
+                        if (onRefresh) onRefresh();
+                    }} 
+                />
             </div>
         </div>
     );

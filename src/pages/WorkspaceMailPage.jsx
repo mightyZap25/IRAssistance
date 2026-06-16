@@ -477,8 +477,8 @@ export default function WorkspaceMailPage() {
                                             <div className="flex items-center gap-4">
                                                 <div className="w-12 h-12 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-500 font-black text-xs border border-rose-100">PDF</div>
                                                 <div className="min-w-0">
-                                                    <p className="text-sm font-black text-slate-800 truncate">QUOTATION_IR-S100.pdf</p>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">1.2 MB</p>
+                                                    <p className="text-sm font-black text-slate-800 truncate">{selectedEmail.attachmentName || 'QUOTATION_IR-S100.pdf'}</p>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{selectedEmail.attachmentSize || '1.2 MB'}</p>
                                                 </div>
                                             </div>
                                             <div className="p-3 bg-slate-50 group-hover:bg-indigo-600 group-hover:text-white rounded-xl transition-all">

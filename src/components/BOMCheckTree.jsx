@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronRight, ChevronDown, Layers, Box, Cpu, Settings, Circle, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { ChevronRight, ChevronDown, Layers, Box, Cpu, Settings, Circle, AlertCircle, CheckCircle2, ShieldAlert } from 'lucide-react';
 
 // Helper to determine icon/color based on category/partID
 function getCategoryStyle(part) {
@@ -35,7 +35,7 @@ function isNodeReady(node, multiplier, inventoryMap) {
     return false;
 }
 
-function BOMCheckTreeNode({ node, level = 0, multiplier = 1, inventoryMap = {}, inboundMap = {}, onShortageClick }) {
+function BOMCheckTreeNode({ node, level = 0, multiplier = 1, inventoryMap = {}, inboundMap = {}, globalShortages = {}, onShortageClick }) {
     const [expanded, setExpanded] = useState(true);
 
     const hasChildren = node.Children && node.Children.length > 0;
@@ -44,22 +44,26 @@ function BOMCheckTreeNode({ node, level = 0, multiplier = 1, inventoryMap = {}, 
 
     const unitQty = Number(node.Quantity || 1);
     const setQty = multiplier;
-    const requiredQty = unitQty * setQty;
-    const currentStock = Number(inventoryMap[node.PartID] || 0);
+    const requiredQty = node.RequiredQty !== undefined ? node.RequiredQty : (unitQty * setQty);
+    const currentStock = node.AvailableStock !== undefined ? node.AvailableStock : Number(inventoryMap[node.PartID] || 0);
     const isActuallyEnough = currentStock >= requiredQty;
     const shortage = requiredQty - currentStock;
 
     const remainingNeeded = Math.max(0, requiredQty - currentStock);
     const isReadyToBuild = !isActuallyEnough && hasChildren && node.Children.every(child => isNodeReady(child, remainingNeeded, inventoryMap));
 
+    // 전사 누적 부족분 (Global Cumulative Shortage)
+    const pid = (node.PartID || '').toUpperCase();
+    const globalShort = globalShortages[pid] || 0;
+
     // Final Label logic
     let statusLabel = { text: '부족', color: 'text-red-500', icon: AlertCircle, bg: 'bg-red-50/10' };
     if (isRoot) {
-        statusLabel = { text: '생산 대상', color: 'text-blue-500', icon: Box, bg: 'bg-blue-50/10' };
+        statusLabel = { text: '생산 대상', color: 'text-blue-500', icon: Box, bg: 'bg-slate-50/30' };
     } else if (isActuallyEnough) {
         statusLabel = { text: 'OK', color: 'text-emerald-600', icon: CheckCircle2, bg: '' };
     } else if (isReadyToBuild) {
-        statusLabel = { text: '제작 필요', color: 'text-blue-600', icon: Layers, bg: 'bg-blue-50/10' };
+        statusLabel = { text: '제작 가능', color: 'text-blue-600', icon: Layers, bg: 'bg-blue-50/10' };
     }
 
     const isInboundAvailable = !isActuallyEnough && !isReadyToBuild;
@@ -76,7 +80,7 @@ function BOMCheckTreeNode({ node, level = 0, multiplier = 1, inventoryMap = {}, 
         <div className="select-none">
             <div
                 onClick={handleClick}
-                className={`flex items-center py-1.5 px-2 border-b border-slate-50 transition-colors ${isRoot ? 'bg-slate-50/30' : ''} ${statusLabel.bg} ${isClickable ? 'cursor-pointer hover:bg-red-100/50' : 'hover:bg-slate-50'}`}
+                className={`flex items-center py-2 px-2 border-b border-slate-50 transition-colors ${isRoot ? 'bg-slate-50/50' : ''} ${statusLabel.bg} ${isClickable ? 'cursor-pointer hover:bg-red-100/50' : 'hover:bg-slate-50'}`}
                 style={{ paddingLeft: `${level * 16 + 8}px` }}
             >
                 {/* Toggle & Badge */}
@@ -95,7 +99,7 @@ function BOMCheckTreeNode({ node, level = 0, multiplier = 1, inventoryMap = {}, 
                     </span>
                 </div>
 
-                {/* Info (Expanded to take more space) */}
+                {/* Info */}
                 <div className="flex-1 flex flex-col justify-center overflow-hidden min-w-0 pr-4">
                     <div className="flex items-center gap-1.5 overflow-hidden">
                         <span className={`text-[11px] font-black truncate ${style.char === 'P' ? 'text-orange-600' : 'text-slate-700'}`}>
@@ -103,15 +107,25 @@ function BOMCheckTreeNode({ node, level = 0, multiplier = 1, inventoryMap = {}, 
                         </span>
                         <span className="text-[8px] font-mono text-slate-400 bg-slate-100 px-1 py-0.5 rounded shrink-0">[{node.PartID}]</span>
                     </div>
-                    {inboundInfo && (
-                        <div className="flex items-center mt-0.5 gap-1">
-                            <span className="text-[7px] font-black text-blue-600 bg-blue-50 px-1 py-0.5 rounded whitespace-nowrap border border-blue-100 uppercase">IN: {inboundInfo.date}</span>
-                            <span className="text-[7px] font-black text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded whitespace-nowrap border border-emerald-100">{inboundInfo.qty?.toLocaleString()} EA</span>
-                        </div>
-                    )}
+
+                    <div className="flex items-center mt-1 gap-1.5 h-3">
+                        {inboundInfo && (
+                            <div className="flex items-center gap-1">
+                                <span className="text-[7px] font-black text-blue-600 bg-blue-50 px-1 py-0.5 rounded whitespace-nowrap border border-blue-100 uppercase">IN: {inboundInfo.date}</span>
+                                <span className="text-[7px] font-black text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded whitespace-nowrap border border-emerald-100">{inboundInfo.qty?.toLocaleString()} EA</span>
+                            </div>
+                        )}
+                        {/* 전사 누적 부족분 표시 (글로벌 뱃지) */}
+                        {globalShort > 0 && (
+                            <div className="flex items-center gap-1 bg-rose-600 text-white px-1.5 py-0.5 rounded animate-pulse shadow-sm">
+                                <ShieldAlert size={8} />
+                                <span className="text-[7px] font-black uppercase whitespace-nowrap">전체 부족: {globalShort.toLocaleString()} EA</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
-                {/* Columns (Tighter and Pushed to extreme right) */}
+                {/* Columns */}
                 <div className="flex items-center gap-2.5 shrink-0 ml-auto border-l border-slate-50 pl-3">
                     <div className="text-right w-11">
                         <p className="text-[7px] font-black text-slate-300 uppercase tracking-tighter leading-tight mb-0.5">Unit</p>
@@ -146,6 +160,7 @@ function BOMCheckTreeNode({ node, level = 0, multiplier = 1, inventoryMap = {}, 
                             multiplier={remainingNeeded}
                             inventoryMap={inventoryMap}
                             inboundMap={inboundMap}
+                            globalShortages={globalShortages}
                             onShortageClick={onShortageClick}
                         />
                     ))}
@@ -155,18 +170,19 @@ function BOMCheckTreeNode({ node, level = 0, multiplier = 1, inventoryMap = {}, 
     );
 }
 
-export default function BOMCheckTree({ data, targetQty, inventoryMap, inboundMap, onShortageClick, className = "" }) {
+export default function BOMCheckTree({ data, targetQty, inventoryMap, inboundMap, globalShortages = {}, onShortageClick, className = "" }) {
     if (!data) return <div className="p-8 text-center text-slate-400 font-bold italic">BOM 데이터가 없습니다.</div>;
 
     return (
         <div className={`flex flex-col min-h-0 ${className}`}>
-            <div className="flex-1 bg-white rounded-2xl border border-slate-100 overflow-hidden">
+            <div className="flex-1 bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
                 <BOMCheckTreeNode
                     node={data}
                     level={0}
                     multiplier={targetQty}
                     inventoryMap={inventoryMap}
                     inboundMap={inboundMap}
+                    globalShortages={globalShortages}
                     onShortageClick={onShortageClick}
                 />
             </div>
