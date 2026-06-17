@@ -11,6 +11,88 @@ export default function SettingsPage() {
     const [syncLoading, setSyncLoading] = useState(false);
     const [syncResult, setSyncResult] = useState(null);
 
+    // Auto Update States
+    const [currentVersion, setCurrentVersion] = useState('0.0.0');
+    const [updateStatus, setUpdateStatus] = useState('idle'); // 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
+    const [downloadPercent, setDownloadPercent] = useState(0);
+    const [updateInfo, setUpdateInfo] = useState(null);
+    const [updateError, setUpdateError] = useState(null);
+
+    React.useEffect(() => {
+        if (window.electronAPI) {
+            // Get current version
+            window.electronAPI.getAppVersion().then(version => {
+                setCurrentVersion(version);
+            }).catch(err => console.error("Failed to get app version:", err));
+
+            // Register IPC message listener
+            const unsubscribe = window.electronAPI.onUpdateMessage((data) => {
+                setUpdateStatus(data.status);
+                if (data.status === 'downloading') {
+                    setDownloadPercent(data.percent || 0);
+                } else if (data.status === 'available') {
+                    setUpdateInfo(data.info);
+                } else if (data.status === 'downloaded') {
+                    setUpdateInfo(data.info);
+                    setDownloadPercent(100);
+                } else if (data.status === 'error') {
+                    setUpdateError(data.error);
+                }
+            });
+
+            return () => {
+                if (unsubscribe) unsubscribe();
+            };
+        }
+    }, []);
+
+    const handleCheckForUpdates = () => {
+        setUpdateStatus('checking');
+        setUpdateError(null);
+        setDownloadPercent(0);
+        if (window.electronAPI) {
+            window.electronAPI.checkForUpdates();
+        } else {
+            // Mocking for browser/demo mode
+            setTimeout(() => {
+                setUpdateStatus('available');
+                setUpdateInfo({
+                    version: '1.0.1',
+                    releaseDate: new Date().toISOString(),
+                    releaseNotes: '이것은 브라우저 데모 환경의 가짜 업데이트 정보입니다.'
+                });
+            }, 1000);
+        }
+    };
+
+    const handleStartDownload = () => {
+        setUpdateStatus('downloading');
+        setDownloadPercent(0);
+        if (window.electronAPI) {
+            window.electronAPI.startDownload();
+        } else {
+            // Mocking for browser/demo mode
+            let percent = 0;
+            const timer = setInterval(() => {
+                percent += 20;
+                setDownloadPercent(percent);
+                if (percent >= 100) {
+                    clearInterval(timer);
+                    setUpdateStatus('downloaded');
+                }
+            }, 500);
+        }
+    };
+
+    const handleRestartApp = () => {
+        if (window.electronAPI) {
+            window.electronAPI.restartApp();
+        } else {
+            alert('앱 재시작을 수행합니다 (브라우저 모드이므로 페이지가 새로고침됩니다).');
+            window.location.reload();
+        }
+    };
+
     const [emailSettings, setEmailSettings] = useState({
         imapHost: 'imap.gmail.com',
         imapPort: '993',
@@ -259,6 +341,9 @@ export default function SettingsPage() {
                         </button>
                         <button onClick={() => setActiveTab('sync')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-bold ${activeTab === 'sync' ? 'bg-teal-50 text-teal-700 border border-teal-100' : 'text-slate-600 hover:bg-slate-50'}`}>
                             <RefreshCw size={18} /> 공급사/제조사 동기화
+                        </button>
+                        <button onClick={() => setActiveTab('update')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-bold ${activeTab === 'update' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'text-slate-600 hover:bg-slate-50'}`}>
+                            <RefreshCw size={18} /> 시스템 자동 업데이트
                         </button>
                     </div>
 
@@ -650,6 +735,139 @@ export default function SettingsPage() {
                                     <p>• 신규 Part 또는 BOM 등록/수정 시 자동으로 실행됩니다.</p>
                                     <p>• 이 버튼은 기존에 이미 저장된 부품 데이터에서 누락된 항목을 <strong>한 번에 정리</strong>할 때 사용합니다.</p>
                                     <p>• 자동 등록된 항목은 공급사/제조사 관리 페이지에서 추가 정보(주소, 연락처 등)를 입력할 수 있습니다.</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'update' && (
+                            <div className="max-w-2xl animate-fade-in text-slate-800">
+                                <h2 className="text-lg font-black text-slate-900 mb-2">시스템 자동 업데이트 (GitHub Releases)</h2>
+                                <p className="text-sm text-slate-500 font-medium mb-6">
+                                    GitHub Releases를 연동하여 IR Assistant ERP 프로그램의 최신 버전을 검사하고 자동으로 설치합니다.
+                                </p>
+
+                                <div className="border border-slate-200 rounded-2xl p-6 bg-slate-50 space-y-6 shadow-sm">
+                                    {/* 현재 버전 & 상태 */}
+                                    <div className="flex justify-between items-center pb-4 border-b border-slate-200">
+                                        <div>
+                                            <span className="text-xs font-black text-slate-400 block">현재 버전 (Current Version)</span>
+                                            <span className="text-lg font-bold text-slate-700">v{currentVersion}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-xs font-black text-slate-400 block text-right">상태 (Status)</span>
+                                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-black mt-1 ${
+                                                updateStatus === 'idle' ? 'bg-slate-200 text-slate-700' :
+                                                updateStatus === 'checking' ? 'bg-amber-100 text-amber-800' :
+                                                updateStatus === 'available' ? 'bg-blue-100 text-blue-800' :
+                                                updateStatus === 'not-available' ? 'bg-emerald-100 text-emerald-800' :
+                                                updateStatus === 'downloading' ? 'bg-indigo-100 text-indigo-800' :
+                                                updateStatus === 'downloaded' ? 'bg-teal-100 text-teal-800' :
+                                                'bg-rose-100 text-rose-800'
+                                            }`}>
+                                                {updateStatus === 'idle' && '대기 중'}
+                                                {updateStatus === 'checking' && '업데이트 확인 중...'}
+                                                {updateStatus === 'available' && '새 업데이트 발견!'}
+                                                {updateStatus === 'not-available' && '최신 버전 사용 중'}
+                                                {updateStatus === 'downloading' && '다운로드 중...'}
+                                                {updateStatus === 'downloaded' && '다운로드 완료 (설치 대기)'}
+                                                {updateStatus === 'error' && '에러 발생'}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* 상세 영역 */}
+                                    {updateStatus === 'checking' && (
+                                        <div className="flex items-center gap-3 py-2 text-slate-600 font-bold">
+                                            <RefreshCw size={20} className="animate-spin text-indigo-500" />
+                                            <span>새로운 버전이 있는지 GitHub에서 검색하는 중입니다...</span>
+                                        </div>
+                                    )}
+
+                                    {updateStatus === 'not-available' && (
+                                        <div className="py-2 text-emerald-700 font-bold">
+                                            ✓ 현재 사용하고 있는 프로그램이 최신 버전입니다. 추가 조치가 필요하지 않습니다.
+                                        </div>
+                                    )}
+
+                                    {updateStatus === 'available' && updateInfo && (
+                                        <div className="space-y-3 p-4 bg-blue-50/50 border border-blue-100 rounded-xl">
+                                            <h3 className="text-sm font-black text-blue-800">
+                                                새로운 버전(v{updateInfo.version})을 다운로드할 수 있습니다!
+                                            </h3>
+                                            {updateInfo.releaseNotes && (
+                                                <div className="text-xs text-blue-600 font-medium">
+                                                    <strong className="block mb-1">업데이트 노트:</strong>
+                                                    <p className="whitespace-pre-wrap bg-white p-2.5 rounded-lg border border-blue-100/60 mt-1 max-h-40 overflow-y-auto">{updateInfo.releaseNotes}</p>
+                                                </div>
+                                            )}
+                                            <button
+                                                onClick={handleStartDownload}
+                                                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-2.5 px-4 rounded-xl text-sm transition-all mt-2 shadow-sm"
+                                            >
+                                                업데이트 다운로드 시작
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {updateStatus === 'downloading' && (
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between text-xs font-black text-slate-500">
+                                                <span>업데이트 파일 다운로드 중...</span>
+                                                <span>{Math.round(downloadPercent)}%</span>
+                                            </div>
+                                            <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                                                <div
+                                                    className="bg-indigo-600 h-full transition-all duration-300"
+                                                    style={{ width: `${downloadPercent}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {updateStatus === 'downloaded' && (
+                                        <div className="space-y-4 p-4 bg-teal-50 border border-teal-100 rounded-xl">
+                                            <h3 className="text-sm font-black text-teal-800">
+                                                업데이트 파일 다운로드가 완료되었습니다.
+                                            </h3>
+                                            <p className="text-xs text-teal-600 font-medium">
+                                                프로그램을 재시작하면 새 버전(v{updateInfo?.version || ''})의 설치가 진행됩니다. 지금 재시작하시겠습니까?
+                                            </p>
+                                            <button
+                                                onClick={handleRestartApp}
+                                                className="w-full bg-teal-600 hover:bg-teal-700 text-white font-black py-2.5 px-4 rounded-xl text-sm transition-all shadow-sm"
+                                            >
+                                                설치 및 프로그램 재시작
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {updateStatus === 'error' && (
+                                        <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl space-y-2">
+                                            <h3 className="text-sm font-black text-rose-800 flex items-center gap-1.5">
+                                                ⚠️ 업데이트 오류 발생
+                                            </h3>
+                                            <p className="text-xs text-rose-600 font-medium whitespace-pre-wrap bg-white p-2.5 rounded-lg border border-rose-100/60 max-h-32 overflow-y-auto">
+                                                {updateError || '알 수 없는 네트워크 오류가 발생했습니다.'}
+                                            </p>
+                                            <button
+                                                onClick={handleCheckForUpdates}
+                                                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black rounded-lg transition-all"
+                                            >
+                                                재시도
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* 업데이트 시작 버튼 (idle / not-available 일 때 노출) */}
+                                    {(updateStatus === 'idle' || updateStatus === 'not-available') && (
+                                        <button
+                                            onClick={handleCheckForUpdates}
+                                            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black px-5 py-2.5 rounded-xl text-sm shadow-md transition-all"
+                                        >
+                                            <RefreshCw size={16} />
+                                            업데이트 확인
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         )}

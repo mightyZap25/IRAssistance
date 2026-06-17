@@ -1,5 +1,6 @@
-import { app, BrowserWindow, Tray, Menu, shell, session } from 'electron';
+import { app, BrowserWindow, Tray, Menu, shell, session, ipcMain } from 'electron';
 import path from 'path';
+import { autoUpdater } from 'electron-updater';
 import { fork } from 'child_process';
 import url from 'url';
 
@@ -198,4 +199,101 @@ app.on('will-quit', () => {
         console.log('[Electron Main] Killing backend server process...');
         serverProcess.kill();
     }
+});
+
+// ==========================================
+// Auto Update Feature
+// ==========================================
+
+autoUpdater.logger = console;
+autoUpdater.autoDownload = false;
+
+function sendUpdateMessage(status, data = {}) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update-message', { status, ...data });
+    }
+}
+
+autoUpdater.on('checking-for-update', () => {
+    sendUpdateMessage('checking');
+});
+
+autoUpdater.on('update-available', (info) => {
+    sendUpdateMessage('available', { info });
+});
+
+autoUpdater.on('update-not-available', (info) => {
+    sendUpdateMessage('not-available', { info });
+});
+
+autoUpdater.on('error', (err) => {
+    sendUpdateMessage('error', { error: err == null ? "unknown" : (err.stack || err).toString() });
+});
+
+autoUpdater.on('download-progress', (progressObj) => {
+    sendUpdateMessage('downloading', {
+        percent: progressObj.percent,
+        bytesPerSecond: progressObj.bytesPerSecond,
+        transferred: progressObj.transferred,
+        total: progressObj.total
+    });
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+    sendUpdateMessage('downloaded', { info });
+});
+
+ipcMain.on('check-for-updates', () => {
+    if (!app.isPackaged) {
+        // Dev mode mocking
+        sendUpdateMessage('checking');
+        setTimeout(() => {
+            sendUpdateMessage('available', {
+                info: {
+                    version: '1.0.1',
+                    releaseDate: new Date().toISOString(),
+                    releaseNotes: '이것은 개발 모드 모의(Mock) 업데이트 정보입니다. 기능 테스트용입니다.'
+                }
+            });
+        }, 1500);
+    } else {
+        autoUpdater.checkForUpdates().catch(err => {
+            sendUpdateMessage('error', { error: err.message });
+        });
+    }
+});
+
+ipcMain.on('start-download', () => {
+    if (!app.isPackaged) {
+        sendUpdateMessage('downloading', { percent: 0 });
+        let percent = 0;
+        const interval = setInterval(() => {
+            percent += 20;
+            sendUpdateMessage('downloading', { percent });
+            if (percent >= 100) {
+                clearInterval(interval);
+                sendUpdateMessage('downloaded', {
+                    info: { version: '1.0.1' }
+                });
+            }
+        }, 800);
+    } else {
+        autoUpdater.downloadUpdate().catch(err => {
+            sendUpdateMessage('error', { error: err.message });
+        });
+    }
+});
+
+ipcMain.on('restart-app', () => {
+    if (!app.isPackaged) {
+        console.log('[Electron Main] Mocking Restart & Install');
+        app.relaunch();
+        app.exit(0);
+    } else {
+        autoUpdater.quitAndInstall();
+    }
+});
+
+ipcMain.handle('get-app-version', () => {
+    return app.getVersion();
 });
