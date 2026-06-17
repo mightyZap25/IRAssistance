@@ -239,27 +239,55 @@ export default function SalesDashboardPage() {
                         </div>
                     </div>
                     
-                    <div className="flex-1 flex items-end justify-between gap-4 px-2 pb-6">
-                        {salesData.chartData.map((d, i) => {
-                            const maxAmount = Math.max(...salesData.chartData.map(cd => cd.amount), 1);
-                            const heightPercentage = Math.max(10, (d.amount / maxAmount) * 100);
-                            
-                            return (
-                                <div key={i} className="flex-1 flex flex-col items-center gap-3 group">
-                                    <div className="w-full relative flex flex-col items-center h-full justify-end">
-                                        <div 
-                                            className="w-full bg-slate-100 rounded-t-xl transition-all group-hover:bg-blue-600 group-hover:shadow-lg group-hover:shadow-blue-100 cursor-pointer" 
-                                            style={{ height: `${heightPercentage}%`, minHeight: '10%' }}
-                                        >
-                                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[9px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                    <div className="flex-1 relative min-h-[220px] flex flex-col justify-end">
+                        {/* 차트 가이드 라인 (그리드 배경) */}
+                        <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-8 pt-4">
+                            {[1, 2, 3, 4].map((n) => (
+                                <div key={n} className="w-full border-t border-slate-100 border-dashed relative"></div>
+                            ))}
+                        </div>
+
+                        {/* 실제 막대 그래프 기둥 */}
+                        <div className="relative z-10 flex-1 flex items-end justify-between gap-6 px-4 pb-8 h-full">
+                            {salesData.chartData.map((d, i) => {
+                                const maxAmount = Math.max(...salesData.chartData.map(cd => cd.amount), 1);
+                                const heightPercentage = d.amount > 0 ? (d.amount / maxAmount) * 100 : 0;
+                                const isHasData = d.amount > 0;
+                                
+                                return (
+                                    <div key={i} className="flex-1 flex flex-col items-center gap-3 group h-full justify-end">
+                                        <div className="w-full relative flex flex-col items-center justify-end h-[85%]">
+                                            {/* 값 툴팁 (글래스모피즘 스타일) */}
+                                            <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white text-[9px] font-black px-2.5 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 transform translate-y-2 group-hover:translate-y-0 shadow-lg backdrop-blur-sm whitespace-nowrap z-20">
                                                 ₩ {(d.amount / 10000).toLocaleString()}만
                                             </div>
+
+                                            {/* 막대 기둥 */}
+                                            <div 
+                                                className={`w-10 max-w-[40px] rounded-t-2xl transition-all duration-500 cursor-pointer relative ${
+                                                    isHasData 
+                                                        ? 'bg-gradient-to-t from-blue-600 via-indigo-500 to-indigo-400 shadow-md shadow-blue-100/50 hover:from-blue-700 hover:to-indigo-500' 
+                                                        : 'bg-slate-100/80 group-hover:bg-slate-200/80'
+                                                }`}
+                                                style={{ height: `${Math.max(4, heightPercentage)}%` }}
+                                            >
+                                                {/* 광원/하이라이트 효과 */}
+                                                {isHasData && (
+                                                    <div className="absolute inset-x-0 top-0 h-1 bg-white/30 rounded-t-2xl" />
+                                                )}
+                                            </div>
                                         </div>
+                                        
+                                        {/* X축 */}
+                                        <span className={`text-[10px] font-black tracking-tight mt-1 transition-colors ${
+                                            isHasData ? 'text-indigo-600 font-extrabold' : 'text-slate-400'
+                                        }`}>
+                                            {d.name}
+                                        </span>
                                     </div>
-                                    <span className="text-[10px] font-black text-slate-400">{d.name}</span>
-                                </div>
-                            );
-                        })}
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
 
