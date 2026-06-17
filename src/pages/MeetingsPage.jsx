@@ -9,7 +9,10 @@ import {
     Clock,
     Pencil,
     File,
-    X
+    X,
+    ChevronDown,
+    ChevronRight,
+    Table2
 } from 'lucide-react';
 import MeetingEditorPanel from '../components/MeetingRegistrationModal';
 import WeeklyMeetingModal from '../components/WeeklyMeetingModal';
@@ -33,7 +36,33 @@ export default function MeetingsPage() {
     // Split panel: undefined=nothing open, null=new, object=edit
     const [editingMeeting, setEditingMeeting] = useState(undefined);
     const [isWeeklyModalOpen, setIsWeeklyModalOpen] = useState(false);
-    const [selectedWeekly, setSelectedWeekly] = useState(null);
+
+    // 주간 보고 우측 편집창에 표시될 선택된 문서
+    const [selectedWeeklyDoc, setSelectedWeeklyDoc] = useState(null);
+
+    // 고정 부서 목록
+    const WEEKLY_DEPARTMENTS = ['개발부서', '생산부서', '품질부서', '영업부서'];
+
+    // 아코디언: 하나만 열림 (문자열 | null)
+    const [openDept, setOpenDept] = useState('개발부서');
+    const currentYear = new Date().getFullYear();
+    const [deptYears, setDeptYears] = useState(
+        Object.fromEntries(['개발부서', '생산부서', '품질부서', '영업부서'].map(d => [d, currentYear]))
+    );
+
+    const availableYears = [...new Set([
+        currentYear,
+        ...weeklyMeetings.map(m => {
+            const d = m.date ? new Date(m.date) : null;
+            return d ? d.getFullYear() : null;
+        }).filter(Boolean)
+    ])].sort((a, b) => b - a);
+
+    const toggleDept = (dept) => {
+        setOpenDept(prev => (prev === dept ? null : dept));
+        // 다른 부서 선택 시 우측 편집창 초기화
+        setSelectedWeeklyDoc(null);
+    };
 
     useEffect(() => { fetchData(); }, []);
 
@@ -165,10 +194,14 @@ export default function MeetingsPage() {
                                                             : 'border-l-[3px] border-transparent hover:bg-slate-50 hover:border-slate-200'
                                                         }`}
                                                 >
-                                                    <File size={13} className={`shrink-0 mt-0.5 ${isActive ? 'text-indigo-500' : 'text-slate-300'}`} />
+                                                    {m.docType === 'sheet' ? (
+                                                        <File size={13} className={`shrink-0 mt-0.5 ${isActive ? 'text-emerald-600' : 'text-emerald-400'}`} />
+                                                    ) : (
+                                                        <FileText size={13} className={`shrink-0 mt-0.5 ${isActive ? 'text-indigo-600' : 'text-indigo-400'}`} />
+                                                    )}
                                                     <div className="flex-1 min-w-0">
-                                                        <p className={`text-[11px] font-black truncate leading-tight ${isActive ? 'text-indigo-700' : 'text-slate-700'}`}>
-                                                            {m.target || '(제목 없음)'}
+                                                        <p className={`text-[11px] font-black truncate leading-tight flex items-center gap-1.5 ${isActive ? 'text-indigo-700' : 'text-slate-700'}`}>
+                                                            {m.docType === 'sheet' ? '📊' : '📄'} {m.target || '(제목 없음)'}
                                                         </p>
                                                         <p className="text-[9px] font-bold text-slate-400 mt-0.5 truncate">
                                                             {formatDate(m.dateTime)}
@@ -192,28 +225,111 @@ export default function MeetingsPage() {
                         <>
                             <div className="px-4 py-2 border-b border-slate-100 flex justify-between items-center shrink-0">
                                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                                    주간 보고 ({weeklyMeetings.length})
+                                    주간 보고
                                 </p>
-                                <button onClick={() => { setSelectedWeekly(null); setIsWeeklyModalOpen(true); }} className="flex items-center gap-1 text-[10px] font-black text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-all">
-                                    <Plus size={10} /> 보고서 등록
+                                <button onClick={() => setIsWeeklyModalOpen(true)} className="flex items-center gap-1 text-[10px] font-black text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-lg transition-all">
+                                    <Plus size={10} /> 신규
                                 </button>
                             </div>
                             <div className="flex-1 overflow-y-auto custom-scrollbar">
-                                <div className="py-1">
-                                    {weeklyMeetings.map(m => (
-                                        <button key={m.id} onClick={() => { setSelectedWeekly(m); setIsWeeklyModalOpen(true); }} className="w-full text-left px-3 py-2 flex items-start gap-2 hover:bg-slate-50 border-l-[3px] border-transparent hover:border-slate-200 transition-all">
-                                            <CalendarIcon size={13} className="shrink-0 mt-0.5 text-slate-400" />
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-[11px] font-black truncate leading-tight text-slate-700">
-                                                    {m.department} 주간 보고
-                                                </p>
-                                                <p className="text-[9px] font-bold text-slate-400 mt-0.5 truncate">
-                                                    {m.date?.toLocaleDateString('ko-KR')}
-                                                </p>
+                                {loading ? (
+                                    <div className="flex items-center justify-center h-16">
+                                        <div className="w-5 h-5 border-2 border-indigo-100 border-t-indigo-500 rounded-full animate-spin" />
+                                    </div>
+                                ) : (
+                                    WEEKLY_DEPARTMENTS.map(dept => {
+                                        const isOpen = openDept === dept;
+                                        const selectedYear = deptYears[dept];
+                                        const deptDocs = weeklyMeetings
+                                            .filter(m => m.department === dept)
+                                            .filter(m => {
+                                                const d = m.date ? new Date(m.date) : null;
+                                                return d && d.getFullYear() === selectedYear;
+                                            })
+                                            .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                                        return (
+                                            <div key={dept}>
+                                                {/* 아코디언 헤더 버튼 */}
+                                                <button
+                                                    onClick={() => toggleDept(dept)}
+                                                    className={`w-full px-3 py-2.5 flex items-center gap-2 text-left border-l-[3px] transition-all ${
+                                                        isOpen
+                                                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                                                        : 'border-transparent text-slate-600 hover:bg-slate-50'
+                                                    }`}
+                                                >
+                                                    {isOpen ? <ChevronDown size={12} className="shrink-0"/> : <ChevronRight size={12} className="shrink-0 text-slate-400"/>}
+                                                    <Table2 size={12} className="shrink-0 opacity-60"/>
+                                                    <span className="text-xs font-black flex-1">{dept}</span>
+                                                    <span className="text-[10px] font-bold text-slate-400">
+                                                        {weeklyMeetings.filter(m => m.department === dept).length}
+                                                    </span>
+                                                </button>
+
+                                                {/* 아코디언 열림 시: 연도 콤보박스 + 리스트 */}
+                                                {isOpen && (
+                                                    <div className="bg-slate-50/80">
+                                                        {/* 연도 콤보박스 */}
+                                                        <div className="px-3 py-2 border-b border-slate-100 flex items-center gap-2">
+                                                            <CalendarIcon size={11} className="text-slate-400 shrink-0" />
+                                                            <select
+                                                                value={selectedYear}
+                                                                onChange={e => setDeptYears(prev => ({ ...prev, [dept]: Number(e.target.value) }))}
+                                                                className="flex-1 px-2 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-bold focus:ring-1 focus:ring-indigo-500 outline-none"
+                                                            >
+                                                                {availableYears.map(y => (
+                                                                    <option key={y} value={y}>{y}년</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+
+                                                        {/* 문서 리스트 */}
+                                                        {deptDocs.length === 0 ? (
+                                                            <div className="py-6 flex flex-col items-center text-slate-300">
+                                                                <Table2 size={24} className="opacity-20 mb-1"/>
+                                                                <p className="text-[10px] font-bold">{selectedYear}년 문서 없음</p>
+                                                            </div>
+                                                        ) : (
+                                                            deptDocs.map(item => {
+                                                                const d = new Date(item.date);
+                                                                const weekOfMonth = Math.ceil((d.getDate() + new Date(d.getFullYear(), d.getMonth(), 1).getDay()) / 7);
+                                                                const isSelected = selectedWeeklyDoc?.id === item.id;
+                                                                return (
+                                                                    <button
+                                                                        key={item.id}
+                                                                        onClick={() => setSelectedWeeklyDoc(item)}
+                                                                        className={`w-full text-left px-4 py-2.5 flex items-start gap-2 group border-l-[3px] transition-all ${
+                                                                            isSelected
+                                                                            ? 'border-emerald-500 bg-emerald-50'
+                                                                            : 'border-transparent hover:bg-white hover:border-slate-200'
+                                                                        }`}
+                                                                    >
+                                                                        <Table2 size={12} className={`shrink-0 mt-0.5 ${isSelected ? 'text-emerald-600' : 'text-slate-300'}`} />
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <p className={`text-[11px] font-black truncate leading-tight ${isSelected ? 'text-emerald-700' : 'text-slate-700'}`}>
+                                                                                {d.getMonth()+1}월 {weekOfMonth}주차
+                                                                            </p>
+                                                                            <p className="text-[9px] font-bold text-slate-400 mt-0.5 truncate">
+                                                                                {d.toLocaleDateString('ko-KR')}
+                                                                            </p>
+                                                                        </div>
+                                                                        <button
+                                                                            onClick={e => { e.stopPropagation(); handleDeleteWeekly(item.id); }}
+                                                                            className="shrink-0 p-0.5 text-slate-200 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all rounded"
+                                                                        >
+                                                                            <Trash2 size={10}/>
+                                                                        </button>
+                                                                    </button>
+                                                                );
+                                                            })
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
-                                        </button>
-                                    ))}
-                                </div>
+                                        );
+                                    })
+                                )}
                             </div>
                         </>
                     )}
@@ -251,54 +367,70 @@ export default function MeetingsPage() {
                     </div>
                 )}
 
-            {/* === Weekly Tab === */}
-            {activeTab === 'weekly' && (
-                <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-y-auto custom-scrollbar p-6">
-                    {loading ? (
-                        <div className="flex items-center justify-center h-48">
-                            <div className="w-9 h-9 border-4 border-indigo-100 border-t-indigo-500 rounded-full animate-spin" />
-                        </div>
-                    ) : weeklyMeetings.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-32 text-slate-300">
-                            <CalendarIcon size={56} className="opacity-10 mb-4" />
-                            <p className="text-sm font-black">등록된 주간 회의 보고서가 없습니다.</p>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                            {weeklyMeetings.map((item) => (
-                                <div key={item.id} className="group bg-slate-50/50 border border-slate-100 rounded-2xl p-6 hover:border-indigo-200 hover:bg-white hover:shadow-xl transition-all duration-300">
-                                    <div className="flex justify-between items-start mb-5">
-                                        <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black">{item.department}</span>
-                                        <span className="text-[10px] font-bold text-slate-400">{item.date?.toLocaleDateString('ko-KR')}</span>
+                {/* Right: Weekly Viewer */}
+                {activeTab === 'weekly' && (
+                    <div className="flex-1 min-h-0 flex flex-col">
+                        {selectedWeeklyDoc ? (
+                            <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                                {/* 우측 헤더 */}
+                                <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-3 shrink-0">
+                                    <Table2 size={16} className="text-emerald-600" />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-black text-slate-800 truncate">
+                                            {selectedWeeklyDoc.title || selectedWeeklyDoc.department + ' 주간 업무 보고'}
+                                        </p>
+                                        <p className="text-[10px] text-slate-400 font-bold">
+                                            {selectedWeeklyDoc.department} &middot; {new Date(selectedWeeklyDoc.date).toLocaleDateString('ko-KR')}
+                                        </p>
                                     </div>
-                                    <h4 className="text-sm font-black text-slate-800 mb-5 leading-snug">
-                                        {item.date?.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}<br />
-                                        <span className="text-indigo-600">{item.department}</span> 주간 업무 보고
-                                    </h4>
-                                    <div className="flex gap-2">
-                                        <a href={item.link} target="_blank" rel="noopener noreferrer"
-                                            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded-xl text-[10px] font-black text-slate-600 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all shadow-sm">
-                                            <ExternalLink size={13} /> 구글 시트 열기
-                                        </a>
-                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                                            <button onClick={() => { setSelectedWeekly(item); setIsWeeklyModalOpen(true); }}
-                                                className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"><FileText size={16} /></button>
-                                            <button onClick={() => handleDeleteWeekly(item.id)}
-                                                className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"><Trash2 size={16} /></button>
-                                        </div>
-                                    </div>
+                                    <a
+                                        href={selectedWeeklyDoc.link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-xl text-[11px] font-black transition-all"
+                                    >
+                                        <ExternalLink size={13} /> 새예서 열기
+                                    </a>
+                                    <button
+                                        onClick={() => setSelectedWeeklyDoc(null)}
+                                        className="p-1.5 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
+                                    >
+                                        <X size={16} />
+                                    </button>
                                 </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
+                                {/* iframe */}
+                                <iframe
+                                    key={selectedWeeklyDoc.id}
+                                    src={selectedWeeklyDoc.link.replace('/edit', '/edit?embedded=true&rm=minimal')}
+                                    className="flex-1 w-full border-0"
+                                    title="Google Sheet"
+                                    allow="autoplay"
+                                />
+                            </div>
+                        ) : (
+                            <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center justify-center text-slate-300 gap-4">
+                                <div className="w-20 h-20 rounded-3xl bg-emerald-50 border-2 border-dashed border-emerald-200 flex items-center justify-center">
+                                    <Table2 size={32} className="text-emerald-300" />
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-sm font-black text-slate-400">주간 보고서를 선택하세요</p>
+                                    <p className="text-xs text-slate-300 mt-1 font-bold">왼쪽 아코디언에서 부서를 펼친 후 문서를 클릭하세요</p>
+                                </div>
+                                <button
+                                    onClick={() => setIsWeeklyModalOpen(true)}
+                                    className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-lg shadow-emerald-100 transition-all active:scale-95"
+                                >
+                                    <Plus size={14} /> 신규 주간 보고서 생성
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
             <WeeklyMeetingModal
                 isOpen={isWeeklyModalOpen}
                 onClose={() => setIsWeeklyModalOpen(false)}
                 onSave={handleSaveWeekly}
-                weekly={selectedWeekly}
             />
         </div>
     );

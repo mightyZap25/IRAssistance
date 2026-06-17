@@ -23,6 +23,29 @@ export default function Header() {
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, w: 400, h: 500 });
 
+    // Full Screen State
+    const [isFullscreen, setIsFullscreen] = useState(false);
+
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsFullscreen(!!document.fullscreenElement);
+        };
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, []);
+
+    const toggleFullscreen = () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch((err) => {
+                console.error(`Error attempting to enable fullscreen: ${err.message}`);
+            });
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
+    };
+
     // Load/Subscribe Personal Memo (Firestore for last active session)
     useEffect(() => {
         if (!currentUser?.uid) return;
@@ -291,6 +314,15 @@ export default function Header() {
 
             {/* Right: Actions & Profile */}
             <div className="flex items-center gap-3">
+
+                {/* ─── 전체화면 토글 버튼 ─── */}
+                <button
+                    onClick={toggleFullscreen}
+                    className="p-2 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all focus:outline-none"
+                    title={isFullscreen ? '전체화면 종료' : '전체화면 모드'}
+                >
+                    {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                </button>
 
                 {/* ─── 임시 역할 전환 콤보박스 (개발용) ─── */}
                 <div className="relative">
