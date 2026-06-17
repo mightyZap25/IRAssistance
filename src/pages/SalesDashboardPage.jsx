@@ -48,6 +48,7 @@ export default function SalesDashboardPage() {
         try {
             const qSnap = await getDocs(collection(db, 'quotations'));
             const bSnap = await getDocs(collection(db, 'billing'));
+            const prSnap = await getDocs(collection(db, 'production_requests'));
             
             let total = 0;
             let pending = 0;
@@ -66,6 +67,27 @@ export default function SalesDashboardPage() {
             qSnap.forEach(doc => {
                 const data = doc.data();
                 if (data.Status === 'ACCEPTED' || data.Status === 'CONFIRMED' || data.Status === 'DRAFT' || data.Status === 'SENT') {
+                    const amount = Number(data.TotalAmount || data.Total || 0);
+                    total += amount;
+                    count++;
+                    
+                    const cName = data.CustomerName || data.ClientName || '기타 고객사';
+                    customerMap[cName] = (customerMap[cName] || 0) + amount;
+                    
+                    const dateVal = data.CreatedAt || data.Date || data.UpdatedAt;
+                    if (dateVal) {
+                        const d = dateVal.toDate ? dateVal.toDate() : new Date(dateVal);
+                        const mKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}`;
+                        if (monthMap[mKey] !== undefined) {
+                            monthMap[mKey] += amount;
+                        }
+                    }
+                }
+            });
+
+            prSnap.forEach(doc => {
+                const data = doc.data();
+                if (data.Status === 'SHIPPED' || data.Status === 'COMPLETED') {
                     const amount = Number(data.TotalAmount || data.Total || 0);
                     total += amount;
                     count++;
