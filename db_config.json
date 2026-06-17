@@ -8,10 +8,10 @@
         "database": "postgres"
     },
     "remote": {
-        "host": "192.168.0.2",
+        "host": "100.67.238.32",
         "port": 15432,
         "user": "irerp",
-        "password": "IRERP060705!",
+        "password": "irerp060705!",
         "database": "postgres"
     }
 }

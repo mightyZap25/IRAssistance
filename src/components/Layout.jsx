@@ -12,7 +12,7 @@ export default function Layout({ children }) {
     const location = useLocation();
     
     // Determine if we should use full width (e.g., for dashboard, google chat)
-    const isFullPage = location.pathname.includes('/dashboard') || location.pathname.includes('/workspace/chat');
+    const isFullPage = location.pathname.includes('/dashboard') || location.pathname.includes('/workspace/chat') || location.pathname.includes('/hr/attendance');
     const isGoogleChat = location.pathname.includes('/workspace/chat');
 
     const isElectron = window.electronAPI?.isElectron || 

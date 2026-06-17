@@ -60,11 +60,11 @@ const loadDbConfig = () => {
         console.error("Failed to load db_config.json, falling back to environment variables:", err);
     }
     const defaultProfile = {
-        host: process.env.PGHOST || '192.168.0.7',
+        host: process.env.PGHOST || '192.168.0.2',
         port: process.env.PGPORT || '15432',
-        user: process.env.PGUSER || 'postgres',
-        password: process.env.PGPASSWORD || 'postgres',
-        database: process.env.PGDATABASE || 'ir_assistant',
+        user: process.env.PGUSER || 'irerp',
+        password: process.env.PGPASSWORD || 'IRERP060705!',
+        database: process.env.PGDATABASE || 'postgres',
     };
     return {
         currentProfile: 'local',

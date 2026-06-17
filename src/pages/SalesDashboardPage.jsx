@@ -127,6 +127,17 @@ export default function SalesDashboardPage() {
         }
     };
 
+    if (loading && salesData.totalRevenue === 0) {
+        return (
+            <div className="h-full flex items-center justify-center bg-slate-50">
+                <div className="flex flex-col items-center gap-3">
+                    <RefreshCw className="text-blue-600 animate-spin" size={40} />
+                    <p className="text-sm font-bold text-slate-500">매출 지표를 동기화하는 중...</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="h-full flex flex-col space-y-6">
             <div className="flex justify-between items-end bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
@@ -138,6 +149,14 @@ export default function SalesDashboardPage() {
                     <p className="text-slate-500 text-sm mt-1.5 font-medium">누적 매출액, 미수금 현황 및 주요 영업 지표를 확인합니다.</p>
                 </div>
                 <div className="flex gap-2">
+                    <button 
+                        onClick={fetchSalesStats}
+                        disabled={loading}
+                        className="p-3 bg-slate-50 text-slate-400 hover:text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-2xl border border-slate-200 transition-all flex items-center justify-center"
+                        title="데이터 새로고침"
+                    >
+                        <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+                    </button>
                     <button className="p-3 bg-slate-50 text-slate-400 hover:text-slate-600 rounded-2xl border border-slate-200 transition-all">
                         <Calendar size={20} />
                     </button>
