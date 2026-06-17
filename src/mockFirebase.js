@@ -215,7 +215,7 @@ export const mockAuth = {
             }
             const client = window.google.accounts.oauth2.initTokenClient({
                 client_id: '602256994765-ntop38htqblvjced9ogfsrfr8kpvc3dc.apps.googleusercontent.com',
-                scope: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/chat.messages.readonly https://www.googleapis.com/auth/chat.spaces.readonly',
+                scope: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/chat.messages.readonly https://www.googleapis.com/auth/chat.spaces.readonly https://www.googleapis.com/auth/calendar',
                 callback: async (tokenResponse) => {
                     if (tokenResponse.error) {
                         return reject(tokenResponse.error);
@@ -245,7 +245,7 @@ export const mockAuth = {
                     }
                 }
             });
-            client.requestAccessToken({ prompt: 'consent' });
+            client.requestAccessToken({ prompt: '' });
         });
     },
     logout: async () => {

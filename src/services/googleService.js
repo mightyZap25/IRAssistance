@@ -61,8 +61,8 @@ export const ensureValidToken = (forceRefresh = false) => {
             initTokenClient();
             tokenResolve = resolve;
             tokenReject = reject;
-            // If no hint in cache, prompt consent; else just get token silently
-            tokenClient.requestAccessToken({ prompt: token ? '' : 'consent' });
+            // Request token silently without forcing consent unless required
+            tokenClient.requestAccessToken({ prompt: '' });
         } catch (err) {
             reject(err);
         }

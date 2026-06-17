@@ -24,6 +24,7 @@ export const googleProvider = new GoogleAuthProvider();
 googleProvider.addScope('https://www.googleapis.com/auth/drive');
 googleProvider.addScope('https://www.googleapis.com/auth/chat.messages');
 googleProvider.addScope('https://www.googleapis.com/auth/chat.spaces');
+googleProvider.addScope('https://www.googleapis.com/auth/calendar');
 export const analytics = {};
 export const db = mockFirestore;
 
