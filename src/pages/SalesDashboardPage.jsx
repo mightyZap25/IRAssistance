@@ -65,7 +65,7 @@ export default function SalesDashboardPage() {
 
             qSnap.forEach(doc => {
                 const data = doc.data();
-                if (data.Status === 'ACCEPTED' || data.Status === 'CONFIRMED') {
+                if (data.Status === 'ACCEPTED' || data.Status === 'CONFIRMED' || data.Status === 'DRAFT' || data.Status === 'SENT') {
                     const amount = Number(data.TotalAmount || data.Total || 0);
                     total += amount;
                     count++;
