@@ -28,7 +28,7 @@ async function initMockDB() {
             const mockUsers = [
                 {
                     uid: 'mock-admin',
-                    email: 'admin@irrobot.com',
+                    email: 'admin@irrocot.com',
                     displayName: '로컬 마스터',
                     role: 'admin',
                     department: 'Management'
@@ -205,26 +205,63 @@ export const mockFirestore = {
 
 // Mock Auth functions
 export const mockAuth = {
-    currentUser: {
-        uid: 'mock-admin',
-        email: 'admin@irrobot.com',
-        displayName: '로컬 마스터',
-        photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-    },
+    currentUser: null,
+    listeners: [],
     login: async () => {
-        console.log('[MockAuth] Logged in successfully');
-        return {
-            user: mockAuth.currentUser
-        };
+        return new Promise((resolve, reject) => {
+            if (!window.google?.accounts?.oauth2) {
+                alert('구글 로그인 모듈이 로드되지 않았습니다. 잠시 후 다시 시도해주세요.');
+                return reject(new Error('GIS not loaded'));
+            }
+            const client = window.google.accounts.oauth2.initTokenClient({
+                client_id: '602256994765-ntop38htqblvjced9ogfsrfr8kpvc3dc.apps.googleusercontent.com',
+                scope: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/chat.messages.readonly https://www.googleapis.com/auth/chat.spaces.readonly',
+                callback: async (tokenResponse) => {
+                    if (tokenResponse.error) {
+                        return reject(tokenResponse.error);
+                    }
+                    try {
+                        const token = tokenResponse.access_token;
+                        const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                            headers: { Authorization: `Bearer ${token}` }
+                        });
+                        if (!userInfoRes.ok) throw new Error('Failed to fetch user info');
+                        const userInfo = await userInfoRes.json();
+                        
+                        console.log('[MockAuth] Logged in successfully via GIS:', userInfo.email || 'No email');
+                        mockAuth.currentUser = {
+                            uid: userInfo.sub || 'mock-user-id',
+                            email: userInfo.email || 'temp@irrocot.com',
+                            displayName: userInfo.name || '알 수 없는 사용자',
+                            photoURL: userInfo.picture || '',
+                        };
+                        mockAuth.listeners.forEach(cb => cb(mockAuth.currentUser));
+                        resolve({
+                            user: mockAuth.currentUser,
+                            credential: { accessToken: token, expiresIn: tokenResponse.expires_in }
+                        });
+                    } catch (err) {
+                        reject(err);
+                    }
+                }
+            });
+            client.requestAccessToken({ prompt: 'consent' });
+        });
     },
     logout: async () => {
         console.log('[MockAuth] Logged out');
+        mockAuth.currentUser = null;
+        mockAuth.listeners.forEach(cb => cb(mockAuth.currentUser));
         return true;
     },
     onAuthStateChanged: (...args) => {
         const cb = args.length === 2 ? args[1] : args[0];
         if (typeof cb === 'function') {
+            mockAuth.listeners.push(cb);
             cb(mockAuth.currentUser);
+            return () => {
+                mockAuth.listeners = mockAuth.listeners.filter(l => l !== cb);
+            };
         }
         return () => {};
     }

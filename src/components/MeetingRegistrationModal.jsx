@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, Plus, Trash2, FileText, Loader, ExternalLink, AlertCircle } from 'lucide-react';
+import { Save, Plus, Trash2, FileText, Loader, ExternalLink, AlertCircle, File } from 'lucide-react';
 import { fetchDrive } from '../services/googleService';
 
 const MEETING_FOLDER_ID = '1ri7Wac0KxC5ze9mLinX01xUTfzRzkrWL';
 
 /**
  * 회의록 편집 패널 (인라인 - 모달 없음)
- * Props: meeting(null=신규), onSave, onCancel
+ * Props: meeting(null=신규), onSave, onCancel, onDocCreated
  */
-export default function MeetingEditorPanel({ meeting = null, onSave, onCancel, hideHeader = false }) {
+export default function MeetingEditorPanel({ meeting = null, onSave, onCancel, onDocCreated, hideHeader = false }) {
     const [formData, setFormData] = useState({
         dateTime: '',
         presenter: '',
@@ -18,8 +18,9 @@ export default function MeetingEditorPanel({ meeting = null, onSave, onCancel, h
         googleDocId: '',
         materials: []
     });
-    const [docStatus, setDocStatus] = useState('idle'); // 'idle' | 'creating' | 'ready' | 'error'
+    const [docStatus, setDocStatus] = useState('idle'); // 'idle' | 'selecting' | 'creating' | 'ready' | 'error'
     const [docError, setDocError] = useState('');
+    const [selectedType, setSelectedType] = useState('doc');
     const hasCreated = useRef(false);
 
     useEffect(() => {
@@ -53,35 +54,108 @@ export default function MeetingEditorPanel({ meeting = null, onSave, onCancel, h
             });
             if (!hasCreated.current) {
                 hasCreated.current = true;
-                createGoogleDoc(defaultTitle);
+                setDocStatus('selecting');
             }
         }
     }, [meeting]);
 
-    const createGoogleDoc = async (title) => {
+    const createGoogleDoc = async (title, type = 'doc') => {
+        setSelectedType(type);
         setDocStatus('creating');
         setDocError('');
         try {
             const docTitle = title || `회의록_${new Date().toLocaleDateString('ko-KR')}`;
-            const file = await fetchDrive('https://www.googleapis.com/drive/v3/files', {
+            
+            // HTML 템플릿 정의 (Word)
+            const htmlContent = `
+                <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; color: #333;">
+                    <h1 style="text-align: center; color: #1e3a8a; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 30px;">회의록 (Meeting Minutes)</h1>
+                    
+                    <table border="1" cellpadding="10" cellspacing="0" style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db; margin-bottom: 30px;">
+                        <tr>
+                            <td style="width: 20%; background-color: #f3f4f6; font-weight: bold; text-align: center; color: #4b5563;">일시</td>
+                            <td style="width: 30%;"></td>
+                            <td style="width: 20%; background-color: #f3f4f6; font-weight: bold; text-align: center; color: #4b5563;">작성자</td>
+                            <td style="width: 30%;"></td>
+                        </tr>
+                        <tr>
+                            <td style="background-color: #f3f4f6; font-weight: bold; text-align: center; color: #4b5563;">참석자</td>
+                            <td colspan="3"></td>
+                        </tr>
+                        <tr>
+                            <td style="background-color: #f3f4f6; font-weight: bold; text-align: center; color: #4b5563;">회의 안건</td>
+                            <td colspan="3"></td>
+                        </tr>
+                    </table>
+
+                    <h3 style="color: #4f46e5; border-left: 4px solid #4f46e5; padding-left: 10px;">1. 주요 논의 사항 (Discussion Points)</h3>
+                    <ul style="margin-bottom: 30px; line-height: 1.6;">
+                        <li></li>
+                    </ul>
+
+                    <h3 style="color: #4f46e5; border-left: 4px solid #4f46e5; padding-left: 10px;">2. 결정 사항 (Decisions)</h3>
+                    <ul style="margin-bottom: 30px; line-height: 1.6;">
+                        <li></li>
+                    </ul>
+
+                    <h3 style="color: #4f46e5; border-left: 4px solid #4f46e5; padding-left: 10px;">3. 향후 계획 (Action Items)</h3>
+                    <table border="1" cellpadding="10" cellspacing="0" style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db;">
+                        <tr>
+                            <td style="background-color: #f3f4f6; font-weight: bold; text-align: center; color: #4b5563;">담당자 (Assignee)</td>
+                            <td style="background-color: #f3f4f6; font-weight: bold; text-align: center; color: #4b5563;">업무 내용 (Task)</td>
+                            <td style="background-color: #f3f4f6; font-weight: bold; text-align: center; color: #4b5563;">기한 (Due Date)</td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                    </table>
+                </div>
+            `;
+
+            // CSV 템플릿 정의 (Sheet)
+            const csvContent = "\uFEFF회의록 (Meeting Minutes)\n\n일시,,작성자,\n참석자,,,\n회의 안건,,,\n\n1. 주요 논의 사항\n내용,,,\n\n2. 결정 사항\n내용,,,\n\n3. 향후 계획 (Action Items)\n담당자 (Assignee),업무 내용 (Task),기한 (Due Date)\n,,\n,,\n";
+
+            const mimeType = type === 'sheet' ? 'application/vnd.google-apps.spreadsheet' : 'application/vnd.google-apps.document';
+            const fileBlob = type === 'sheet' ? new Blob([csvContent], { type: 'text/csv' }) : new Blob([htmlContent], { type: 'text/html' });
+
+            // multipart/related 형태의 업로드용 폼 생성
+            const metadata = {
+                name: docTitle,
+                mimeType: mimeType,
+                parents: [MEETING_FOLDER_ID]
+            };
+
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            form.append('file', fileBlob);
+
+            const file = await fetchDrive('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: docTitle,
-                    mimeType: 'application/vnd.google-apps.document',
-                    parents: [MEETING_FOLDER_ID]
-                })
+                body: form
+                // headers: 'Content-Type'은 브라우저가 FormData 처리 시 자동으로 boundary와 함께 설정하므로 생략해야 함.
             });
 
             const docId = file.id;
-            const editUrl = `https://docs.google.com/document/d/${docId}/edit`;
+            const baseUrl = type === 'sheet' ? 'https://docs.google.com/spreadsheets/d/' : 'https://docs.google.com/document/d/';
+            const editUrl = `${baseUrl}${docId}/edit`;
 
             setFormData(prev => ({
                 ...prev,
                 googleDocUrl: editUrl,
                 googleDocId: docId,
+                docType: type
             }));
             setDocStatus('ready');
+            if (onDocCreated) {
+                onDocCreated();
+            }
         } catch (err) {
             console.error('[createGoogleDoc] Error:', err);
             setDocError(err.message || '구글 문서 생성에 실패했습니다.');
@@ -119,76 +193,13 @@ export default function MeetingEditorPanel({ meeting = null, onSave, onCancel, h
     };
 
     return (
-        <div className="flex-1 h-full flex flex-col bg-white overflow-hidden">
-            {/* Panel Header - hidden when embedded in popup */}
-            {!hideHeader && (
-                <div className="px-5 py-3.5 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-slate-50 to-indigo-50/40 shrink-0">
-                    <div className="flex items-center gap-2.5">
-                        <div className="p-1.5 bg-indigo-100 rounded-lg">
-                            <FileText size={15} className="text-indigo-600" />
-                        </div>
-                        <div>
-                            <p className="text-sm font-black text-slate-800">
-                                {meeting ? '회의록 편집' : '신규 회의록'}
-                            </p>
-                            <p className="text-[10px] text-slate-400 font-bold">
-                                {docStatus === 'ready' ? '구글 드라이브에 저장됨' : '구글 드라이브 연동 중...'}
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {formData.googleDocUrl && (
-                            <a href={formData.googleDocUrl} target="_blank" rel="noopener noreferrer"
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-300 rounded-lg text-[10px] font-black transition-all">
-                                <ExternalLink size={11} /> 새 탭
-                            </a>
-                        )}
-                        {onCancel && (
-                            <button type="button" onClick={onCancel}
-                                className="px-3 py-1.5 text-[10px] font-black text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all">
-                                닫기
-                            </button>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
-                {/* Top bar: metadata only, single line */}
-                <div className="px-4 py-2 bg-slate-50/80 border-b border-slate-100 shrink-0 flex items-center gap-3">
-                    {/* 일시 */}
-                    <div className="flex items-center gap-1.5 shrink-0">
-                        <label className="text-[9px] font-black text-slate-400 whitespace-nowrap">일시</label>
-                        <input type="datetime-local" name="dateTime" value={formData.dateTime} onChange={handleChange}
-                            className="px-2 py-1 bg-white border border-slate-200 rounded-md text-[10px] font-bold focus:ring-1 focus:ring-indigo-500 outline-none" required />
-                    </div>
-                    <div className="w-px h-4 bg-slate-200 shrink-0" />
-                    {/* 발표자 */}
-                    <div className="flex items-center gap-1.5 w-32 shrink-0">
-                        <label className="text-[9px] font-black text-slate-400 whitespace-nowrap">발표자</label>
-                        <input type="text" name="presenter" value={formData.presenter} onChange={handleChange}
-                            placeholder="이름" className="flex-1 min-w-0 px-2 py-1 bg-white border border-slate-200 rounded-md text-[10px] font-bold focus:ring-1 focus:ring-indigo-500 outline-none" required />
-                    </div>
-                    <div className="w-px h-4 bg-slate-200 shrink-0" />
-                    {/* 참석자 */}
-                    <div className="flex items-center gap-1.5 w-44 shrink-0">
-                        <label className="text-[9px] font-black text-slate-400 whitespace-nowrap">참석자</label>
-                        <input type="text" name="attendees" value={formData.attendees} onChange={handleChange}
-                            placeholder="쉼표로 구분" className="flex-1 min-w-0 px-2 py-1 bg-white border border-slate-200 rounded-md text-[10px] font-bold focus:ring-1 focus:ring-indigo-500 outline-none" />
-                    </div>
-                    <div className="w-px h-4 bg-slate-200 shrink-0" />
-                    {/* 관련업무 */}
-                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                        <label className="text-[9px] font-black text-slate-400 whitespace-nowrap">제목</label>
-                        <input type="text" name="target" value={formData.target} onChange={handleChange}
-                            placeholder="제품/프로젝트명" className="flex-1 min-w-0 px-2 py-1 bg-white border border-slate-200 rounded-md text-[10px] font-bold focus:ring-1 focus:ring-indigo-500 outline-none" required />
-                    </div>
-                </div>
-
+        <div className="flex-1 h-full flex gap-3 overflow-hidden">
+            <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden bg-white border border-slate-200 rounded-2xl shadow-sm">
                 {/* Google Doc Embed (Middle) */}
-                <div className="flex-1 flex flex-col min-h-0" style={{ minHeight: 0 }}>
+                <div className="flex-1 flex flex-col min-h-0 relative" style={{ minHeight: 0 }}>
+                    {/* Header overlay just to show status if needed, or we can just remove it */}
                     {docStatus === 'creating' && (
-                        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-slate-400">
+                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-white/90 backdrop-blur-sm text-slate-400">
                             <div className="relative">
                                 <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center">
                                     <FileText size={24} className="text-indigo-300" />
@@ -203,6 +214,36 @@ export default function MeetingEditorPanel({ meeting = null, onSave, onCancel, h
                             </div>
                         </div>
                     )}
+                    {docStatus === 'selecting' && (
+                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-6 bg-slate-50">
+                            <div className="text-center mb-2">
+                                <h2 className="text-xl font-black text-slate-800 tracking-tight">문서 형식 선택</h2>
+                                <p className="text-sm font-bold text-slate-500 mt-1">회의록을 작성할 구글 문서 형식을 선택해 주세요.</p>
+                            </div>
+                            <div className="flex gap-4">
+                                <button type="button" onClick={() => createGoogleDoc(formData.target, 'doc')}
+                                    className="w-40 h-40 bg-white border-2 border-indigo-100 rounded-2xl hover:border-indigo-400 hover:shadow-lg transition-all flex flex-col items-center justify-center gap-4 group">
+                                    <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                                        <FileText size={32} className="text-indigo-600" />
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="font-black text-slate-700 text-sm">Google Docs</div>
+                                        <div className="text-xs font-bold text-slate-400">워드 형식</div>
+                                    </div>
+                                </button>
+                                <button type="button" onClick={() => createGoogleDoc(formData.target, 'sheet')}
+                                    className="w-40 h-40 bg-white border-2 border-emerald-100 rounded-2xl hover:border-emerald-400 hover:shadow-lg transition-all flex flex-col items-center justify-center gap-4 group">
+                                    <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                                        <File size={32} className="text-emerald-600" />
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="font-black text-slate-700 text-sm">Google Sheets</div>
+                                        <div className="text-xs font-bold text-slate-400">엑셀 형식</div>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    )}
                     {docStatus === 'error' && (
                         <div className="flex-1 flex flex-col items-center justify-center gap-3 p-8">
                             <div className="w-14 h-14 rounded-2xl bg-rose-50 flex items-center justify-center">
@@ -211,7 +252,7 @@ export default function MeetingEditorPanel({ meeting = null, onSave, onCancel, h
                             <p className="text-sm font-black text-rose-600">구글 문서 생성 실패</p>
                             <p className="text-xs text-slate-400 text-center max-w-xs">{docError}</p>
                             <button type="button"
-                                onClick={() => createGoogleDoc(formData.target)}
+                                onClick={() => createGoogleDoc(formData.target, selectedType)}
                                 className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl transition-all">
                                 다시 시도
                             </button>
@@ -219,7 +260,7 @@ export default function MeetingEditorPanel({ meeting = null, onSave, onCancel, h
                     )}
                     {docStatus === 'ready' && formData.googleDocId && (
                         <iframe
-                            src={`https://docs.google.com/document/d/${formData.googleDocId}/edit`}
+                            src={formData.googleDocUrl}
                             className="w-full border-0"
                             style={{ flex: 1, minHeight: 0, height: '100%', display: 'block' }}
                             title="Meeting Minutes"
@@ -265,8 +306,8 @@ export default function MeetingEditorPanel({ meeting = null, onSave, onCancel, h
                     <div className="flex items-center gap-2 shrink-0">
                         {onCancel && (
                             <button type="button" onClick={onCancel}
-                                className="px-3.5 py-1.5 text-[10px] font-black text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all">
-                                취소
+                                className="px-3.5 py-1.5 text-[10px] font-black text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-all">
+                                닫기
                             </button>
                         )}
                         <button type="submit" disabled={docStatus === 'creating'}
@@ -276,6 +317,18 @@ export default function MeetingEditorPanel({ meeting = null, onSave, onCancel, h
                     </div>
                 </div>
             </form>
+
+            {/* Right side floating toolbar */}
+            <div className="w-12 shrink-0 flex flex-col items-center gap-3 pt-2">
+                {formData.googleDocUrl && (
+                    <a href={formData.googleDocUrl} target="_blank" rel="noopener noreferrer"
+                        className="w-10 h-10 flex flex-col items-center justify-center gap-1 bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 rounded-xl shadow-sm transition-all"
+                        title="새 탭에서 열기">
+                        <ExternalLink size={16} />
+                        <span className="text-[8px] font-black">새 탭</span>
+                    </a>
+                )}
+            </div>
         </div>
     );
 }

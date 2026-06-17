@@ -7,17 +7,23 @@ export const useFirebase = false;
 
 // Proxy Auth
 export const auth = mockAuth;
-export const signInWithPopup = async () => ({ user: mockAuth.currentUser });
-export const signOut = async () => true;
-export const onAuthStateChanged = (authInstance, cb) => {
-    cb(mockAuth.currentUser);
-    return () => {};
-};
+export const signInWithPopup = async () => mockAuth.login();
+export const signOut = async () => mockAuth.logout();
+export const onAuthStateChanged = (authInstance, cb) => mockAuth.onAuthStateChanged(cb);
 export class GoogleAuthProvider {
-    static credentialFromResult() { return { accessToken: 'mock_access_token' }; }
-    addScope() {}
+    constructor() {
+        this.scopes = [];
+    }
+    static credentialFromResult(result) { return result?.credential ? { accessToken: result.credential.accessToken, expiresIn: result.credential.expiresIn } : { accessToken: 'mock_access_token' }; }
+    addScope(scope) {
+        this.scopes.push(scope);
+    }
 }
 export const googleProvider = new GoogleAuthProvider();
+// Google Workspace 연동을 위한 필요 스코프 추가 (실제 Firebase 연동 시 사용)
+googleProvider.addScope('https://www.googleapis.com/auth/drive');
+googleProvider.addScope('https://www.googleapis.com/auth/chat.messages');
+googleProvider.addScope('https://www.googleapis.com/auth/chat.spaces');
 export const analytics = {};
 export const db = mockFirestore;
 

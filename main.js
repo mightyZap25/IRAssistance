@@ -12,7 +12,7 @@ let serverProcess = null;
 let isQuitting = false;
 let hasShownTrayBalloon = false;
 
-const PORT = 5000;
+const PORT = 5050;
 
 // Start Express Backend Server as a child process
 function startBackend() {
@@ -53,7 +53,7 @@ function createWindow() {
     });
 
     const isDev = !app.isPackaged;
-    const primaryUrl = isDev ? 'http://localhost:5173' : 'http://localhost:5000';
+    const primaryUrl = isDev ? 'http://localhost:5173' : 'http://localhost:5050';
 
     const loadApp = () => {
         mainWindow.loadURL(primaryUrl).catch(err => {

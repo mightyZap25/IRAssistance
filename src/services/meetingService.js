@@ -1,8 +1,10 @@
 import { db } from '../firebase';
+import { getDriveMeetings } from './googleService';
 import { 
     collection, 
     addDoc, 
     updateDoc, 
+    setDoc,
     deleteDoc, 
     doc, 
     getDocs, 
@@ -16,9 +18,10 @@ const WEEKLY_MEETINGS_COLLECTION = 'weekly_meetings';
 
 // Meetings CRUD
 export const getMeetings = async () => {
+    // 1. Fetch from Firebase
     const q = query(collection(db, MEETINGS_COLLECTION), orderBy('dateTime', 'desc'));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => {
+    const fbMeetings = snapshot.docs.map(doc => {
         const data = doc.data();
         return {
             id: doc.id,
@@ -26,6 +29,47 @@ export const getMeetings = async () => {
             dateTime: data.dateTime?.toDate ? data.dateTime.toDate() : (data.dateTime ? new Date(data.dateTime) : null)
         };
     });
+
+    // 2. Fetch from Google Drive
+    let driveFiles = [];
+    try {
+        driveFiles = await getDriveMeetings();
+    } catch (e) {
+        console.warn('[getMeetings] Failed to fetch from Google Drive. Showing only Firebase records.', e);
+        return fbMeetings;
+    }
+
+    // 3. Merge! Drive is the source of truth for documents in the folder.
+    const merged = driveFiles.map(file => {
+        const fbMatch = fbMeetings.find(m => m.googleDocId === file.id);
+        if (fbMatch) {
+            return {
+                ...fbMatch,
+                target: file.name, // Drive name overrides
+                dateTime: new Date(file.createdTime),
+                googleDocUrl: file.webViewLink,
+                googleDocId: file.id
+            };
+        } else {
+            return {
+                id: file.id, // Temp ID (not in Firebase yet)
+                target: file.name,
+                dateTime: new Date(file.createdTime),
+                googleDocUrl: file.webViewLink,
+                googleDocId: file.id,
+                presenter: '',
+                attendees: '',
+                materials: []
+            };
+        }
+    });
+
+    // Also include any FB meetings that don't have a google doc yet (drafts, errors, etc.)
+    const fbWithoutDoc = fbMeetings.filter(m => !m.googleDocId);
+    
+    const finalMeetings = [...merged, ...fbWithoutDoc];
+    finalMeetings.sort((a, b) => b.dateTime - a.dateTime);
+    return finalMeetings;
 };
 
 export const addMeeting = async (meetingData) => {
@@ -38,10 +82,10 @@ export const addMeeting = async (meetingData) => {
 
 export const updateMeeting = async (id, meetingData) => {
     const meetingRef = doc(db, MEETINGS_COLLECTION, id);
-    return await updateDoc(meetingRef, {
+    return await setDoc(meetingRef, {
         ...meetingData,
         updatedAt: serverTimestamp()
-    });
+    }, { merge: true });
 };
 
 export const deleteMeeting = async (id) => {

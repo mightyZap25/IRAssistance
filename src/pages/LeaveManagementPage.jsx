@@ -147,14 +147,15 @@ export default function LeaveManagementPage() {
     // 실시간 근무 타이머
     useEffect(() => {
         let itv;
+        const getDateObj = (val) => val?.toDate ? val.toDate() : new Date(val);
         if (attendanceLog?.checkIn && !attendanceLog?.checkOut) {
             itv = setInterval(() => {
-                const diff = new Date() - attendanceLog.checkIn.toDate();
+                const diff = new Date() - getDateObj(attendanceLog.checkIn);
                 const h = Math.floor(diff/3600000), m = Math.floor((diff%3600000)/60000), s = Math.floor((diff%60000)/1000);
                 setElapsedTime(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`);
             }, 1000);
         } else if (attendanceLog?.checkIn && attendanceLog?.checkOut) {
-            const diff = attendanceLog.checkOut.toDate() - attendanceLog.checkIn.toDate();
+            const diff = getDateObj(attendanceLog.checkOut) - getDateObj(attendanceLog.checkIn);
             const h = Math.floor(diff/3600000), m = Math.floor((diff%3600000)/60000), s = Math.floor((diff%60000)/1000);
             setElapsedTime(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`);
         } else setElapsedTime('00:00:00');
@@ -278,8 +279,9 @@ export default function LeaveManagementPage() {
     for (let i = 0; i < firstDay; i++) calendarDays.push(null);
     for (let i = 1; i <= daysInMonth; i++) calendarDays.push(new Date(year, month, i));
 
-    const checkInTime = attendanceLog?.checkIn ? attendanceLog.checkIn.toDate().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : null;
-    const checkOutTime = attendanceLog?.checkOut ? attendanceLog.checkOut.toDate().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : null;
+    const getDateObj = (val) => val?.toDate ? val.toDate() : new Date(val);
+    const checkInTime = attendanceLog?.checkIn ? getDateObj(attendanceLog.checkIn).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : null;
+    const checkOutTime = attendanceLog?.checkOut ? getDateObj(attendanceLog.checkOut).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : null;
 
     return (
         <div className="p-3 bg-slate-50 min-h-screen font-sans">

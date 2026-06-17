@@ -102,117 +102,137 @@ export default function MeetingsPage() {
     const isEditorOpen = editingMeeting !== undefined;
 
     return (
-        <div className="h-[calc(100vh-120px)] flex flex-col gap-4">
+        <div className="h-[calc(100vh-120px)] flex flex-col gap-3">
             {/* Header */}
-            <div className="flex justify-between items-center bg-white px-6 py-4 rounded-2xl border border-slate-200 shadow-sm shrink-0">
-                <div>
-                    <h1 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2.5">
-                        <Users className="text-indigo-600" size={22} /> 회의 및 미팅 관리
-                    </h1>
-                    <p className="text-slate-400 text-xs mt-1 font-bold">회의 자료를 공유하고 주간 부서별 업무 보고를 관리합니다.</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <div className="flex bg-slate-100 p-1 rounded-xl">
-                        <button onClick={() => setActiveTab('meetings')}
-                            className={`px-5 py-2 rounded-lg text-xs font-black transition-all ${activeTab === 'meetings' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                            회의/리뷰 자료
-                        </button>
-                        <button onClick={() => setActiveTab('weekly')}
-                            className={`px-5 py-2 rounded-lg text-xs font-black transition-all ${activeTab === 'weekly' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                            주간 회의 보고
-                        </button>
-                    </div>
-                    {activeTab === 'meetings' && (
-                        <button
-                            onClick={() => setEditingMeeting(null)}
-                            className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-100 transition-all active:scale-95"
-                        >
-                            <Plus size={14} /> 신규 작성
-                        </button>
-                    )}
-                    {activeTab === 'weekly' && (
-                        <button onClick={() => { setSelectedWeekly(null); setIsWeeklyModalOpen(true); }}
-                            className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-100 transition-all active:scale-95">
-                            <Plus size={14} /> 보고서 등록
-                        </button>
-                    )}
-                </div>
+            <div className="flex justify-between items-center bg-white px-5 py-3 rounded-2xl border border-slate-200 shadow-sm shrink-0">
+                <h1 className="text-lg font-black text-slate-800 tracking-tight flex items-center gap-2">
+                    <Users className="text-indigo-600" size={20} /> 회의 및 미팅 관리
+                </h1>
+                <p className="text-slate-400 text-[11px] font-bold">회의 자료를 공유하고 주간 부서별 업무 보고를 관리합니다.</p>
             </div>
 
-            {/* === Meetings Tab: Left list + Right editor === */}
-            {activeTab === 'meetings' && (
-                <div className="flex-1 flex gap-4 min-h-0">
-
-                    {/* Left: File List Panel */}
-                    <div className="w-56 shrink-0 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-                        <div className="px-4 py-3 border-b border-slate-100 shrink-0">
-                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                                회의록 목록 ({meetings.length})
-                            </p>
-                        </div>
-                        <div className="flex-1 overflow-y-auto custom-scrollbar">
-                            {loading ? (
-                                <div className="flex items-center justify-center h-24">
-                                    <div className="w-6 h-6 border-2 border-indigo-100 border-t-indigo-500 rounded-full animate-spin" />
-                                </div>
-                            ) : meetings.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-12 px-4 text-slate-300 text-center">
-                                    <FileText size={32} className="opacity-20 mb-2" />
-                                    <p className="text-[10px] font-bold leading-relaxed">등록된 회의록이 없습니다</p>
-                                    <p className="text-[9px] mt-1 opacity-60">신규 작성 버튼을 눌러 시작하세요</p>
-                                </div>
-                            ) : (
-                                <div className="py-1">
-                                    {meetings.map((m) => {
-                                        const isActive = editingMeeting?.id === m.id;
-                                        return (
-                                            <button
-                                                key={m.id}
-                                                onClick={() => setEditingMeeting(m)}
-                                                className={`w-full text-left px-3 py-2.5 flex items-start gap-2 group transition-all
-                                                    ${isActive
-                                                        ? 'bg-indigo-50 border-l-[3px] border-indigo-500'
-                                                        : 'border-l-[3px] border-transparent hover:bg-slate-50 hover:border-slate-200'
-                                                    }`}
-                                            >
-                                                <File size={13} className={`shrink-0 mt-0.5 ${isActive ? 'text-indigo-500' : 'text-slate-300'}`} />
-                                                <div className="flex-1 min-w-0">
-                                                    <p className={`text-[11px] font-black truncate leading-tight ${isActive ? 'text-indigo-700' : 'text-slate-700'}`}>
-                                                        {m.target || '(제목 없음)'}
-                                                    </p>
-                                                    <p className="text-[9px] font-bold text-slate-400 mt-0.5 truncate">
-                                                        {formatDate(m.dateTime)}
-                                                        {m.presenter ? ` · ${m.presenter}` : ''}
-                                                    </p>
-                                                </div>
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); handleDeleteMeeting(m.id); }}
-                                                    className="shrink-0 p-0.5 text-slate-200 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all rounded"
-                                                >
-                                                    <Trash2 size={10} />
-                                                </button>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            )}
+            {/* Main Content Area */}
+            <div className="flex-1 flex gap-4 min-h-0">
+                {/* Left: File List Panel (Always Visible) */}
+                <div className="w-64 shrink-0 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+                    {/* Tab Switcher */}
+                    <div className="p-2 border-b border-slate-100 shrink-0">
+                        <div className="flex bg-slate-100 p-1 rounded-xl w-full">
+                            <button onClick={() => setActiveTab('meetings')}
+                                className={`flex-1 py-1.5 rounded-lg text-xs font-black transition-all ${activeTab === 'meetings' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                                회의/리뷰 자료
+                            </button>
+                            <button onClick={() => setActiveTab('weekly')}
+                                className={`flex-1 py-1.5 rounded-lg text-xs font-black transition-all ${activeTab === 'weekly' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                                주간 회의 보고
+                            </button>
                         </div>
                     </div>
 
-                    {/* Right: Editor or Empty Placeholder */}
-                    <div className="flex-1 min-h-0 flex flex-col rounded-2xl border border-slate-200 shadow-sm overflow-hidden bg-white">
-                        {isEditorOpen ? (
-                            <div className="flex-1 h-full min-h-0 flex flex-col">
-                                <MeetingEditorPanel
-                                    key={editingMeeting?.id ?? 'new'}
-                                    meeting={editingMeeting}
-                                    onSave={handleSaveMeeting}
-                                    onCancel={() => setEditingMeeting(undefined)}
-                                />
+                    {/* List Area based on active tab */}
+                    {activeTab === 'meetings' ? (
+                        <>
+                            <div className="px-4 py-2 border-b border-slate-100 flex justify-between items-center shrink-0">
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                    회의록 목록 ({meetings.length})
+                                </p>
+                                <button onClick={() => setEditingMeeting(null)} className="flex items-center gap-1 text-[10px] font-black text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-all">
+                                    <Plus size={10} /> 신규 작성
+                                </button>
                             </div>
+                            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                {loading ? (
+                                    <div className="flex items-center justify-center h-24">
+                                        <div className="w-6 h-6 border-2 border-indigo-100 border-t-indigo-500 rounded-full animate-spin" />
+                                    </div>
+                                ) : meetings.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-12 px-4 text-slate-300 text-center">
+                                        <FileText size={32} className="opacity-20 mb-2" />
+                                        <p className="text-[10px] font-bold leading-relaxed">등록된 회의록이 없습니다</p>
+                                        <p className="text-[9px] mt-1 opacity-60">신규 작성 버튼을 눌러 시작하세요</p>
+                                    </div>
+                                ) : (
+                                    <div className="py-1">
+                                        {meetings.map((m) => {
+                                            const isActive = editingMeeting?.id === m.id;
+                                            return (
+                                                <button
+                                                    key={m.id}
+                                                    onClick={() => setEditingMeeting(m)}
+                                                    className={`w-full text-left px-3 py-2.5 flex items-start gap-2 group transition-all
+                                                        ${isActive
+                                                            ? 'bg-indigo-50 border-l-[3px] border-indigo-500'
+                                                            : 'border-l-[3px] border-transparent hover:bg-slate-50 hover:border-slate-200'
+                                                        }`}
+                                                >
+                                                    <File size={13} className={`shrink-0 mt-0.5 ${isActive ? 'text-indigo-500' : 'text-slate-300'}`} />
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className={`text-[11px] font-black truncate leading-tight ${isActive ? 'text-indigo-700' : 'text-slate-700'}`}>
+                                                            {m.target || '(제목 없음)'}
+                                                        </p>
+                                                        <p className="text-[9px] font-bold text-slate-400 mt-0.5 truncate">
+                                                            {formatDate(m.dateTime)}
+                                                            {m.presenter ? ` · ${m.presenter}` : ''}
+                                                        </p>
+                                                    </div>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleDeleteMeeting(m.id); }}
+                                                        className="shrink-0 p-0.5 text-slate-200 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all rounded"
+                                                    >
+                                                        <Trash2 size={10} />
+                                                    </button>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="px-4 py-2 border-b border-slate-100 flex justify-between items-center shrink-0">
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                    주간 보고 ({weeklyMeetings.length})
+                                </p>
+                                <button onClick={() => { setSelectedWeekly(null); setIsWeeklyModalOpen(true); }} className="flex items-center gap-1 text-[10px] font-black text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-all">
+                                    <Plus size={10} /> 보고서 등록
+                                </button>
+                            </div>
+                            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                <div className="py-1">
+                                    {weeklyMeetings.map(m => (
+                                        <button key={m.id} onClick={() => { setSelectedWeekly(m); setIsWeeklyModalOpen(true); }} className="w-full text-left px-3 py-2 flex items-start gap-2 hover:bg-slate-50 border-l-[3px] border-transparent hover:border-slate-200 transition-all">
+                                            <CalendarIcon size={13} className="shrink-0 mt-0.5 text-slate-400" />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-[11px] font-black truncate leading-tight text-slate-700">
+                                                    {m.department} 주간 보고
+                                                </p>
+                                                <p className="text-[9px] font-bold text-slate-400 mt-0.5 truncate">
+                                                    {m.date?.toLocaleDateString('ko-KR')}
+                                                </p>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </div>
+
+                {/* Right Content Area */}
+                {activeTab === 'meetings' && (
+                    <div className="flex-1 min-h-0 flex flex-col">
+                        {isEditorOpen ? (
+                            <MeetingEditorPanel
+                                key={editingMeeting?.id ?? 'new'}
+                                meeting={editingMeeting}
+                                onSave={handleSaveMeeting}
+                                onCancel={() => setEditingMeeting(undefined)}
+                                onDocCreated={fetchData}
+                            />
                         ) : (
                             /* Empty placeholder */
-                            <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4">
+                            <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center justify-center text-slate-300 gap-4">
                                 <div className="w-20 h-20 rounded-3xl bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center">
                                     <FileText size={32} className="opacity-30" />
                                 </div>
@@ -229,8 +249,7 @@ export default function MeetingsPage() {
                             </div>
                         )}
                     </div>
-                </div>
-            )}
+                )}
 
             {/* === Weekly Tab === */}
             {activeTab === 'weekly' && (
@@ -274,7 +293,7 @@ export default function MeetingsPage() {
                     )}
                 </div>
             )}
-
+        </div>
             <WeeklyMeetingModal
                 isOpen={isWeeklyModalOpen}
                 onClose={() => setIsWeeklyModalOpen(false)}

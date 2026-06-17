@@ -6,6 +6,8 @@
 const CLIENT_ID = '602256994765-ntop38htqblvjced9ogfsrfr8kpvc3dc.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/documents';
 
+export const MEETING_FOLDER_ID = '1ri7Wac0KxC5ze9mLinX01xUTfzRzkrWL';
+
 let tokenClient = null;
 let tokenResolve = null;
 let tokenReject = null;
@@ -142,4 +144,14 @@ export const getOrCreateFolder = async (folderName) => {
         body: JSON.stringify({ name: folderName, mimeType: 'application/vnd.google-apps.folder' })
     });
     return folder.id;
+};
+
+/**
+ * Google Drive: 회의록 폴더의 파일 목록 조회
+ */
+export const getDriveMeetings = async () => {
+    const q = `'${MEETING_FOLDER_ID}' in parents and trashed = false`;
+    const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,createdTime,webViewLink)&orderBy=createdTime desc`;
+    const data = await fetchDrive(searchUrl);
+    return data.files || [];
 };

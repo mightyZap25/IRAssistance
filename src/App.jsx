@@ -36,7 +36,7 @@ import TasksPage from './pages/TasksPage'
 import TaskCalendarPage from './pages/TaskCalendarPage'
 import ProjectManagementPage from './pages/ProjectManagementPage'
 import SalesDashboardPage from './pages/SalesDashboardPage'
-import QuotationsPage from './pages/QuotationsPage'
+
 import BillingPage from './pages/BillingPage'
 import SettingsPage from './pages/SettingsPage'
 
@@ -307,13 +307,7 @@ function AppContent() {
                     </Layout>
                 </PrivateRoute>
             } />
-            <Route path="/sales/quotations" element={
-                <PrivateRoute>
-                    <Layout>
-                        <QuotationsPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
+
             <Route path="/sales/billing" element={
                 <PrivateRoute>
                     <Layout>

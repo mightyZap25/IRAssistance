@@ -25,7 +25,7 @@ export function AuthProvider({ children }) {
     const [devRoleOverride, setDevRoleOverride] = useState(null); // 임시 역할 오버라이드
 
     // Domain restriction configuration
-    const ALLOWED_DOMAINS = ['irrobot.com'];
+    const ALLOWED_DOMAINS = ['irrocot.com', 'irrobot.com'];
 
     async function login() {
         try {
@@ -37,15 +37,18 @@ export function AuthProvider({ children }) {
             const credential = GoogleAuthProvider.credentialFromResult(result);
             if (credential && credential.accessToken) {
                 localStorage.setItem('google_access_token', credential.accessToken);
+                const expiresIn = credential.expiresIn || 3500;
+                localStorage.setItem('google_access_token_expires_at', Date.now() + (expiresIn - 60) * 1000);
             }
 
             // Domain Check
-            // const domain = user.email.split('@')[1]?.toLowerCase();
-            // if (!ALLOWED_DOMAINS.includes(domain)) {
-            //     await logout();
-            //     setError(`Unauthorized domain: ${domain}. Only @irrobot.com accounts are allowed.`);
-            //     return;
-            // }
+            const userEmail = user?.email || 'temp@irrocot.com';
+            const domain = userEmail.split('@')[1]?.toLowerCase();
+            if (!ALLOWED_DOMAINS.includes(domain)) {
+                await logout();
+                setError(`Unauthorized domain: ${domain}. Only @irrocot.com accounts are allowed.`);
+                return;
+            }
 
             // Sync Profile
             const profile = await syncUserProfile(user);
@@ -59,22 +62,24 @@ export function AuthProvider({ children }) {
     function logout() {
         setUserProfile(null);
         localStorage.removeItem('google_access_token');
+        localStorage.removeItem('google_access_token_expires_at');
         return signOut(auth);
     }
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (user) {
-                // const domain = user.email.split('@')[1]?.toLowerCase();
+                const userEmail = user.email || 'temp@irrocot.com';
+                const domain = userEmail.split('@')[1]?.toLowerCase();
                 // Add console log for debugging (remove in prod)
-                console.log("Auth State Changed: ", user.email);
+                console.log("Auth State Changed: ", userEmail);
 
-                // if (!domain || !ALLOWED_DOMAINS.includes(domain)) {
-                //     console.warn("Unauthorized/Unknown domain logout:", domain);
-                //     signOut(auth);
-                //     setCurrentUser(null);
-                //     setUserProfile(null);
-                // } else {
+                if (!domain || !ALLOWED_DOMAINS.includes(domain)) {
+                    console.warn("Unauthorized/Unknown domain logout:", domain);
+                    signOut(auth);
+                    setCurrentUser(null);
+                    setUserProfile(null);
+                } else {
                     setCurrentUser(user);
                     // Fetch profile quietly if not already valid
                     try {
@@ -83,7 +88,7 @@ export function AuthProvider({ children }) {
                     } catch (err) {
                         console.error("Profile sync failed", err);
                     }
-                // }
+                }
             } else {
                 setCurrentUser(null);
                 setUserProfile(null);

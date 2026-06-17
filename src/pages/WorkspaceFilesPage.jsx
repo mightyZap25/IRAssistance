@@ -49,7 +49,7 @@ export default function WorkspaceFilesPage() {
     const [files, setFiles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedCategory, setSelectedCategory] = useState('all'); // all (로컬), drive (구글 드라이브)
+    const [selectedCategory, setSelectedCategory] = useState('drive');
 
     // 구글 드라이브 실시간 연동 상태
     const [folderId, setFolderId] = useState(() => localStorage.getItem('erp_gdrive_folder_id') || DEFAULT_FOLDER_ID);
@@ -561,32 +561,6 @@ export default function WorkspaceFilesPage() {
 
                 <div className="flex items-center gap-3">
                     <button
-                        onClick={handleGoogleTokenRequest}
-                        className="flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all"
-                    >
-                        <Key size={14} className="text-amber-500" />
-                        구글 연동 인증
-                    </button>
-                    <button
-                        onClick={() => {
-                            setTempFolderId(folderId);
-                            setIsConfigOpen(true);
-                        }}
-                        className="flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all"
-                    >
-                        <Folder size={14} className="text-sky-500" />
-                        폴더 연동 설정
-                    </button>
-                    {folderId !== DEFAULT_FOLDER_ID && (
-                        <button
-                            onClick={handleDisconnectFolder}
-                            className="flex items-center gap-1.5 bg-white hover:bg-rose-50 text-rose-600 border border-rose-150 px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all"
-                        >
-                            <X size={14} />
-                            연동 초기화
-                        </button>
-                    )}
-                    <button
                         onClick={() => {
                             setFileCategory('local');
                             setSelectedTemplate('');
@@ -607,112 +581,9 @@ export default function WorkspaceFilesPage() {
                 </div>
             </div>
 
-            {/* 필터 탭 */}
-            <div className="flex flex-col md:flex-row gap-3 items-center justify-between bg-slate-50 p-4 rounded-xl border border-slate-100">
-                <div className="flex gap-2 w-full md:w-auto">
-                    <button
-                        onClick={() => setSelectedCategory('all')}
-                        className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
-                            selectedCategory === 'all' 
-                            ? 'bg-sky-200 text-sky-900 border border-sky-300' 
-                            : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
-                        }`}
-                    >
-                        ERP 생성 문서 ({files.length})
-                    </button>
-                    <button
-                        onClick={() => setSelectedCategory('drive')}
-                        className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
-                            selectedCategory === 'drive' 
-                            ? 'bg-sky-200 text-sky-900 border border-sky-300' 
-                            : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
-                        }`}
-                    >
-                        <Cloud size={12} />
-                        구글 드라이브 전용 폴더
-                    </button>
-                </div>
-
-                {selectedCategory === 'all' && (
-                    <div className="relative w-full md:w-80">
-                        <input
-                            type="text"
-                            placeholder="파일명, 작성자 검색..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-400"
-                        />
-                        <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
-                    </div>
-                )}
-            </div>
-
             {/* 메인 렌더링 영역 */}
-            {selectedCategory === 'all' ? (
-                /* 1. ERP 로컬 파일 목록 */
-                loading ? (
-                    <div className="flex flex-col items-center justify-center py-20 bg-white border border-slate-200 rounded-2xl">
-                        <RefreshCw className="animate-spin text-sky-500 mb-3" size={32} />
-                        <p className="text-slate-500 font-medium">데이터를 불러오는 중입니다...</p>
-                    </div>
-                ) : files.length === 0 ? (
-                    <div className="text-center py-20 bg-white border border-slate-200 rounded-2xl">
-                        <File size={48} className="mx-auto text-slate-300 mb-4" />
-                        <h3 className="text-lg font-bold text-slate-700">생성된 ERP 내부 문서가 없습니다</h3>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {files.map((file) => (
-                            <div 
-                                key={file.id} 
-                                className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md hover:border-sky-200 transition-all flex flex-col justify-between group cursor-pointer"
-                                onClick={() => {
-                                    setActiveViewFile(file);
-                                    setEditContent(file.content || '');
-                                    setIsEditing(false);
-                                }}
-                            >
-                                <div className="flex items-start justify-between">
-                                    <div className="flex gap-3">
-                                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                                            file.type === 'sheet' 
-                                            ? 'bg-emerald-50 text-emerald-600' 
-                                            : 'bg-sky-50 text-sky-600'
-                                        }`}>
-                                            {file.type === 'sheet' ? <FileSpreadsheet size={20} /> : <FileText size={20} />}
-                                        </div>
-                                        <div className="min-w-0">
-                                            <h3 className="font-bold text-slate-800 text-sm truncate group-hover:text-sky-600 transition-colors">
-                                                {file.name}
-                                            </h3>
-                                            <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
-                                                <span>{file.owner}</span>
-                                                <span className="w-1 h-1 rounded-full bg-slate-300" />
-                                                <span>{file.updatedAt}</span>
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-3">
-                                    <span className="text-xs font-semibold text-slate-400">{file.size || '0 KB'}</span>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDeleteFile(file.id);
-                                        }}
-                                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )
-            ) : (
-                /* 2. 구글 워크스페이스 실시간 폴더 연동 브라우저 */
-                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-[500px]">
+            {/* 구글 워크스페이스 실시간 폴더 연동 브라우저 */}
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-[500px]">
                     {/* 브레드크럼 및 상단 컨트롤러 */}
                     <div className="bg-slate-50 border-b border-slate-100 px-6 py-3 flex items-center justify-between">
                         <div className="flex items-center gap-1 text-xs font-bold text-slate-600">
@@ -828,7 +699,7 @@ export default function WorkspaceFilesPage() {
                         )}
                     </div>
                 </div>
-            )}
+
 
             {/* 파일 열기 및 뷰어 모달 */}
             {activeViewFile && (
@@ -871,12 +742,12 @@ export default function WorkspaceFilesPage() {
                                         <iframe
                                             src={
                                                 activeViewFile.type === 'sheet'
-                                                ? `https://docs.google.com/spreadsheets/d/${activeViewFile.id}/preview`
-                                                : `https://docs.google.com/document/d/${activeViewFile.id}/preview`
+                                                ? `https://docs.google.com/spreadsheets/d/${activeViewFile.id}/edit?rm=minimal`
+                                                : `https://docs.google.com/document/d/${activeViewFile.id}/edit?rm=minimal`
                                             }
-                                            className="w-full h-[70vh] min-h-[550px] border-0 rounded-lg bg-slate-100"
-                                            title="Google Doc Live Preview"
-                                            allow="autoplay"
+                                            className="w-full h-[75vh] min-h-[600px] border-0 rounded-lg bg-slate-100 shadow-inner"
+                                            title="Google Workspace Editor"
+                                            allow="autoplay; clipboard-read; clipboard-write"
                                         />
                                     ) : activeViewFile.type === 'sheet' ? (
                                         <div className="p-4 overflow-auto">
@@ -919,7 +790,7 @@ export default function WorkspaceFilesPage() {
                             <div>
                                 {activeViewFile.googleLink && (
                                     <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100">
-                                        구글 Workspace 동기화 문서 (미리보기 지원)
+                                        구글 Workspace 동기화 문서 (직접 편집 모드)
                                     </span>
                                 )}
                             </div>
@@ -932,7 +803,7 @@ export default function WorkspaceFilesPage() {
                                         className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
                                     >
                                         <ExternalLink size={14} />
-                                        {activeViewFile.type === 'sheet' ? '구글 스프레드시트로 편집하기' : '구글 문서(Word)로 편집하기'}
+                                        새 창에서 열기
                                     </a>
                                 ) : (
                                     isEditing ? (

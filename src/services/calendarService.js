@@ -14,14 +14,18 @@ export async function getOrCreateCalendar() {
     if (!token) throw new Error('No Google Access Token');
 
     // 1. 캘린더 목록 조회
+    if (token === 'mock_access_token') {
+        return 'mock_calendar_id';
+    }
+
     const listRes = await fetch(`${API_BASE}/users/me/calendarList`, {
         headers: { 'Authorization': `Bearer ${token}` }
     });
     
     if (!listRes.ok) {
-        if (listRes.status === 401) {
-            console.warn("[Calendar] Invalid credentials. Token might be expired.");
-            localStorage.removeItem('google_access_token');
+        if (listRes.status === 401 || listRes.status === 403) {
+            console.warn("[Calendar] 캘린더 접근 권한이 없거나 토큰이 만료되었습니다. 캘린더 동기화가 비활성화됩니다.");
+            return null;
         }
         throw new Error('Failed to fetch calendar list');
     }
@@ -63,7 +67,13 @@ export async function syncTaskToGoogleCalendar(taskId, taskData) {
         const token = getAccessToken();
         if (!token) return;
 
+        if (token === 'mock_access_token') {
+            console.log("[Calendar MOCK] Task synced successfully (mock):", formatEventId(taskId));
+            return formatEventId(taskId);
+        }
+
         const calendarId = await getOrCreateCalendar();
+        if (!calendarId) return;
         const gEventId = formatEventId(taskId);
 
         // Date 설정. dueDate, startDate, endDate 등 상황에 맞게 처리
@@ -127,7 +137,13 @@ export async function deleteTaskFromGoogleCalendar(taskId) {
         const token = getAccessToken();
         if (!token) return;
         
+        if (token === 'mock_access_token') {
+            console.log("[Calendar MOCK] Task deleted successfully from calendar.");
+            return;
+        }
+
         const calendarId = await getOrCreateCalendar();
+        if (!calendarId) return;
         const gEventId = formatEventId(taskId);
 
         const res = await fetch(`${API_BASE}/calendars/${encodeURIComponent(calendarId)}/events/${gEventId}`, {
@@ -153,6 +169,7 @@ export async function pollGoogleCalendarToTasks(ownerUid) {
         if (!token) return;
 
         const calendarId = await getOrCreateCalendar();
+        if (!calendarId) return;
         
         // 최근 30일(또는 전체) 이벤트 fetch (성능을 위해 한달치만)
         const timeMin = new Date();

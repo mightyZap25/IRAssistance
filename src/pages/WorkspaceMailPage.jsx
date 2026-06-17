@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
     Mail, Inbox, Send, Star, Trash2, Archive, 
     Search, Filter, RefreshCw, Plus, MoreVertical,
@@ -21,9 +21,64 @@ export default function WorkspaceMailPage() {
     const [isComposeOpen, setIsComposeOpen] = useState(false);
     const [composeData, setComposeData] = useState({ to: '', subject: '', content: '' });
 
-    // Mock Email Data
-    useEffect(() => {
+    // 구글 토큰 확인 유틸
+    const getValidToken = () => {
+        const token = localStorage.getItem('google_access_token');
+        const expiresAt = localStorage.getItem('google_access_token_expires_at');
+        if (!token || !expiresAt || Date.now() > Number(expiresAt)) return null;
+        return token;
+    };
+
+    const fetchEmails = useCallback(async () => {
         setLoading(true);
+        const token = getValidToken();
+        
+        if (token) {
+            try {
+                // Gmail API 연동
+                const listRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=15', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!listRes.ok) throw new Error('Gmail API fetch failed');
+                const listData = await listRes.json();
+                
+                if (listData.messages && listData.messages.length > 0) {
+                    const emailPromises = listData.messages.map(async (msg) => {
+                        const msgRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const msgData = await msgRes.json();
+                        
+                        const headers = msgData.payload.headers;
+                        const subjectHeader = headers.find(h => h.name.toLowerCase() === 'subject');
+                        const fromHeader = headers.find(h => h.name.toLowerCase() === 'from');
+                        const dateHeader = headers.find(h => h.name.toLowerCase() === 'date');
+                        
+                        return {
+                            id: msg.id,
+                            sender: fromHeader ? fromHeader.value.split('<')[0].trim() : 'Unknown',
+                            email: fromHeader ? (fromHeader.value.match(/<(.*)>/)?.[1] || fromHeader.value) : '',
+                            subject: subjectHeader ? subjectHeader.value : '(제목 없음)',
+                            content: msgData.snippet || '',
+                            date: dateHeader ? new Date(dateHeader.value).toLocaleString() : '',
+                            isRead: !msgData.labelIds.includes('UNREAD'),
+                            isStarred: msgData.labelIds.includes('STARRED'),
+                            hasAttachment: msgData.payload.parts?.some(p => p.filename && p.filename.length > 0) || false,
+                            folder: msgData.labelIds.includes('SENT') ? 'sent' : 'inbox',
+                            tags: ['API 연동됨']
+                        };
+                    });
+                    const fetchedEmails = await Promise.all(emailPromises);
+                    setEmails(fetchedEmails);
+                    setLoading(false);
+                    return;
+                }
+            } catch (err) {
+                console.warn('Gmail API 실패. 폴백 Mock 데이터 사용:', err);
+            }
+        }
+        
+        // Mock 데이터 폴백
         setTimeout(() => {
             const mockData = [
                 {
@@ -83,6 +138,56 @@ export default function WorkspaceMailPage() {
             setLoading(false);
         }, 800);
     }, []);
+
+    // Initial Load
+    useEffect(() => {
+        fetchEmails();
+    }, [fetchEmails]);
+
+    const handleSendEmail = async () => {
+        if (!composeData.to || !composeData.subject) {
+            alert('받는 사람과 제목을 입력하세요.');
+            return;
+        }
+
+        const token = getValidToken();
+        if (token) {
+            try {
+                const str = [
+                    `To: ${composeData.to}`,
+                    `Subject: =?utf-8?B?${btoa(unescape(encodeURIComponent(composeData.subject)))}?=`,
+                    'Content-Type: text/plain; charset="UTF-8"',
+                    'MIME-Version: 1.0',
+                    '',
+                    composeData.content
+                ].join('\n');
+                
+                const raw = btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+                
+                const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ raw })
+                });
+
+                if (!res.ok) throw new Error('Failed to send email');
+                alert('메일이 성공적으로 발송되었습니다.');
+                setIsComposeOpen(false);
+                fetchEmails(); // Refresh sent folder
+                return;
+            } catch (err) {
+                console.error("Gmail 발송 오류:", err);
+                alert('Gmail 발송 중 오류가 발생했습니다. (Mock 전송으로 대체)');
+            }
+        }
+        
+        // Mock Send
+        alert('[Mock] 메일 발송 완료!');
+        setIsComposeOpen(false);
+    };
 
     const folders = [
         { id: 'inbox', label: '수신함', icon: Inbox, count: 2 },
@@ -218,7 +323,7 @@ export default function WorkspaceMailPage() {
                         </div>
                         <div className="flex items-center gap-1.5">
                             <button className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="필터"><Filter size={18} /></button>
-                            <button className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="새로고침"><RefreshCw size={18} /></button>
+                            <button onClick={fetchEmails} className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="새로고침"><RefreshCw size={18} /></button>
                             <div className="w-px h-6 bg-slate-100 mx-2" />
                             <button className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all" title="선택 삭제"><Trash2 size={18} /></button>
                         </div>
@@ -345,7 +450,7 @@ export default function WorkspaceMailPage() {
                             </button>
                             <div className="flex gap-3">
                                 <button onClick={() => setIsComposeOpen(false)} className="px-6 py-3 text-sm font-black text-slate-500 hover:bg-slate-200 rounded-xl transition-all">취소</button>
-                                <button className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-black shadow-lg shadow-indigo-100 flex items-center gap-2 active:scale-95 transition-all">
+                                <button onClick={handleSendEmail} className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-black shadow-lg shadow-indigo-100 flex items-center gap-2 active:scale-95 transition-all">
                                     <SendHorizontal size={18} /> 보내기
                                 </button>
                             </div>

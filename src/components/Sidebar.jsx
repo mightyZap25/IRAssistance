@@ -13,12 +13,12 @@ import {
 } from 'lucide-react';
 
 const ROLE_MENU_MAP = {
-    admin: ['/', '/settings', '/parts', '/bom', '/customers', '/prod-requests', '/prod-execution', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/ecn', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/quotations', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
+    admin: ['/', '/settings', '/parts', '/bom', '/customers', '/prod-requests', '/prod-execution', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/ecn', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
     engineer: ['/', '/parts', '/bom', '/ecn', '/inventory', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
-    sales: ['/', '/customers', '/prod-requests', '/inventory', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/quotations', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
+    sales: ['/', '/customers', '/prod-requests', '/inventory', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
     qa: ['/', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/inventory', '/transactions', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
     production: ['/', '/prod-execution', '/prod-requests', '/inventory', '/purchasing', '/outsourcing', '/transactions', '/vendors', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
-    manager: ['/', '/customers', '/prod-requests', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/quotations', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
+    manager: ['/', '/customers', '/prod-requests', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
     viewer: ['/', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
 };
 
@@ -79,7 +79,6 @@ export default function Sidebar() {
             title: '영업 및 매출',
             items: [
                 { name: '매출 대시보드', path: '/sales/dashboard', icon: TrendingUp },
-                { name: '견적서 관리', path: '/sales/quotations', icon: FileText },
                 { name: '수금 및 영수증', path: '/sales/billing', icon: CreditCard }
             ]
         }

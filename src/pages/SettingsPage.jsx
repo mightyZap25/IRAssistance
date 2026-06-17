@@ -5,7 +5,7 @@ import RoleGuard from '../components/common/RoleGuard';
 import { syncAllPartsToSupplierDB } from '../services/supplierAutoRegister';
 
 export default function SettingsPage() {
-    const [activeTab, setActiveTab] = useState('email');
+    const [activeTab, setActiveTab] = useState('database');
     const { userProfile } = useAuth();
     const [loading, setLoading] = useState(false);
     const [syncLoading, setSyncLoading] = useState(false);
@@ -238,6 +238,7 @@ export default function SettingsPage() {
                 <div className="flex flex-1 gap-4 overflow-hidden">
                     {/* Sidebar Tabs */}
                     <div className="w-64 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex flex-col gap-2 shrink-0">
+
                         <button onClick={() => setActiveTab('database')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-bold ${activeTab === 'database' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'text-slate-600 hover:bg-slate-50'}`}>
                             <Database size={18} /> DB 연동 설정 (PostgreSQL)
                         </button>
