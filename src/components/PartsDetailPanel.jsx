@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../firebase';
-import { collection, getDocs, limit, query, where, updateDoc, doc } from '../firebase';
+import { collection, getDocs, limit, query, where, updateDoc, doc, getDoc } from '../firebase';
 import { X, Clock, ArrowRightLeft, Layers, FileText, ShieldCheck, User, Sparkles, AlertTriangle, Paperclip, PenTool, Plus } from 'lucide-react';
 import RoleGuard from './common/RoleGuard';
 import { USER_ROLES } from '../services/userService';

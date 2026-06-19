@@ -15,6 +15,7 @@ import BOMImportModal from '../components/BOMImportModal';
 import CategoryManagerModal from '../components/CategoryManagerModal';
 import { useAuth } from '../contexts/AuthContext';
 import { hasPermission, USER_ROLES } from '../services/userService';
+import { createNotificationByRoute } from '../services/notificationService';
 
 const BOMPage = () => {
     const { userProfile } = useAuth();
@@ -551,16 +552,25 @@ const BOMPage = () => {
     };
 
     const handleDiscontinueMaster = async () => {
-        if (!selectedMaster || !selectedMaster.id) return;
+        if (!bomData || !bomData.id) {
+            alert('단종 처리할 품목 정보가 올바르지 않습니다.');
+            return;
+        }
         
+        const canDiscontinue = userProfile && hasPermission(userProfile.role, USER_ROLES.MANAGER);
+        if (!canDiscontinue) {
+            alert('단종 처리 권한이 없습니다. (MANAGER 이상)');
+            return;
+        }
+
         const isConfirm = window.confirm(
-            `[${selectedMaster.PartID}] ${selectedMaster.Name}\n\n이 품목을 정말로 단종(Discontinue) 처리하시겠습니까?\n단종 처리 시 목록에서 숨겨지며, 데이터베이스에는 영구 보존됩니다.`
+            `[${bomData.PartID}] ${bomData.Name}\n\n이 품목을 정말로 단종(Discontinue) 처리하시겠습니까?\n단종 처리 시 목록에서 숨겨지며, 데이터베이스에는 영구 보존됩니다.`
         );
 
         if (isConfirm) {
             setLoading(true);
             try {
-                const partRef = doc(db, 'parts', selectedMaster.id);
+                const partRef = doc(db, 'parts', bomData.id);
                 await updateDoc(partRef, { Status: 'Obsolete' });
                 
                 alert('단종 처리가 완료되었습니다.');
@@ -730,70 +740,14 @@ const BOMPage = () => {
                     });
                 }
             } else if (selectedMaster && selectedMaster.id) {
-                const partRef = doc(db, 'parts', selectedMaster.id);
-                const updateData = {
-                    Spec: specString,
-                    Description: bomData.Description || '',
-                    LastUpdatedBy: currentUserLog
-                };
-                if (bomData.ProductCategoryId !== undefined) updateData.ProductCategoryId = bomData.ProductCategoryId;
-                if (bomData.ProductSeriesId !== undefined) updateData.ProductSeriesId = bomData.ProductSeriesId;
-                batch.update(partRef, updateData);
-
-                // --- Update BOM relationships (Recursive) ---
-                const processBOMNodes = async (parentNode) => {
-                    if (!parentNode.Children) return;
-                    for (const child of parentNode.Children) {
-                        // DB에 기존 관계가 있는지 쿼리
-                        const bomQuery = query(
-                            collection(db, 'bom'), 
-                            where('ParentID', '==', parentNode.PartID), 
-                            where('ChildID', '==', child.PartID)
-                        );
-                        const bomSnap = await getDocs(bomQuery);
-
-                        if (child.isDeleted) {
-                            // 삭제된 노드면 db에서 해당 관계 삭제 (또는 Status를 Obsolete으로 변경. 여기선 완전 삭제로 구현)
-                            bomSnap.docs.forEach(d => {
-                                batch.delete(doc(db, 'bom', d.id));
-                            });
-                        } else if (child.isNew || bomSnap.empty) {
-                            // 신규 추가된 자식 (bom 관계 문서 ID를 ParentID_ChildID로 지정)
-                            const customBomId = `${parentNode.PartID}_${child.PartID}`;
-                            const newBomRef = doc(db, 'bom', customBomId);
-                            batch.set(newBomRef, {
-                                ParentID: parentNode.PartID,
-                                ChildID: child.PartID,
-                                Quantity: child.Quantity,
-                                Location: child.Location || '',
-                                Note: child.Note || '',
-                                Status: 'Active'
-                            });
-                        } else if (child.isModified) {
-                            // 기존 데이터 수정 (수량, 로케이션 등)
-                            bomSnap.docs.forEach(d => {
-                                batch.update(doc(db, 'bom', d.id), {
-                                    Quantity: child.Quantity,
-                                    Location: child.Location || '',
-                                    Note: child.Note || ''
-                                });
-                            });
-                        }
-
-                        // 재귀적으로 자식의 자식도 처리
-                        if (!child.isDeleted) {
-                            await processBOMNodes(child);
-                        }
-                    }
-                };
-
-                await processBOMNodes(bomData);
-                // ---------------------------------------------
-
-                // ECN Auto-drafting
                 if (ecnData && ecnData.updateType === 'ECN') {
+                    // ECN 기안 시에는 실제 부품과 BOM 구조를 즉시 업데이트하지 않고, 오직 ecnDraft 문서만 DB에 셋업합니다.
+                    // 기존 부품의 Status를 Pending(설변 진행 중)으로 변경합니다.
+                    const partRef = doc(db, 'parts', selectedMaster.id);
+                    batch.update(partRef, { Status: 'Pending' });
+
                     const diffs = compareBOMs(navStack[0].originalStructure || {}, bomData);
-                    const ecnRef = doc(collection(db, 'ecns'));
+                    const ecnRef = doc(collection(db, 'ecn_draft_items'));
                     // Fetch derivative models
                     const derivQuery = query(collection(db, 'parts'), where('BasePartID', '==', bomData.PartID));
                     const derivSnap = await getDocs(derivQuery);
@@ -814,10 +768,7 @@ const BOMPage = () => {
                         Rev: bomData.Rev || '1.0',
                         CurrentRevision: bomData.Rev || '1.0',
                         Reason: ecnData.reason,
-                        Status: 'Pending',
-                        CurrentStep: 0,
-                        ApprovalHistory: [],
-                        RequestedBy: userProfile?.displayName || userProfile?.Name || 'Unknown',
+                        Status: 'Draft',
                         CreatedAt: serverTimestamp(),
                         Changes: diffs.map(d => `${d.type.toUpperCase()}: ${d.partId} (${d.name}) ${d.details || ''}`),
                         ProposedChanges: { Spec: specString, Description: bomData.Description },
@@ -837,20 +788,93 @@ const BOMPage = () => {
                     }
                     
                     batch.set(ecnRef, ecnDraft);
+                } else {
+                    // 단순 업데이트 시에는 기존 부품과 BOM 구조를 즉시 업데이트합니다.
+                    const partRef = doc(db, 'parts', selectedMaster.id);
+                    const updateData = {
+                        Spec: specString,
+                        Description: bomData.Description || '',
+                        LastUpdatedBy: currentUserLog
+                    };
+                    if (bomData.ProductCategoryId !== undefined) updateData.ProductCategoryId = bomData.ProductCategoryId;
+                    if (bomData.ProductSeriesId !== undefined) updateData.ProductSeriesId = bomData.ProductSeriesId;
+                    batch.update(partRef, updateData);
+
+                    // --- Update BOM relationships (Recursive) ---
+                    const processBOMNodes = async (parentNode) => {
+                        if (!parentNode.Children) return;
+                        for (const child of parentNode.Children) {
+                            // DB에 기존 관계가 있는지 쿼리
+                            const bomQuery = query(
+                                collection(db, 'bom'), 
+                                where('ParentID', '==', parentNode.PartID), 
+                                where('ChildID', '==', child.PartID)
+                            );
+                            const bomSnap = await getDocs(bomQuery);
+
+                            if (child.isDeleted) {
+                                // 삭제된 노드면 db에서 해당 관계 삭제 (또는 Status를 Obsolete으로 변경. 여기선 완전 삭제로 구현)
+                                bomSnap.docs.forEach(d => {
+                                    batch.delete(doc(db, 'bom', d.id));
+                                });
+                            } else if (child.isNew || bomSnap.empty) {
+                                // 신규 추가된 자식 (bom 관계 문서 ID를 ParentID_ChildID로 지정)
+                                const customBomId = `${parentNode.PartID}_${child.PartID}`;
+                                const newBomRef = doc(db, 'bom', customBomId);
+                                batch.set(newBomRef, {
+                                    ParentID: parentNode.PartID,
+                                    ChildID: child.PartID,
+                                    Quantity: child.Quantity,
+                                    Location: child.Location || '',
+                                    Note: child.Note || '',
+                                    Status: 'Active'
+                                });
+                            } else if (child.isModified) {
+                                // 기존 데이터 수정 (수량, 로케이션 등)
+                                bomSnap.docs.forEach(d => {
+                                    batch.update(doc(db, 'bom', d.id), {
+                                        Quantity: child.Quantity,
+                                        Location: child.Location || '',
+                                        Note: child.Note || ''
+                                    });
+                                });
+                            }
+
+                            // 재귀적으로 자식의 자식도 처리
+                            if (!child.isDeleted) {
+                                await processBOMNodes(child);
+                            }
+                        }
+                    };
+
+                    await processBOMNodes(bomData);
                 }
             }
 
             await batch.commit();
 
-            if (selectedMaster && selectedMaster.id) {
+            if (ecnData?.updateType !== 'ECN' && selectedMaster && selectedMaster.id) {
                 const updatedMasterSnap = await getDoc(doc(db, 'parts', selectedMaster.id));
                 if (updatedMasterSnap.exists()) {
                     setSelectedMaster({ id: updatedMasterSnap.id, ...updatedMasterSnap.data() });
                 }
             }
 
+            // BOM 변경 알림 전송
+            try {
+                const partId = isCreatingNew ? (bomData.PartID.includes('NEW') ? bomData.PartID : bomData.PartID) : bomData.PartID;
+                if (ecnData && ecnData.updateType === 'ECN') {
+                    await createNotificationByRoute('/ecn', 'ECN 대기 등록', `부품 [${partId}] ${bomData.Name}에 대한 설계변경 내역이 ECN 대기 리스트에 등록되었습니다.`);
+                } else {
+                    const action = isCreatingNew ? '신규 등록' : 'BOM 수정';
+                    await createNotificationByRoute('/bom', `BOM ${action}`, `BOM [${partId}] ${bomData.Name}이(가) ${action}되었습니다.`);
+                }
+            } catch (notiErr) {
+                console.warn("Failed to send BOM notification:", notiErr);
+            }
+
             if (ecnData?.updateType === 'ECN') {
-                alert('BOM 변경 사항이 저장되었으며 ECN 초안이 자동으로 기안되었습니다.');
+                alert('BOM 변경 사항이 ECN 대기 리스트에 임시 등록되었습니다. ECN 결재선 지정을 위해 ECN 승인서를 작성해주세요.');
             } else {
                 alert('BOM 변경 사항이 성공적으로 저장되었습니다.');
             }
@@ -1174,6 +1198,32 @@ const BOMPage = () => {
                                     <div className="flex items-center gap-2 mb-1">
                                         <span className="px-2 py-0.5 rounded text-[10px] font-black bg-blue-100 text-blue-700 border border-blue-200 uppercase tracking-tighter">Rev {bomData.Rev || '1.0'}</span>
                                         <span className="text-slate-400 font-mono text-xs">{bomData.PartID}</span>
+                                        {(() => {
+                                            const lifecycleStatus = bomData.Lifecycle || bomData.Status;
+                                            if (!lifecycleStatus) return null;
+                                            const statusUpper = lifecycleStatus.toUpperCase();
+                                            let colorClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                                            let label = '승인완료/양산';
+                                            
+                                            if (statusUpper === 'DRAFT') {
+                                                colorClass = 'bg-orange-50 text-orange-700 border-orange-200 animate-pulse';
+                                                label = '대기/개발중';
+                                            } else if (statusUpper === 'RND') {
+                                                colorClass = 'bg-purple-50 text-purple-700 border-purple-200';
+                                                label = '연구소용';
+                                            } else if (statusUpper === 'OBSOLETE' || statusUpper === 'DISCONTINUED') {
+                                                colorClass = 'bg-rose-50 text-rose-700 border-rose-200';
+                                                label = '폐기/단종';
+                                            } else if (statusUpper === 'ECN' || statusUpper === 'ECN PENDING' || statusUpper === 'PENDING') {
+                                                colorClass = 'bg-blue-50 text-blue-700 border-blue-200 animate-pulse';
+                                                label = '설계변경';
+                                            }
+                                            return (
+                                                <span className={`px-2 py-0.5 rounded text-[10px] font-black border uppercase tracking-tighter ml-2 ${colorClass}`}>
+                                                    {label}
+                                                </span>
+                                            );
+                                        })()}
                                         {bomData.isDerivative && (
                                             <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200 uppercase tracking-tighter ml-2" title={`기본 모델: ${bomData.BasePartID}`}>Derived</span>
                                         )}
@@ -1186,29 +1236,54 @@ const BOMPage = () => {
                             <div className="flex gap-2">
                                 {!isEditMode ? (
                                     <>
+                                        {bomData && (() => {
+                                            const statusUpper = (bomData.Lifecycle || bomData.Status || '').toUpperCase();
+                                            return statusUpper !== 'OBSOLETE' && statusUpper !== 'DISCONTINUED';
+                                        })() && (
+                                            <button 
+                                                onClick={handleDiscontinueMaster} 
+                                                className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm shadow-md shadow-rose-100 transition-all rounded-lg"
+                                            >
+                                                <Ban size={16} /> 단종 처리
+                                            </button>
+                                        )}
                                         <button onClick={handleDeriveBOM} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-bold text-sm shadow-md shadow-emerald-100 transition-all">
                                             <GitCompare size={16} /> 파생발의
                                         </button>
                                         <button onClick={handleComparePrevious} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-bold text-sm shadow-sm transition-all">
                                             <GitCompare size={16} /> 이전 리비전과 비교
                                         </button>
-                                        <button 
-                                            onClick={() => {
-                                                setIsEditMode(true);
-                                                const selectedCat = bomFolders.find(f => f.id === bomData.ProductCategoryId);
-                                                const isActuator = (bomData.Category && bomData.Category.toLowerCase().includes('actuator')) || 
-                                                                   (selectedCat && selectedCat.name.toLowerCase().includes('actuator'));
-                                                
-                                                if (isActuator) {
-                                                    const merged = mergeActuatorSpecs(editingSpecs);
-                                                    setBomData({...bomData, Spec: JSON.stringify(merged)});
-                                                    setEditingSpecs(merged);
-                                                }
-                                            }} 
-                                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-sm shadow-md shadow-indigo-100 transition-all"
-                                        >
-                                            <Edit3 size={16} /> 수정 시작
-                                        </button>
+                                        {bomData && (() => {
+                                            const statusUpper = (bomData.Lifecycle || bomData.Status || '').toUpperCase();
+                                            const isPending = statusUpper === 'PENDING' || statusUpper === 'ECN' || statusUpper === 'ECN PENDING';
+                                            
+                                            if (isPending) {
+                                                return (
+                                                    <div className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-400 rounded-lg font-bold text-xs border border-slate-200 cursor-not-allowed">
+                                                        설계변경 진행 중
+                                                    </div>
+                                                );
+                                            }
+                                            return (
+                                                <button 
+                                                    onClick={() => {
+                                                        setIsEditMode(true);
+                                                        const selectedCat = bomFolders.find(f => f.id === bomData.ProductCategoryId);
+                                                        const isActuator = (bomData.Category && bomData.Category.toLowerCase().includes('actuator')) || 
+                                                                           (selectedCat && selectedCat.name.toLowerCase().includes('actuator'));
+                                                        
+                                                        if (isActuator) {
+                                                            const merged = mergeActuatorSpecs(editingSpecs);
+                                                            setBomData({...bomData, Spec: JSON.stringify(merged)});
+                                                            setEditingSpecs(merged);
+                                                        }
+                                                    }} 
+                                                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-sm shadow-md shadow-indigo-100 transition-all"
+                                                >
+                                                    <Edit3 size={16} /> 수정
+                                                </button>
+                                            );
+                                        })()}
                                         <button onClick={() => setIsExportModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-bold text-sm shadow-sm">
                                             <Download size={16} /> 내보내기
                                         </button>

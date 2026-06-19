@@ -22,7 +22,7 @@ export default function BOMExportModal({ isOpen, onClose, rootPart, bomData }) {
                 const partId = (item.PartID || '').toUpperCase();
                 const category = (item.Category || '').toLowerCase();
                 
-                if (partId.startsWith('IRE') || category.includes('electronic') || category.includes('회로')) {
+                if (partId.startsWith('IRE') || category.includes('electronic') || category.includes('회로') || category.includes('전자')) {
                     acc.electronic.push(item);
                 } else if (partId.startsWith('IRM') || category.includes('mech') || category.includes('기구')) {
                     acc.mechanical.push(item);

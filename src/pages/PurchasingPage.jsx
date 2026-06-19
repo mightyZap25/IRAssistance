@@ -14,7 +14,7 @@ import RFQEmailModal from '../components/RFQEmailModal';
 import QuotationUploadModal from '../components/QuotationUploadModal';
 import ApprovalModal from '../components/ApprovalModal';
 import ExpenseResolutionModal from '../components/ExpenseResolutionModal';
-import { createNotification } from '../services/notificationService';
+import { createNotification, createNotificationByRoute } from '../services/notificationService';
 
 const PO_STATUS_INFO = {
     DRAFT: { label: '발주 초안', color: 'bg-slate-100 text-slate-500 border-slate-200' },
@@ -86,7 +86,9 @@ export default function PurchasingPage() {
         const TotalQty = Items.reduce((acc, item) => acc + item.Qty, 0);
         const summaryPartName = Items.length > 0 ? (Items.length === 1 ? Items[0].PartName : `${Items[0].PartName} 외 ${Items.length - 1}건`) : '';
 
-        if (formData.id) {
+        let isEdit = !!formData.id;
+
+        if (isEdit) {
             const { id, ...rest } = formData;
             await updateDoc(doc(db, 'purchasing', id), { ...rest, Items, PartName: summaryPartName, Qty: TotalQty, TotalPrice, UpdatedAt: serverTimestamp() });
         } else {
@@ -96,12 +98,38 @@ export default function PurchasingPage() {
                 Status: 'RFQ_SENT', PaymentStatus: 'PENDING', CreatedAt: serverTimestamp(), CreatedBy: userProfile?.uid
             });
         }
+
+        // 발주 알림 전송
+        try {
+            const action = isEdit ? '수정' : '신규 요청';
+            await createNotificationByRoute('/purchasing', `발주 ${action}`, `발주서 [${summaryPartName}]이(가) ${action}되었습니다.`, `/purchasing`);
+        } catch (notiErr) {
+            console.warn("Failed to send purchasing notification:", notiErr);
+        }
+
         fetchData();
     };
 
     const handleStatusUpdate = async (id, status, extra = {}) => {
         try {
-            await updateDoc(doc(db, 'purchasing', id), { Status: status, ...extra, UpdatedAt: serverTimestamp() });
+            const docRef = doc(db, 'purchasing', id);
+            await updateDoc(docRef, { Status: status, ...extra, UpdatedAt: serverTimestamp() });
+            
+            // 발주 상태 업데이트 알림 전송
+            try {
+                const poSnap = await getDocs(query(collection(db, 'purchasing'), where('PONumber', '==', extra.PONumber || '')));
+                const po = poSnap.empty ? null : poSnap.docs[0].data();
+                const poName = po ? po.PartName : '알 수 없는 발주';
+                await createNotificationByRoute('/purchasing', '발주 상태 변경', `발주서 [${poName}]의 상태가 [${status}] 상태로 변경되었습니다.`, `/purchasing`);
+            } catch (notiErr) {
+                // query fallback
+                try {
+                    await createNotificationByRoute('/purchasing', '발주 상태 변경', `발주서 ID [${id}]의 상태가 [${status}] 상태로 변경되었습니다.`, `/purchasing`);
+                } catch (innerErr) {
+                    console.warn("Failed to send purchasing status notification:", innerErr);
+                }
+            }
+            
             fetchData();
         } catch (err) { console.error(err); }
     };

@@ -5,6 +5,7 @@ import { Plus, Trash2, Mail, Phone, User, X, Building2, Pencil, History, Package
 import MasterDataGrid from '../components/common/MasterDataGrid';
 import MasterDetailLayout from '../components/common/MasterDetailLayout';
 import CustomerDetailPanel from '../components/CustomerDetailPanel';
+import { createNotificationByRoute } from '../services/notificationService';
 
 export default function CustomersPage() {
     const [customers, setCustomers] = useState([]);
@@ -499,12 +500,22 @@ function CustomerModal({ initialData, onClose, onSuccess }) {
             if (initialData) {
                 const docRef = doc(db, 'customers', initialData.id);
                 await updateDoc(docRef, { ...savePayload, UpdatedAt: Timestamp.now() });
+                try {
+                    await createNotificationByRoute('/customers', '고객사 수정', `고객사 [${formData.Name}] 정보가 수정되었습니다.`);
+                } catch (notiErr) {
+                    console.warn("Failed to send customer notification:", notiErr);
+                }
                 onSuccess({ ...savePayload, id: initialData.id });
             } else {
                 const docRef = await addDoc(collection(db, 'customers'), {
                     ...savePayload,
                     CreatedAt: Timestamp.now()
                 });
+                try {
+                    await createNotificationByRoute('/customers', '고객사 신규 등록', `고객사 [${formData.Name}]이(가) 신규 등록되었습니다.`);
+                } catch (notiErr) {
+                    console.warn("Failed to send customer notification:", notiErr);
+                }
                 onSuccess({ ...savePayload, id: docRef.id });
             }
         } catch (error) {

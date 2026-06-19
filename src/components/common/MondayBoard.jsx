@@ -98,7 +98,9 @@ export default function MondayBoard({
     onDeleteTask,
     groups: customGroups,
     groupingField = 'status',
-    onAddTask
+    onAddTask,
+    allCategories,
+    currentUser
 }) {
     const [users, setUsers] = useState([]);
 
@@ -147,6 +149,8 @@ export default function MondayBoard({
                         onUpdateTask={onUpdateTask}
                         onDeleteTask={onDeleteTask}
                         onAddTask={onAddTask}
+                        allCategories={allCategories}
+                        currentUser={currentUser}
                     />
                 );
             })}
@@ -154,7 +158,7 @@ export default function MondayBoard({
     );
 }
 
-function MondayGroup({ group, tasks, allTasks, users, onSelect, onUpdateTask, onDeleteTask, onAddTask }) {
+function MondayGroup({ group, tasks, allTasks, users, onSelect, onUpdateTask, onDeleteTask, onAddTask, allCategories, currentUser }) {
     const [isExpanded, setIsExpanded] = useState(true);
     const [isAdding, setIsAdding] = useState(false);
     const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -195,7 +199,7 @@ function MondayGroup({ group, tasks, allTasks, users, onSelect, onUpdateTask, on
                                 <th className={`px-4 border-l-4 ${group.color} border-r border-slate-100 min-w-[350px]`}>항목 명칭</th>
                                 <th className="w-24 px-2 text-center border-r border-slate-100">유형</th>
                                 <th className="w-40 px-2 text-center border-r border-slate-100">제품명</th>
-                                <th className="w-14 px-2 text-center border-r border-slate-100"><User size={14} className="mx-auto" title="소유자" /></th>
+                                <th className="w-14 px-2 text-center border-r border-slate-100 text-center">담당자</th>
                                 <th className="w-32 px-2 text-center border-r border-slate-100 text-center">상태</th>
                                 <th className="w-28 px-2 text-center border-r border-slate-100 text-center">시작일</th>
                                 <th className="w-28 px-2 text-center border-r border-slate-100 text-center">마감일</th>
@@ -219,6 +223,8 @@ function MondayGroup({ group, tasks, allTasks, users, onSelect, onUpdateTask, on
                                     onDeleteTask={onDeleteTask}
                                     onAddTask={onAddTask}
                                     groupId={group.id}
+                                    allCategories={allCategories}
+                                    currentUser={currentUser}
                                 />
                             ))}
                             {isAdding ? (
@@ -271,7 +277,7 @@ function MondayGroup({ group, tasks, allTasks, users, onSelect, onUpdateTask, on
     );
 }
 
-function MondayRow({ task, allTasks, users, groupColor, onSelect, onUpdateTask, onDeleteTask, onAddTask, groupId, isSubtask = false }) {
+function MondayRow({ task, allTasks, users, groupColor, onSelect, onUpdateTask, onDeleteTask, onAddTask, groupId, isSubtask = false, allCategories, currentUser }) {
     const [activeDropdown, setActiveDropdown] = useState(null);
     const [targetRect, setTargetRect] = useState(null);
     const [isSubtasksExpanded, setIsSubtasksExpanded] = useState(true);
@@ -285,9 +291,27 @@ function MondayRow({ task, allTasks, users, groupColor, onSelect, onUpdateTask, 
 
     const status = STATUS_OPTIONS[stdStatusKey];
     const priority = PRIORITY_OPTIONS[stdPriorityKey];
-    const typeKey = task.type || 'none';
-    const typeInfo = TYPE_OPTIONS[typeKey] || TYPE_OPTIONS.none;
+    
+    // 이슈 유형 맵핑 (Category 및 type 처리)
+    const typeKey = task.Category || task.category || task.type || 'none';
+    let typeInfo;
+    if (allCategories && allCategories[typeKey]) {
+        typeInfo = {
+            label: allCategories[typeKey].label || typeKey,
+            color: allCategories[typeKey].color || 'bg-slate-200 border-slate-300 text-slate-700',
+            textColor: allCategories[typeKey].color?.includes('text-') ? '' : 'text-slate-700'
+        };
+    } else {
+        const legacyInfo = TYPE_OPTIONS[typeKey] || TYPE_OPTIONS.none;
+        typeInfo = {
+            label: legacyInfo.label,
+            color: legacyInfo.color,
+            textColor: legacyInfo.textColor || 'text-white'
+        };
+    }
+
     const assignee = users.find(u => u.uid === (task.assigneeUid || task.AssigneeUid));
+    const isAssignee = (task.assigneeUid || task.AssigneeUid) === currentUser?.uid;
 
     const handleDropdownOpen = (e, type) => {
         setTargetRect(e.currentTarget.getBoundingClientRect());
@@ -295,6 +319,23 @@ function MondayRow({ task, allTasks, users, groupColor, onSelect, onUpdateTask, 
     };
 
     const handleValueChange = (field, value) => {
+        // 담당자 배정 특수 처리 (UID와 함께 Name도 업데이트)
+        if (field === 'assigneeUid') {
+            const assigneeUser = users.find(u => u.uid === value);
+            const assigneeName = assigneeUser ? assigneeUser.displayName || assigneeUser.name || '' : '';
+            
+            const updatePayload = {};
+            const uidKey = task.hasOwnProperty('AssigneeUid') ? 'AssigneeUid' : 'assigneeUid';
+            const nameKey = task.hasOwnProperty('AssigneeName') ? 'AssigneeName' : 'assigneeName';
+            
+            updatePayload[uidKey] = value;
+            updatePayload[nameKey] = assigneeName;
+
+            onUpdateTask(task.id, updatePayload);
+            setActiveDropdown(null);
+            return;
+        }
+
         let finalField = field;
         let finalValue = value;
 
@@ -304,6 +345,13 @@ function MondayRow({ task, allTasks, users, groupColor, onSelect, onUpdateTask, 
         if (task.hasOwnProperty('AssigneeUid')) finalField = (field === 'assigneeUid' ? 'AssigneeUid' : finalField);
         if (task.hasOwnProperty('DueDate')) finalField = (field === 'dueDate' ? 'DueDate' : finalField);
         if (task.hasOwnProperty('StartDate')) finalField = (field === 'startDate' ? 'StartDate' : finalField);
+        
+        // Category 필드명 매핑 처리 추가
+        if (task.hasOwnProperty('Category') && field === 'type') {
+            finalField = 'Category';
+        } else if (task.hasOwnProperty('category') && field === 'type') {
+            finalField = 'category';
+        }
 
         // 프로젝트 TASK의 'completed' 특수 처리
         if (task.hasOwnProperty('completed') && field === 'status') {
@@ -370,7 +418,7 @@ function MondayRow({ task, allTasks, users, groupColor, onSelect, onUpdateTask, 
                 <td className="px-0.5 py-0.5 border-r border-slate-100 text-center">
                     <div
                         onClick={(e) => handleDropdownOpen(e, 'type')}
-                        className={`w-full h-9 flex items-center justify-center font-black text-white transition-all hover:brightness-105 cursor-pointer rounded-lg shadow-sm text-[11px] ${typeInfo.color}`}
+                        className={`w-full h-9 flex items-center justify-center font-black transition-all hover:brightness-105 cursor-pointer rounded-lg shadow-sm text-[11px] ${typeInfo.color} ${typeInfo.textColor}`}
                     >
                         {typeInfo.label}
                     </div>
@@ -403,7 +451,7 @@ function MondayRow({ task, allTasks, users, groupColor, onSelect, onUpdateTask, 
                                 <span className="text-[10px] font-black text-slate-600">{assignee.displayName?.substring(0, 1)}</span>
                             )
                         ) : (
-                            <UserPlus size={14} className="opacity-30" />
+                            <span className="text-[9px] font-black text-slate-400">배정</span>
                         )}
                     </div>
                 </td>
@@ -417,14 +465,32 @@ function MondayRow({ task, allTasks, users, groupColor, onSelect, onUpdateTask, 
                     </div>
                 </td>
 
-                <td className="px-1 py-1 text-center border-r border-slate-100 cursor-pointer group/date" onClick={(e) => handleDropdownOpen(e, 'startDate')}>
-                    <div className="w-full h-full min-h-[28px] flex items-center justify-center text-slate-400 font-black tracking-tighter text-[11px] group-hover/date:bg-slate-100 rounded transition-colors">
+                <td 
+                    className={`px-1 py-1 text-center border-r border-slate-100 ${isAssignee ? 'cursor-pointer group/date' : 'cursor-not-allowed opacity-60'}`} 
+                    onClick={(e) => {
+                        if (isAssignee) {
+                            handleDropdownOpen(e, 'startDate');
+                        } else {
+                            alert('시작일은 배정된 담당자만 설정할 수 있습니다.');
+                        }
+                    }}
+                >
+                    <div className={`w-full h-full min-h-[28px] flex items-center justify-center text-slate-400 font-black tracking-tighter text-[11px] ${isAssignee ? 'group-hover/date:bg-slate-100' : ''} rounded transition-colors`}>
                         {formatDate(task.startDate || task.StartDate)}
                     </div>
                 </td>
 
-                <td className="px-1 py-1 text-center border-r border-slate-100 cursor-pointer group/date" onClick={(e) => handleDropdownOpen(e, 'dueDate')}>
-                    <div className="w-full h-full min-h-[28px] flex items-center justify-center text-rose-500 font-black tracking-tighter text-[11px] group-hover/date:bg-slate-100 rounded transition-colors">
+                <td 
+                    className={`px-1 py-1 text-center border-r border-slate-100 ${isAssignee ? 'cursor-pointer group/date' : 'cursor-not-allowed opacity-60'}`} 
+                    onClick={(e) => {
+                        if (isAssignee) {
+                            handleDropdownOpen(e, 'dueDate');
+                        } else {
+                            alert('마감일은 배정된 담당자만 설정할 수 있습니다.');
+                        }
+                    }}
+                >
+                    <div className={`w-full h-full min-h-[28px] flex items-center justify-center text-rose-500 font-black tracking-tighter text-[11px] ${isAssignee ? 'group-hover/date:bg-slate-100' : ''} rounded transition-colors`}>
                         {formatDate(task.dueDate || task.DueDate || task.endDate)}
                     </div>
                 </td>
@@ -488,16 +554,32 @@ function MondayRow({ task, allTasks, users, groupColor, onSelect, onUpdateTask, 
 
                 {activeDropdown === 'type' && (
                 <DropdownPortal targetRect={targetRect} onClose={() => setActiveDropdown(null)} width={130}>
-                    <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl p-1.5 ring-1 ring-black/5">
-                        {Object.entries(TYPE_OPTIONS).map(([key, cfg]) => (
-                            <button 
-                                key={key}
-                                onClick={() => handleValueChange('type', key)}
-                                className={`w-full h-9 mb-1 last:mb-0 rounded-xl flex items-center justify-center font-black text-white text-[11px] transition-all hover:scale-[1.03] shadow-sm ${cfg.color}`}
-                            >
-                                {cfg.label}
-                            </button>
-                        ))}
+                    <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl p-1.5 ring-1 ring-black/5 max-h-60 overflow-y-auto custom-scrollbar">
+                        {allCategories ? (
+                            Object.entries(allCategories).map(([key, cfg]) => {
+                                const btnColor = cfg.color || 'bg-slate-200 border-slate-300 text-slate-700';
+                                const btnTextColor = cfg.color?.includes('text-') ? '' : 'text-slate-700';
+                                return (
+                                    <button 
+                                        key={key}
+                                        onClick={() => handleValueChange('type', key)}
+                                        className={`w-full h-9 mb-1 last:mb-0 rounded-xl flex items-center justify-center font-black text-[11px] transition-all hover:scale-[1.03] shadow-sm ${btnColor} ${btnTextColor}`}
+                                    >
+                                        {cfg.label || key}
+                                    </button>
+                                );
+                            })
+                        ) : (
+                            Object.entries(TYPE_OPTIONS).map(([key, cfg]) => (
+                                <button 
+                                    key={key}
+                                    onClick={() => handleValueChange('type', key)}
+                                    className={`w-full h-9 mb-1 last:mb-0 rounded-xl flex items-center justify-center font-black text-white text-[11px] transition-all hover:scale-[1.03] shadow-sm ${cfg.color}`}
+                                >
+                                    {cfg.label}
+                                </button>
+                            ))
+                        )}
                     </div>
                 </DropdownPortal>
             )}
@@ -593,6 +675,8 @@ function MondayRow({ task, allTasks, users, groupColor, onSelect, onUpdateTask, 
                     onAddTask={onAddTask}
                     groupId={groupId}
                     isSubtask={true}
+                    allCategories={allCategories}
+                    currentUser={currentUser}
                 />
             ))}
         </React.Fragment>

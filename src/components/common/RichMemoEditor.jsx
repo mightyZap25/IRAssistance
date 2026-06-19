@@ -61,14 +61,14 @@ export default function RichMemoEditor({ value, onChange, onSave, saving = false
                             setTimeout(onSave, 0);
                         }}
                         disabled={saving}
-                        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all shadow-sm shrink-0 mr-2 ${
+                        className={`flex items-center justify-center px-2.5 h-8 rounded-lg transition-all shadow-sm shrink-0 mr-2 text-[10px] font-black ${
                             saving 
                             ? '!bg-slate-100 !text-slate-400' 
                             : '!bg-emerald-600 hover:!bg-emerald-700 !text-white active:scale-95'
                         }`}
                         title="저장 (Save)"
                     >
-                        {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} style={{ stroke: 'white' }} />}
+                        {saving ? '저장중' : '저장'}
                     </button>
 
                     <div className="w-px h-6 bg-slate-200 mx-1 mr-2" />

@@ -12,6 +12,7 @@ import {
     Filter, Download, Plus, X, Search, Package, Users, Calendar,
     RefreshCw, FileText, AlertTriangle, Edit2, Barcode, HelpCircle, Eye, CornerDownRight
 } from 'lucide-react';
+import { createNotificationByRoute } from '../services/notificationService';
 
 // ─────────────────────────────────────────────────────────────
 // 기간 필터 옵션
@@ -604,6 +605,18 @@ export default function TransactionsPage() {
                 "비권한자 재고 보정 감지",
                 `관리자 권한이 없는 사용자 ${tData.CreatedBy} (${userProfile?.role || 'Guest'})가 품목 [${formData.PartID}]에 수동 수불 조정(${formData.Type === 'In' ? '입고' : '출고'}, ${formData.Quantity} EA)을 수행했습니다.`
             );
+        }
+
+        // 수불 변동 알림 전송
+        try {
+            await createNotificationByRoute(
+                '/transactions', 
+                '수동 입출고 등록', 
+                `품목 [${formData.PartID}]에 대해 수동 수불 조정(${formData.Type === 'In' ? '입고' : '출고'}, ${formData.Quantity} EA)이 수행되었습니다.`,
+                '/transactions'
+            );
+        } catch (notiErr) {
+            console.warn("Failed to send transaction notification:", notiErr);
         }
 
         await fetchAll();

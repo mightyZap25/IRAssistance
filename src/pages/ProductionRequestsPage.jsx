@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { db, collection, getDocs, doc, updateDoc, addDoc, setDoc, serverTimestamp, query, orderBy, where, writeBatch } from '../firebase';
+import { createNotificationByRoute } from '../services/notificationService';
 import { useAuth } from '../contexts/AuthContext';
 import MasterDataGrid from '../components/common/MasterDataGrid';
 
@@ -1224,12 +1225,21 @@ export default function ProductionRequestsPage() {
         try {
             const updateData = { Status: nextStatus, UpdatedAt: serverTimestamp(), Logs: [logEntry, ...(pr.Logs || [])] };
             await updateDoc(doc(db, 'production_requests', prId), updateData);
+            
+            // 알림 발송
+            try {
+                await createNotificationByRoute('/prod-requests', '생산 의뢰 상태 변경', `생산 의뢰서 [${pr.PRNumber || pr.id}]의 상태가 [${nextStatus}] 상태로 변경되었습니다.`, `/prod-requests`);
+            } catch (notiErr) {
+                console.warn("Failed to send PR status notification:", notiErr);
+            }
+
             await fetchPRs();
             if (selectedPR?.id === prId) setSelectedPR(prev => ({ ...prev, ...updateData }));
         } catch (err) { console.error(err); }
     };
 
     const handlePaymentComplete = async (prId, totalAmount) => {
+        const pr = prs.find(p => p.id === prId);
         try {
             const updateData = { 
                 PaymentStatus: 'PAID', 
@@ -1238,6 +1248,14 @@ export default function ProductionRequestsPage() {
                 UpdatedAt: serverTimestamp() 
             };
             await updateDoc(doc(db, 'production_requests', prId), updateData);
+            
+            // 알림 발송
+            try {
+                await createNotificationByRoute('/prod-requests', '생산 의뢰 수금 완료', `생산 의뢰서 [${pr ? pr.PRNumber : prId}]의 수금이 완료되었습니다.`, `/prod-requests`);
+            } catch (notiErr) {
+                console.warn("Failed to send PR payment notification:", notiErr);
+            }
+
             await fetchPRs();
             if (selectedPR?.id === prId) setSelectedPR(prev => ({ ...prev, ...updateData }));
         } catch (err) { console.error(err); }
@@ -1283,6 +1301,14 @@ export default function ProductionRequestsPage() {
             }
             
             await batch.commit();
+
+            // 알림 발송
+            try {
+                await createNotificationByRoute('/prod-requests', '생산 의뢰 완제품 출하', `생산 의뢰서 [${pr.PRNumber || pr.id}]의 완제품이 출하 완료되었습니다.`, `/prod-requests`);
+            } catch (notiErr) {
+                console.warn("Failed to send PR shipment notification:", notiErr);
+            }
+
             await fetchPRs();
             if (selectedPR?.id === prId) setSelectedPR(prev => ({ ...prev, ...updateData }));
         } catch (err) { console.error(err); }
@@ -1291,6 +1317,14 @@ export default function ProductionRequestsPage() {
     const handleSavePR = async (formData) => {
         const prNumber = generatePRNumber();
         await setDoc(doc(db, 'production_requests', prNumber), { ...formData, PRNumber: prNumber, CreatedAt: serverTimestamp() });
+        
+        // 알림 발송
+        try {
+            await createNotificationByRoute('/prod-requests', '생산 의뢰 신규 등록', `고객사 [${formData.CustomerName}]의 생산 의뢰서 [${prNumber}]가 등록되었습니다.`, `/prod-requests`);
+        } catch (notiErr) {
+            console.warn("Failed to send PR save notification:", notiErr);
+        }
+
         await fetchPRs();
         return { id: prNumber };
     };

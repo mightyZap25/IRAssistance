@@ -40,7 +40,7 @@ export async function getBOMStructure(rootPartId) {
     const partMap = {};
     partsSnap.forEach(doc => {
         const d = doc.data();
-        partMap[d.PartID] = d;
+        partMap[d.PartID] = { id: doc.id, ...d };
     });
 
     // 3. Build Tree Function

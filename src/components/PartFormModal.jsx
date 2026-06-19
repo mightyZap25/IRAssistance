@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { collection, doc, getDocs, query, where, writeBatch, addDoc, updateDoc, runTransaction } from '../firebase';
+import { collection, doc, getDocs, query, where, writeBatch, addDoc, updateDoc, runTransaction, serverTimestamp } from '../firebase';
 import { db } from '../firebase';
 import { 
     X, Save, FileText, Plus, CheckCircle2, 
     Settings2, Trash2, Tag, CheckSquare, MessageSquare, RefreshCw, 
-    Truck, DollarSign, PenTool, Database, Link as LinkIcon, ClipboardList
+    Truck, DollarSign, PenTool, Database, Link as LinkIcon, ClipboardList, ShieldCheck
 } from 'lucide-react';
 import BOMSaveModal from './BOMSaveModal';
 import { getCustomFields, createCustomField, deactivateCustomField } from '../services/metadataService';
 import { autoRegisterFromPart } from '../services/supplierAutoRegister';
+import { createNotificationByRoute } from '../services/notificationService';
+import { useAuth } from '../contexts/AuthContext';
 
 // Local helper for revision update
 function getNextRevision(currentRev) {
@@ -39,6 +41,7 @@ const PART_TYPES = [
 ];
 
 export default function PartFormModal({ mode = 'create', initialData = null, onClose, onSuccess }) {
+    const { userProfile } = useAuth();
     const isEdit = mode === 'edit';
     const [isRevisionUp, setIsRevisionUp] = useState(false);
     
@@ -326,68 +329,105 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
         }
     };
 
-    const handleFinalSubmit = async () => {
+    const handleFinalSubmit = async (ecnData) => {
         setIsSubmitting(true);
         try {
             if (isEdit) {
                 const batch = writeBatch(db);
-                const partRef = doc(db, 'parts', initialData.id);
-                const qaRef = doc(db, 'qa_target_parts', initialData.id);
+                
+                if (ecnData && ecnData.updateType === 'ECN') {
+                    // ECN 기안 시에는 부품 정보는 즉시 수정하지 않고 ECN 결재로 이관합니다.
+                    // 또한 기존 부품의 Status를 Pending(설변 진행 중)으로 변경합니다.
+                    const partRef = doc(db, 'parts', initialData.id);
+                    batch.update(partRef, { Status: 'Pending' });
 
-                if (isRevisionUp) {
-                    const newRev = getNextRevision(formData.Rev);
-                    const newPartID = formData.PartID; 
-
-                    const newPartData = { 
-                        ...formData, 
-                        PartID: newPartID,
-                        Rev: newRev, 
-                        IsLatestRevision: true, 
-                        CreatedAt: new Date().toISOString() 
-                    };
-                    delete newPartData.id;
-                    batch.set(doc(db, 'parts', newPartID), newPartData);
-                    batch.update(partRef, { IsLatestRevision: false });
-                    
-                    // QA Settings Sync
-                    if (qaSettings.isTarget) {
-                        batch.set(qaRef, {
-                            partId: newPartID,
-                            partName: formData.Name,
-                            spec: formData.Spec || '',
-                            useDocument: qaSettings.useDocument,
-                            inspectionItems: qaSettings.inspectionItems,
-                            updatedAt: new Date()
-                        });
-                    } else {
-                        batch.delete(qaRef);
+                    const proposedChanges = { ...formData };
+                    if (isRevisionUp) {
+                        const nextRev = getNextRevision(formData.Rev);
+                        proposedChanges.Rev = nextRev;
+                        proposedChanges.Revision = nextRev;
                     }
-                    
+
+                    const ecnRef = doc(collection(db, 'ecn_draft_items'));
+                    const ecnDraft = {
+                        Title: `[Part Update] ${formData.Name}`,
+                        Derivatives: [],
+                        HasStatusChange: false,
+                        InventoryAction: 'Use As Is',
+                        Type: 'Part Change',
+                        PartID: formData.PartID,
+                        PartName: formData.Name,
+                        MasterPartID: formData.MasterPartID || formData.PartID.split('-')[0],
+                        Rev: formData.Rev || '1.0',
+                        CurrentRevision: formData.Rev || '1.0',
+                        Reason: ecnData.reason,
+                        Status: 'Draft',
+                        CreatedAt: serverTimestamp(),
+                        Changes: ecnData.changes || [],
+                        ProposedChanges: proposedChanges,
+                        ProposedBOM: null
+                    };
+
+                    batch.set(ecnRef, ecnDraft);
                     await batch.commit();
                 } else {
-                    batch.update(partRef, formData);
-                    
-                    // QA Settings Sync
-                    if (qaSettings.isTarget) {
-                        batch.set(qaRef, {
-                            partId: initialData.PartID,
-                            partName: formData.Name,
-                            spec: formData.Spec || '',
-                            useDocument: qaSettings.useDocument,
-                            inspectionItems: qaSettings.inspectionItems,
-                            updatedAt: new Date()
-                        });
+                    const partRef = doc(db, 'parts', initialData.id);
+                    const qaRef = doc(db, 'qa_target_parts', initialData.id);
+
+                    if (isRevisionUp) {
+                        const newRev = getNextRevision(formData.Rev);
+                        const newPartID = formData.PartID; 
+
+                        const newPartData = { 
+                            ...formData, 
+                            PartID: newPartID,
+                            Rev: newRev, 
+                            IsLatestRevision: true, 
+                            CreatedAt: new Date().toISOString() 
+                        };
+                        delete newPartData.id;
+                        batch.set(doc(db, 'parts', newPartID), newPartData);
+                        batch.update(partRef, { IsLatestRevision: false });
+                        
+                        // QA Settings Sync
+                        if (qaSettings.isTarget) {
+                            batch.set(qaRef, {
+                                partId: newPartID,
+                                partName: formData.Name,
+                                spec: formData.Spec || '',
+                                useDocument: qaSettings.useDocument,
+                                inspectionItems: qaSettings.inspectionItems,
+                                updatedAt: new Date()
+                            });
+                        } else {
+                            batch.delete(qaRef);
+                        }
+                        
+                        await batch.commit();
                     } else {
-                        batch.delete(qaRef);
+                        batch.update(partRef, formData);
+                        
+                        // QA Settings Sync
+                        if (qaSettings.isTarget) {
+                            batch.set(qaRef, {
+                                partId: initialData.PartID,
+                                partName: formData.Name,
+                                spec: formData.Spec || '',
+                                useDocument: qaSettings.useDocument,
+                                inspectionItems: qaSettings.inspectionItems,
+                                updatedAt: new Date()
+                            });
+                        } else {
+                            batch.delete(qaRef);
+                        }
+                        
+                        await batch.commit();
                     }
-                    
-                    await batch.commit();
                 }
                 // 공급사/제조사 자동 등록 (편집 후)
                 try { await autoRegisterFromPart(formData); } catch (e) { console.warn('[AutoReg] 공급사/제조사 자동 등록 오류(무시):', e); }
             } else {
                 // RUN TRANSACTION FOR SAFE AUTO-ID GENERATION (CONCURRENCY LOCK)
-                const { runTransaction } = await import('firebase/firestore');
                 await runTransaction(db, async (transaction) => {
                     const catCode = formData.Category.match(/\((.*?)\)/)?.[1] || 'M';
                     const classCode = formData.Class.match(/\((.*?)\)/)?.[1] || 'I';
@@ -477,6 +517,23 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                 });
                 // 공급사/제조사 자동 등록 (신규 등록 후)
                 try { await autoRegisterFromPart(formData); } catch (e) { console.warn('[AutoReg] 공급사/제조사 자동 등록 오류(무시):', e); }
+            }
+
+            // 부품 추가/수정 알림 전송
+            try {
+                const partId = isEdit ? (isRevisionUp ? `${formData.PartID} (Rev ${getNextRevision(formData.Rev)})` : initialData.PartID) : (formData.PartID || '신규 부품');
+                if (isEdit && ecnData && ecnData.updateType === 'ECN') {
+                    await createNotificationByRoute('/ecn', 'ECN 대기 등록', `부품 [${partId}] ${formData.Name}에 대한 설계변경 내역이 ECN 대기 리스트에 등록되었습니다.`);
+                } else {
+                    const action = isEdit ? '수정' : '신규 등록';
+                    await createNotificationByRoute('/parts', `부품 ${action}`, `부품 [${partId}] ${formData.Name}이(가) ${action}되었습니다.`);
+                }
+            } catch (notiErr) {
+                console.warn("Failed to send part notification:", notiErr);
+            }
+
+            if (isEdit && ecnData && ecnData.updateType === 'ECN') {
+                alert('부품 변경 사항이 ECN 대기 리스트에 임시 등록되었습니다. ECN 결재선 지정을 위해 ECN 승인서를 작성해주세요.');
             }
             onSuccess();
             onClose();

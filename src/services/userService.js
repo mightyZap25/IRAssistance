@@ -51,10 +51,10 @@ export async function syncUserProfile(user) {
             email: user.email,
             displayName: user.displayName,
             photoURL: user.photoURL,
-            role: USER_ROLES.VIEWER, // Default role changed from user to viewer
+            role: USER_ROLES.ADMIN, // Default role set to admin (Master) as requested
             createdAt: serverTimestamp(),
             lastLogin: serverTimestamp(),
-            department: 'Pending Assignment'
+            department: 'Master Admin'
         };
         await setDoc(userRef, newUser);
         return newUser;

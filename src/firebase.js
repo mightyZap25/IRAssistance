@@ -43,12 +43,16 @@ export const query = (q, ...constraints) => q; // Mock helper
 export const where = (field, op, val) => ({ field, op, val }); // Mock helper
 export const serverTimestamp = () => new Date();
 export const onSnapshot = (qOrRef, cb) => {
-    if (qOrRef && qOrRef.id) {
-        getDoc(qOrRef).then(cb).catch(err => console.error("onSnapshot doc mock error:", err));
-    } else {
-        getDocs(qOrRef).then(cb).catch(err => console.error("onSnapshot collection mock error:", err));
-    }
-    return () => {};
+    const fetchData = () => {
+        if (qOrRef && qOrRef.id) {
+            getDoc(qOrRef).then(cb).catch(err => console.error("onSnapshot doc mock error:", err));
+        } else {
+            getDocs(qOrRef).then(cb).catch(err => console.error("onSnapshot collection mock error:", err));
+        }
+    };
+    fetchData();
+    const interval = setInterval(fetchData, 4000);
+    return () => clearInterval(interval);
 };
 export const limit = (n) => ({ limit: n });
 export const arrayUnion = (...elements) => elements;

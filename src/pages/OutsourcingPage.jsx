@@ -9,7 +9,7 @@ import CreateOutsourcingModal from '../components/CreateOutsourcingModal';
 import RFQEmailModal from '../components/RFQEmailModal';
 import ApprovalModal from '../components/ApprovalModal';
 import ExpenseResolutionModal from '../components/ExpenseResolutionModal';
-import { createNotification } from '../services/notificationService';
+import { createNotification, createNotificationByRoute } from '../services/notificationService';
 
 const OUTSOURCING_STATUS = {
     DRAFT: { label: '의뢰초안', color: 'bg-slate-100 text-slate-500 border-slate-200' },
@@ -49,7 +49,8 @@ export default function OutsourcingPage() {
     };
 
     const handleSaveOrder = async (formData) => {
-        if (formData.id) {
+        let isEdit = !!formData.id;
+        if (isEdit) {
             await updateDoc(doc(db, 'outsourcing', formData.id), { ...formData, UpdatedAt: serverTimestamp() });
         } else {
             await addDoc(collection(db, 'outsourcing'), {
@@ -59,6 +60,15 @@ export default function OutsourcingPage() {
                 CreatedBy: userProfile?.uid
             });
         }
+
+        // 알림 발송
+        try {
+            const action = isEdit ? '수정' : '신규 의뢰';
+            await createNotificationByRoute('/outsourcing', `외주 의뢰 ${action}`, `외주 가공 의뢰 [${formData.PartName}]이(가) ${action}되었습니다.`, `/outsourcing`);
+        } catch (notiErr) {
+            console.warn("Failed to send outsourcing notification:", notiErr);
+        }
+
         fetchData();
     };
 
@@ -100,6 +110,14 @@ export default function OutsourcingPage() {
             });
 
             await batch.commit();
+
+            // 알림 발송
+            try {
+                await createNotificationByRoute('/outsourcing', '외주 자재 불출 완료', `외주 가공 의뢰 [${order.PartName}]에 대한 사급 자재가 불출(출고) 처리되었습니다.`, `/outsourcing`);
+            } catch (notiErr) {
+                console.warn("Failed to send outsourcing ship notification:", notiErr);
+            }
+
             alert('자재 불출 및 재고 차감이 완료되었습니다.');
             fetchData();
         } catch (err) { console.error(err); alert('자재 불출 중 오류 발생'); } finally { setLoading(false); }
@@ -107,6 +125,21 @@ export default function OutsourcingPage() {
 
     const handleStatusUpdate = async (id, status, extra = {}) => {
         await updateDoc(doc(db, 'outsourcing', id), { Status: status, ...extra, UpdatedAt: serverTimestamp() });
+        
+        // 알림 발송
+        try {
+            const orderSnap = await getDocs(query(collection(db, 'outsourcing'), where('OrderNumber', '==', extra.OrderNumber || '')));
+            const order = orderSnap.empty ? null : orderSnap.docs[0].data();
+            const partName = order ? order.PartName : '알 수 없는 외주';
+            await createNotificationByRoute('/outsourcing', '외주 가공 상태 변경', `외주 가공 의뢰 [${partName}]의 상태가 [${status}] 상태로 변경되었습니다.`, `/outsourcing`);
+        } catch (notiErr) {
+            try {
+                await createNotificationByRoute('/outsourcing', '외주 가공 상태 변경', `외주 가공 의뢰 ID [${id}]의 상태가 [${status}] 상태로 변경되었습니다.`, `/outsourcing`);
+            } catch (innerErr) {
+                console.warn("Failed to send outsourcing status notification:", innerErr);
+            }
+        }
+
         fetchData();
     };
 

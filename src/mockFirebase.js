@@ -85,6 +85,7 @@ export const mockFirestore = {
                     };
                 }),
                 size: data.length,
+                empty: data.length === 0,
                 forEach: (cb) => {
                     data.forEach(item => {
                         const docId = item.id || item.PartID || item.uid || '';
@@ -98,7 +99,7 @@ export const mockFirestore = {
             };
         } catch (err) {
             console.error(`[MockDB] getDocs error for ${collectionName}:`, err);
-            return { docs: [], size: 0, forEach: () => {} };
+            return { docs: [], size: 0, empty: true, forEach: () => {} };
         }
     },
     getDoc: async (docRef) => {

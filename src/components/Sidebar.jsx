@@ -54,16 +54,49 @@ export default function Sidebar() {
         .map(group => ({ ...group, items: group.items.filter(item => isAllowed(item.path)) }))
         .filter(group => group.items.length > 0);
 
-    const ALL_MENU_GROUPS = [
-        { title: '메인', items: [ { name: '부품 관리', path: '/parts', icon: Settings }, { name: 'BOM 관리', path: '/bom', icon: Layers }, { name: '고객사 관리', path: '/customers', icon: Building2 } ] },
-        { title: '생산 및 구매', items: [ { name: '생산 의뢰', path: '/prod-requests', icon: ClipboardList }, { name: '생산 계획', path: '/prod-execution', icon: PlayCircle }, { name: '발주 관리', path: '/purchasing', icon: ShoppingCart }, { name: '외주 관리', path: '/outsourcing', icon: Truck } ] },
-        { title: '재고 및 품질', items: [ { name: '품질 대시보드', path: '/qa/dashboard', icon: TrendingUp }, { name: '재고 현황', path: '/inventory', icon: Package }, { name: '품질 공정 관리', path: '/qa/process', icon: Activity }, { name: '품질 기준 설정', path: '/qa/config', icon: Settings }, { name: '개발 성능 테스트', path: '/qa/dev-testing', icon: Microscope }, { name: '입출고 내역', path: '/transactions', icon: History } ] },
-        { title: '마스터 데이터', items: [ { name: '제조사 관리', path: '/manufacturers', icon: Factory }, { name: '공급사 관리', path: '/vendors', icon: Users }, { name: 'ECN 승인', path: '/ecn', icon: AlertCircle, badge: pendingEcnCount > 0 ? pendingEcnCount : null }, { name: '환경설정(Admin)', path: '/settings', icon: Settings } ] }
+    const PLM_GROUPS = [
+        {
+            title: 'ERP 핵심 & PLM',
+            items: [
+                { name: '부품 관리', path: '/parts', icon: Settings },
+                { name: 'BOM 관리', path: '/bom', icon: Layers },
+                { name: '고객사 관리', path: '/customers', icon: Building2 },
+                { name: '제조사 관리', path: '/manufacturers', icon: Factory },
+                { name: '공급사 관리', path: '/vendors', icon: Users },
+                { name: 'ECN 승인', path: '/ecn', icon: AlertCircle, badge: pendingEcnCount > 0 ? pendingEcnCount : null }
+            ]
+        }
+    ];
+
+    const SCM_GROUPS = [
+        {
+            title: '생산 & 공급망 SCM',
+            items: [
+                { name: '생산 의뢰', path: '/prod-requests', icon: ClipboardList },
+                { name: '생산 계획', path: '/prod-execution', icon: PlayCircle },
+                { name: '발주 관리', path: '/purchasing', icon: ShoppingCart },
+                { name: '외주 관리', path: '/outsourcing', icon: Truck },
+                { name: '입출고 내역', path: '/transactions', icon: History }
+            ]
+        }
+    ];
+
+    const QA_GROUPS = [
+        {
+            title: '재고 & 품질 QA',
+            items: [
+                { name: '품질 대시보드', path: '/qa/dashboard', icon: TrendingUp },
+                { name: '재고 현황', path: '/inventory', icon: Package },
+                { name: '품질 공정 관리', path: '/qa/process', icon: Activity },
+                { name: '품질 기준 설정', path: '/qa/config', icon: Settings },
+                { name: '개발 성능 테스트', path: '/qa/dev-testing', icon: Microscope }
+            ]
+        }
     ];
 
     const PROJECT_MENU_GROUPS = [
         {
-            title: '프로젝트 제어',
+            title: '프로젝트 & 작업 PM',
             items: [
                 { name: '프로젝트 현황판', path: '/project/dashboard', icon: LayoutDashboard },
                 { name: '개발 프로젝트', path: '/project/management', icon: Briefcase },
@@ -76,7 +109,7 @@ export default function Sidebar() {
 
     const SALES_MENU_GROUPS = [
         {
-            title: '영업 및 매출',
+            title: '영업 & 정산',
             items: [
                 { name: '매출 대시보드', path: '/sales/dashboard', icon: TrendingUp },
                 { name: '수금 및 영수증', path: '/sales/billing', icon: CreditCard }
@@ -86,7 +119,7 @@ export default function Sidebar() {
 
     const COLLAB_MENU_GROUPS = [
         {
-            title: '근무 및 오피스',
+            title: '협업 & 공통 오피스',
             items: [
                 { name: '근태 관리', path: '/hr/attendance', icon: UserCheck, badge: pendingApprovalCount > 0 ? pendingApprovalCount : null },
                 { name: '통합 일정', path: '/workspace/calendar', icon: CalendarDays },
@@ -99,10 +132,22 @@ export default function Sidebar() {
         }
     ];
 
-    const fErp = filterGroups(ALL_MENU_GROUPS);
+    const ADMIN_GROUPS = [
+        {
+            title: '시스템 제어',
+            items: [
+                { name: '환경설정(Admin)', path: '/settings', icon: Settings }
+            ]
+        }
+    ];
+
+    const fPlm = filterGroups(PLM_GROUPS);
+    const fScm = filterGroups(SCM_GROUPS);
+    const fQa = filterGroups(QA_GROUPS);
     const fProj = filterGroups(PROJECT_MENU_GROUPS);
     const fSales = filterGroups(SALES_MENU_GROUPS);
     const fCollab = filterGroups(COLLAB_MENU_GROUPS);
+    const fAdmin = filterGroups(ADMIN_GROUPS);
 
     const roleInfo = {
         admin: { label: 'Admin', color: 'bg-rose-500' },
@@ -138,7 +183,15 @@ export default function Sidebar() {
                     </NavLink>
                 )}
 
-                {[ { g: fErp, t: 'ERP' }, { g: fSales, t: 'SALES' }, { g: fProj, t: 'PROJ' }, { g: fCollab, t: 'COLLAB' } ].map(sec => sec.g.length > 0 && (
+                {[
+                    { g: fPlm, t: 'PLM' },
+                    { g: fScm, t: 'SCM' },
+                    { g: fQa, t: 'QA' },
+                    { g: fProj, t: 'PROJ' },
+                    { g: fSales, t: 'SALES' },
+                    { g: fCollab, t: 'COLLAB' },
+                    { g: fAdmin, t: 'ADMIN' }
+                ].map(sec => sec.g.length > 0 && (
                     <div key={sec.t} className="space-y-2">
                         <div className="px-3 text-[11px] font-black text-slate-400 uppercase tracking-wider">{sec.t}</div>
                         <div className="space-y-1 pl-2 border-l border-slate-100 ml-2">

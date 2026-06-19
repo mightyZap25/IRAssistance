@@ -1,48 +1,88 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, arrayUnion, addDoc } from '../firebase';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { getNextRevision } from '../services/bomService';
 import MasterDataGrid from '../components/common/MasterDataGrid';
-import { Clock, CheckCircle2, XCircle, Info, ChevronRight, User, Calendar, Tag, AlertCircle, ArrowRight, Minus, Plus, Edit3, MessageSquare, ShieldCheck } from 'lucide-react';
-
+import { 
+    Clock, CheckCircle2, XCircle, Info, ChevronRight, User, Calendar, Tag, 
+    AlertCircle, ArrowRight, Minus, Plus, Edit3, MessageSquare, ShieldCheck, 
+    Trash2, ClipboardList, CheckSquare, PlusCircle
+} from 'lucide-react';
 import { useLocation } from 'react-router-dom';
+import { createNotificationByRoute } from '../services/notificationService';
+
+const DEFAULT_APPROVAL_STEPS = [
+    { step: 0, label: '연구소 담당자', approverId: '', approverName: '' },
+    { step: 1, label: '생산 담당자', approverId: '', approverName: '' },
+    { step: 2, label: 'QA 담당자', approverId: '', approverName: '' },
+    { step: 3, label: '영업 담당자', approverId: '', approverName: '' },
+    { step: 4, label: '대표', approverId: '', approverName: '' }
+];
 
 const ECN_COLUMN_DEFS = {
-    Title: { label: '요청명 (Title)', default: true },
-    Type: { label: '구분', default: true },
-    PartID: { label: '품번 (Part ID)', default: true },
-    PartName: { label: '품명 (Name)', default: true },
-    Status: { label: '상태 (Status)', default: true },
+    ECNNumber: { label: '문서번호', default: true },
+    Title: { label: '승인서 제목', default: true },
+    ECNType: { label: '구분', default: true },
+    PublishDate: { label: '발행일자', default: true },
+    Status: { label: '상태', default: true },
     CurrentStep: { label: '결재 현황', default: true },
     RequestedBy: { label: '기안자', default: true },
-    CreatedAt: { label: '요청/처리 일시', default: true },
+    CreatedAt: { label: '기안 일시', default: true },
 };
 
-const APPROVAL_STEPS = [
-    { id: 0, label: '연구소 담당자', role: 'ENGINEER_LEAD' },
-    { id: 1, label: '생산 담당자', role: 'PRODUCTION_MANAGER' },
-    { id: 2, label: 'QA 담당자', role: 'QA_MANAGER' },
-    { id: 3, label: '영업 담당자', role: 'SALES_MANAGER' },
-    { id: 4, label: '대표', role: 'CEO' }
-];
+const DRAFT_COLUMN_DEFS = {
+    Type: { label: '분류', default: true },
+    PartID: { label: '품번', default: true },
+    PartName: { label: '품명', default: true },
+    Rev: { label: '현재 Rev', default: true },
+    Reason: { label: '변경 요약/사유', default: true },
+    RequestedBy: { label: '발의자', default: true },
+};
 
 const ECNPage = () => {
     const { userProfile } = useAuth();
     const location = useLocation();
-    const [viewMode, setViewMode] = useState('PENDING'); // PENDING or HISTORY
+    
+    // View Mode: PENDING (결재대기함), HISTORY (처리완료함), DRAFT_ITEMS (설변 대기 리스트)
+    const [viewMode, setViewMode] = useState('PENDING'); 
     const [ecnList, setEcnList] = useState([]);
+    const [draftItems, setDraftItems] = useState([]);
+    const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
+    
     const [selectedEcn, setSelectedEcn] = useState(null);
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
     const [approvalComment, setApprovalComment] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
 
+    // ECN 승인서 작성 모달 상태
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [selectedDraftIds, setSelectedDraftIds] = useState([]);
+    const [formTitle, setFormTitle] = useState('');
+    const [formPublishDate, setFormPublishDate] = useState(new Date().toISOString().slice(0, 10));
+    const [formSeries, setFormSeries] = useState('Actuator');
+    const [formCommMethod, setFormCommMethod] = useState('PT');
+    const [formModelsText, setFormModelsText] = useState('');
+    const [formECNType, setFormECNType] = useState('정규');
+    const [formSpecChange, setFormSpecChange] = useState(false);
+    const [formSpecChangeContent, setFormSpecChangeContent] = useState('');
+    const [formImprovement, setFormImprovement] = useState('');
+    const [formNote, setFormNote] = useState('');
+    const [formRevNo, setFormRevNo] = useState('2.0');
+    const [customApprovalSteps, setCustomApprovalSteps] = useState([]);
+
+    const [filteredData, setFilteredData] = useState([]);
+    const [sortConfig, setSortConfig] = useState({ key: 'CreatedAt', direction: 'desc' });
+    const [gridViewMode, setGridViewMode] = useState('list');
+
     useEffect(() => {
         fetchECNs();
-    }, []);
+        fetchDraftItemsAndUsers();
+    }, [viewMode]);
 
-    // URL 파라미터 감지 (이슈 링크 연동용)
+    // URL 파라미터 감지 (외부 링크 연동용)
     useEffect(() => {
         if (ecnList.length > 0) {
             const params = new URLSearchParams(location.search);
@@ -51,15 +91,11 @@ const ECNPage = () => {
                 const target = ecnList.find(e => e.id === ecnId);
                 if (target) {
                     setSelectedEcn(target);
-                    setIsModalOpen(true);
+                    setIsDetailsModalOpen(true);
                 }
             }
         }
     }, [location.search, ecnList]);
-
-    const [filteredData, setFilteredData] = useState([]);
-    const [sortConfig, setSortConfig] = useState({ key: 'CreatedAt', direction: 'desc' });
-    const [gridViewMode, setGridViewMode] = useState('list');
 
     const handleSort = (key) => {
         let direction = 'asc';
@@ -88,60 +124,14 @@ const ECNPage = () => {
         });
     }, [ecnList, sortConfig, viewMode]);
 
-    useEffect(() => {
-        const fixLegacyDraftParts = async () => {
-            try {
-                const partsSnap = await getDocs(query(collection(db, 'parts'), where('IsLatestRevision', '==', true)));
-                const pendingEcnsSnap = await getDocs(query(collection(db, 'ecns'), where('Status', '==', 'Pending')));
-                const pendingPartIds = new Set(pendingEcnsSnap.docs.map(d => d.data().PartID));
-
-                let createdAny = false;
-                for (const pDoc of partsSnap.docs) {
-                    const pData = pDoc.data();
-                    // If it's Draft or Pending and has no pending ECN, create one
-                    if ((pData.Lifecycle === 'Draft' || pData.Status === 'Pending') && !pendingPartIds.has(pData.PartID)) {
-                        await addDoc(collection(db, 'ecns'), {
-                            MasterPartID: pData.MasterPartID || pData.PartID.split('-')[0],
-                            PartID: pData.PartID,
-                            PartName: pData.Name || pData.PartName || '명칭 없음',
-                            Rev: pData.Rev || '1.0',
-                            CurrentRevision: pData.Rev || '1.0',
-                            Reason: '누락된 초도품/설계변경 승인 처리 (시스템 자동 복구)',
-                            Type: 'Initial Release',
-                            Status: 'Pending',
-                            CurrentStep: 0,
-                            ApprovalHistory: [],
-                            RequestedBy: 'System Migration',
-                            CreatedAt: serverTimestamp(),
-                            Changes: [{ field: 'Lifecycle', oldValue: 'Draft', newValue: 'Active' }]
-                        });
-                        createdAny = true;
-                    }
-                }
-                if (createdAny) fetchECNs();
-            } catch (err) {
-                console.error('Migration failed', err);
-            }
-        };
-        
-        fixLegacyDraftParts();
-        fetchECNs();
-    }, [viewMode]);
-
     const fetchECNs = async () => {
         setLoading(true);
         try {
             let q;
             if (viewMode === 'PENDING') {
-                q = query(
-                    collection(db, 'ecns'),
-                    where('Status', '==', 'Pending')
-                );
+                q = query(collection(db, 'ecns'), where('Status', '==', 'Pending'));
             } else {
-                q = query(
-                    collection(db, 'ecns'),
-                    where('Status', 'in', ['Approved', 'Rejected'])
-                );
+                q = query(collection(db, 'ecns'), where('Status', 'in', ['Approved', 'Rejected']));
             }
             const querySnapshot = await getDocs(q);
             const list = [];
@@ -149,7 +139,6 @@ const ECNPage = () => {
                 list.push({ id: doc.id, ...doc.data() });
             });
 
-            // Client-side sorting as a fallback for index latency
             list.sort((a, b) => {
                 const getTime = (val) => {
                     if (!val) return 0;
@@ -157,7 +146,6 @@ const ECNPage = () => {
                     if (val instanceof Date) return val.getTime();
                     return 0;
                 };
-
                 const timeA = viewMode === 'PENDING' ? getTime(a.CreatedAt) : getTime(a.ProcessedAt || a.CreatedAt);
                 const timeB = viewMode === 'PENDING' ? getTime(b.CreatedAt) : getTime(b.ProcessedAt || b.CreatedAt);
                 return timeB - timeA;
@@ -170,27 +158,141 @@ const ECNPage = () => {
         setLoading(false);
     };
 
+    const fetchDraftItemsAndUsers = async () => {
+        try {
+            // ecn_draft_items 중 대기(Draft) 상태인 항목 조회
+            const draftSnap = await getDocs(query(collection(db, 'ecn_draft_items'), where('Status', '==', 'Draft')));
+            const list = [];
+            draftSnap.forEach((doc) => {
+                list.push({ id: doc.id, ...doc.data() });
+            });
+            setDraftItems(list);
+
+            // 전체 유저 정보 조회 (결재선 지정용)
+            const usersSnap = await getDocs(collection(db, 'users'));
+            const uList = [];
+            usersSnap.forEach((doc) => {
+                const uData = doc.data();
+                uList.push({
+                    uid: doc.id,
+                    email: uData.email || '',
+                    displayName: uData.displayName || uData.Name || '알 수 없는 사용자',
+                    role: uData.role || ''
+                });
+            });
+            setUsers(uList);
+        } catch (err) {
+            console.error("Error fetching draft items and users:", err);
+        }
+    };
+
+    // ECN 승인서 기안용 문서번호 자동 생성
+    const generateECNNumber = async () => {
+        const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const ecnsSnap = await getDocs(collection(db, 'ecns'));
+        const todayEcns = ecnsSnap.docs.filter(d => (d.data().ECNNumber || '').startsWith(`ECN-${todayStr}`));
+        const nextSeq = (todayEcns.length + 1).toString().padStart(4, '0');
+        return `ECN-${todayStr}-${nextSeq}`;
+    };
+
+    // ECN 기안 제출
+    const handleSubmitECN = async () => {
+        if (!formTitle.trim()) { alert('승인서 제목을 입력해주세요.'); return; }
+        if (selectedDraftIds.length === 0) { alert('설계변경 대기 리스트에서 하나 이상의 대상을 선택해주세요.'); return; }
+        
+        // 결재선 검증 (비어 있는 결재자가 있는지)
+        const hasEmptyApprover = customApprovalSteps.some(step => !step.approverId);
+        if (hasEmptyApprover) {
+            alert('모든 결재 단계의 결재자를 지정해주세요.');
+            return;
+        }
+
+        try {
+            setLoading(true);
+            const batch = writeBatch(db);
+            const ecnNum = await generateECNNumber();
+            const newEcnRef = doc(collection(db, 'ecns'));
+
+            const selectedItems = draftItems.filter(item => selectedDraftIds.includes(item.id));
+
+            const newEcnDoc = {
+                ECNNumber: ecnNum,
+                Title: formTitle,
+                PublishDate: formPublishDate,
+                ApplicableSeries: formSeries,
+                CommunicationMethod: formCommMethod,
+                ApplicableModelsText: formModelsText,
+                ECNType: formECNType,
+                SpecChangeFlag: formSpecChange,
+                SpecChangeContent: formSpecChangeContent,
+                ImprovementEffect: formImprovement,
+                Note: formNote,
+                RevNo: formRevNo,
+                Status: 'Pending',
+                CurrentStep: 0,
+                ApprovalHistory: [],
+                ApprovalSteps: customApprovalSteps,
+                RequestedBy: userProfile?.displayName || userProfile?.Name || 'Unknown',
+                CreatedAt: serverTimestamp(),
+                Items: selectedItems 
+            };
+
+            batch.set(newEcnRef, newEcnDoc);
+
+            // 대기 항목들의 상태를 'Pending ECN'으로 변경하여 묶임 상태 명시
+            selectedItems.forEach(item => {
+                const itemRef = doc(db, 'ecn_draft_items', item.id);
+                batch.update(itemRef, { Status: 'Pending ECN', ECNNumber: ecnNum });
+            });
+
+            await batch.commit();
+            alert(`설계변경 승인서 기안이 완료되었습니다. (문서번호: ${ecnNum})`);
+            setIsCreateModalOpen(false);
+            
+            // 폼 초기화
+            setFormTitle('');
+            setFormSeries('Actuator');
+            setFormCommMethod('PT');
+            setFormModelsText('');
+            setFormECNType('정규');
+            setFormSpecChange(false);
+            setFormSpecChangeContent('');
+            setFormImprovement('');
+            setFormNote('');
+            setFormRevNo('2.0');
+            setSelectedDraftIds([]);
+
+            fetchECNs();
+            fetchDraftItemsAndUsers();
+        } catch (error) {
+            console.error("ECN 제출 실패:", error);
+            alert("ECN 승인서 저장 중 오류가 발생했습니다.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const isUserTurn = (ecn) => {
         if (!userProfile || ecn.Status !== 'Pending') return false;
         const currentStepIdx = ecn.CurrentStep || 0;
-        // 사용자 요청에 따라 현재 로그인된 계정에 무조건 마스터 권한(결재 승인/반려 가능) 부여
-        const isMaster = true; 
-        return isMaster || userProfile.role === APPROVAL_STEPS[currentStepIdx]?.role;
+        
+        // 지정 결재선 존재 시, 해당 단계 approverId가 일치하는지 판별
+        if (ecn.ApprovalSteps && ecn.ApprovalSteps.length > 0) {
+            const currentStepApprover = ecn.ApprovalSteps[currentStepIdx];
+            return userProfile.uid === currentStepApprover?.approverId || userProfile.role === 'admin';
+        }
+        
+        return userProfile.role === 'admin';
     };
 
+    // ECN 결재 승인
     const handleApprove = async (ecn) => {
         const currentStepIdx = ecn.CurrentStep || 0;
-        const isFinalStep = currentStepIdx === APPROVAL_STEPS.length - 1;
+        const totalSteps = ecn.ApprovalSteps ? ecn.ApprovalSteps.length : DEFAULT_APPROVAL_STEPS.length;
+        const isFinalStep = currentStepIdx === totalSteps - 1;
+        const stepsList = ecn.ApprovalSteps || DEFAULT_APPROVAL_STEPS;
 
-        if (currentStepIdx === 3 && ecn.Derivatives && ecn.Derivatives.length > 0) {
-            const hasPending = ecn.Derivatives.some(d => d.Action === 'Pending');
-            if (hasPending) {
-                alert('영업부서는 모든 파생 모델에 대해 [진행] 또는 [미진행]을 선택해야 합니다.');
-                return;
-            }
-        }
-
-        if (!window.confirm(isFinalStep ? '최종 승인하시겠습니까? 리비전이 자동으로 상승하고 BOM이 업데이트됩니다.' : `${APPROVAL_STEPS[currentStepIdx].label} 단계 승인을 진행하시겠습니까?`)) return;
+        if (!window.confirm(isFinalStep ? '최종 승인하시겠습니까? 관련 부품 및 BOM 변경 내용이 실시간 반영되고 새 리비전이 발행됩니다.' : `${stepsList[currentStepIdx].label} 단계 승인을 진행하시겠습니까?`)) return;
 
         try {
             const batch = writeBatch(db);
@@ -198,7 +300,7 @@ const ECNPage = () => {
             
             const approvalRecord = {
                 step: currentStepIdx,
-                stepName: APPROVAL_STEPS[currentStepIdx].label,
+                stepName: stepsList[currentStepIdx].label,
                 approver: userProfile?.displayName || userProfile?.Name || 'Unknown',
                 approverId: userProfile?.uid,
                 timestamp: new Date(),
@@ -206,61 +308,67 @@ const ECNPage = () => {
                 status: 'Approved'
             };
 
-            // Save Derivatives and ECO options
-            if (ecn.Derivatives) batch.update(ecnRef, { Derivatives: ecn.Derivatives });
-            if (ecn.HasStatusChange !== undefined) batch.update(ecnRef, { HasStatusChange: ecn.HasStatusChange });
-            if (ecn.InventoryAction) batch.update(ecnRef, { InventoryAction: ecn.InventoryAction });
-
             if (isFinalStep) {
-                // Final Approval Logic
-                const partsQuery = query(collection(db, 'parts'), where('PartID', '==', ecn.PartID));
-                const partsSnap = await getDocs(partsQuery);
-                
-                if (partsSnap.empty) {
-                    alert('대상 부품을 찾을 수 없습니다.');
-                    return;
-                }
+                // 최종 승인 시 설계변경 내역 일괄 반영
+                if (ecn.Items && ecn.Items.length > 0) {
+                    for (const item of ecn.Items) {
+                        const proposed = item.ProposedChanges || {};
+                        const partsQuery = query(collection(db, 'parts'), where('PartID', '==', item.PartID));
+                        const partsSnap = await getDocs(partsQuery);
 
-                const partDoc = partsSnap.docs[0];
-                const partRef = partDoc.ref;
-                const oldPartData = partDoc.data();
-                const nextRev = getNextRevision(oldPartData.Revision || oldPartData.Rev || '1.0');
-                const masterId = oldPartData.MasterPartID || oldPartData.PartID.split('-')[0];
-                const newPartId = `${masterId}-${nextRev}`;
+                        if (!partsSnap.empty) {
+                            const partDoc = partsSnap.docs[0];
+                            const partRef = partDoc.ref;
+                            const oldPartData = partDoc.data();
+                            const nextRev = proposed.Rev || getNextRevision(oldPartData.Revision || oldPartData.Rev || '1.0');
+                            const masterId = oldPartData.MasterPartID || oldPartData.PartID.split('-')[0];
+                            const newPartId = `${masterId}-${nextRev}`;
 
-                batch.update(partRef, { IsLatestRevision: false });
+                            // 기존 부품 락 해제 및 최신 상태 해제
+                            batch.update(partRef, { IsLatestRevision: false, Status: 'Approved' });
 
-                batch.set(doc(db, 'parts', newPartId), {
-                    ...oldPartData,
-                    PartID: newPartId,
-                    MasterPartID: masterId,
-                    Rev: nextRev,
-                    Revision: nextRev,
-                    Status: 'Approved',
-                    Lifecycle: 'Active',
-                    IsLatestRevision: true,
-                    CreatedAt: serverTimestamp(),
-                    LastModified: serverTimestamp(),
-                    ...(ecn.ProposedChanges || {})
-                });
+                            // 신규 리비전 부품 등록
+                            batch.set(doc(db, 'parts', newPartId), {
+                                ...oldPartData,
+                                ...proposed,
+                                PartID: newPartId,
+                                MasterPartID: masterId,
+                                Rev: nextRev,
+                                Revision: nextRev,
+                                Status: 'Approved',
+                                Lifecycle: 'Active',
+                                IsLatestRevision: true,
+                                CreatedAt: serverTimestamp(),
+                                LastModified: serverTimestamp()
+                            });
 
-                if (ecn.ProposedBOM && Array.isArray(ecn.ProposedBOM)) {
-                    const bomQuery = query(collection(db, 'bom'), where('ParentID', '==', oldPartData.PartID));
-                    const bomSnap = await getDocs(bomQuery);
-                    bomSnap.forEach(bomDoc => {
-                        batch.delete(doc(db, 'bom', bomDoc.id));
-                    });
+                            // BOM 변경 내역 일괄 적용
+                            if (item.Type === 'BOM Change' && item.ProposedBOM && Array.isArray(item.ProposedBOM)) {
+                                const bomQuery = query(collection(db, 'bom'), where('ParentID', '==', oldPartData.PartID));
+                                const bomSnap = await getDocs(bomQuery);
+                                bomSnap.forEach(bomDoc => {
+                                    batch.delete(doc(db, 'bom', bomDoc.id));
+                                });
 
-                    ecn.ProposedBOM.forEach((item) => {
-                        const newBomRef = doc(collection(db, 'bom'));
-                        batch.set(newBomRef, {
-                            ParentID: newPartId,
-                            ChildID: item.ChildID,
-                            Quantity: item.Quantity,
-                            Revision: nextRev,
-                            CreatedAt: serverTimestamp()
-                        });
-                    });
+                                item.ProposedBOM.forEach((pBom) => {
+                                    const newBomRef = doc(collection(db, 'bom'));
+                                    batch.set(newBomRef, {
+                                        ParentID: newPartId,
+                                        ChildID: pBom.ChildID,
+                                        Quantity: pBom.Quantity,
+                                        Location: pBom.Location || '',
+                                        Note: pBom.Note || '',
+                                        Revision: nextRev,
+                                        CreatedAt: serverTimestamp()
+                                    });
+                                });
+                            }
+                        }
+
+                        // ecn_draft_items 승인 처리 완료 상태 변경
+                        const draftItemRef = doc(db, 'ecn_draft_items', item.id);
+                        batch.update(draftItemRef, { Status: 'Approved' });
+                    }
                 }
 
                 batch.update(ecnRef, {
@@ -268,9 +376,7 @@ const ECNPage = () => {
                     CurrentStep: currentStepIdx + 1,
                     ProcessedAt: serverTimestamp(),
                     ApprovalHistory: arrayUnion(approvalRecord),
-                    ApprovedBy: userProfile?.displayName || userProfile?.Name || 'System',
-                    NewPartID: newPartId,
-                    ApprovedRevision: nextRev
+                    ApprovedBy: userProfile?.displayName || userProfile?.Name || 'System'
                 });
             } else {
                 batch.update(ecnRef, {
@@ -280,9 +386,21 @@ const ECNPage = () => {
             }
 
             await batch.commit();
+
+            // 알림 발송
+            try {
+                if (isFinalStep) {
+                    await createNotificationByRoute('/parts', 'ECN 최종 승인 완료', `ECN [${ecn.ECNNumber || ecn.id}] 설계변경 건이 최종 승인되었습니다.`);
+                } else {
+                    await createNotificationByRoute('/ecn', 'ECN 결재 승인', `ECN [${ecn.ECNNumber || ecn.id}] 건이 ${stepsList[currentStepIdx].label} 단계를 통과하였습니다.`);
+                }
+            } catch (notiErr) {
+                console.warn("Failed to send ECN approval notification:", notiErr);
+            }
+
             alert(isFinalStep ? '최종 승인이 완료되었습니다.' : '승인되었습니다. 다음 단계로 전달됩니다.');
             setApprovalComment('');
-            setIsModalOpen(false);
+            setIsDetailsModalOpen(false);
             fetchECNs();
         } catch (error) {
             console.error("Error approving ECN: ", error);
@@ -290,17 +408,25 @@ const ECNPage = () => {
         }
     };
 
+    // ECN 결재 반려
     const handleReject = async (ecn) => {
-        const reason = window.prompt('반려 사유를 입력해주세요:');
-        if (reason === null) return;
+        const reason = approvalComment.trim();
+        if (!reason) {
+            alert('반려 사유를 결재 의견란에 먼저 입력해주세요.');
+            return;
+        }
+
+        if (!window.confirm('해당 ECN 요청을 반려 처리하시겠습니까?')) return;
 
         try {
+            const batch = writeBatch(db);
             const ecnRef = doc(db, 'ecns', ecn.id);
             const currentStepIdx = ecn.CurrentStep || 0;
+            const stepsList = ecn.ApprovalSteps || DEFAULT_APPROVAL_STEPS;
             
             const rejectRecord = {
                 step: currentStepIdx,
-                stepName: APPROVAL_STEPS[currentStepIdx].label,
+                stepName: stepsList[currentStepIdx].label,
                 approver: userProfile?.displayName || userProfile?.Name || 'Unknown',
                 approverId: userProfile?.uid,
                 timestamp: new Date(),
@@ -308,7 +434,7 @@ const ECNPage = () => {
                 status: 'Rejected'
             };
 
-            await updateDoc(ecnRef, {
+            batch.update(ecnRef, {
                 Status: 'Rejected',
                 ProcessedAt: serverTimestamp(),
                 RejectedBy: userProfile?.displayName || userProfile?.Name || 'System',
@@ -316,8 +442,32 @@ const ECNPage = () => {
                 ApprovalHistory: arrayUnion(rejectRecord)
             });
 
-            alert('반려 처리되었습니다.');
-            setIsModalOpen(false);
+            // 묶인 품목 대기 상태(Draft) 및 품목 원상태 복구
+            if (ecn.Items && ecn.Items.length > 0) {
+                for (const item of ecn.Items) {
+                    const draftItemRef = doc(db, 'ecn_draft_items', item.id);
+                    batch.update(draftItemRef, { Status: 'Draft' });
+
+                    const partsQuery = query(collection(db, 'parts'), where('PartID', '==', item.PartID));
+                    const partsSnap = await getDocs(partsQuery);
+                    if (!partsSnap.empty) {
+                        batch.update(partsSnap.docs[0].ref, { Status: 'Approved' });
+                    }
+                }
+            }
+
+            await batch.commit();
+
+            // 반려 알림 발송
+            try {
+                await createNotificationByRoute('/ecn', 'ECN 결재 반려', `ECN [${ecn.ECNNumber || ecn.id}] 건이 반려 처리되었습니다. 사유: ${reason}`);
+            } catch (notiErr) {
+                console.warn("Failed to send ECN rejection notification:", notiErr);
+            }
+
+            alert('반려 처리되었습니다. 관련 품목들은 설계변경 대기 리스트로 원복되었습니다.');
+            setApprovalComment('');
+            setIsDetailsModalOpen(false);
             fetchECNs();
         } catch (error) {
             console.error("Error rejecting ECN: ", error);
@@ -325,7 +475,7 @@ const ECNPage = () => {
         }
     };
 
-    const StatusTag = ({ status, step }) => {
+    const StatusTag = ({ status }) => {
         const styles = {
             Pending: "bg-amber-100 text-amber-700 border-amber-200",
             Approved: "bg-emerald-100 text-emerald-700 border-emerald-200",
@@ -348,10 +498,11 @@ const ECNPage = () => {
         );
     };
 
-    const StepIndicator = ({ currentStep, status }) => {
+    const StepIndicator = ({ currentStep, steps, status }) => {
+        const list = steps && steps.length > 0 ? steps : DEFAULT_APPROVAL_STEPS;
         return (
             <div className="flex items-center gap-1 w-full">
-                {APPROVAL_STEPS.map((step, idx) => (
+                {list.map((step, idx) => (
                     <React.Fragment key={idx}>
                         <div className="flex flex-col items-center gap-1 flex-1">
                             <div className={`h-1.5 w-full rounded-full transition-all duration-500 ${
@@ -363,11 +514,49 @@ const ECNPage = () => {
                                 idx === currentStep ? 'text-indigo-600' : 'text-slate-400'
                             }`}>{step.label}</span>
                         </div>
-                        {idx < APPROVAL_STEPS.length - 1 && <div className="w-1" />}
+                        {idx < list.length - 1 && <div className="w-1" />}
                     </React.Fragment>
                 ))}
             </div>
         );
+    };
+
+    const openCreateModal = () => {
+        if (draftItems.length === 0) {
+            alert('현재 설계변경 대기 리스트에 등록된 품목이 없습니다.');
+            return;
+        }
+        // 기본 5개 단계 초기화 및 유저 매핑
+        setCustomApprovalSteps(DEFAULT_APPROVAL_STEPS.map(step => ({
+            ...step,
+            approverId: users.find(u => u.role === step.role)?.uid || '',
+            approverName: users.find(u => u.role === step.role)?.displayName || ''
+        })));
+        setIsCreateModalOpen(true);
+    };
+
+    const handleAddApprovalStep = () => {
+        const nextStepIdx = customApprovalSteps.length;
+        setCustomApprovalSteps([
+            ...customApprovalSteps,
+            { step: nextStepIdx, label: `추가 결재자 ${nextStepIdx + 1}`, approverId: '', approverName: '' }
+        ]);
+    };
+
+    const handleRemoveApprovalStep = (idx) => {
+        const filtered = customApprovalSteps.filter((_, i) => i !== idx).map((step, newIdx) => ({
+            ...step,
+            step: newIdx
+        }));
+        setCustomApprovalSteps(filtered);
+    };
+
+    const handleStepApproverChange = (idx, approverUid) => {
+        const targetUser = users.find(u => u.uid === approverUid);
+        const updated = [...customApprovalSteps];
+        updated[idx].approverId = approverUid;
+        updated[idx].approverName = targetUser ? targetUser.displayName : '';
+        setCustomApprovalSteps(updated);
     };
 
     return (
@@ -379,9 +568,9 @@ const ECNPage = () => {
                             <div className="p-3 bg-gradient-to-br from-indigo-600 to-violet-700 rounded-2xl text-white shadow-xl shadow-indigo-200">
                                 <ShieldCheck size={32} strokeWidth={2.5} />
                             </div>
-                            ECN 결재 시스템
+                            ECN 설계변경 결재 시스템
                         </h1>
-                        <p className="text-slate-500 font-medium mt-3 ml-1">설계 변경 통보(ECN)에 대한 5단계 순차 결재 및 리비전 관리</p>
+                        <p className="text-slate-500 font-medium mt-3 ml-1">품목 및 BOM의 변경 내역을 통합한 설계변경 승인서 작성 및 결재 진행</p>
                     </div>
 
                     <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200">
@@ -401,6 +590,19 @@ const ECNPage = () => {
                         >
                             처리 완료함
                         </button>
+                        <button
+                            onClick={() => setViewMode('DRAFT_ITEMS')}
+                            className={`px-4 py-3 rounded-xl text-sm font-black transition-all duration-300 relative ${
+                                viewMode === 'DRAFT_ITEMS' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-500 hover:bg-slate-50'
+                            }`}
+                        >
+                            설변 대기 리스트
+                            {draftItems.length > 0 && (
+                                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center text-[10px] font-black border border-white animate-bounce">
+                                    {draftItems.length}
+                                </span>
+                            )}
+                        </button>
                     </div>
                 </div>
 
@@ -414,13 +616,73 @@ const ECNPage = () => {
                         </div>
                         <p className="mt-6 text-slate-500 font-black tracking-widest uppercase text-xs">데이터를 불러오는 중</p>
                     </div>
+                ) : viewMode === 'DRAFT_ITEMS' ? (
+                    <div className="bg-white rounded-3xl border border-slate-200 p-6 flex flex-col flex-1 min-h-0 shadow-sm">
+                        <div className="flex justify-between items-center mb-4">
+                            <div>
+                                <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
+                                    <ClipboardList className="text-indigo-600" size={18} /> 설계변경 임시 대기 목록 ({draftItems.length})
+                                </h3>
+                                <p className="text-slate-400 text-xs mt-1">부품 스펙 수정 및 BOM 변경 기안 후 아직 승인서 결재선이 지정되지 않은 임시 변경 데이터들입니다.</p>
+                            </div>
+                            <button
+                                onClick={openCreateModal}
+                                className="px-5 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 shadow-md shadow-indigo-100 transition-all flex items-center gap-2"
+                            >
+                                <PlusCircle size={16} /> ECN 승인서 작성
+                            </button>
+                        </div>
+                        
+                        <div className="flex-1 overflow-auto border border-slate-100 rounded-2xl">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-50 border-b border-slate-200">
+                                        <th className="p-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">분류</th>
+                                        <th className="p-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">대상 품번</th>
+                                        <th className="p-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">품명</th>
+                                        <th className="p-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">현재 Rev</th>
+                                        <th className="p-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">변경 요약 및 사유</th>
+                                        <th className="p-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">기안자</th>
+                                        <th className="p-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">발의일</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {draftItems.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="7" className="p-20 text-center text-slate-400 text-sm font-bold">
+                                                현재 설계변경 대기 상태의 품목 내역이 없습니다.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        draftItems.map((item) => (
+                                            <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                                                <td className="p-3">
+                                                    <span className={`px-2 py-0.5 text-[9px] font-black rounded border uppercase ${
+                                                        item.Type === 'BOM Change' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-amber-50 text-amber-700 border-amber-100'
+                                                    }`}>{item.Type === 'BOM Change' ? 'BOM 구조' : '단일 파트'}</span>
+                                                </td>
+                                                <td className="p-3 font-extrabold text-xs text-indigo-600">{item.PartID}</td>
+                                                <td className="p-3 font-semibold text-xs text-slate-700 truncate max-w-[150px]">{item.PartName}</td>
+                                                <td className="p-3 text-xs text-slate-500 font-bold">Rev {item.Rev}</td>
+                                                <td className="p-3 text-xs text-slate-600 font-medium truncate max-w-[300px]" title={item.Reason}>{item.Reason || '사유 없음'}</td>
+                                                <td className="p-3 text-xs text-slate-500 font-bold">{item.RequestedBy}</td>
+                                                <td className="p-3 text-xs text-slate-400 font-bold">
+                                                    {item.CreatedAt?.toDate ? item.CreatedAt.toDate().toLocaleDateString() : 'N/A'}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 ) : ecnList.length === 0 ? (
                     <div className="bg-white rounded-[40px] border-2 border-dashed border-slate-200 p-32 text-center shadow-sm">
                         <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300 border border-slate-100">
                             <Clock size={48} />
                         </div>
                         <h3 className="text-lg font-black text-slate-800 mb-3 tracking-tight">표시할 결재 안건이 없습니다.</h3>
-                        <p className="text-slate-400 font-medium max-w-xs mx-auto">새로운 설계 변경 요청이 들어오면 여기에 표시됩니다.</p>
+                        <p className="text-slate-400 font-medium max-w-xs mx-auto">새로운 설계 변경 요청이 기안되면 여기에 표시됩니다.</p>
                     </div>
                 ) : (
                     <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-200/50 dark:border-slate-800/80 shadow-sm flex-1 flex flex-col min-h-0 relative z-20 overflow-hidden mt-3 mx-1">
@@ -429,24 +691,24 @@ const ECNPage = () => {
                             columnDefs={ECN_COLUMN_DEFS}
                             sortConfig={sortConfig}
                             onSort={handleSort}
-                            onRowClick={(row) => { setSelectedEcn(row); setIsModalOpen(true); }}
+                            onRowClick={(row) => { setSelectedEcn(row); setIsDetailsModalOpen(true); }}
                             rowKey="id"
-                            sortableColumns={['Title', 'Type', 'PartID', 'PartName', 'Status', 'RequestedBy', 'CreatedAt']}
+                            sortableColumns={['ECNNumber', 'Title', 'ECNType', 'PublishDate', 'Status', 'RequestedBy', 'CreatedAt']}
                             enableSearch={true}
                             searchTerm={searchTerm}
                             onSearchChange={setSearchTerm}
-                            searchPlaceholder="결재 제목, 품번, 기안자 검색..."
+                            searchPlaceholder="문서번호, 제목, 기안자 검색..."
                             enableFilter={true}
                             onFilteredDataChange={setFilteredData}
                             enableViewModeToggle={true}
                             viewMode={gridViewMode}
                             onViewModeChange={setGridViewMode}
                             cellRenderer={{
-                                Status: (val, row) => <StatusTag status={row.Status} step={row.CurrentStep} />,
-                                Type: (val) => <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-black rounded uppercase tracking-widest border border-slate-200 shrink-0">{val || 'ECN'}</span>,
+                                Status: (val, row) => <StatusTag status={row.Status} />,
+                                ECNType: (val) => <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-black rounded uppercase tracking-widest border border-slate-200 shrink-0">{val || 'ECN'}</span>,
                                 CurrentStep: (val, row) => (
                                     <div className="scale-[0.65] origin-left w-64 -my-3 flex items-center">
-                                        <StepIndicator currentStep={val || 0} status={row.Status} />
+                                        <StepIndicator currentStep={val || 0} steps={row.ApprovalSteps} status={row.Status} />
                                     </div>
                                 ),
                                 CreatedAt: (val, row) => {
@@ -454,14 +716,14 @@ const ECNPage = () => {
                                     return <span className="text-xs text-slate-500 font-bold tracking-tight">{timeVal?.toDate ? timeVal.toDate().toLocaleDateString() : 'N/A'}</span>;
                                 },
                                 Title: (val, row) => (
-                                    <div className="flex items-center gap-2 max-w-[200px]">
+                                    <div className="flex items-center gap-2 max-w-[300px]">
                                         {isUserTurn(row) && <div className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse shrink-0" />}
                                         <span className="font-extrabold text-slate-900 truncate">{val || 'ECN Request'}</span>
                                     </div>
                                 )
                             }}
                             cardRenderer={(ecn) => (
-                                <div key={ecn.id} onClick={() => { setSelectedEcn(ecn); setIsModalOpen(true); }} className="bg-white rounded-lg border border-slate-200 p-2 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all duration-300 group relative overflow-hidden flex items-center cursor-pointer">
+                                <div key={ecn.id} onClick={() => { setSelectedEcn(ecn); setIsDetailsModalOpen(true); }} className="bg-white rounded-lg border border-slate-200 p-2 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all duration-300 group relative overflow-hidden flex items-center cursor-pointer">
                                     {isUserTurn(ecn) && <div className="absolute top-0 left-0 w-1 h-full bg-indigo-600" />}
                                     <div className="flex items-center justify-between gap-4 w-full pl-2">
                                         <div className="flex items-center gap-3 flex-[1.5] min-w-0">
@@ -472,22 +734,17 @@ const ECNPage = () => {
                                                 {ecn.Status === 'Pending' ? <Clock size={16} /> : ecn.Status === 'Approved' ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
                                             </div>
                                             <div className="flex items-center gap-3 min-w-0 truncate">
-                                                <StatusTag status={ecn.Status} step={ecn.CurrentStep} />
-                                                <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-black rounded uppercase tracking-widest border border-slate-200 shrink-0">{ecn.Type || 'ECN'}</span>
-                                                <h3 className="text-sm font-black text-slate-900 truncate shrink max-w-[150px]">{ecn.Title || 'ECN Request'}</h3>
-                                                <div className="flex items-center gap-2 text-xs truncate shrink min-w-0 ml-2 hidden xl:flex">
-                                                    <div className="flex items-center gap-1 text-slate-700 font-bold bg-slate-50 px-2 py-0.5 rounded border border-slate-100 whitespace-nowrap">
-                                                        <Tag className="text-indigo-500" size={10} />
-                                                        <span>{ecn.PartName || '품명 미지정'}</span>
-                                                        <span className="text-slate-400 font-medium text-[9px] ml-0.5">({ecn.PartID})</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-1 text-slate-500 whitespace-nowrap"><User className="text-slate-400" size={10} /> <span>{ecn.RequestedBy}</span></div>
-                                                    <div className="flex items-center gap-1 text-slate-400 whitespace-nowrap"><Calendar size={10} /> <span>{ecn.CreatedAt?.toDate ? ecn.CreatedAt.toDate().toLocaleDateString() : 'N/A'}</span></div>
+                                                <StatusTag status={ecn.Status} />
+                                                <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-black rounded uppercase tracking-widest border border-slate-200 shrink-0">{ecn.ECNNumber || 'ECN'}</span>
+                                                <h3 className="text-sm font-black text-slate-900 truncate shrink max-w-[250px]">{ecn.Title || 'ECN Request'}</h3>
+                                                <div className="flex items-center gap-2 text-xs truncate shrink min-w-0 ml-2 hidden xl:flex text-slate-400">
+                                                    <span>(총 {ecn.Items?.length || 0}건 묶음)</span>
+                                                    <span className="ml-1"><User className="text-slate-400 inline" size={10} /> {ecn.RequestedBy}</span>
                                                 </div>
                                             </div>
                                         </div>
                                         <div className="flex-1 max-w-[250px] hidden lg:block shrink-0 px-4">
-                                            <StepIndicator currentStep={ecn.CurrentStep || 0} status={ecn.Status} />
+                                            <StepIndicator currentStep={ecn.CurrentStep || 0} steps={ecn.ApprovalSteps} status={ecn.Status} />
                                         </div>
                                         <div className="flex items-center gap-3 shrink-0 lg:pl-4 lg:border-l border-slate-100">
                                             {viewMode === 'HISTORY' && (
@@ -508,19 +765,271 @@ const ECNPage = () => {
                 )}
             </div>
 
-            {isModalOpen && selectedEcn && (
-                <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-start justify-center pt-[5%] pb-[2%] px-[4%]">
-                    <div className="bg-white rounded-xl w-full max-w-3xl shadow-xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[95%]">
-                        <div className="flex justify-between items-center p-2 border-b border-slate-100 shrink-0">
+            {/* 설계변경 승인서 기안 작성 모달 */}
+            {isCreateModalOpen && createPortal(
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl w-full max-w-4xl shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90%] overflow-hidden">
+                        <div className="flex justify-between items-center p-6 border-b border-slate-100 shrink-0">
+                            <div>
+                                <h2 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                                    <ClipboardList size={22} className="text-indigo-600" /> 설계변경(ECN) 승인서 작성 기안
+                                </h2>
+                                <p className="text-slate-400 text-xs mt-1">대기 중인 부품 및 BOM의 변경 내역을 묶어서 통합 결재선을 발행합니다.</p>
+                            </div>
+                            <button onClick={() => setIsCreateModalOpen(false)} className="p-1 hover:bg-slate-100 rounded-full text-slate-400 transition-colors">
+                                <XCircle size={24} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 flex-1 overflow-y-auto space-y-6">
+                            {/* 1. ECN 정보 작성 */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="md:col-span-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">승인서 제목</label>
+                                    <input 
+                                        type="text" 
+                                        value={formTitle}
+                                        onChange={(e) => setFormTitle(e.target.value)}
+                                        placeholder="설계변경 승인서 제목을 적으세요..."
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-800 outline-none focus:bg-white focus:ring-4 focus:ring-indigo-50"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">발행일자</label>
+                                    <input 
+                                        type="date" 
+                                        value={formPublishDate}
+                                        onChange={(e) => setFormPublishDate(e.target.value)}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-800 outline-none focus:bg-white focus:ring-4 focus:ring-indigo-50"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">적용 분류/시리즈</label>
+                                    <select 
+                                        value={formSeries}
+                                        onChange={(e) => setFormSeries(e.target.value)}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none focus:bg-white"
+                                    >
+                                        <option value="Actuator">Actuator</option>
+                                        <option value="PCB Board">PCB Board</option>
+                                        <option value="Mechanical Parts">Mechanical Parts</option>
+                                        <option value="ETC">기타 부품군</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">통신 방법</label>
+                                    <select 
+                                        value={formCommMethod}
+                                        onChange={(e) => setFormCommMethod(e.target.value)}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none focus:bg-white"
+                                    >
+                                        <option value="PT">PT (IRPROTOCOL)</option>
+                                        <option value="RS485">RS485</option>
+                                        <option value="CAN">CAN</option>
+                                        <option value="TTL">TTL</option>
+                                        <option value="None">해당없음</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">구분 (Type)</label>
+                                    <div className="flex gap-2 bg-slate-100 p-1 rounded-xl">
+                                        <button 
+                                            type="button"
+                                            onClick={() => setFormECNType('정규')}
+                                            className={`flex-1 py-1.5 rounded-lg text-xs font-black transition-all ${formECNType === '정규' ? 'bg-indigo-600 text-white shadow' : 'text-slate-500'}`}
+                                        >
+                                            정규
+                                        </button>
+                                        <button 
+                                            type="button"
+                                            onClick={() => setFormECNType('임시')}
+                                            className={`flex-1 py-1.5 rounded-lg text-xs font-black transition-all ${formECNType === '임시' ? 'bg-indigo-600 text-white shadow' : 'text-slate-500'}`}
+                                        >
+                                            임시
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">적용 대상 모델 (텍스트 직접 입력)</label>
+                                    <input 
+                                        type="text" 
+                                        value={formModelsText}
+                                        onChange={(e) => setFormModelsText(e.target.value)}
+                                        placeholder="예: IR-ACTUATOR-01, BOARD-MAIN-REV2"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-800 outline-none focus:bg-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Revision No. (계획)</label>
+                                    <input 
+                                        type="text" 
+                                        value={formRevNo}
+                                        onChange={(e) => setFormRevNo(e.target.value)}
+                                        placeholder="예: 2.0"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-800 outline-none focus:bg-white"
+                                    />
+                                </div>
+                                <div className="md:col-span-3 border-t border-slate-100 pt-3">
+                                    <label className="flex items-center gap-2 cursor-pointer mb-2">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={formSpecChange}
+                                            onChange={(e) => setFormSpecChange(e.target.checked)}
+                                            className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                                        />
+                                        <span className="text-xs font-bold text-slate-700">공표 사양 변경 발생 유무</span>
+                                    </label>
+                                    {formSpecChange && (
+                                        <textarea 
+                                            value={formSpecChangeContent}
+                                            onChange={(e) => setFormSpecChangeContent(e.target.value)}
+                                            placeholder="사양서 도면이나 공표 자료의 구체적인 스펙 변경 내역을 작성하세요..."
+                                            className="w-full h-16 bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-semibold text-slate-700 focus:bg-white"
+                                        />
+                                    )}
+                                </div>
+                                <div className="md:col-span-3">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">개선 효과 (Improvement Effect)</label>
+                                    <textarea 
+                                        value={formImprovement}
+                                        onChange={(e) => setFormImprovement(e.target.value)}
+                                        placeholder="신뢰성 개선, 단가 인하, 조립성 향상 등 설계변경에 의한 효과를 적으세요..."
+                                        className="w-full h-16 bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-semibold text-slate-700 focus:bg-white"
+                                    />
+                                </div>
+                                <div className="md:col-span-3">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Note (기타 특기 사항)</label>
+                                    <input 
+                                        type="text"
+                                        value={formNote}
+                                        onChange={(e) => setFormNote(e.target.value)}
+                                        placeholder="그 외 재고 폐기 계획이나 특별 참고 사항을 적으세요..."
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold text-slate-800 outline-none focus:bg-white"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* 2. 대상 기안 항목 다중 선택 */}
+                            <div className="border-t border-slate-100 pt-4">
+                                <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-3">설계변경 리스트 추가 대상 지정</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-56 overflow-y-auto p-1 bg-slate-50 rounded-2xl border border-slate-100 shadow-inner">
+                                    {draftItems.map((item) => {
+                                        const isSelected = selectedDraftIds.includes(item.id);
+                                        return (
+                                            <div 
+                                                key={item.id} 
+                                                onClick={() => {
+                                                    if (isSelected) {
+                                                        setSelectedDraftIds(selectedDraftIds.filter(id => id !== item.id));
+                                                    } else {
+                                                        setSelectedDraftIds([...selectedDraftIds, item.id]);
+                                                    }
+                                                }}
+                                                className={`p-3 rounded-xl border flex items-start gap-3 cursor-pointer transition-all ${
+                                                    isSelected ? 'bg-indigo-50/50 border-indigo-300 shadow-sm' : 'bg-white border-slate-200 hover:border-slate-300'
+                                                }`}
+                                            >
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={isSelected}
+                                                    onChange={() => {}} // 부모 div 클릭 핸들러로 대행
+                                                    className="w-4 h-4 rounded text-indigo-600 mt-0.5 shrink-0"
+                                                />
+                                                <div className="min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className={`px-1.5 py-0.5 text-[8px] font-black rounded border uppercase ${
+                                                            item.Type === 'BOM Change' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-amber-100 text-amber-700 border-amber-200'
+                                                        }`}>{item.Type === 'BOM Change' ? 'BOM 변경' : '파트 변경'}</span>
+                                                        <span className="text-xs font-black text-indigo-600">{item.PartID}</span>
+                                                    </div>
+                                                    <p className="text-[11px] font-bold text-slate-800 truncate">{item.PartName}</p>
+                                                    <p className="text-[10px] text-slate-500 font-semibold mt-1">사유: {item.Reason}</p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* 3. 결재선 지정 (동적) */}
+                            <div className="border-t border-slate-100 pt-4">
+                                <div className="flex justify-between items-center mb-3">
+                                    <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-widest">결재선 (Approvers Line) 구성</h4>
+                                    <button 
+                                        type="button"
+                                        onClick={handleAddApprovalStep}
+                                        className="px-3 py-1 bg-slate-800 text-white rounded-lg text-xs font-bold hover:bg-slate-700 flex items-center gap-1.5"
+                                    >
+                                        + 결재 단계 추가
+                                    </button>
+                                </div>
+                                <div className="space-y-3">
+                                    {customApprovalSteps.map((step, idx) => (
+                                        <div key={idx} className="flex items-center gap-4 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                                            <span className="text-xs font-black text-indigo-600 shrink-0 w-8">{idx + 1}단계</span>
+                                            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                <input 
+                                                    type="text" 
+                                                    value={step.label}
+                                                    onChange={(e) => {
+                                                        const updated = [...customApprovalSteps];
+                                                        updated[idx].label = e.target.value;
+                                                        setCustomApprovalSteps(updated);
+                                                    }}
+                                                    placeholder="결재선 라벨 (예: 설계검토)"
+                                                    className="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500"
+                                                />
+                                                <select 
+                                                    value={step.approverId}
+                                                    onChange={(e) => handleStepApproverChange(idx, e.target.value)}
+                                                    className="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500"
+                                                >
+                                                    <option value="">-- 결재 유저 선택 --</option>
+                                                    {users.map(u => (
+                                                        <option key={u.uid} value={u.uid}>
+                                                            {u.displayName} ({u.email}) [{u.role || '유저'}]
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <button 
+                                                type="button" 
+                                                onClick={() => handleRemoveApprovalStep(idx)}
+                                                className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200 rounded-b-3xl shrink-0">
+                            <button onClick={() => setIsCreateModalOpen(false)} className="px-5 py-2.5 bg-white border border-slate-300 text-slate-600 rounded-xl font-bold text-xs hover:bg-slate-100 transition-all">취소</button>
+                            <button onClick={handleSubmitECN} className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs hover:bg-indigo-700 shadow-md shadow-indigo-100 transition-all flex items-center gap-1.5">
+                                <ShieldCheck size={16} /> 승인서 기안 제출
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* 설계변경 상세 결재 모달 */}
+            {isDetailsModalOpen && selectedEcn && createPortal(
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl w-full max-w-4xl shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90%] overflow-hidden">
+                        <div className="flex justify-between items-center p-6 border-b border-slate-100 shrink-0">
                             <div className="space-y-3 flex-1">
                                 <div className="flex items-center gap-2">
-                                    <span className="px-3 py-1 bg-indigo-600 text-white text-[10px] font-bold rounded-md uppercase tracking-wider">{selectedEcn.Type}</span>
-                                    <StatusTag status={selectedEcn.Status} step={selectedEcn.CurrentStep} />
+                                    <span className="px-3 py-1 bg-indigo-600 text-white text-[10px] font-bold rounded-md uppercase tracking-wider">{selectedEcn.ECNNumber}</span>
+                                    <StatusTag status={selectedEcn.Status} />
                                 </div>
                                 <div className="flex items-center gap-4 flex-wrap">
-                                    <h2 className="text-base font-bold text-slate-900 tracking-tight">{selectedEcn.Title || 'ECN 상세 내역'}</h2>
+                                    <h2 className="text-base font-bold text-slate-900 tracking-tight">{selectedEcn.Title}</h2>
                                     <div className="flex items-start ml-3 lg:border-l border-slate-200 lg:pl-4">
-                                        {APPROVAL_STEPS.map((step, idx) => {
+                                        {(selectedEcn.ApprovalSteps || DEFAULT_APPROVAL_STEPS).map((step, idx) => {
                                             const history = selectedEcn.ApprovalHistory?.find(h => h.step === idx);
                                             const isCurrent = (selectedEcn.CurrentStep || 0) === idx && selectedEcn.Status === 'Pending';
                                             const isPast = (selectedEcn.CurrentStep || 0) > idx || selectedEcn.Status === 'Approved';
@@ -536,9 +1045,9 @@ const ECNPage = () => {
                                                             {isPast ? <CheckCircle2 size={12} /> : history?.status === 'Rejected' ? <XCircle size={12} /> : <span className="text-[8px] font-bold">{idx + 1}</span>}
                                                         </div>
                                                         <span className={`text-[8px] font-bold whitespace-nowrap ${isCurrent ? 'text-indigo-600' : isPast ? 'text-slate-800' : 'text-slate-400'}`}>{step.label}</span>
-                                                        {history ? <span className="text-[8px] text-slate-500 truncate w-full text-center mt-0.5">{history.approver}</span> : isCurrent ? <span className="text-[8px] text-indigo-400 mt-0.5">대기중</span> : null}
+                                                        {step.approverName ? <span className="text-[8px] text-slate-500 truncate w-full text-center mt-0.5">{step.approverName}</span> : isCurrent ? <span className="text-[8px] text-indigo-400 mt-0.5">대기중</span> : null}
                                                     </div>
-                                                    {idx < APPROVAL_STEPS.length - 1 && (
+                                                    {idx < (selectedEcn.ApprovalSteps || DEFAULT_APPROVAL_STEPS).length - 1 && (
                                                         <div className={`w-10 h-0.5 mt-2 -mx-4 ${
                                                             (selectedEcn.CurrentStep || 0) > idx && history?.status !== 'Rejected' ? 'bg-emerald-500' : 'bg-slate-200'
                                                         }`} />
@@ -549,230 +1058,148 @@ const ECNPage = () => {
                                     </div>
                                 </div>
                             </div>
-                            <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 transition-colors ml-4"><XCircle size={24} /></button>
+                            <button onClick={() => setIsDetailsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 transition-colors ml-4"><XCircle size={24} /></button>
                         </div>
 
-                        <div className="p-2 flex-1 overflow-y-auto custom-scrollbar">
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
-                                <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
-                                    <label className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">대상 품목 명칭</label>
-                                    <p className="font-semibold text-slate-800 text-xs truncate">{selectedEcn.PartName || '품명 미지정'}</p>
-                                    <p className="text-[9px] text-indigo-600 mt-0.5 font-medium">{selectedEcn.PartID}</p>
+                        <div className="p-6 flex-1 overflow-y-auto space-y-6">
+                            {/* 1. 승인서 메타 데이터 표 */}
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-150 shadow-sm">
+                                <div>
+                                    <label className="text-[9px] font-semibold text-slate-500 block mb-1">발행일자</label>
+                                    <p className="font-bold text-xs text-slate-800">{selectedEcn.PublishDate}</p>
                                 </div>
-                                <div className="bg-slate-50 p-2 rounded-xl border border-slate-200 shadow-sm md:col-span-2">
-                                    <label className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">리비전 변동 (Revision Plan)</label>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <div className="text-center">
-                                            <p className="text-[8px] font-medium text-slate-500 mb-0.5">Current</p>
-                                            <p className="font-bold text-slate-700 text-sm">Rev {selectedEcn.CurrentRevision || '1.0'}</p>
-                                        </div>
-                                        <div className="text-slate-300">
-                                            <ArrowRight size={14} />
-                                        </div>
-                                        <div className="text-center">
-                                            <p className="text-[8px] font-medium text-indigo-500 mb-0.5">Proposed</p>
-                                            <p className="font-bold text-indigo-600 text-sm">Rev {getNextRevision(selectedEcn.CurrentRevision || '1.0')}</p>
-                                        </div>
+                                <div>
+                                    <label className="text-[9px] font-semibold text-slate-500 block mb-1">적용 시리즈 / 통신 방법</label>
+                                    <p className="font-bold text-xs text-slate-800">{selectedEcn.ApplicableSeries} / {selectedEcn.CommunicationMethod}</p>
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-semibold text-slate-500 block mb-1">구분 및 Revision No.</label>
+                                    <p className="font-bold text-xs text-slate-800">{selectedEcn.ECNType} / Rev {selectedEcn.RevNo}</p>
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-semibold text-slate-500 block mb-1">기안자</label>
+                                    <p className="font-bold text-xs text-slate-800">{selectedEcn.RequestedBy}</p>
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="text-[9px] font-semibold text-slate-500 block mb-1">적용 모델</label>
+                                    <p className="font-bold text-xs text-slate-800">{selectedEcn.ApplicableModelsText || 'N/A'}</p>
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="text-[9px] font-semibold text-slate-500 block mb-1">공표사양변경유무</label>
+                                    <p className="font-bold text-xs text-slate-800">
+                                        {selectedEcn.SpecChangeFlag ? `있음 (${selectedEcn.SpecChangeContent})` : '없음'}
+                                    </p>
+                                </div>
+                                <div className="md:col-span-4 border-t border-slate-200/60 pt-2">
+                                    <label className="text-[9px] font-semibold text-slate-500 block mb-1">개선 효과</label>
+                                    <p className="text-xs font-semibold text-slate-700">{selectedEcn.ImprovementEffect || '내용 없음'}</p>
+                                </div>
+                                {selectedEcn.Note && (
+                                    <div className="md:col-span-4">
+                                        <label className="text-[9px] font-semibold text-slate-500 block mb-1">Note</label>
+                                        <p className="text-xs font-semibold text-slate-500 italic">{selectedEcn.Note}</p>
                                     </div>
-                                </div>
-                                <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
-                                    <label className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">기안 정보</label>
-                                    <div className="flex items-center gap-1 mb-0.5">
-                                        <User size={10} className="text-slate-400" />
-                                        <p className="font-semibold text-[11px] text-slate-800">{selectedEcn.RequestedBy}</p>
-                                    </div>
-                                    <p className="text-[8px] text-slate-500">{selectedEcn.CreatedAt?.toDate ? selectedEcn.CreatedAt.toDate().toLocaleString() : ''}</p>
-                                </div>
+                                )}
                             </div>
 
-                            <div className="space-y-3">
-                                <section>
-                                    <div className="flex items-center gap-1.5 mb-1.5">
-                                        <Edit3 size={12} className="text-slate-500" />
-                                        <h4 className="text-[11px] font-bold text-slate-800">변경 사유 및 요청 배경</h4>
-                                    </div>
-                                    <div className="bg-slate-50 border border-slate-200 p-2 rounded-xl text-slate-700 text-[11px] leading-relaxed">
-                                        {selectedEcn.Reason || '사유가 입력되지 않았습니다.'}
-                                    </div>
-                                </section>
-
-                                {/* 상세 변경 내역 (Diff) - 객체/문자열 병합 처리 */}
-                                {selectedEcn.Changes && selectedEcn.Changes.length > 0 && (
-                                    <section>
-                                        <div className="flex items-center gap-2 mb-3">
-                                            <AlertCircle size={16} className="text-slate-500" />
-                                            <h4 className="text-sm font-bold text-slate-800">상세 변경 내역</h4>
-                                        </div>
-                                        <div className="bg-white rounded-xl overflow-hidden border border-slate-200 shadow-sm">
-                                            <table className="w-full text-left">
-                                                <thead>
-                                                    <tr className="bg-slate-50 border-b border-slate-200">
-                                                        <th className="px-4 py-3 text-[10px] font-semibold text-slate-500 uppercase whitespace-nowrap">항목(Field)</th>
-                                                        <th className="px-4 py-3 text-[10px] font-semibold text-slate-500 uppercase whitespace-nowrap">기존 (Before)</th>
-                                                        <th className="px-4 py-3 text-[10px] font-semibold text-slate-500 uppercase whitespace-nowrap">변경 (After)</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-slate-100">
-                                                    {selectedEcn.Changes.map((change, idx) => {
-                                                        const isObj = typeof change === 'object' && change !== null;
-                                                        const field = isObj ? change.field : '변경 내역';
-                                                        const oldValue = isObj ? change.oldValue : '-';
-                                                        const newValue = isObj ? change.newValue : change;
-                                                        
-                                                        return (
-                                                            <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                                                <td className="px-4 py-3 whitespace-nowrap"><span className="text-sm font-medium text-slate-700">{field}</span></td>
-                                                                <td className="px-4 py-3 whitespace-nowrap"><span className="text-sm text-rose-600 line-through">{oldValue}</span></td>
-                                                                <td className="px-4 py-3 whitespace-nowrap">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <ArrowRight className="text-slate-300" size={14} />
-                                                                        <span className="text-sm text-emerald-600 font-medium">{newValue}</span>
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        );
-                                                    })}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </section>
-                                )}
-
-                                <section>
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <Minus size={16} className="text-slate-500" />
-                                        <h4 className="text-sm font-bold text-slate-800">BOM 구조 변경 내역</h4>
-                                    </div>
-                                    {selectedEcn.ProposedBOM && selectedEcn.ProposedBOM.length > 0 ? (
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                            {selectedEcn.ProposedBOM.map((item, idx) => (
-                                                <div key={idx} className="bg-white p-3 rounded-xl border border-slate-200 flex items-center justify-between shadow-sm">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={`p-1.5 rounded-md ${item.isDeleted ? 'bg-rose-50 text-rose-500' : item.isNew ? 'bg-emerald-50 text-emerald-500' : 'bg-slate-100 text-slate-500'}`}>
-                                                            {item.isDeleted ? <Minus size={16} /> : item.isNew ? <Plus size={16} /> : <Edit3 size={16} />}
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-sm font-medium text-slate-800">{item.ChildID}</p>
-                                                            <p className="text-[10px] text-slate-500">수량: {item.Quantity} EA</p>
-                                                        </div>
-                                                    </div>
-                                                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded uppercase ${
-                                                        item.isDeleted ? 'bg-rose-50 text-rose-600' : item.isNew ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-500'
-                                                    }`}>
-                                                        {item.isDeleted ? 'Removed' : item.isNew ? 'Added' : 'Existing'}
-                                                    </span>
+                            {/* 2. 기안 묶음 설계변경 항목들 */}
+                            <div>
+                                <h4 className="text-sm font-extrabold text-slate-800 mb-3 flex items-center gap-1.5">
+                                    <CheckSquare size={16} className="text-indigo-600" /> 설계변경 대상 목록 ({selectedEcn.Items?.length || 0}건)
+                                </h4>
+                                <div className="space-y-4">
+                                    {selectedEcn.Items?.map((item, idx) => (
+                                        <div key={idx} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`px-2 py-0.5 text-[9px] font-black rounded border uppercase ${
+                                                        item.Type === 'BOM Change' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-amber-50 text-amber-700 border-amber-100'
+                                                    }`}>{item.Type === 'BOM Change' ? 'BOM 구조 변경' : '부품 스펙 변경'}</span>
+                                                    <span className="font-extrabold text-xs text-indigo-600">{item.PartID}</span>
+                                                    <span className="font-extrabold text-xs text-slate-700">{item.PartName}</span>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-3 text-center text-sm text-slate-500">
-                                            BOM 구조의 직접적인 변경 사항이 없습니다.
-                                        </div>
-                                    )}
-                                </section>
-
-                                {/* Derivative Models & ECO Extra Fields */}
-                                {selectedEcn.Derivatives && selectedEcn.Derivatives.length > 0 && (
-                                    <section className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 shadow-sm mt-4">
-                                        <div className="flex items-center gap-2 mb-3">
-                                            <AlertCircle size={16} className="text-indigo-600" />
-                                            <h4 className="text-sm font-bold text-indigo-900">파생 모델 연동 검토 (Derivative Models)</h4>
-                                        </div>
-                                        <div className="space-y-2">
-                                            {selectedEcn.Derivatives.map((deriv, idx) => (
-                                                <div key={idx} className="flex items-center justify-between bg-white p-3 rounded-lg border border-indigo-100 shadow-sm">
-                                                    <div>
-                                                        <p className="text-xs font-bold text-slate-800">{deriv.Name}</p>
-                                                        <p className="text-[10px] text-slate-500">{deriv.PartID}</p>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <button 
-                                                            disabled={!isUserTurn(selectedEcn) || selectedEcn.CurrentStep !== 3}
-                                                            onClick={() => {
-                                                                const newDerivs = [...selectedEcn.Derivatives];
-                                                                newDerivs[idx].Action = 'Proceed';
-                                                                setSelectedEcn({...selectedEcn, Derivatives: newDerivs});
-                                                            }}
-                                                            className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${deriv.Action === 'Proceed' ? 'bg-emerald-600 text-white shadow-md' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
-                                                        >
-                                                            진행 (Proceed)
-                                                        </button>
-                                                        <button 
-                                                            disabled={!isUserTurn(selectedEcn) || selectedEcn.CurrentStep !== 3}
-                                                            onClick={() => {
-                                                                const newDerivs = [...selectedEcn.Derivatives];
-                                                                newDerivs[idx].Action = 'Skip';
-                                                                setSelectedEcn({...selectedEcn, Derivatives: newDerivs});
-                                                            }}
-                                                            className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${deriv.Action === 'Skip' ? 'bg-rose-600 text-white shadow-md' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
-                                                        >
-                                                            미진행 (Skip)
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        {isUserTurn(selectedEcn) && selectedEcn.CurrentStep === 3 && (
-                                            <p className="text-[10px] text-indigo-500 font-bold mt-2 text-right">* 영업부서는 파생 모델 진행 여부를 필수로 선택해야 합니다.</p>
-                                        )}
-                                    </section>
-                                )}
-
-                                {/* ECO Additional Options */}
-                                {isUserTurn(selectedEcn) && (
-                                    <section className="bg-slate-50 p-4 rounded-xl border border-slate-200 mt-4 flex gap-6">
-                                        <label className="flex items-center gap-2 cursor-pointer">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={selectedEcn.HasStatusChange || false}
-                                                onChange={(e) => setSelectedEcn({...selectedEcn, HasStatusChange: e.target.checked})}
-                                                className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
-                                            />
-                                            <span className="text-sm font-bold text-slate-700">현상 변경 여부 (Status Change)</span>
-                                        </label>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm font-bold text-slate-700">재고 처리 방식:</span>
-                                            <select 
-                                                value={selectedEcn.InventoryAction || 'Use As Is'}
-                                                onChange={(e) => setSelectedEcn({...selectedEcn, InventoryAction: e.target.value})}
-                                                className="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-indigo-500"
-                                            >
-                                                <option value="Use As Is">그대로 사용 (Use As Is)</option>
-                                                <option value="Running Change">자연 소진 후 변경 (Running Change)</option>
-                                                <option value="Immediate Change">즉시 변경 (Immediate Change)</option>
-                                                <option value="Rework">재작업 (Rework)</option>
-                                                <option value="Scrap">폐기 (Scrap)</option>
-                                            </select>
-                                        </div>
-                                    </section>
-                                )}
-
-                                {isUserTurn(selectedEcn) && (
-                                    <section className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm mt-6">
-                                        <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
-                                            <ShieldCheck size={16} className="text-indigo-600" /> 결재 처리
-                                        </h4>
-                                        <div className="space-y-3">
-                                            <textarea
-                                                value={approvalComment}
-                                                onChange={(e) => setApprovalComment(e.target.value)}
-                                                placeholder="결재 의견을 입력하세요"
-                                                className="w-full h-16 bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all resize-none"
-                                            />
-                                            <div className="grid grid-cols-2 gap-2 max-w-sm">
-                                                <button onClick={() => handleReject(selectedEcn)} className="px-4 py-2.5 bg-white text-rose-600 border border-rose-200 rounded-lg font-medium text-sm hover:bg-rose-50 transition-all">반려 처리</button>
-                                                <button onClick={() => handleApprove(selectedEcn)} className="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium text-sm hover:bg-indigo-700 transition-all">승인 완료</button>
+                                                <span className="text-[10px] font-bold text-slate-400">발의자: {item.RequestedBy}</span>
                                             </div>
+                                            <div className="text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100 font-bold text-slate-600 leading-relaxed">
+                                                변경 사유: {item.Reason || '사유 요약 없음'}
+                                            </div>
+                                            {/* 상세 변경 내역 (Diff) */}
+                                            {item.Changes && item.Changes.length > 0 && (
+                                                <div className="border border-slate-100 rounded-xl overflow-hidden text-xs">
+                                                    <div className="bg-slate-50 px-3 py-1.5 font-black text-[10px] text-slate-500 uppercase tracking-widest border-b border-slate-150">세부 변경 내역</div>
+                                                    <div className="divide-y divide-slate-100 px-3 py-1.5 font-bold text-slate-600 space-y-1">
+                                                        {item.Changes.map((change, cIdx) => (
+                                                            <div key={cIdx} className="flex items-center gap-2">
+                                                                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0"></div>
+                                                                <span>{change}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
-                                    </section>
-                                )}
+                                    ))}
+                                </div>
                             </div>
+
+                            {/* ECN 결재선 히스토리 */}
+                            {selectedEcn.ApprovalHistory && selectedEcn.ApprovalHistory.length > 0 && (
+                                <div>
+                                    <h4 className="text-sm font-extrabold text-slate-800 mb-3">결재 진행 이력</h4>
+                                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                                        {selectedEcn.ApprovalHistory.map((hist, idx) => (
+                                            <div key={idx} className="flex justify-between items-start border-b border-slate-200/60 pb-2.5 last:border-b-0 last:pb-0">
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`px-2 py-0.5 rounded text-[8px] font-bold ${
+                                                            hist.status === 'Approved' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'
+                                                        }`}>{hist.status}</span>
+                                                        <span className="text-xs font-black text-slate-700">{hist.stepName}</span>
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 font-semibold mt-1">의견: {hist.comment || '의견 없음'}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-[10px] font-bold text-slate-700">{hist.approver}</p>
+                                                    <p className="text-[8px] text-slate-400 font-bold mt-0.5">
+                                                        {hist.timestamp instanceof Date ? hist.timestamp.toLocaleString() : new Date(hist.timestamp).toLocaleString()}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* 결재 처리 단락 */}
+                            {isUserTurn(selectedEcn) && (
+                                <section className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm mt-6">
+                                    <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
+                                        <ShieldCheck size={16} className="text-indigo-600" /> 결재 처리 (승인 / 반려)
+                                    </h4>
+                                    <div className="space-y-3">
+                                        <textarea
+                                            autoFocus
+                                            value={approvalComment}
+                                            onChange={(e) => setApprovalComment(e.target.value)}
+                                            onKeyDown={(e) => e.stopPropagation()}
+                                            placeholder="승인 의견 또는 반려 사유를 입력하세요"
+                                            className="w-full h-16 bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all resize-none"
+                                        />
+                                        <div className="grid grid-cols-2 gap-2 max-w-sm">
+                                            <button onClick={() => handleReject(selectedEcn)} className="px-4 py-2.5 bg-white text-rose-600 border border-rose-200 rounded-lg font-medium text-sm hover:bg-rose-50 transition-all">반려 처리</button>
+                                            <button onClick={() => handleApprove(selectedEcn)} className="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium text-sm hover:bg-indigo-700 transition-all">승인 완료</button>
+                                        </div>
+                                    </div>
+                                </section>
+                            )}
                         </div>
-                        <div className="bg-slate-50 px-3 py-4 flex justify-end gap-3 border-t border-slate-200 rounded-b-2xl shrink-0">
-                            <button onClick={() => setIsModalOpen(false)} className="px-5 py-2 bg-slate-800 text-white rounded-lg font-medium text-sm hover:bg-slate-700 transition-all">화면 닫기</button>
+
+                        <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200 rounded-b-3xl shrink-0">
+                            <button onClick={() => setIsDetailsModalOpen(false)} className="px-5 py-2 bg-slate-800 text-white rounded-lg font-medium text-sm hover:bg-slate-700 transition-all">화면 닫기</button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
