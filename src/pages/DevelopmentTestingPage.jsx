@@ -103,8 +103,8 @@ export default function DevelopmentTestingPage() {
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <button className="flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-black hover:bg-black transition-all shadow-lg shadow-slate-100">
-                        <Plus size={18} /> 테스트 수동 생성
+                    <button className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl font-black text-sm shadow-md shadow-indigo-100 transition-all transform hover:scale-[1.02]">
+                        <Plus size={18} /> 테스트 요청
                     </button>
                 </div>
             </div>

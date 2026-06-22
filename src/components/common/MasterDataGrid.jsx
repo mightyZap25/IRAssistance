@@ -249,7 +249,6 @@ export default function MasterDataGrid({
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [activeFilters, setActiveFilters] = useState([]);
 
-    // 요구사항 1: 데이터 추천(Recommendation) 추출
     const recommendations = React.useMemo(() => {
         const recs = {};
         // 모든 컬럼(columnOrder에 포함된 키들)에 대해 유니크한 값 추출
@@ -265,13 +264,16 @@ export default function MasterDataGrid({
         return recs;
     }, [data, columnOrder]);
 
+    // UI 프리징 방지를 위한 React 18 지연 평가 적용
+    const debouncedSearchTerm = React.useDeferredValue(searchTerm);
+
     // Internal dynamic filtering engine
     // 요구사항 3: 필터 평가 로직 고도화
     const finalFilteredData = React.useMemo(() => {
         return data.filter(row => {
             // 1. Text Search Filtering (기존 기능 유지)
-            if (enableSearch && searchTerm) {
-                const term = searchTerm.toLowerCase();
+            if (enableSearch && debouncedSearchTerm) {
+                const term = debouncedSearchTerm.toLowerCase();
                 const searchableFields = ['Name', 'PartID', 'Description', 'Spec', 'ContactPerson', 'CompanyName'];
                 const match = searchableFields.some(field => 
                     String(row[field] || '').toLowerCase().includes(term)
@@ -338,23 +340,9 @@ export default function MasterDataGrid({
             }
             return true;
         });
-    }, [data, searchTerm, activeFilters, enableSearch]);
+    }, [data, debouncedSearchTerm, activeFilters, enableSearch]);
 
-    const prevFilteredDataRef = React.useRef();
-
-    React.useEffect(() => {
-        if (typeof onFilteredDataChange === 'function') {
-            // 무한 루프 방지: 데이터의 내용이 실제로 변경되었을 때만 호출
-            const isSame = prevFilteredDataRef.current && 
-                          prevFilteredDataRef.current.length === finalFilteredData.length &&
-                          prevFilteredDataRef.current.every((val, i) => val === finalFilteredData[i]);
-            
-            if (!isSame) {
-                prevFilteredDataRef.current = finalFilteredData;
-                onFilteredDataChange(finalFilteredData);
-            }
-        }
-    }, [finalFilteredData, onFilteredDataChange]);
+    // Remove prevFilteredDataRef and useEffect since onFilteredDataChange is unnecessary and causes double renders
 
     // Dnd Sensors
     const sensors = useSensors(

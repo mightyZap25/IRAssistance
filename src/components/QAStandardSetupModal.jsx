@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Trash2, CheckCircle2, ClipboardList, FileText, AlertCircle } from 'lucide-react';
+import { X, Plus, Trash2, CheckCircle2, ClipboardList, FileText, AlertCircle, ShieldCheck } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 

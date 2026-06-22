@@ -38,9 +38,9 @@ export const updateDoc = (docRef, data) => mockFirestore.setDoc(docRef, data, { 
 export const writeBatch = mockFirestore.writeBatch;
 export const collection = mockFirestore.collection;
 export const getDocs = mockFirestore.getDocs;
-export const orderBy = (field, dir) => field; // Mock helper
-export const query = (q, ...constraints) => q; // Mock helper
-export const where = (field, op, val) => ({ field, op, val }); // Mock helper
+export const orderBy = (field, dir) => ({ type: 'orderBy', field, dir }); // Mock helper
+export const query = (q, ...constraints) => ({ ...q, constraints: (q.constraints || []).concat(constraints) }); // Mock helper
+export const where = (field, op, val) => ({ type: 'where', field, op, val }); // Mock helper
 export const serverTimestamp = () => new Date();
 export const onSnapshot = (qOrRef, cb) => {
     const fetchData = () => {
@@ -54,7 +54,7 @@ export const onSnapshot = (qOrRef, cb) => {
     const interval = setInterval(fetchData, 4000);
     return () => clearInterval(interval);
 };
-export const limit = (n) => ({ limit: n });
+export const limit = (n) => ({ type: 'limit', n });
 export const arrayUnion = (...elements) => elements;
 export const runTransaction = async (dbInstance, updateFunction) => {
     const transaction = {

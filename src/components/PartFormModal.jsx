@@ -43,7 +43,7 @@ const PART_TYPES = [
 export default function PartFormModal({ mode = 'create', initialData = null, onClose, onSuccess }) {
     const { userProfile } = useAuth();
     const isEdit = mode === 'edit';
-    const [isRevisionUp, setIsRevisionUp] = useState(false);
+    
     
     // Existing parts list for substitute mapping
     const [availableParts, setAvailableParts] = useState([]);
@@ -157,9 +157,11 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
         fetchCustomFields();
 
         if (isEdit && initialData) {
+            const nextRev = getNextRevision(initialData.Rev);
             setFormData(prev => ({
                 ...prev,
                 ...initialData,
+                Rev: nextRev, // 자동으로 +0.1 리비전 증가된 값으로 기본 세팅
                 Safety: { CE: false, ROHS: false, UL: false, KC: false, REACH: false, ...(initialData.Safety || {}) },
                 SafetyLinks: { CE: '', ROHS: '', UL: '', KC: '', REACH: '', ...(initialData.SafetyLinks || {}) },
                 CustomData: initialData.CustomData || {}
@@ -317,9 +319,9 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                 }
             });
 
+            const isRevisionUp = isEdit && initialData && formData.Rev !== initialData.Rev;
             if (isRevisionUp) {
-                const nextRev = getNextRevision(formData.Rev);
-                changes.push(`[REVISION UP] ${formData.Rev} -> ${nextRev}`);
+                changes.push(`[REVISION UP] ${initialData.Rev} -> ${formData.Rev}`);
             }
 
             setDetectedChanges(changes);
@@ -332,20 +334,18 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
     const handleFinalSubmit = async (ecnData) => {
         setIsSubmitting(true);
         try {
+            const isRevisionUp = isEdit && initialData && formData.Rev !== initialData.Rev;
             if (isEdit) {
                 const batch = writeBatch(db);
                 
                 if (ecnData && ecnData.updateType === 'ECN') {
-                    // ECN 기안 시에는 부품 정보는 즉시 수정하지 않고 ECN 결재로 이관합니다.
-                    // 또한 기존 부품의 Status를 Pending(설변 진행 중)으로 변경합니다.
                     const partRef = doc(db, 'parts', initialData.id);
                     batch.update(partRef, { Status: 'Pending' });
 
                     const proposedChanges = { ...formData };
                     if (isRevisionUp) {
-                        const nextRev = getNextRevision(formData.Rev);
-                        proposedChanges.Rev = nextRev;
-                        proposedChanges.Revision = nextRev;
+                        proposedChanges.Rev = formData.Rev;
+                        proposedChanges.Revision = formData.Rev;
                     }
 
                     const ecnRef = doc(collection(db, 'ecn_draft_items'));
@@ -375,7 +375,7 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                     const qaRef = doc(db, 'qa_target_parts', initialData.id);
 
                     if (isRevisionUp) {
-                        const newRev = getNextRevision(formData.Rev);
+                        const newRev = formData.Rev;
                         const newPartID = formData.PartID; 
 
                         const newPartData = { 
@@ -389,7 +389,6 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                         batch.set(doc(db, 'parts', newPartID), newPartData);
                         batch.update(partRef, { IsLatestRevision: false });
                         
-                        // QA Settings Sync
                         if (qaSettings.isTarget) {
                             batch.set(qaRef, {
                                 partId: newPartID,
@@ -407,7 +406,6 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                     } else {
                         batch.update(partRef, formData);
                         
-                        // QA Settings Sync
                         if (qaSettings.isTarget) {
                             batch.set(qaRef, {
                                 partId: initialData.PartID,
@@ -424,10 +422,8 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                         await batch.commit();
                     }
                 }
-                // 공급사/제조사 자동 등록 (편집 후)
                 try { await autoRegisterFromPart(formData); } catch (e) { console.warn('[AutoReg] 공급사/제조사 자동 등록 오류(무시):', e); }
             } else {
-                // RUN TRANSACTION FOR SAFE AUTO-ID GENERATION (CONCURRENCY LOCK)
                 await runTransaction(db, async (transaction) => {
                     const catCode = formData.Category.match(/\((.*?)\)/)?.[1] || 'M';
                     const classCode = formData.Class.match(/\((.*?)\)/)?.[1] || 'I';
@@ -445,7 +441,6 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                         if (countersData[prefix]) {
                             nextSeqNum = countersData[prefix] + 1;
                         } else {
-                            // If prefix not in counters, fallback to query once to initialize
                             const partsRef = collection(db, 'parts');
                             const q = query(
                                 partsRef,
@@ -466,7 +461,6 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                             nextSeqNum = maxSeq + 1;
                         }
                     } else {
-                        // If counter doc doesn't exist at all, fallback to query once
                         const partsRef = collection(db, 'parts');
                         const q = query(
                             partsRef,
@@ -488,9 +482,8 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                     }
 
                     const nextSeq = nextSeqNum.toString().padStart(4, '0');
-                    const newPartID = `${prefix}${nextSeq}`; // 리비전을 덧붙이지 않음
+                    const newPartID = `${prefix}${nextSeq}`;
 
-                    // Create new document docRef with explicit PartID
                     const newDocRef = doc(db, 'parts', newPartID);
                     const finalPartData = {
                         ...formData,
@@ -502,7 +495,6 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                     transaction.set(newDocRef, finalPartData);
                     transaction.set(counterRef, { ...countersData, [prefix]: nextSeqNum }, { merge: true });
 
-                    // QA Settings Sync (New Part)
                     if (qaSettings.isTarget) {
                         const qaRef = doc(db, 'qa_target_parts', newPartID);
                         transaction.set(qaRef, {
@@ -515,13 +507,12 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                         });
                     }
                 });
-                // 공급사/제조사 자동 등록 (신규 등록 후)
                 try { await autoRegisterFromPart(formData); } catch (e) { console.warn('[AutoReg] 공급사/제조사 자동 등록 오류(무시):', e); }
             }
 
-            // 부품 추가/수정 알림 전송
             try {
-                const partId = isEdit ? (isRevisionUp ? `${formData.PartID} (Rev ${getNextRevision(formData.Rev)})` : initialData.PartID) : (formData.PartID || '신규 부품');
+                const isRevisionUp = isEdit && initialData && formData.Rev !== initialData.Rev;
+                const partId = isEdit ? (isRevisionUp ? `${formData.PartID} (Rev ${formData.Rev})` : initialData.PartID) : (formData.PartID || '신규 부품');
                 if (isEdit && ecnData && ecnData.updateType === 'ECN') {
                     await createNotificationByRoute('/ecn', 'ECN 대기 등록', `부품 [${partId}] ${formData.Name}에 대한 설계변경 내역이 ECN 대기 리스트에 등록되었습니다.`);
                 } else {
@@ -583,7 +574,6 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                     </div>
                     
                     <div className="flex flex-col gap-2">
-                        {/* Selected Tags */}
                         {formData.SubstitutePartIDs?.length > 0 && (
                             <div className="flex flex-wrap gap-1.5 p-1.5 bg-indigo-50/50 rounded-xl border border-indigo-100/50">
                                 {formData.SubstitutePartIDs.map(id => {
@@ -599,7 +589,6 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                             </div>
                         )}
                         
-                        {/* Search & Results */}
                         <div className="relative">
                             <input 
                                 value={substituteSearch} 
@@ -678,7 +667,6 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
     return createPortal(
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-[1000] flex items-center justify-center p-4 overflow-hidden">
             <div className="bg-white rounded-[2rem] w-full max-w-6xl max-h-[95vh] shadow-2xl flex flex-col animate-in zoom-in-95 duration-300 border border-white/20">
-                {/* Header */}
                 <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 flex-shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-slate-900 rounded-xl shadow-xl shadow-slate-200">
@@ -700,9 +688,7 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                 </div>
 
                 <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3">
-                    {/* Primary Info: Basic Identification, Manufacturing, and Custom Fields */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-                        {/* Section 1: Identification */}
                         <div className="bg-slate-50/50 p-3 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-1">
                             <h3 className={sectionTitleClass}><Database size={14} className="text-indigo-500" /> Basic Identification</h3>
                             <div className="flex flex-col gap-1">
@@ -809,7 +795,6 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                             </div>
                         </div>
 
-                        {/* Section 2: Manufacturing & Sourcing */}
                         <div className="bg-slate-50/50 p-3 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-1">
                             <h3 className={sectionTitleClass}><Truck size={14} className="text-amber-500" /> Manufacturing & Sourcing</h3>
                             <div className="flex flex-col gap-1">
@@ -871,7 +856,6 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                                         <span className="text-[10px] font-bold text-slate-400">일 (Days)</span>
                                     </div>
                                 </div>
-                                 {/* Compliance Certs UI Refined */}
                                  <div className="mt-1 p-2 bg-white/50 rounded-2xl border border-slate-100 flex flex-col gap-2">
                                      <label className={labelClass}>Compliance Certs</label>
                                      <div className="grid grid-cols-3 gap-1.5">
@@ -900,7 +884,6 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                                          ))}
                                      </div>
                                      
-                                     {/* Certification and Material Sheet Link Inputs */}
                                      {Object.keys(formData.Safety || {}).some(key => formData.Safety[key]) && (
                                          <div className="mt-2 space-y-1.5 border-t border-slate-100 pt-2 text-left">
                                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">인증서 / 물성시트 링크 (URL)</span>
@@ -935,7 +918,6 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                             </div>
                         </div>
 
-                        {/* Section 4: Additional Specs & Custom Items */}
                         <div className="bg-slate-50/50 p-3 rounded-3xl border border-slate-100 shadow-sm space-y-2">
                             <div className="flex items-center justify-between">
                                 <h3 className={sectionTitleClass}><PenTool size={14} className="text-rose-500" /> Additional Specs</h3>
@@ -1003,7 +985,6 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                         </div>
                     </div>
 
-                    {/* Section 5: QA & Quality Standards */}
                     <div className="bg-slate-50/50 p-4 rounded-3xl border border-slate-100 space-y-4">
                         <div className="flex items-center justify-between">
                             <h3 className={sectionTitleClass}><ShieldCheck size={14} className="text-teal-600" /> QA & Quality Standards (수입검사 기준)</h3>
@@ -1018,7 +999,6 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
 
                         {qaSettings.isTarget && (
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in slide-in-from-top-2">
-                                {/* Doc Replacement Toggle */}
                                 <div className="lg:col-span-2">
                                     <label className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-2xl cursor-pointer hover:bg-teal-50/30 transition-all group">
                                         <input 
@@ -1089,7 +1069,6 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                         )}
                     </div>
 
-                    {/* Section 6: Documentation & Notes */}
                     <div className="bg-slate-50/50 p-3 rounded-3xl border border-slate-100 shadow-sm space-y-2">
                         <h3 className={sectionTitleClass}><ClipboardList size={14} className="text-slate-500" /> Documentation & Extended Info</h3>
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-4 gap-y-2">
@@ -1112,19 +1091,15 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                         </div>
                     </div>
 
-                    {/* Revision Control */}
-                    {isEdit && (
-                        <div className="p-3 bg-rose-50/30 rounded-2xl border border-rose-100">
-                            <label className="flex items-center gap-3 group cursor-pointer">
-                                <input type="checkbox" checked={isRevisionUp} onChange={e => setIsRevisionUp(e.target.checked)} className="w-5 h-5 rounded border-2 border-slate-300 text-rose-600 focus:ring-rose-500/20 transition-all" />
-                                <div className="flex flex-col">
-                                    <span className="text-[12px] font-black text-slate-800 group-hover:text-rose-600 transition-colors">Generate New Revision (Minor Up)</span>
-                                    <span className="text-[9px] font-bold text-slate-400">Current version will be archived. New version: {getNextRevision(formData.Rev)}.</span>
-                                </div>
-                            </label>
+                    {/* Revision Control Header Info */}
+                    {isEdit && formData.Rev !== initialData?.Rev && (
+                        <div className="p-3 bg-indigo-50/50 rounded-2xl border border-indigo-100/50">
+                            <span className="text-[12px] font-black text-indigo-600">새 리비전 (New Revision)</span>
+                            <p className="text-[10px] text-slate-500 mt-1">
+                                리비전이 {initialData?.Rev} 에서 {formData.Rev} (으)로 변경되었습니다. 저장 시 기존 버전은 보존되고 새 버전으로 등록됩니다.
+                            </p>
                         </div>
                     )}
-
                     {/* Form Submission Footer */}
                     <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">
                         <button type="button" onClick={onClose} className="px-6 py-2 bg-white border border-slate-200 text-slate-500 font-black text-xs rounded-xl hover:bg-slate-50 transition-all uppercase tracking-[0.2em]">Discard</button>

@@ -19,17 +19,28 @@ const RiskInventorySettingModal = ({ isOpen, onClose, onRefresh }) => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [partsSnap, settingsSnap] = await Promise.all([
-                getDocs(query(collection(db, 'parts'), orderBy('Name', 'asc'))),
+            const [partsRes, settingsSnap] = await Promise.all([
+                fetch('http://localhost:5050/api/db/parts'),
                 getDocs(collection(db, 'inventory_settings'))
             ]);
 
-            setParts(partsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            const partsData = await partsRes.json();
+            const validParts = partsData.filter(p => p.Class !== 'BOM_Category' && p.Class !== 'BOM_Series');
+            validParts.sort((a, b) => (a.Name || '').localeCompare(b.Name || ''));
+            setParts(validParts.map(p => ({ ...p, id: p.PartID })));
             
             const settings = settingsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
             setFgSettings(settings.filter(s => s.Type === 'FG'));
             setPartSettings(settings.filter(s => s.Type === 'PART'));
         } catch (err) { console.error(err); } finally { setLoading(false); }
+    };
+
+    const isProduct = (p) => {
+        const cat = (p.Category || '').toLowerCase();
+        const cls = (p.Class || '').toLowerCase();
+        return cat.includes('완제품') || cat.includes('product') || cat.includes('actuator') || 
+               cls.includes('완제품') || cls.includes('product') || cls.includes('actuator') || 
+               (p.PartID && p.PartID.match(/^(12|17|22|32)/));
     };
 
     const handleAddSetting = (type) => {
@@ -110,10 +121,10 @@ const RiskInventorySettingModal = ({ isOpen, onClose, onRefresh }) => {
                                         <select 
                                             value={s.PartID} 
                                             onChange={e => setFgSettings(fgSettings.map(x => x.id === s.id ? {...x, PartID: e.target.value} : x))}
-                                            className="flex-[3] bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-black outline-none focus:ring-2 focus:ring-indigo-500"
+                                            className="flex-[3] w-0 min-w-0 bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-black outline-none focus:ring-2 focus:ring-indigo-500 truncate"
                                         >
                                             <option value="">완제품 선택...</option>
-                                            {parts.filter(p => p.Class === 'ASSY').map(p => <option key={p.id} value={p.PartID}>[{p.PartID}] {p.Name}</option>)}
+                                            {parts.filter(p => isProduct(p)).map(p => <option key={p.id} value={p.PartID}>[{p.PartID}] {p.Name}</option>)}
                                         </select>
                                         <div className="flex-[1.5] relative">
                                             <input 
@@ -149,10 +160,10 @@ const RiskInventorySettingModal = ({ isOpen, onClose, onRefresh }) => {
                                         <select 
                                             value={s.PartID} 
                                             onChange={e => setPartSettings(partSettings.map(x => x.id === s.id ? {...x, PartID: e.target.value} : x))}
-                                            className="flex-[3] bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-black outline-none focus:ring-2 focus:ring-emerald-500"
+                                            className="flex-[3] w-0 min-w-0 bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-black outline-none focus:ring-2 focus:ring-emerald-500 truncate"
                                         >
                                             <option value="">부품 선택...</option>
-                                            {parts.filter(p => p.Class !== 'ASSY').map(p => <option key={p.id} value={p.PartID}>[{p.PartID}] {p.Name}</option>)}
+                                            {parts.filter(p => !isProduct(p)).map(p => <option key={p.id} value={p.PartID}>[{p.PartID}] {p.Name}</option>)}
                                         </select>
                                         <div className="flex-[1.5] relative">
                                             <input 

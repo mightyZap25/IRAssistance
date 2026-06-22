@@ -72,8 +72,50 @@ export const mockFirestore = {
         try {
             const res = await fetch(`/api/db/${collectionName}`);
             if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-            const data = await res.json();
+            let data = await res.json();
             
+            // Filter out Category/Series from generic parts queries
+            if (collectionName === 'parts') {
+                const isCategoryQuery = q.constraints && q.constraints.some(c => 
+                    c.field === 'Class' && (c.val === 'BOM_Category' || (Array.isArray(c.val) && c.val.includes('BOM_Category')))
+                );
+                if (!isCategoryQuery) {
+                    data = data.filter(item => item.Class !== 'BOM_Category' && item.Class !== 'BOM_Series');
+                }
+            }
+            
+            // Apply local filtering if constraints exist
+            if (q.constraints && q.constraints.length > 0) {
+                q.constraints.forEach(c => {
+                    if (c.type === 'where') {
+                        data = data.filter(item => {
+                            const itemVal = item[c.field];
+                            if (c.op === '==') return itemVal === c.val;
+                            if (c.op === '!=') return itemVal !== c.val;
+                            if (c.op === 'in') return Array.isArray(c.val) && c.val.includes(itemVal);
+                            if (c.op === 'not-in') return Array.isArray(c.val) && !c.val.includes(itemVal);
+                            if (c.op === '>') return itemVal > c.val;
+                            if (c.op === '>=') return itemVal >= c.val;
+                            if (c.op === '<') return itemVal < c.val;
+                            if (c.op === '<=') return itemVal <= c.val;
+                            if (c.op === 'array-contains') return Array.isArray(itemVal) && itemVal.includes(c.val);
+                            if (c.op === 'array-contains-any') return Array.isArray(itemVal) && Array.isArray(c.val) && itemVal.some(v => c.val.includes(v));
+                            return true;
+                        });
+                    }
+                    if (c.type === 'orderBy') {
+                        data = data.sort((a, b) => {
+                            if (a[c.field] < b[c.field]) return c.dir === 'desc' ? 1 : -1;
+                            if (a[c.field] > b[c.field]) return c.dir === 'desc' ? -1 : 1;
+                            return 0;
+                        });
+                    }
+                    if (c.type === 'limit') {
+                        data = data.slice(0, c.n);
+                    }
+                });
+            }
+
             return {
                 docs: data.map(item => {
                     const docId = item.id || item.PartID || item.uid || '';

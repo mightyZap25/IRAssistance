@@ -62,8 +62,17 @@ const ECNPage = () => {
     const [selectedDraftIds, setSelectedDraftIds] = useState([]);
     const [formTitle, setFormTitle] = useState('');
     const [formPublishDate, setFormPublishDate] = useState(new Date().toISOString().slice(0, 10));
-    const [formSeries, setFormSeries] = useState('Actuator');
-    const [formCommMethod, setFormCommMethod] = useState('PT');
+    const [formCategory, setFormCategory] = useState('Actuator');
+    const [formModelSeries, setFormModelSeries] = useState('');
+    const [formCommMethod, setFormCommMethod] = useState([]);
+    const [formStroke, setFormStroke] = useState([]);
+    const [candidateTargetModels, setCandidateTargetModels] = useState([]);
+    const [matchedTargetModelIDs, setMatchedTargetModelIDs] = useState([]);
+    const [selectedTargetModels, setSelectedTargetModels] = useState([]);
+    const [applyToAllSeries, setApplyToAllSeries] = useState(false);
+    const [individualRevBump, setIndividualRevBump] = useState(false);
+    const [individualRevs, setIndividualRevs] = useState({});
+    
     const [formModelsText, setFormModelsText] = useState('');
     const [formECNType, setFormECNType] = useState('정규');
     const [formSpecChange, setFormSpecChange] = useState(false);
@@ -72,6 +81,8 @@ const ECNPage = () => {
     const [formNote, setFormNote] = useState('');
     const [formRevNo, setFormRevNo] = useState('2.0');
     const [customApprovalSteps, setCustomApprovalSteps] = useState([]);
+    const [allProducts, setAllProducts] = useState([]);
+    const [bomFolders, setBomFolders] = useState([]);
 
     const [filteredData, setFilteredData] = useState([]);
     const [sortConfig, setSortConfig] = useState({ key: 'CreatedAt', direction: 'desc' });
@@ -81,6 +92,192 @@ const ECNPage = () => {
         fetchECNs();
         fetchDraftItemsAndUsers();
     }, [viewMode]);
+
+    // 모달이 열리면 리스트와 bom_folders를 가져오기
+    useEffect(() => {
+        if (!isCreateModalOpen) return;
+        const fetchData = async () => {
+            try {
+                // Fetch parts from local REST API
+                const partsResp = await fetch('http://localhost:5050/api/db/parts');
+                if (!partsResp.ok) throw new Error(`HTTP ${partsResp.status} for parts`);
+                const partsData = await partsResp.json();
+                setAllProducts(partsData);
+
+                // Construct bomFolders from parts with Class 'BOM_Category' or 'BOM_Series'
+                const mockBomFolders = partsData.filter(p => p.Class === 'BOM_Category' || p.Class === 'BOM_Series').map(p => ({
+                    id: p.id,
+                    name: p.Name,
+                    type: p.Class === 'BOM_Category' ? 'category' : 'series',
+                    parentId: p.ParentFolderId || null
+                }));
+
+                // Fetch bom_folders from local REST API (in case there are any)
+                const foldersResp = await fetch('http://localhost:5050/api/db/bom_folders');
+                if (!foldersResp.ok) throw new Error(`HTTP ${foldersResp.status} for bom_folders`);
+                const foldersData = await foldersResp.json();
+                
+                setBomFolders([...mockBomFolders, ...foldersData]);
+            } catch (err) {
+                console.error("Error fetching data from local API:", err);
+            }
+        };
+        fetchData();
+    }, [isCreateModalOpen]);
+
+    // 분류(Category)에 따른 동적 시리즈(Series) 옵션 추출 (Actuator 전용)
+    const seriesOptions = React.useMemo(() => {
+        if (formCategory !== 'Actuator') return [];
+
+        const seriesSet = new Set();
+        
+        // Actuator 카테고리 ID들 식별 (bom_folders 기반)
+        const actuatorCats = bomFolders.filter(f => f.type === 'category' && (
+            f.name?.toLowerCase().includes('actuator') || f.name?.includes('액추')
+        ));
+        const actuatorCatIds = actuatorCats.map(f => f.id);
+
+        // 1. bom_folders에서 Actuator 카테고리 하위 시리즈 추출
+        actuatorCats.forEach(actuatorCat => {
+            bomFolders.filter(f => f.type === 'series' && f.parentId === actuatorCat.id).forEach(s => {
+                if (s.name) seriesSet.add(s.name);
+            });
+        });
+        
+        console.log('Collected series options:', Array.from(seriesSet).length, Array.from(seriesSet));
+        
+        return Array.from(seriesSet).sort().map(name => ({ id: name, name: name }));
+    }, [allProducts, bomFolders, formCategory]);
+
+    // 시리즈 및 필터 변경 시 대상 모델 추출 로직
+    useEffect(() => {
+        if (!isCreateModalOpen || allProducts.length === 0) {
+            setCandidateTargetModels([]);
+            setMatchedTargetModelIDs([]);
+            setSelectedTargetModels([]);
+            return;
+        }
+        
+        let seriesModels = [];
+
+        // BOM 폴더 ID 식별 (Board 카테고리 포함 한글)
+        const boardCatIds = bomFolders.filter(f => f.type === 'category' && (
+            f.name?.toLowerCase().includes('board') || f.name?.toLowerCase().includes('pcb') || f.name?.includes('보드')
+        )).map(f => f.id);
+        const actuatorCatIds = bomFolders.filter(f => f.type === 'category' && (
+            f.name?.toLowerCase().includes('actuator') || f.name?.includes('액추')
+        )).map(f => f.id);
+
+        if (formCategory === 'Board') {
+            // Board는 시리즈 필터 없이 모든 완제품 보드를 가져옴
+            seriesModels = allProducts.filter(p => {
+                if (p.ProductCategoryId && boardCatIds.includes(p.ProductCategoryId)) return true;
+
+                const cat = (p.Category || '').toLowerCase();
+                const cls = (p.Class || '').toLowerCase();
+                const name = (p.Name || '').toLowerCase();
+                
+                // 이름이나 클래스, 카테고리에 board, pcb, pcba 가 포함된 부품들
+                const isBoard = name.includes('board') || name.includes('pcb') || cat.includes('board') || cls.includes('board');
+                
+                // BOM_Category 등의 설정용 데이터는 제외
+                return isBoard && cls !== 'bom_category' && cls !== 'bom_series';
+            });
+        } else if (formCategory === 'Actuator') {
+            if (!formModelSeries) {
+                setCandidateTargetModels([]);
+                setMatchedTargetModelIDs([]);
+                setSelectedTargetModels([]);
+                return;
+            }
+
+            // 선택된 series 찾기
+            const prefix = formModelSeries;
+            const seriesFolder = bomFolders.find(f => f.name === prefix && f.type === 'series');
+            
+            seriesModels = allProducts.filter(p => {
+                const isActuatorByBOM = p.ProductCategoryId && actuatorCatIds.includes(p.ProductCategoryId);
+                
+                const cat = (p.Category || '').toLowerCase();
+                const cls = (p.Class || '').toLowerCase();
+                const isProductLegacy = cat.includes('완제품') || cat.includes('product') || cat.includes('actuator') || cls.includes('actuator') || (p.PartID && p.PartID.match(/^(12|17|22|32)/));
+                const isActuatorLegacy = cls.includes('actuator') || cat.includes('actuator') || cls === '' || !cls;
+                
+                if (!isActuatorByBOM && (!isProductLegacy || !isActuatorLegacy)) return false;
+
+                // bom_folders 기준 매칭
+                if (seriesFolder && p.ProductSeriesId === seriesFolder.id) return true;
+                
+                // fallback (PartID prefix 매칭)
+                return (p.PartID && p.PartID.startsWith(prefix)) || (p.Name && p.Name.startsWith(prefix));
+            });
+        }
+
+        // 이름순 정렬
+        seriesModels.sort((a, b) => (a.Name || '').localeCompare(b.Name || ''));
+        setCandidateTargetModels(seriesModels);
+
+        // 통신 및 스트로크 필터에 맞는 모델 ID 추출
+        let matchedIDs = [];
+        seriesModels.forEach(model => {
+            let isCommMatched = false;
+            let isStrokeMatched = false;
+            const modelName = model.Name || '';
+
+            // 통신 필터 (아무것도 선택 안했으면 필터 적용 안함 = 모두 매칭)
+            if (formCommMethod.length === 0) {
+                isCommMatched = true;
+            } else {
+                isCommMatched = formCommMethod.some(method => {
+                    const methodUpper = method.toUpperCase();
+                    return model.Spec && typeof model.Spec === 'string' && model.Spec.toUpperCase().includes(methodUpper);
+                });
+            }
+
+            // Stroke 필터 (아무것도 선택 안했으면 필터 적용 안함 = 모두 매칭)
+            if (formStroke.length === 0) {
+                isStrokeMatched = true;
+            } else {
+                isStrokeMatched = formStroke.some(stroke => {
+                    const numOnly = stroke.replace('mm', '');
+                    const regex = new RegExp(`${numOnly}\\s*mm`, 'i');
+                    return model.Spec && typeof model.Spec === 'string' && model.Spec.match(regex);
+                });
+            }
+
+            if (isCommMatched && isStrokeMatched) {
+                matchedIDs.push(model.PartID);
+            }
+        });
+        
+        setMatchedTargetModelIDs(matchedIDs);
+
+        const finalSelectedIDs = applyToAllSeries ? seriesModels.map(m => m.PartID) : matchedIDs;
+        setSelectedTargetModels(finalSelectedIDs);
+
+        // 최대 Rev 계산 및 개별 Rev 초기화
+        let maxRevVal = 0;
+        const newIndivRevs = {};
+
+        seriesModels.forEach(m => {
+            const revNum = parseFloat(m.Rev || '1.0');
+            // 선택된 모델들 중에서만 최대 리비전 계산
+            if (finalSelectedIDs.includes(m.PartID)) {
+                if (!isNaN(revNum) && revNum > maxRevVal) {
+                    maxRevVal = revNum;
+                }
+            }
+            // 모든 후보 모델에 대해 +0.1 한 값을 개별 리비전 초기값으로 세팅
+            newIndivRevs[m.PartID] = isNaN(revNum) ? '1.1' : (revNum + 0.1).toFixed(1);
+        });
+
+        if (maxRevVal === 0) maxRevVal = 1.0;
+        
+        // 필터나 선택 대상이 바뀌면 전체 formRevNo 자동 업데이트
+        setFormRevNo((maxRevVal + 0.1).toFixed(1));
+        setIndividualRevs(newIndivRevs);
+
+    }, [formModelSeries, formCommMethod, formStroke, applyToAllSeries, isCreateModalOpen, allProducts]);
 
     // URL 파라미터 감지 (외부 링크 연동용)
     useEffect(() => {
@@ -217,17 +414,22 @@ const ECNPage = () => {
 
             const newEcnDoc = {
                 ECNNumber: ecnNum,
-                Title: formTitle,
+                Title: formTitle.trim(),
                 PublishDate: formPublishDate,
-                ApplicableSeries: formSeries,
-                CommunicationMethod: formCommMethod,
-                ApplicableModelsText: formModelsText,
+                Category: formCategory,
+                Series: formModelSeries,
+                CommMethod: formCommMethod,
+                StrokeLength: formStroke,
                 ECNType: formECNType,
-                SpecChangeFlag: formSpecChange,
+                SpecChange: formSpecChange,
                 SpecChangeContent: formSpecChangeContent,
-                ImprovementEffect: formImprovement,
+                Improvement: formImprovement,
                 Note: formNote,
                 RevNo: formRevNo,
+                TargetNewRev: individualRevBump ? '개별 계산' : formRevNo,
+                TargetRevs: individualRevBump ? individualRevs : {},
+                TargetModels: selectedTargetModels.filter(id => matchedTargetModelIDs.includes(id)),
+                SeriesModels: selectedTargetModels.filter(id => !matchedTargetModelIDs.includes(id)),
                 Status: 'Pending',
                 CurrentStep: 0,
                 ApprovalHistory: [],
@@ -251,9 +453,10 @@ const ECNPage = () => {
             
             // 폼 초기화
             setFormTitle('');
-            setFormSeries('Actuator');
-            setFormCommMethod('PT');
-            setFormModelsText('');
+            setFormCategory('Actuator');
+            setFormModelSeries('');
+            setFormCommMethod(['PT', 'RS485', 'Modbus RTU', 'CAN', 'TTL', 'None']);
+            setFormStroke(['27mm', '40mm', '53mm', 'None']);
             setFormECNType('정규');
             setFormSpecChange(false);
             setFormSpecChangeContent('');
@@ -310,59 +513,72 @@ const ECNPage = () => {
 
             if (isFinalStep) {
                 // 최종 승인 시 설계변경 내역 일괄 반영
+                const targetModels = ecn.TargetModels || [];
+                const seriesModels = ecn.SeriesModels || [];
+                const allModelsToProcess = [...targetModels, ...seriesModels];
+
+                // 1. 모델들의 리비전 업데이트
+                for (const modelId of allModelsToProcess) {
+                    const partsQuery = query(collection(db, 'parts'), where('PartID', '==', modelId));
+                    const partsSnap = await getDocs(partsQuery);
+
+                    if (!partsSnap.empty) {
+                        const partDoc = partsSnap.docs[0];
+                        const partRef = partDoc.ref;
+                        const oldPartData = partDoc.data();
+                        
+                        let nextRev = '1.0';
+                        if (ecn.TargetNewRev && ecn.TargetNewRev !== '개별 계산') {
+                            nextRev = String(ecn.TargetNewRev);
+                        } else {
+                            nextRev = getNextRevision(oldPartData.Revision || oldPartData.Rev || '1.0');
+                        }
+
+                        // 부품 ID 유지, 리비전만 증가
+                        batch.update(partRef, {
+                            Rev: nextRev,
+                            Revision: nextRev,
+                            LastModified: serverTimestamp()
+                        });
+                        
+                        // 기존 BOM 레코드의 Revision 필드 업데이트
+                        const bomQuery = query(collection(db, 'bom'), where('ParentID', '==', modelId));
+                        const bomSnap = await getDocs(bomQuery);
+                        bomSnap.forEach(bomDoc => {
+                            batch.update(bomDoc.ref, { Revision: nextRev });
+                        });
+                    }
+                }
+
+                // 2. 구체적인 Draft Item 내역 (BOM 변경 등) 적용
                 if (ecn.Items && ecn.Items.length > 0) {
                     for (const item of ecn.Items) {
-                        const proposed = item.ProposedChanges || {};
-                        const partsQuery = query(collection(db, 'parts'), where('PartID', '==', item.PartID));
-                        const partsSnap = await getDocs(partsQuery);
-
-                        if (!partsSnap.empty) {
-                            const partDoc = partsSnap.docs[0];
-                            const partRef = partDoc.ref;
-                            const oldPartData = partDoc.data();
-                            const nextRev = proposed.Rev || getNextRevision(oldPartData.Revision || oldPartData.Rev || '1.0');
-                            const masterId = oldPartData.MasterPartID || oldPartData.PartID.split('-')[0];
-                            const newPartId = `${masterId}-${nextRev}`;
-
-                            // 기존 부품 락 해제 및 최신 상태 해제
-                            batch.update(partRef, { IsLatestRevision: false, Status: 'Approved' });
-
-                            // 신규 리비전 부품 등록
-                            batch.set(doc(db, 'parts', newPartId), {
-                                ...oldPartData,
-                                ...proposed,
-                                PartID: newPartId,
-                                MasterPartID: masterId,
-                                Rev: nextRev,
-                                Revision: nextRev,
-                                Status: 'Approved',
-                                Lifecycle: 'Active',
-                                IsLatestRevision: true,
-                                CreatedAt: serverTimestamp(),
-                                LastModified: serverTimestamp()
+                        if (item.Type === 'BOM Change' && item.ProposedBOM && Array.isArray(item.ProposedBOM)) {
+                            const bomQuery = query(collection(db, 'bom'), where('ParentID', '==', item.PartID));
+                            const bomSnap = await getDocs(bomQuery);
+                            bomSnap.forEach(bomDoc => {
+                                batch.delete(doc(db, 'bom', bomDoc.id));
                             });
 
-                            // BOM 변경 내역 일괄 적용
-                            if (item.Type === 'BOM Change' && item.ProposedBOM && Array.isArray(item.ProposedBOM)) {
-                                const bomQuery = query(collection(db, 'bom'), where('ParentID', '==', oldPartData.PartID));
-                                const bomSnap = await getDocs(bomQuery);
-                                bomSnap.forEach(bomDoc => {
-                                    batch.delete(doc(db, 'bom', bomDoc.id));
-                                });
-
-                                item.ProposedBOM.forEach((pBom) => {
-                                    const newBomRef = doc(collection(db, 'bom'));
-                                    batch.set(newBomRef, {
-                                        ParentID: newPartId,
-                                        ChildID: pBom.ChildID,
-                                        Quantity: pBom.Quantity,
-                                        Location: pBom.Location || '',
-                                        Note: pBom.Note || '',
-                                        Revision: nextRev,
-                                        CreatedAt: serverTimestamp()
-                                    });
-                                });
+                            let nextRev = '1.0';
+                            if (ecn.TargetNewRev && ecn.TargetNewRev !== '개별 계산') {
+                                nextRev = String(ecn.TargetNewRev);
+                            } else {
+                                nextRev = getNextRevision(item.Rev || '1.0');
                             }
+
+                            item.ProposedBOM.forEach((pBom) => {
+                                const newBomRef = doc(collection(db, 'bom'));
+                                batch.set(newBomRef, {
+                                    ParentID: item.PartID,
+                                    ChildID: pBom.ChildID,
+                                    Quantity: pBom.Quantity,
+                                    Location: pBom.Location || '',
+                                    Note: pBom.Note || '',
+                                    Revision: nextRev,
+                                    CreatedAt: serverTimestamp()
+                                });
+                            });
                         }
 
                         // ecn_draft_items 승인 처리 완료 상태 변경
@@ -768,7 +984,7 @@ const ECNPage = () => {
             {/* 설계변경 승인서 기안 작성 모달 */}
             {isCreateModalOpen && createPortal(
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl w-full max-w-4xl shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90%] overflow-hidden">
+                    <div className="bg-white rounded-3xl w-full max-w-5xl shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90%] overflow-hidden">
                         <div className="flex justify-between items-center p-6 border-b border-slate-100 shrink-0">
                             <div>
                                 <h2 className="text-lg font-black text-slate-800 flex items-center gap-2">
@@ -781,93 +997,207 @@ const ECNPage = () => {
                             </button>
                         </div>
 
-                        <div className="p-6 flex-1 overflow-y-auto space-y-6">
-                            {/* 1. ECN 정보 작성 */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="md:col-span-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">승인서 제목</label>
-                                    <input 
-                                        type="text" 
-                                        value={formTitle}
-                                        onChange={(e) => setFormTitle(e.target.value)}
-                                        placeholder="설계변경 승인서 제목을 적으세요..."
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-800 outline-none focus:bg-white focus:ring-4 focus:ring-indigo-50"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">발행일자</label>
-                                    <input 
-                                        type="date" 
-                                        value={formPublishDate}
-                                        onChange={(e) => setFormPublishDate(e.target.value)}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-800 outline-none focus:bg-white focus:ring-4 focus:ring-indigo-50"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">적용 분류/시리즈</label>
-                                    <select 
-                                        value={formSeries}
-                                        onChange={(e) => setFormSeries(e.target.value)}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none focus:bg-white"
-                                    >
-                                        <option value="Actuator">Actuator</option>
-                                        <option value="PCB Board">PCB Board</option>
-                                        <option value="Mechanical Parts">Mechanical Parts</option>
-                                        <option value="ETC">기타 부품군</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">통신 방법</label>
-                                    <select 
-                                        value={formCommMethod}
-                                        onChange={(e) => setFormCommMethod(e.target.value)}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none focus:bg-white"
-                                    >
-                                        <option value="PT">PT (IRPROTOCOL)</option>
-                                        <option value="RS485">RS485</option>
-                                        <option value="CAN">CAN</option>
-                                        <option value="TTL">TTL</option>
-                                        <option value="None">해당없음</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">구분 (Type)</label>
-                                    <div className="flex gap-2 bg-slate-100 p-1 rounded-xl">
-                                        <button 
-                                            type="button"
-                                            onClick={() => setFormECNType('정규')}
-                                            className={`flex-1 py-1.5 rounded-lg text-xs font-black transition-all ${formECNType === '정규' ? 'bg-indigo-600 text-white shadow' : 'text-slate-500'}`}
+                        <div className="p-6 flex-1 overflow-y-auto flex flex-col lg:flex-row gap-6 lg:gap-0">
+                            <div className="flex-1 space-y-6 lg:pr-6">
+                                {/* 1. ECN 정보 작성 */}
+                            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 mb-4 shadow-sm">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                    <div className="md:col-span-3">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">승인서 제목</label>
+                                        <input 
+                                            type="text" 
+                                            value={formTitle}
+                                            onChange={(e) => setFormTitle(e.target.value)}
+                                            placeholder="설계변경 승인서 제목을 적으세요..."
+                                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">발행일자</label>
+                                        <input 
+                                            type="date" 
+                                            value={formPublishDate}
+                                            onChange={(e) => setFormPublishDate(e.target.value)}
+                                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100"
+                                        />
+                                    </div>
+                                    
+                                    <div className="md:col-span-1">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">적용 분류</label>
+                                        <select 
+                                            value={formCategory}
+                                            onChange={(e) => {
+                                                setFormCategory(e.target.value);
+                                                setFormModelSeries('');
+                                            }}
+                                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100"
                                         >
-                                            정규
-                                        </button>
-                                        <button 
-                                            type="button"
-                                            onClick={() => setFormECNType('임시')}
-                                            className={`flex-1 py-1.5 rounded-lg text-xs font-black transition-all ${formECNType === '임시' ? 'bg-indigo-600 text-white shadow' : 'text-slate-500'}`}
+                                            <option value="Actuator">Actuator</option>
+                                            <option value="Board">Board</option>
+                                            <option value="Mechanical Parts">Mechanical Parts</option>
+                                            <option value="ETC">기타 부품군</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">시리즈 선택</label>
+                                        <select 
+                                            value={formModelSeries}
+                                            onChange={(e) => setFormModelSeries(e.target.value)}
+                                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100"
                                         >
-                                            임시
-                                        </button>
+                                            <option value="">시리즈 선택</option>
+                                            {seriesOptions.map(series => (
+                                                <option key={series.id} value={series.id}>{series.name}</option>
+                                            ))}
+                                            {/* DB에 없는 경우를 위한 수동 입력 옵션 방어 */}
+                                            {seriesOptions.length === 0 && <option disabled>해당 분류의 시리즈 없음</option>}
+                                        </select>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">구분 (Type)</label>
+                                        <div className="flex gap-2 bg-slate-200 p-1 rounded-xl">
+                                            <button 
+                                                type="button"
+                                                onClick={() => setFormECNType('정규')}
+                                                className={`flex-1 py-1 rounded-lg text-xs font-black transition-all ${formECNType === '정규' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}
+                                            >
+                                                정규
+                                            </button>
+                                            <button 
+                                                type="button"
+                                                onClick={() => setFormECNType('임시')}
+                                                className={`flex-1 py-1 rounded-lg text-xs font-black transition-all ${formECNType === '임시' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}
+                                            >
+                                                임시
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="md:col-span-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">통신 방법</label>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {['PT', 'RS485', 'CAN', 'TTL'].map(method => (
+                                                <label key={method} className="flex items-center gap-1.5 cursor-pointer bg-white border border-slate-200 px-2 py-0.5 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">
+                                                    <input 
+                                                        type="checkbox"
+                                                        checked={formCommMethod.includes(method)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) setFormCommMethod(prev => [...prev, method]);
+                                                            else setFormCommMethod(prev => prev.filter(m => m !== method));
+                                                        }}
+                                                        className="w-3.5 h-3.5 text-indigo-600 rounded focus:ring-indigo-500 border-slate-300"
+                                                    />
+                                                    <span className="text-[10px] font-bold text-slate-700">{method === 'PT' ? 'PT (IRPROTOCOL)' : method}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Stroke 길이</label>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {['27mm', '40mm', '53mm'].map(stroke => (
+                                                <label key={stroke} className="flex items-center gap-1.5 cursor-pointer bg-white border border-slate-200 px-2 py-0.5 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">
+                                                    <input 
+                                                        type="checkbox"
+                                                        checked={formStroke.includes(stroke)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) setFormStroke(prev => [...prev, stroke]);
+                                                            else setFormStroke(prev => prev.filter(s => s !== stroke));
+                                                        }}
+                                                        className="w-3.5 h-3.5 text-indigo-600 rounded focus:ring-indigo-500 border-slate-300"
+                                                    />
+                                                    <span className="text-[11px] font-bold text-slate-700">{stroke}</span>
+                                                </label>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div className="md:col-span-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">적용 대상 모델 (텍스트 직접 입력)</label>
-                                    <input 
-                                        type="text" 
-                                        value={formModelsText}
-                                        onChange={(e) => setFormModelsText(e.target.value)}
-                                        placeholder="예: IR-ACTUATOR-01, BOARD-MAIN-REV2"
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-800 outline-none focus:bg-white"
-                                    />
+                                    <div className="flex justify-between items-end mb-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">적용 대상 모델 (완제품)</label>
+                                        <label className="flex items-center gap-1.5 cursor-pointer">
+                                            <input 
+                                                type="checkbox"
+                                                checked={applyToAllSeries}
+                                                onChange={(e) => setApplyToAllSeries(e.target.checked)}
+                                                className="w-3.5 h-3.5 text-indigo-600 rounded focus:ring-indigo-500 border-slate-300"
+                                            />
+                                            <span className="text-[10px] font-bold bg-indigo-50 px-1.5 py-0.5 rounded text-indigo-600">시리즈 전체 적용</span>
+                                        </label>
+                                    </div>
+                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 max-h-48 overflow-y-auto">
+                                        {candidateTargetModels.length === 0 ? (
+                                            <p className="text-xs text-slate-400 text-center py-4">선택된 시리즈에 해당하는 완제품이 없습니다.</p>
+                                        ) : (
+                                            <div className="flex flex-col gap-2">
+                                                {candidateTargetModels.map(model => {
+                                                    const isMatched = matchedTargetModelIDs.includes(model.PartID);
+                                                    return (
+                                                    <label key={model.PartID} className={`flex items-center gap-2 cursor-pointer p-1.5 rounded-lg transition-colors ${
+                                                        isMatched ? 'hover:bg-indigo-50 bg-white border border-slate-100 shadow-sm' : 'hover:bg-slate-100 opacity-60'
+                                                    }`}>
+                                                        <input 
+                                                            type="checkbox" 
+                                                            checked={selectedTargetModels.includes(model.PartID)}
+                                                            disabled={applyToAllSeries}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setSelectedTargetModels(prev => [...prev, model.PartID]);
+                                                                } else {
+                                                                    setSelectedTargetModels(prev => prev.filter(id => id !== model.PartID));
+                                                                }
+                                                            }}
+                                                            className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 border-slate-300 disabled:opacity-50"
+                                                        />
+                                                        <span className={`text-xs flex-1 truncate ${isMatched ? 'font-black text-slate-800' : 'font-bold text-slate-500'}`}>{model.Name}</span>
+                                                        
+                                                        {individualRevBump ? (
+                                                            <div className="ml-auto flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                                                                <span className="text-[9px] font-bold text-slate-400 hidden sm:inline">Rev {model.Rev || '1.0'} →</span>
+                                                                <input 
+                                                                    type="text"
+                                                                    value={individualRevs[model.PartID] || ''}
+                                                                    onChange={(e) => setIndividualRevs(prev => ({...prev, [model.PartID]: e.target.value}))}
+                                                                    disabled={!selectedTargetModels.includes(model.PartID)}
+                                                                    className="w-10 sm:w-12 text-center sm:text-right text-[10px] font-black bg-white border border-indigo-200 px-1 py-0.5 rounded text-indigo-700 outline-none focus:ring-1 focus:ring-indigo-400 disabled:opacity-50"
+                                                                />
+                                                            </div>
+                                                        ) : (
+                                                            <span className="ml-auto shrink-0 text-[10px] font-black bg-slate-200 px-1.5 py-0.5 rounded text-slate-500">Rev {model.Rev || '1.0'}</span>
+                                                        )}
+                                                    </label>
+                                                )})}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Revision No. (계획)</label>
+                                    <div className="flex justify-between items-end mb-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Revision No. (계획)</label>
+                                        <label className="flex items-center gap-1.5 cursor-pointer">
+                                            <input 
+                                                type="checkbox"
+                                                checked={individualRevBump}
+                                                onChange={(e) => setIndividualRevBump(e.target.checked)}
+                                                className="w-3.5 h-3.5 text-indigo-600 rounded focus:ring-indigo-500 border-slate-300"
+                                            />
+                                            <span className="text-[10px] font-bold text-slate-500">개별 +0.1 증가</span>
+                                        </label>
+                                    </div>
                                     <input 
                                         type="text" 
                                         value={formRevNo}
                                         onChange={(e) => setFormRevNo(e.target.value)}
                                         placeholder="예: 2.0"
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-800 outline-none focus:bg-white"
+                                        disabled={individualRevBump}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-800 outline-none focus:bg-white disabled:opacity-50 disabled:bg-slate-100"
                                     />
+                                    {individualRevBump && (
+                                        <p className="text-[10px] font-bold text-slate-500 mt-1.5 px-1">체크된 대상들의 현재 리비전에서 각각 0.1씩 증가합니다.</p>
+                                    )}
                                 </div>
                                 <div className="md:col-span-3 border-t border-slate-100 pt-3">
                                     <label className="flex items-center gap-2 cursor-pointer mb-2">
@@ -950,11 +1280,12 @@ const ECNPage = () => {
                                     })}
                                 </div>
                             </div>
+                            </div> {/* End of left column */}
 
                             {/* 3. 결재선 지정 (동적) */}
-                            <div className="border-t border-slate-100 pt-4">
+                            <div className="w-full lg:w-[320px] shrink-0 border-t lg:border-t-0 lg:border-l border-slate-100 pt-6 lg:pt-0 lg:pl-6">
                                 <div className="flex justify-between items-center mb-3">
-                                    <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-widest">결재선 (Approvers Line) 구성</h4>
+                                    <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-widest">결재 설정</h4>
                                     <button 
                                         type="button"
                                         onClick={handleAddApprovalStep}
@@ -963,11 +1294,11 @@ const ECNPage = () => {
                                         + 결재 단계 추가
                                     </button>
                                 </div>
-                                <div className="space-y-3">
+                                <div className="space-y-2">
                                     {customApprovalSteps.map((step, idx) => (
-                                        <div key={idx} className="flex items-center gap-4 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                                        <div key={idx} className="flex items-center gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200">
                                             <span className="text-xs font-black text-indigo-600 shrink-0 w-8">{idx + 1}단계</span>
-                                            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <div className="flex-1 grid grid-cols-2 gap-2">
                                                 <input 
                                                     type="text" 
                                                     value={step.label}
@@ -977,12 +1308,12 @@ const ECNPage = () => {
                                                         setCustomApprovalSteps(updated);
                                                     }}
                                                     placeholder="결재선 라벨 (예: 설계검토)"
-                                                    className="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500"
+                                                    className="bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500"
                                                 />
                                                 <select 
                                                     value={step.approverId}
                                                     onChange={(e) => handleStepApproverChange(idx, e.target.value)}
-                                                    className="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500"
+                                                    className="bg-white border border-slate-300 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-800 outline-none focus:border-indigo-500"
                                                 >
                                                     <option value="">-- 결재 유저 선택 --</option>
                                                     {users.map(u => (
@@ -1069,20 +1400,28 @@ const ECNPage = () => {
                                     <p className="font-bold text-xs text-slate-800">{selectedEcn.PublishDate}</p>
                                 </div>
                                 <div>
-                                    <label className="text-[9px] font-semibold text-slate-500 block mb-1">적용 시리즈 / 통신 방법</label>
-                                    <p className="font-bold text-xs text-slate-800">{selectedEcn.ApplicableSeries} / {selectedEcn.CommunicationMethod}</p>
+                                    <label className="text-[9px] font-semibold text-slate-500 block mb-1">적용 시리즈</label>
+                                    <p className="font-bold text-xs text-slate-800">{selectedEcn.Series}</p>
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-semibold text-slate-500 block mb-1">통신 방법</label>
+                                    <p className="font-bold text-xs text-slate-800">{Array.isArray(selectedEcn.CommMethod) ? selectedEcn.CommMethod.join(', ') : selectedEcn.CommMethod}</p>
                                 </div>
                                 <div>
                                     <label className="text-[9px] font-semibold text-slate-500 block mb-1">구분 및 Revision No.</label>
-                                    <p className="font-bold text-xs text-slate-800">{selectedEcn.ECNType} / Rev {selectedEcn.RevNo}</p>
+                                    <p className="font-bold text-xs text-slate-800">{selectedEcn.ECNType} / Rev {selectedEcn.TargetNewRev || selectedEcn.RevNo}</p>
                                 </div>
                                 <div>
                                     <label className="text-[9px] font-semibold text-slate-500 block mb-1">기안자</label>
                                     <p className="font-bold text-xs text-slate-800">{selectedEcn.RequestedBy}</p>
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label className="text-[9px] font-semibold text-slate-500 block mb-1">적용 모델</label>
-                                    <p className="font-bold text-xs text-slate-800">{selectedEcn.ApplicableModelsText || 'N/A'}</p>
+                                    <label className="text-[9px] font-semibold text-slate-500 block mb-1">BOM 설계변경 대상 모델</label>
+                                    <p className="font-bold text-xs text-slate-800 break-words">{selectedEcn.TargetModels?.length > 0 ? selectedEcn.TargetModels.join(', ') : '없음'}</p>
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="text-[9px] font-semibold text-slate-500 block mb-1">리비전 동기화 대상 모델 (시리즈 전체)</label>
+                                    <p className="font-bold text-xs text-slate-400 break-words">{selectedEcn.SeriesModels?.length > 0 ? selectedEcn.SeriesModels.join(', ') : '없음'}</p>
                                 </div>
                                 <div className="md:col-span-2">
                                     <label className="text-[9px] font-semibold text-slate-500 block mb-1">공표사양변경유무</label>

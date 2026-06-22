@@ -28,6 +28,7 @@ export default function ProjectManagementPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [selectedProject, setSelectedProject] = useState(null);
+    const [newProjectCode, setNewProjectCode] = useState('');
 
     // Filter/Tab
     const [activeTab, setActiveTab] = useState('ALL'); // ALL | ACTIVE | COMPLETED
@@ -106,6 +107,23 @@ export default function ProjectManagementPage() {
         });
     }, [projects, searchTerm, activeTab]);
 
+    const generateProjectCode = () => {
+        const year = new Date().getFullYear();
+        const prefix = `IR-${year}-`;
+        let maxIdx = 0;
+        
+        projects.forEach(p => {
+            if (p.code && p.code.startsWith(prefix)) {
+                const idxStr = p.code.replace(prefix, '');
+                const idx = parseInt(idxStr, 10);
+                if (!isNaN(idx) && idx > maxIdx) {
+                    maxIdx = idx;
+                }
+            }
+        });
+        return `${prefix}${String(maxIdx + 1).padStart(3, '0')}`;
+    };
+
     const handleCreateProject = async (e) => {
         e.preventDefault();
         const name = e.target.projectName.value;
@@ -171,7 +189,10 @@ export default function ProjectManagementPage() {
                     </p>
                 </div>
                 <button
-                    onClick={() => setIsCreateModalOpen(true)}
+                    onClick={() => {
+                        setNewProjectCode(generateProjectCode());
+                        setIsCreateModalOpen(true);
+                    }}
                     className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl font-black text-sm shadow-md shadow-indigo-100 transition-all transform hover:scale-[1.02]"
                 >
                     <Plus size={18} />
@@ -313,8 +334,14 @@ export default function ProjectManagementPage() {
                         <div className="p-6 space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-1.5 tracking-widest">프로젝트 코드</label>
-                                    <input name="projectCode" required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-black outline-none focus:ring-2 focus:ring-indigo-500" placeholder="예: IR-2026-001" />
+                                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-1.5 tracking-widest">프로젝트 코드 (자동생성)</label>
+                                    <input 
+                                        name="projectCode" 
+                                        required 
+                                        value={newProjectCode}
+                                        onChange={e => setNewProjectCode(e.target.value)}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-black text-slate-500 outline-none focus:ring-2 focus:ring-indigo-500" 
+                                    />
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-black text-slate-500 uppercase block mb-1.5 tracking-widest">프로젝트 명</label>

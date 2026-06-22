@@ -46,7 +46,7 @@ export default function PartsPage() {
     const [selectedPartId, setSelectedPartId] = useState(null);
     const [isModifying, setIsModifying] = useState(false);
 
-    const [filteredParts, setFilteredParts] = useState([]);
+    const [filteredParts, setFilteredParts] = useState([]); // Removed, but keeping for compatibility if needed elsewhere
     const [sortConfig, setSortConfig] = useState({ key: 'PartID', direction: 'asc' });
     const [showOverseasOnly, setShowOverseasOnly] = useState(false);
 
@@ -202,7 +202,7 @@ export default function PartsPage() {
                             searchPlaceholder="부품명, Part ID 검색..."
                             
                             enableFilter={true}
-                            onFilteredDataChange={setFilteredParts}
+                            // onFilteredDataChange removed to prevent double rendering
                             
                             enableViewModeToggle={true}
                             viewMode={viewMode}
