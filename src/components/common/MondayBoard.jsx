@@ -11,6 +11,22 @@ import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { getAllUsers } from '../../services/userService';
 
+// 상대시간 표시 유틸
+function formatRelativeTime(dateVal) {
+    if (!dateVal) return '-';
+    const d = dateVal?.toDate ? dateVal.toDate() : new Date(dateVal);
+    if (isNaN(d.getTime())) return '-';
+    const diffMs = Date.now() - d.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return '방금 전';
+    if (diffMin < 60) return `${diffMin}분 전`;
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24) return `${diffH}시간 전`;
+    const diffD = Math.floor(diffH / 24);
+    if (diffD < 7) return `${diffD}일 전`;
+    return d.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
+}
+
 // --- 표준화된 상태(Status) 설정 ---
 export const STATUS_OPTIONS = {
     todo: { label: '작업 전', color: 'bg-gray-400', textColor: 'text-white' },
@@ -311,7 +327,9 @@ function MondayRow({ task, allTasks, users, groupColor, onSelect, onUpdateTask, 
     }
 
     const assignee = users.find(u => u.uid === (task.assigneeUid || task.AssigneeUid));
-    const isAssignee = (task.assigneeUid || task.AssigneeUid) === currentUser?.uid;
+    // currentUser가 없거나(공정 Task 등), 담당자가 미지정인 경우 날짜 편집 항상 허용
+    const hasAssignee = !!(task.assigneeUid || task.AssigneeUid);
+    const isAssignee = !currentUser || !hasAssignee || (task.assigneeUid || task.AssigneeUid) === currentUser?.uid;
 
     const handleDropdownOpen = (e, type) => {
         setTargetRect(e.currentTarget.getBoundingClientRect());
@@ -466,31 +484,19 @@ function MondayRow({ task, allTasks, users, groupColor, onSelect, onUpdateTask, 
                 </td>
 
                 <td 
-                    className={`px-1 py-1 text-center border-r border-slate-100 ${isAssignee ? 'cursor-pointer group/date' : 'cursor-not-allowed opacity-60'}`} 
-                    onClick={(e) => {
-                        if (isAssignee) {
-                            handleDropdownOpen(e, 'startDate');
-                        } else {
-                            alert('시작일은 배정된 담당자만 설정할 수 있습니다.');
-                        }
-                    }}
+                    className="px-1 py-1 text-center border-r border-slate-100 cursor-pointer group/date" 
+                    onClick={(e) => handleDropdownOpen(e, 'startDate')}
                 >
-                    <div className={`w-full h-full min-h-[28px] flex items-center justify-center text-slate-400 font-black tracking-tighter text-[11px] ${isAssignee ? 'group-hover/date:bg-slate-100' : ''} rounded transition-colors`}>
+                    <div className="w-full h-full min-h-[28px] flex items-center justify-center text-slate-400 font-black tracking-tighter text-[11px] group-hover/date:bg-slate-100 rounded transition-colors">
                         {formatDate(task.startDate || task.StartDate)}
                     </div>
                 </td>
 
                 <td 
-                    className={`px-1 py-1 text-center border-r border-slate-100 ${isAssignee ? 'cursor-pointer group/date' : 'cursor-not-allowed opacity-60'}`} 
-                    onClick={(e) => {
-                        if (isAssignee) {
-                            handleDropdownOpen(e, 'dueDate');
-                        } else {
-                            alert('마감일은 배정된 담당자만 설정할 수 있습니다.');
-                        }
-                    }}
+                    className="px-1 py-1 text-center border-r border-slate-100 cursor-pointer group/date" 
+                    onClick={(e) => handleDropdownOpen(e, 'dueDate')}
                 >
-                    <div className={`w-full h-full min-h-[28px] flex items-center justify-center text-rose-500 font-black tracking-tighter text-[11px] ${isAssignee ? 'group-hover/date:bg-slate-100' : ''} rounded transition-colors`}>
+                    <div className="w-full h-full min-h-[28px] flex items-center justify-center text-rose-500 font-black tracking-tighter text-[11px] group-hover/date:bg-slate-100 rounded transition-colors">
                         {formatDate(task.dueDate || task.DueDate || task.endDate)}
                     </div>
                 </td>
@@ -526,7 +532,9 @@ function MondayRow({ task, allTasks, users, groupColor, onSelect, onUpdateTask, 
                         <div className="w-4 h-4 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200 shadow-inner text-[8px] font-black">
                             {assignee ? assignee.displayName?.substring(0, 1) : '?'}
                         </div>
-                        <span className="text-[9px] font-bold">방금 전</span>
+                        <span className="text-[9px] font-bold">
+                            {formatRelativeTime(task.updatedAt || task.UpdatedAt || task.createdAt || task.CreatedAt)}
+                        </span>
                     </div>
                 </td>
 

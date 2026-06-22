@@ -6,7 +6,7 @@ import {
     Trash2, Plus, Save, Briefcase, User, Layers, Layout, AlertCircle
 } from 'lucide-react';
 import { getIssuesByProject } from '../services/issueService';
-import MondayBoard from './common/MondayBoard';
+import StageTaskBoard from './common/StageTaskBoard';
 
 const STAGE_DOCUMENTS = {
     planning: ['제품 기획서', '시장 분석서', '개발 일정표'],
@@ -17,12 +17,14 @@ const STAGE_DOCUMENTS = {
     mp_transfer: ['양산 이관 승인서', '최종 BOM', '포장 사양서'],
 };
 
-export default function ProjectProcessPanel({ isOpen, onClose, project, stages, onUpdate, users }) {
+export default function ProjectProcessPanel({ isOpen, onClose, project, stages, onUpdate, users, currentUser }) {
     const [viewMode, setViewMode] = useState('overview'); // overview | issues | stage_detail
     const [activeStageId, setActiveStageId] = useState(null);
     const [newTest, setNewTest] = useState({ parent: '', child: '' });
     const [isAddingNewParent, setIsAddingNewParent] = useState(false);
-    
+    const [inlineAddingGroup, setInlineAddingGroup] = useState(null);
+    const [inlineTaskName, setInlineTaskName] = useState('');
+    const [newLink, setNewLink] = useState({ title: '', url: '' }); // 링크 추가 상태 관리
     const [projectIssues, setProjectIssues] = useState([]);
     const [loadingIssues, setLoadingIssues] = useState(false);
     const [editingTest, setEditingTest] = useState(null); // The test task object currently opened in details
@@ -78,35 +80,61 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
         await onUpdate(project.id, { schedules: updatedSchedules });
     };
 
-    const handleAddTest = async (stageId) => {
-        if (!newTest.parent || !newTest.child) return;
+    // 태스크 완료율 기반 프로젝트 진행률 자동 계산
+    const calcProgressFromTasks = (tests) => {
+        const allTasks = Object.values(tests || {}).flat();
+        if (allTasks.length === 0) return project.progress || 0;
+        const done = allTasks.filter(t => t.status === 'done' || t.completed === true).length;
+        return Math.round((done / allTasks.length) * 100);
+    };
+
+    const handleAddTest = async (stageId, groupName, taskName) => {
+        const pName = groupName ?? newTest.parent;
+        const cName = taskName ?? newTest.child;
+        if (!pName || !cName) return;
         const updatedTests = { ...(project.tests || {}) };
         if (!updatedTests[stageId]) updatedTests[stageId] = [];
         updatedTests[stageId].push({ 
             id: Date.now(), 
-            parent: newTest.parent, 
-            child: newTest.child, 
-            completed: false, 
+            parent: pName,       // 그룹명 (호환성 유지)
+            title: cName,        // 타스크명 (통일된 필드명)
+            child: cName,        // 하위 호환성 유지
+            status: 'todo',      // 다단계 상태
+            completed: false,    // 호환성 유지
             updatedAt: new Date().toISOString(),
             startDate: project.schedules?.[stageId]?.start || '',
-            endDate: project.schedules?.[stageId]?.end || '',
+            dueDate: project.schedules?.[stageId]?.end || '',
+            endDate: project.schedules?.[stageId]?.end || '',   // 호환성 유지
             assigneeUid: '',
             assigneeName: '',
-            priority: 'Medium', // High, Medium, Low
-            difficulty: 'Medium', // High, Medium, Low
+            priority: 'Medium',
+            difficulty: 'Medium',
             notes: ''
         });
-        await onUpdate(project.id, { tests: updatedTests });
-        setNewTest({ ...newTest, child: '' }); 
+        const newProgress = calcProgressFromTasks(updatedTests);
+        await onUpdate(project.id, { tests: updatedTests, progress: newProgress });
+        setNewTest({ parent: pName, child: '' }); 
+        setInlineAddingGroup(null);
+        setInlineTaskName('');
     };
 
     const toggleTest = async (stageId, testId) => {
         const updatedTests = { ...project.tests };
-        updatedTests[stageId] = updatedTests[stageId].map(t => t.id === testId ? { ...t, completed: !t.completed, updatedAt: new Date().toISOString() } : t);
-        await onUpdate(project.id, { tests: updatedTests });
-        // sync details state if open
+        updatedTests[stageId] = updatedTests[stageId].map(t => {
+            if (t.id !== testId) return t;
+            const isDone = t.status === 'done' || t.completed === true;
+            return { 
+                ...t, 
+                status: isDone ? 'todo' : 'done',
+                completed: !isDone,
+                updatedAt: new Date().toISOString() 
+            };
+        });
+        const newProgress = calcProgressFromTasks(updatedTests);
+        await onUpdate(project.id, { tests: updatedTests, progress: newProgress });
         if (editingTest && editingTest.id === testId) {
-            setEditingTest(prev => ({ ...prev, completed: !prev.completed }));
+            const updated = updatedTests[stageId].find(t => t.id === testId);
+            setEditingTest(prev => ({ ...prev, status: updated.status, completed: updated.completed }));
         }
     };
 
@@ -124,6 +152,12 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
         updatedTests[stageId] = updatedTests[stageId].map(t => {
             if (t.id === testId) {
                 const updated = { ...t, ...fields, updatedAt: new Date().toISOString() };
+                // status/completed 동기화
+                if (fields.status !== undefined) updated.completed = (fields.status === 'done');
+                if (fields.completed !== undefined) updated.status = fields.completed ? 'done' : 'todo';
+                // title/child 동기화
+                if (fields.title !== undefined) updated.child = fields.title;
+                if (fields.child !== undefined) updated.title = fields.child;
                 if (fields.assigneeUid !== undefined) {
                     const matchedUser = (users || []).find(u => u.uid === fields.assigneeUid);
                     updated.assigneeName = matchedUser ? matchedUser.displayName : '';
@@ -132,10 +166,15 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
             }
             return t;
         });
-        await onUpdate(project.id, { tests: updatedTests });
+        const newProgress = calcProgressFromTasks(updatedTests);
+        await onUpdate(project.id, { tests: updatedTests, progress: newProgress });
         if (editingTest && editingTest.id === testId) {
             setEditingTest(prev => {
                 const nextVal = { ...prev, ...fields };
+                if (fields.status !== undefined) nextVal.completed = (fields.status === 'done');
+                if (fields.completed !== undefined) nextVal.status = fields.completed ? 'done' : 'todo';
+                if (fields.title !== undefined) nextVal.child = fields.title;
+                if (fields.child !== undefined) nextVal.title = fields.child;
                 if (fields.assigneeUid !== undefined) {
                     const matchedUser = (users || []).find(u => u.uid === fields.assigneeUid);
                     nextVal.assigneeName = matchedUser ? matchedUser.displayName : '';
@@ -166,15 +205,46 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
             <div className="fixed inset-y-0 right-0 w-full md:w-[750px] bg-slate-50 shadow-2xl z-[150] flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-300">
                 
                 {/* 1. Header */}
-                <div className="bg-white px-5 py-3 border-b border-slate-200 flex justify-between items-center shrink-0">
-                    <div>
-                        <div className="flex items-center gap-2 mb-0.5">
-                            <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[9px] font-black border border-indigo-100 font-mono tracking-tighter uppercase">{project.code}</span>
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Control Center</span>
+                <div className="bg-white px-5 pt-4 pb-3 border-b border-slate-200 shrink-0">
+                    <div className="flex justify-between items-start">
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                                <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[9px] font-black border border-indigo-100 font-mono tracking-tighter uppercase">{project.code}</span>
+                                {/* 현재 단계 뱅지 */}
+                                {(() => {
+                                    const s = stages.find(st => st.id === project.currentStage);
+                                    return s ? (
+                                        <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-50 border border-amber-200 ${s.color}`}>
+                                            <s.icon size={10}/> {s.label}
+                                        </span>
+                                    ) : null;
+                                })()}
+                            </div>
+                            <h2 className="text-base font-black text-slate-900 leading-tight truncate">{project.name}</h2>
                         </div>
-                        <h2 className="text-lg font-black text-slate-900 leading-tight">{project.name}</h2>
+                        <button onClick={onClose} className="ml-3 p-1.5 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg transition-all shrink-0">
+                            <X size={18}/>
+                        </button>
                     </div>
-                    <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg transition-all"><X size={20}/></button>
+                    {/* 전체 진행률 바 */}
+                    <div className="mt-3 space-y-1">
+                        <div className="flex justify-between items-center">
+                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Overall Progress</span>
+                            <span className={`text-[10px] font-black ${
+                                (project.progress || 0) >= 80 ? 'text-emerald-600' :
+                                (project.progress || 0) >= 40 ? 'text-indigo-600' : 'text-amber-600'
+                            }`}>{project.progress || 0}%</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div 
+                                className={`h-full rounded-full transition-all duration-700 ${
+                                    (project.progress || 0) >= 80 ? 'bg-emerald-500' :
+                                    (project.progress || 0) >= 40 ? 'bg-indigo-500' : 'bg-amber-400'
+                                }`}
+                                style={{ width: `${project.progress || 0}%` }}
+                            />
+                        </div>
+                    </div>
                 </div>
 
                 {/* 2. Navigation Tabs */}
@@ -205,12 +275,28 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                             const isCurrent = project.currentStage === stage.id;
                             const isActive = activeStageId === stage.id;
                             const isCompleted = idx < currentStageIdx;
+                            // Task 완료율
+                            const stageTasks = project.tests?.[stage.id] || [];
+                            const doneCount = stageTasks.filter(t => t.status === 'done' || t.completed).length;
+                            const pct = stageTasks.length > 0 ? Math.round((doneCount / stageTasks.length) * 100) : null;
                             return (
                                 <button key={stage.id} onClick={() => handleStageSelect(stage.id)} className={`flex flex-col items-center min-w-[75px] transition-all ${isActive ? 'scale-105' : 'opacity-50 hover:opacity-100'}`}>
                                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center border-2 mb-1 transition-all ${isActive ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg ring-2 ring-indigo-50' : isCurrent ? 'bg-amber-50 border-amber-200 text-amber-600' : isCompleted ? 'bg-emerald-50 border-emerald-500 text-emerald-600' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
                                         {isCompleted ? <CheckCircle2 size={16} /> : <stage.icon size={14} />}
                                     </div>
                                     <span className={`text-[9px] font-black ${isActive ? 'text-indigo-600' : 'text-slate-500'}`}>{stage.label}</span>
+                                    {/* Task 완료율 배지 */}
+                                    {pct !== null && (
+                                        <span className={`text-[8px] font-black mt-0.5 px-1 py-0.5 rounded-full leading-none ${
+                                            pct === 100 
+                                                ? 'bg-emerald-100 text-emerald-700' 
+                                                : isActive 
+                                                    ? 'bg-indigo-100 text-indigo-700' 
+                                                    : 'bg-slate-100 text-slate-500'
+                                        }`}>
+                                            {pct}%
+                                        </span>
+                                    )}
                                 </button>
                             );
                         })}
@@ -242,23 +328,95 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">🚀 로드맵 요약</h4>
-                                <div className="grid grid-cols-1 gap-2">
-                                    {stages.map((s) => {
+                                <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5">
+                                    <span>🚀</span> 로드맵 요약
+                                </h4>
+                                <div className="space-y-1.5">
+                                    {stages.map((s, idx) => {
                                         const isCurrent = project.currentStage === s.id;
+                                        const isCompleted = idx < stages.findIndex(st => st.id === project.currentStage);
+                                        const isFuture = !isCurrent && !isCompleted;
                                         const docCount = project.documents?.[s.id]?.length || 0;
-                                        const testDone = project.tests?.[s.id]?.filter(t => t.completed).length || 0;
-                                        const testTotal = project.tests?.[s.id]?.length || 0;
+                                        const stageTasks = project.tests?.[s.id] || [];
+                                        const testDone = stageTasks.filter(t => t.status === 'done' || t.completed).length;
+                                        const testTotal = stageTasks.length;
+                                        const taskPct = testTotal > 0 ? Math.round((testDone / testTotal) * 100) : 0;
+                                        const schedStart = project.schedules?.[s.id]?.start;
+                                        const schedEnd = project.schedules?.[s.id]?.end;
+
                                         return (
-                                            <div key={s.id} onClick={() => handleStageSelect(s.id)} className={`flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer group ${isCurrent ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : 'bg-white border-slate-200 hover:border-indigo-300'}`}>
-                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isCurrent ? 'bg-white/20 text-white' : 'bg-slate-50 text-slate-400 group-hover:text-indigo-600'}`}><s.icon size={16}/></div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex justify-between items-center mb-0.5"><span className={`text-xs font-black truncate ${isCurrent ? 'text-white' : 'text-slate-800'}`}>{s.label}</span></div>
-                                                    <div className="flex items-center gap-3 text-[9px] font-bold opacity-70">
-                                                        <span>문서: {docCount}건</span><span>|</span><span>테스트: {testDone}/{testTotal}</span>
-                                                    </div>
+                                            <div 
+                                                key={s.id} 
+                                                onClick={() => handleStageSelect(s.id)} 
+                                                className={`relative flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer group overflow-hidden ${
+                                                    isCurrent 
+                                                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' 
+                                                        : isCompleted 
+                                                            ? 'bg-emerald-50 border-emerald-200 hover:border-emerald-400' 
+                                                            : 'bg-white border-slate-200 hover:border-indigo-200 opacity-60 hover:opacity-100'
+                                                }`}
+                                            >
+                                                {/* 왜쪽 아이콘 */}
+                                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border-2 ${
+                                                    isCurrent 
+                                                        ? 'bg-white/20 border-white/30 text-white' 
+                                                        : isCompleted 
+                                                            ? 'bg-emerald-500 border-emerald-500 text-white'
+                                                            : 'bg-slate-50 border-slate-200 text-slate-400 group-hover:text-indigo-600'
+                                                }`}>
+                                                    {isCompleted 
+                                                        ? <CheckCircle2 size={16}/> 
+                                                        : <s.icon size={14}/>
+                                                    }
                                                 </div>
-                                                <ChevronRight size={14} className={isCurrent ? 'text-white' : 'text-slate-300 group-hover:text-indigo-500'}/>
+
+                                                {/* 중앙 콘텐츠 */}
+                                                <div className="flex-1 min-w-0 space-y-1">
+                                                    <div className="flex justify-between items-center">
+                                                        <span className={`text-xs font-black truncate ${
+                                                            isCurrent ? 'text-white' : isCompleted ? 'text-emerald-800' : 'text-slate-700'
+                                                        }`}>{s.label}</span>
+                                                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                                                            {testTotal > 0 && (
+                                                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${
+                                                                    isCurrent ? 'bg-white/20 text-white' : isCompleted ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                                                                }`}>
+                                                                    {testDone}/{testTotal}
+                                                                </span>
+                                                            )}
+                                                            {docCount > 0 && (
+                                                                <span className={`text-[9px] font-black ${
+                                                                    isCurrent ? 'text-white/70' : 'text-slate-400'
+                                                                }`}>📄 {docCount}</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Task 완료율 바 */}
+                                                    {testTotal > 0 && (
+                                                        <div className={`w-full h-1 rounded-full overflow-hidden ${
+                                                            isCurrent ? 'bg-white/20' : 'bg-slate-200'
+                                                        }`}>
+                                                            <div 
+                                                                className={`h-full rounded-full transition-all ${
+                                                                    isCurrent ? 'bg-white' : isCompleted ? 'bg-emerald-500' : 'bg-indigo-400'
+                                                                }`} 
+                                                                style={{ width: `${taskPct}%` }} 
+                                                            />
+                                                        </div>
+                                                    )}
+
+                                                    {/* 일정 */}
+                                                    {(schedStart || schedEnd) && (
+                                                        <div className={`text-[8px] font-bold ${
+                                                            isCurrent ? 'text-white/60' : 'text-slate-400'
+                                                        }`}>
+                                                            {schedStart || '?'} ~ {schedEnd || '?'}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <ChevronRight size={14} className={isCurrent ? 'text-white/60' : 'text-slate-300 group-hover:text-indigo-500'}/>
                                             </div>
                                         );
                                     })}
@@ -307,67 +465,115 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                                 {activeStageId !== project.currentStage && <button onClick={() => handleStageChange(activeStageId)} className="w-full bg-indigo-600 text-white py-2 rounded-xl text-[10px] font-black shadow-md hover:bg-indigo-700">단계를 [{activeStage.label}]로 변경</button>}
                             </div>
 
-                            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
-                                <h3 className="text-xs font-black text-slate-800 border-b pb-2 flex justify-between items-center">
-                                    <span className="flex items-center gap-1.5"><CheckCircle2 size={14} className="text-emerald-500"/> PROJECT TASK</span>
-                                    <span className="text-[9px] font-black text-slate-400">{project.tests?.[activeStageId]?.filter(t => t.completed).length || 0}/{project.tests?.[activeStageId]?.length || 0} 완료</span>
-                                </h3>
-                                <div className="space-y-4">
-                                    <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 space-y-2">
-                                        <div className="flex items-center justify-between"><label className="text-[8px] font-black text-slate-400 uppercase">신규 분류(그룹) 및 태스크 등록</label></div>
-                                        <div className="flex gap-2">
-                                            <input type="text" placeholder="분류 명칭 (예: 기구설계)" value={newTest.parent} onChange={(e) => setNewTest({...newTest, parent: e.target.value})} className="w-1/3 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[10px] font-black" />
-                                            <input type="text" placeholder="첫 번째 태스크 명칭 (필수)" value={newTest.child} onChange={(e) => setNewTest({...newTest, child: e.target.value})} onKeyDown={(e) => { if(e.key === 'Enter') handleAddTest(activeStageId); }} className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[10px] font-black" />
-                                            <button type="button" onClick={() => handleAddTest(activeStageId)} className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-[10px] font-black whitespace-nowrap">태스크 생성</button>
+                                <div className="space-y-3">
+                                    {/* PROJECT TASK - StageTaskBoard */}
+                                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                        <div className="flex justify-between items-center px-4 py-3 border-b border-slate-100">
+                                            <h3 className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                                                <CheckCircle2 size={14} className="text-emerald-500"/>
+                                                PROJECT TASK
+                                            </h3>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[9px] font-black text-slate-400">
+                                                    {project.tests?.[activeStageId]?.filter(t => t.status === 'done' || t.completed).length || 0}
+                                                    /{project.tests?.[activeStageId]?.length || 0} 완료
+                                                </span>
+                                                {/* 신규 그룹 추가 */}
+                                                {newTest.parent ? (
+                                                    <div className="flex items-center gap-1.5 animate-in slide-in-from-right duration-200">
+                                                        <input
+                                                            type="text"
+                                                            autoFocus
+                                                            placeholder="첫 태스크명"
+                                                            value={newTest.child}
+                                                            onChange={e => setNewTest(p => ({ ...p, child: e.target.value }))}
+                                                            onKeyDown={e => {
+                                                                if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleAddTest(activeStageId);
+                                                                if (e.key === 'Escape') setNewTest({ parent: '', child: '' });
+                                                            }}
+                                                            className="w-32 bg-slate-50 border border-indigo-200 rounded-lg px-2 py-1 text-[10px] font-bold outline-none focus:ring-1 focus:ring-indigo-400"
+                                                        />
+                                                        <button
+                                                            onClick={() => handleAddTest(activeStageId)}
+                                                            disabled={!newTest.child}
+                                                            className="px-2 py-1 bg-indigo-600 text-white rounded-lg text-[9px] font-black disabled:opacity-40 hover:bg-indigo-700 transition-colors"
+                                                        >
+                                                            생성
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setNewTest({ parent: '', child: '' })}
+                                                            className="p-1 text-slate-300 hover:text-rose-400 transition-colors"
+                                                        >
+                                                            <X size={12}/>
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => {
+                                                            const g = window.prompt('신규 그룹명을 입력하세요 (예: 기구설계, 소프트웨어)');
+                                                            if (g?.trim()) setNewTest({ parent: g.trim(), child: '' });
+                                                        }}
+                                                        className="flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-xl text-[9px] font-black hover:bg-indigo-100 transition-colors"
+                                                    >
+                                                        <Plus size={11}/> 그룹 추가
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="p-3">
+                                            <StageTaskBoard
+                                                tasks={project.tests?.[activeStageId] || []}
+                                                users={users}
+                                                onSelect={setEditingTest}
+                                                onUpdateTask={(id, fields) => handleUpdateTestDetail(activeStageId, id, fields)}
+                                                onDeleteTask={(id) => removeTest(activeStageId, id)}
+                                                onAddTask={(groupName, taskName) => handleAddTest(activeStageId, groupName, taskName)}
+                                            />
                                         </div>
                                     </div>
-
-                                    <MondayBoard
-                                        tasks={project.tests?.[activeStageId] || []}
-                                        onSelect={setEditingTest}
-                                        onUpdateTask={(id, fields) => handleUpdateTestDetail(activeStageId, id, fields)}
-                                        onDeleteTask={(id) => removeTest(activeStageId, id)}
-                                        groupingField="parent"
-                                        onAddTask={(parentName) => {
-                                            const taskName = prompt(`[${parentName}] 그룹에 추가할 태스크 명칭을 입력하세요:`);
-                                            if (taskName) {
-                                                const updatedTests = { ...(project.tests || {}) };
-                                                if (!updatedTests[activeStageId]) updatedTests[activeStageId] = [];
-                                                updatedTests[activeStageId].push({ 
-                                                    id: Date.now(), 
-                                                    parent: parentName, 
-                                                    child: taskName, 
-                                                    completed: false, 
-                                                    updatedAt: new Date().toISOString(),
-                                                    startDate: project.schedules?.[activeStageId]?.start || '',
-                                                    endDate: project.schedules?.[activeStageId]?.end || '',
-                                                    assigneeUid: '',
-                                                    assigneeName: '',
-                                                    priority: 'Medium',
-                                                    notes: ''
-                                                });
-                                                onUpdate(project.id, { tests: updatedTests });
-                                            }
-                                        }}
-                                    />
                                 </div>
-                            </div>
 
                             <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-2">
                                 <h3 className="text-xs font-black text-slate-800 flex items-center gap-1.5 border-b pb-2"><MessageSquare size={14} className="text-blue-500"/> 업무 메모</h3>
                                 <textarea rows="3" value={project.memos?.[activeStageId] || ''} onChange={(e) => handleMemoChange(activeStageId, e.target.value)} placeholder="기록 사항..." className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-[10px] font-medium resize-none shadow-inner" />
                             </div>
 
+                            {/* 기술 산출물 */}
                             <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
-                                <h3 className="text-xs font-black text-slate-800 border-b pb-2 flex justify-between items-center"><span className="flex items-center gap-1.5"><FileText size={14} className="text-slate-400"/> 기술 산출물</span><span className="text-[9px] font-black text-slate-400">{project.documents?.[activeStageId]?.length || 0}/{STAGE_DOCUMENTS[activeStageId]?.length} 건</span></h3>
-                                <div className="grid grid-cols-1 gap-2">
+                                <h3 className="text-xs font-black text-slate-800 border-b pb-2 flex justify-between items-center">
+                                    <span className="flex items-center gap-1.5"><FileText size={14} className="text-slate-400"/> 기술 산출물</span>
+                                    <span className="text-[9px] font-black text-slate-400">{project.documents?.[activeStageId]?.length || 0}/{STAGE_DOCUMENTS[activeStageId]?.length} 건</span>
+                                </h3>
+                                <div className="grid grid-cols-1 gap-1.5">
                                     {STAGE_DOCUMENTS[activeStageId]?.map((docName, idx) => {
                                         const uploadedDoc = project.documents?.[activeStageId]?.find(d => d.name === docName);
                                         return (
-                                            <div key={idx} className={`flex items-center gap-3 p-2.5 rounded-xl border transition-all ${uploadedDoc ? 'bg-emerald-50/20 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>
-                                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${uploadedDoc ? 'bg-emerald-100 text-emerald-600' : 'bg-white text-slate-300'}`}><FileText size={14}/></div>
-                                                <div className="flex-1 min-w-0"><p className="text-[10px] font-black truncate">{docName}</p><p className="text-[7px] text-slate-400 font-bold">{uploadedDoc ? uploadedDoc.updatedAt.split('T')[0] : '미등록'}</p></div>
-                                                {uploadedDoc ? <a href={uploadedDoc.url} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-white text-emerald-600 rounded-lg border border-emerald-100 shadow-sm"><ExternalLink size={12}/></a> : <button onClick={() => addDocumentLink(activeStageId, docName)} className="p-1.5 bg-white text-indigo-600 rounded-lg border border-slate-200 shadow-sm"><Plus size={12}/></button>}
+                                            <div key={idx} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all group/doc ${
+                                                uploadedDoc 
+                                                    ? 'bg-emerald-50 border-emerald-200 hover:border-emerald-300' 
+                                                    : 'bg-slate-50 border-slate-100 hover:border-slate-200'
+                                            }`}>
+                                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-black ${
+                                                    uploadedDoc ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400'
+                                                }`}>
+                                                    {uploadedDoc ? '✓' : `${idx + 1}`}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className={`text-[10px] font-black truncate ${uploadedDoc ? 'text-emerald-800' : 'text-slate-600'}`}>{docName}</p>
+                                                    <p className="text-[8px] text-slate-400 font-bold">
+                                                        {uploadedDoc ? `등록: ${uploadedDoc.updatedAt.split('T')[0]}` : '미등록'}
+                                                    </p>
+                                                </div>
+                                                {uploadedDoc 
+                                                    ? <a href={uploadedDoc.url} target="_blank" rel="noopener noreferrer" 
+                                                        className="shrink-0 flex items-center gap-1 px-2 py-1 bg-white text-emerald-600 rounded-lg border border-emerald-200 text-[9px] font-black shadow-sm hover:bg-emerald-50 transition-colors">
+                                                        <ExternalLink size={10}/> 열기
+                                                      </a>
+                                                    : <button onClick={() => addDocumentLink(activeStageId, docName)} 
+                                                        className="shrink-0 flex items-center gap-1 px-2 py-1 bg-white text-indigo-600 rounded-lg border border-indigo-100 text-[9px] font-black shadow-sm hover:bg-indigo-50 transition-colors">
+                                                        <Plus size={10}/> 등록
+                                                      </button>
+                                                }
                                             </div>
                                         );
                                     })}
@@ -378,40 +584,90 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                 </div>
 
                 {/* 4. Footer */}
-                <div className="p-3 bg-white border-t border-slate-200 shrink-0 flex items-center justify-between">
-                    <button onClick={() => { if(window.confirm("프로젝트를 삭제하시겠습니까?")) { /* delete logic */ onClose(); } }} className="text-rose-400 text-[8px] font-black hover:text-rose-600 uppercase tracking-widest flex items-center gap-1.5"><Trash2 size={12}/> Delete</button>
-                    <div className="text-[8px] font-black text-slate-200 uppercase">Sync: {project.updatedAt?.toDate ? project.updatedAt.toDate().toLocaleTimeString() : 'N/A'}</div>
+                <div className="px-5 py-3 bg-white border-t border-slate-100 shrink-0 flex items-center justify-between">
+                    <button 
+                        onClick={() => { if(window.confirm("프로젝트를 삭제하시겠습니까?")) { onClose(); } }} 
+                        className="flex items-center gap-1.5 text-rose-400 text-[9px] font-black hover:text-rose-600 uppercase tracking-widest px-2 py-1 hover:bg-rose-50 rounded-lg transition-all"
+                    >
+                        <Trash2 size={11}/> 삭제
+                    </button>
+                    <div className="flex items-center gap-1.5 text-[8px] font-black text-slate-300">
+                        <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                        Sync: {project.updatedAt?.toDate ? project.updatedAt.toDate().toLocaleTimeString('ko-KR') : 'N/A'}
+                    </div>
                 </div>
 
-                {/* 5. Task Detail Modal (Popup inside portal) */}
+                {/* 5. Task Detail Modal */}
                 {editingTest && (
                     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-                        <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
-                            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                                <div>
-                                    <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest">TASK DETAILS</span>
-                                    <h3 className="text-sm font-black text-slate-800 leading-tight">[{editingTest.parent}] {editingTest.child}</h3>
+                        <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+                            {/* 모달 헤더 */}
+                            <div className={`px-5 pt-5 pb-4 border-b border-slate-100 flex justify-between items-start ${
+                                (() => {
+                                    const s = editingTest.status || (editingTest.completed ? 'done' : 'todo');
+                                    return s === 'done' ? 'bg-gradient-to-r from-emerald-50 to-white' :
+                                           s === 'working' ? 'bg-gradient-to-r from-amber-50 to-white' :
+                                           s === 'stuck' ? 'bg-gradient-to-r from-rose-50 to-white' :
+                                           'bg-slate-50/50';
+                                })()
+                            }`}>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest">TASK DETAILS</span>
+                                        {/* 현재 상태 표시 */}
+                                        {(() => {
+                                            const s = editingTest.status || (editingTest.completed ? 'done' : 'todo');
+                                            const cfg = {
+                                                todo:    { label: '작업 전', cls: 'bg-slate-200 text-slate-700' },
+                                                working: { label: '진행 중', cls: 'bg-amber-400 text-white' },
+                                                stuck:   { label: '막힐',   cls: 'bg-rose-500 text-white' },
+                                                done:    { label: '완료',   cls: 'bg-emerald-500 text-white' },
+                                            }[s] || { label: s, cls: 'bg-slate-100 text-slate-600' };
+                                            return <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${cfg.cls}`}>{cfg.label}</span>;
+                                        })()}
+                                    </div>
+                                    <h3 className="text-sm font-black text-slate-900 leading-snug">[{editingTest.parent}] {editingTest.title || editingTest.child}</h3>
+                                    {editingTest.dueDate && (
+                                        <p className="text-[9px] text-rose-500 font-black mt-1">
+                                            마감: {editingTest.dueDate || editingTest.endDate}
+                                        </p>
+                                    )}
                                 </div>
-                                <button type="button" onClick={() => setEditingTest(null)} className="p-1.5 text-slate-400 hover:text-slate-700 bg-slate-100 rounded-xl"><X size={16}/></button>
+                                <button type="button" onClick={() => setEditingTest(null)} className="ml-3 p-1.5 text-slate-400 hover:text-slate-700 bg-white/80 rounded-xl shrink-0 shadow-sm">
+                                    <X size={16}/>
+                                </button>
                             </div>
                             
-                            <div className="p-5 space-y-4 flex-1 overflow-y-auto max-h-[60vh] text-xs">
-                                {/* Completed Status */}
-                                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                                    <span className="font-black text-slate-700">진행 상태</span>
-                                    <button 
-                                        type="button"
-                                        onClick={() => toggleTest(activeStageId, editingTest.id)} 
-                                        className={`flex items-center gap-1.5 px-3 py-1 rounded-xl font-black text-[10px] transition-all shadow-sm ${
-                                            editingTest.completed ? 'bg-emerald-500 text-white' : 'bg-white text-slate-600 border border-slate-250'
-                                        }`}
-                                    >
-                                        {editingTest.completed ? <CheckCircle2 size={12} /> : <Circle size={12} />}
-                                        {editingTest.completed ? '완료' : '진행 대기'}
-                                    </button>
+                            <div className="p-5 space-y-4 flex-1 overflow-y-auto text-xs">
+                                {/* Status */}
+                                <div className="space-y-1.5">
+                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">진행 상태</label>
+                                    <div className="grid grid-cols-4 gap-1.5">
+                                        {[
+                                            { key: 'todo',    label: '작업 전', emoji: '⏳', cls: 'bg-slate-100 text-slate-700 border-slate-200' },
+                                            { key: 'working', label: '진행 중', emoji: '🔄', cls: 'bg-amber-400 text-white border-amber-400' },
+                                            { key: 'stuck',   label: '막힐',   emoji: '🚧', cls: 'bg-rose-500 text-white border-rose-500' },
+                                            { key: 'done',    label: '완료',   emoji: '✅', cls: 'bg-emerald-500 text-white border-emerald-500' },
+                                        ].map(opt => {
+                                            const curStatus = editingTest.status || (editingTest.completed ? 'done' : 'todo');
+                                            const isAct = curStatus === opt.key;
+                                            return (
+                                                <button
+                                                    key={opt.key}
+                                                    onClick={() => handleUpdateTestDetail(activeStageId, editingTest.id, { status: opt.key })}
+                                                    className={`flex flex-col items-center py-2 rounded-xl font-black text-[10px] border-2 transition-all ${
+                                                        isAct ? opt.cls + ' shadow-md scale-105' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'
+                                                    }`}
+                                                >
+                                                    <span className="text-lg">{opt.emoji}</span>
+                                                    <span>{opt.label}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
 
-                                {/* Date Range */}
+                                {/* 날짜 */}
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1">
                                         <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">시작일</label>
@@ -419,72 +675,102 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                                             type="date" 
                                             value={editingTest.startDate || ''} 
                                             onChange={(e) => handleUpdateTestDetail(activeStageId, editingTest.id, { startDate: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold" 
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold focus:ring-1 focus:ring-indigo-300 outline-none" 
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">완료일</label>
+                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">마감일</label>
                                         <input 
                                             type="date" 
-                                            value={editingTest.endDate || ''} 
-                                            onChange={(e) => handleUpdateTestDetail(activeStageId, editingTest.id, { endDate: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold" 
+                                            value={editingTest.dueDate || editingTest.endDate || ''} 
+                                            onChange={(e) => handleUpdateTestDetail(activeStageId, editingTest.id, { dueDate: e.target.value, endDate: e.target.value })}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold focus:ring-1 focus:ring-indigo-300 outline-none" 
                                         />
                                     </div>
                                 </div>
 
-                                {/* Assignee & Priority & Difficulty */}
-                                <div className="space-y-3">
-                                    <div className="space-y-1">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">담당자 지정</label>
-                                        <select 
-                                            value={editingTest.assigneeUid || ''} 
-                                            onChange={(e) => handleUpdateTestDetail(activeStageId, editingTest.id, { assigneeUid: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold"
+                                {/* 담당자 - 아바타 버튼 그리드 */}
+                                <div className="space-y-2">
+                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">담당자</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {/* 담당자 없음 */}
+                                        <button
+                                            onClick={() => handleUpdateTestDetail(activeStageId, editingTest.id, { assigneeUid: '', assigneeName: '' })}
+                                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-black border-2 transition-all ${
+                                                !editingTest.assigneeUid 
+                                                    ? 'bg-slate-700 text-white border-slate-700 shadow-md' 
+                                                    : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'
+                                            }`}
                                         >
-                                            <option value="">담당자 없음</option>
-                                            {(users || []).map(u => (
-                                                <option key={u.uid} value={u.uid}>{u.displayName} ({u.department || '부서 미설정'})</option>
-                                            ))}
-                                        </select>
+                                            <User size={11}/> 미지정
+                                        </button>
+                                        {(users || []).map(u => {
+                                            const isAssigned = editingTest.assigneeUid === u.uid;
+                                            return (
+                                                <button
+                                                    key={u.uid}
+                                                    onClick={() => handleUpdateTestDetail(activeStageId, editingTest.id, { assigneeUid: u.uid })}
+                                                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-black border-2 transition-all ${
+                                                        isAssigned 
+                                                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' 
+                                                            : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
+                                                    }`}
+                                                >
+                                                    {u.photoURL 
+                                                        ? <img src={u.photoURL} alt="" className="w-4 h-4 rounded-full"/>
+                                                        : <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black ${
+                                                            isAssigned ? 'bg-white/20' : 'bg-indigo-100 text-indigo-600'
+                                                          }`}>{u.displayName?.[0]}</div>
+                                                    }
+                                                    {u.displayName}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
+                                </div>
 
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">우선순위</label>
-                                            <select 
-                                                value={editingTest.priority || 'Medium'} 
-                                                onChange={(e) => handleUpdateTestDetail(activeStageId, editingTest.id, { priority: e.target.value })}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold"
-                                            >
-                                                <option value="High">높음 (상)</option>
-                                                <option value="Medium">보통 (중)</option>
-                                                <option value="Low">낮음 (하)</option>
-                                            </select>
+                                {/* 우선순위 + 난이도 */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">우선순위</label>
+                                        <div className="flex gap-1">
+                                            {[{v:'High',l:'높음',c:'bg-rose-500 text-white'},{v:'Medium',l:'보통',c:'bg-amber-400 text-white'},{v:'Low',l:'낙음',c:'bg-slate-300 text-slate-700'}].map(opt => (
+                                                <button key={opt.v}
+                                                    onClick={() => handleUpdateTestDetail(activeStageId, editingTest.id, { priority: opt.v })}
+                                                    className={`flex-1 py-1.5 rounded-lg text-[9px] font-black transition-all border-2 ${
+                                                        (editingTest.priority || 'Medium') === opt.v 
+                                                            ? opt.c + ' border-transparent shadow-sm scale-105' 
+                                                            : 'bg-white text-slate-400 border-slate-200'
+                                                    }`}
+                                                >{opt.l}</button>
+                                            ))}
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">난이도</label>
-                                            <select 
-                                                value={editingTest.difficulty || 'Medium'} 
-                                                onChange={(e) => handleUpdateTestDetail(activeStageId, editingTest.id, { difficulty: e.target.value })}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold"
-                                            >
-                                                <option value="High">어려움 (상)</option>
-                                                <option value="Medium">보통 (중)</option>
-                                                <option value="Low">쉬움 (하)</option>
-                                            </select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">난이도</label>
+                                        <div className="flex gap-1">
+                                            {[{v:'High',l:'어려움',c:'bg-purple-500 text-white'},{v:'Medium',l:'보통',c:'bg-blue-400 text-white'},{v:'Low',l:'쉽음',c:'bg-slate-300 text-slate-700'}].map(opt => (
+                                                <button key={opt.v}
+                                                    onClick={() => handleUpdateTestDetail(activeStageId, editingTest.id, { difficulty: opt.v })}
+                                                    className={`flex-1 py-1.5 rounded-lg text-[9px] font-black transition-all border-2 ${
+                                                        (editingTest.difficulty || 'Medium') === opt.v 
+                                                            ? opt.c + ' border-transparent shadow-sm scale-105' 
+                                                            : 'bg-white text-slate-400 border-slate-200'
+                                                    }`}
+                                                >{opt.l}</button>
+                                            ))}
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Documents & Links */}
-                                <div className="space-y-3">
-                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 border-b pb-1.5">
-                                        <ExternalLink size={12}/> 참조 문서 및 링크
+                                {/* 링크 */}
+                                <div className="space-y-2">
+                                    <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                        <ExternalLink size={11}/> 참조 문서 및 링크
                                     </h4>
                                     <div className="space-y-1.5">
                                         {(editingTest.links || []).map((link, lIdx) => (
-                                            <div key={lIdx} className="flex items-center justify-between bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl group/link">
+                                            <div key={lIdx} className="flex items-center justify-between bg-slate-50 border border-slate-100 px-3 py-2 rounded-xl group/link">
                                                 <div className="flex flex-col min-w-0">
                                                     <span className="text-[10px] font-black text-slate-700 truncate">{link.title}</span>
                                                     <a href={link.url} target="_blank" rel="noreferrer" className="text-[8px] text-blue-500 hover:underline truncate">{link.url}</a>
@@ -496,7 +782,7 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                                                     }}
                                                     className="p-1 text-slate-300 hover:text-rose-500 opacity-0 group-hover/link:opacity-100 transition-all"
                                                 >
-                                                    <X size={10} />
+                                                    <X size={10}/>
                                                 </button>
                                             </div>
                                         ))}
@@ -505,48 +791,67 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                                         <input 
                                             type="text" 
                                             placeholder="문서명" 
-                                            id="new-link-title"
-                                            className="w-1/3 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none" 
+                                            value={newLink.title}
+                                            onChange={e => setNewLink(p => ({ ...p, title: e.target.value }))}
+                                            className="w-1/3 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none focus:ring-1 focus:ring-indigo-300" 
                                         />
                                         <input 
                                             type="text" 
                                             placeholder="URL (구글드라이브 등)" 
-                                            id="new-link-url"
-                                            className="flex-1 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none" 
+                                            value={newLink.url}
+                                            onChange={e => setNewLink(p => ({ ...p, url: e.target.value }))}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter' && newLink.title && newLink.url) {
+                                                    const nextLinks = [...(editingTest.links || []), { title: newLink.title, url: newLink.url }];
+                                                    handleUpdateTestDetail(activeStageId, editingTest.id, { links: nextLinks });
+                                                    setNewLink({ title: '', url: '' });
+                                                }
+                                            }}
+                                            className="flex-1 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none focus:ring-1 focus:ring-indigo-300" 
                                         />
                                         <button 
                                             onClick={() => {
-                                                const title = document.getElementById('new-link-title').value;
-                                                const url = document.getElementById('new-link-url').value;
-                                                if (title && url) {
-                                                    const nextLinks = [...(editingTest.links || []), { title, url }];
+                                                if (newLink.title && newLink.url) {
+                                                    const nextLinks = [...(editingTest.links || []), { title: newLink.title, url: newLink.url }];
                                                     handleUpdateTestDetail(activeStageId, editingTest.id, { links: nextLinks });
-                                                    document.getElementById('new-link-title').value = '';
-                                                    document.getElementById('new-link-url').value = '';
+                                                    setNewLink({ title: '', url: '' });
                                                 }
                                             }}
-                                            className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black"
+                                            className="px-3 py-1 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-lg text-[10px] font-black hover:bg-indigo-100 transition-colors"
                                         >
                                             추가
                                         </button>
                                     </div>
                                 </div>
 
-                                {/* Notepad / Memo style description */}
-                                <div className="space-y-1.5 pt-1">
-                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">메모 및 업무 상세내역 (메모장)</label>
+                                {/* 메모 */}
+                                <div className="space-y-1.5">
+                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">메모 및 상세 내역</label>
                                     <textarea 
-                                        rows="6" 
+                                        rows="5" 
                                         value={editingTest.notes || ''} 
                                         onChange={(e) => handleUpdateTestDetail(activeStageId, editingTest.id, { notes: e.target.value })}
-                                        placeholder="이 TASK의 상세 지침, 실행 로그, 참고 사항 등을 메모장처럼 자유롭게 기록해 보세요..." 
-                                        className="w-full bg-amber-50/30 border border-amber-200/80 rounded-2xl p-4 text-[11px] font-medium resize-none shadow-inner text-slate-800 placeholder-slate-400/80 font-sans focus:outline-none focus:ring-1 focus:ring-amber-300" 
+                                        placeholder="이 TASK의 상세 지침, 실행 로그, 참고 사항 등..." 
+                                        className="w-full bg-amber-50/50 border border-amber-200/80 rounded-2xl p-4 text-[11px] font-medium resize-none text-slate-800 placeholder-slate-400/70 focus:outline-none focus:ring-1 focus:ring-amber-300" 
                                     />
                                 </div>
                             </div>
-                            <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3.5 shrink-0">
-                                <button type="button" onClick={() => removeTest(activeStageId, editingTest.id)} className="px-4 py-2 bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all font-black text-[10px] rounded-xl flex items-center gap-1.5"><Trash2 size={12}/> 삭제</button>
-                                <button type="button" onClick={() => setEditingTest(null)} className="flex-1 py-2 bg-indigo-600 text-white hover:bg-indigo-700 transition-all font-black text-[10px] rounded-xl text-center shadow-md shadow-indigo-100">닫기</button>
+
+                            <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex gap-3 shrink-0">
+                                <button 
+                                    type="button" 
+                                    onClick={() => { removeTest(activeStageId, editingTest.id); setEditingTest(null); }} 
+                                    className="flex items-center gap-1.5 px-4 py-2 bg-white text-rose-500 hover:bg-rose-50 border border-rose-200 transition-all font-black text-[10px] rounded-xl shadow-sm"
+                                >
+                                    <Trash2 size={12}/> 삭제
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={() => setEditingTest(null)} 
+                                    className="flex-1 py-2 bg-indigo-600 text-white hover:bg-indigo-700 transition-all font-black text-[10px] rounded-xl shadow-md shadow-indigo-100"
+                                >
+                                    저장 및 닫기
+                                </button>
                             </div>
                         </div>
                     </div>

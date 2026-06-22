@@ -1,5 +1,5 @@
 {
-    "currentProfile": "local",
+    "currentProfile": "remote",
     "local": {
         "host": "192.168.0.7",
         "port": 15432,

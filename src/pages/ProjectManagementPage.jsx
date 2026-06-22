@@ -7,7 +7,8 @@ import {
     CheckCircle2, Clock, AlertTriangle, MoreVertical, 
     Layers, Zap, Terminal, Microscope, Factory, Ship,
     LayoutGrid, List, ArrowRight, Kanban, Calendar,
-    AlertCircle, ListChecks, CheckCircle, TrendingUp, User, Circle
+    AlertCircle, ListChecks, CheckCircle, TrendingUp, User, Circle,
+    CalendarDays, Users, ChevronLeft, Activity, Tag
 } from 'lucide-react';
 import ProjectProcessPanel from '../components/ProjectProcessPanel';
 import ProjectGanttChart from '../components/ProjectGanttChart';
@@ -369,6 +370,7 @@ export default function ProjectManagementPage() {
                 stages={PROCESS_STAGES}
                 onUpdate={handleUpdateProject}
                 users={users}
+                currentUser={currentUser}
             />
         </div>
     );
@@ -376,60 +378,119 @@ export default function ProjectManagementPage() {
 
 function ProjectCard({ project, onClick, onMoveStage }) {
     const currentIdx = PROCESS_STAGES.findIndex(s => s.id === project.currentStage);
+    const currentStage = PROCESS_STAGES[currentIdx];
 
-    const handlePrev = (e) => {
-        e.stopPropagation();
-        if (currentIdx > 0) {
-            onMoveStage(PROCESS_STAGES[currentIdx - 1].id);
-        }
-    };
+    // Task 완료율 계산
+    const allTasks = Object.values(project.tests || {}).flat();
+    const doneTasks = allTasks.filter(t => t.status === 'done' || t.completed === true).length;
+    const taskPct = allTasks.length > 0 ? Math.round((doneTasks / allTasks.length) * 100) : null;
 
-    const handleNext = (e) => {
-        e.stopPropagation();
-        if (currentIdx < PROCESS_STAGES.length - 1) {
-            onMoveStage(PROCESS_STAGES[currentIdx + 1].id);
-        }
-    };
+    // D-day 계산 (일정이 세팅된 현 공정 단계 기준)
+    const schedEnd = project.schedules?.[project.currentStage]?.end;
+    let dday = null;
+    if (schedEnd) {
+        const diff = Math.ceil((new Date(schedEnd) - new Date()) / (1000 * 60 * 60 * 24));
+        dday = diff;
+    }
+
+    const handlePrev = (e) => { e.stopPropagation(); if (currentIdx > 0) onMoveStage(PROCESS_STAGES[currentIdx - 1].id); };
+    const handleNext = (e) => { e.stopPropagation(); if (currentIdx < PROCESS_STAGES.length - 1) onMoveStage(PROCESS_STAGES[currentIdx + 1].id); };
+
+    const progressColor = (project.progress || 0) >= 80 ? 'bg-emerald-500' : (project.progress || 0) >= 40 ? 'bg-indigo-500' : 'bg-amber-400';
 
     return (
         <div 
             onClick={onClick}
-            className="bg-white border border-slate-200/80 rounded-xl p-3.5 hover:border-indigo-400 hover:shadow-md transition-all cursor-pointer group flex flex-col space-y-3"
+            className="bg-white border border-slate-200/80 rounded-2xl hover:border-indigo-300 hover:shadow-lg transition-all duration-200 cursor-pointer group flex flex-col overflow-hidden"
         >
-            <div>
+            {/* 상단 액센트 스트라이프 */}
+            <div className={`h-1 w-full ${currentStage?.color?.replace('text-', 'bg-').replace('-500', '-400') || 'bg-indigo-400'}`} />
+
+            <div className="p-4 flex flex-col space-y-3 flex-1">
+                {/* 헤더: 코드 + D-day */}
                 <div className="flex justify-between items-start gap-1">
-                    <span className="text-[9px] font-black text-slate-400 font-mono tracking-tighter uppercase truncate">{project.code || 'NO-CODE'}</span>
-                    <span className="text-[10px] font-black text-indigo-600">{project.progress || 0}%</span>
+                    <span className="text-[9px] font-black text-slate-400 font-mono tracking-tighter uppercase truncate">
+                        {project.code || 'NO-CODE'}
+                    </span>
+                    {dday !== null && (
+                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md whitespace-nowrap ${
+                            dday < 0 ? 'bg-rose-100 text-rose-600' :
+                            dday <= 3 ? 'bg-amber-100 text-amber-700' :
+                            'bg-slate-100 text-slate-500'
+                        }`}>
+                            {dday < 0 ? `D+${Math.abs(dday)} 초과` : dday === 0 ? 'D-Day' : `D-${dday}`}
+                        </span>
+                    )}
                 </div>
-                <h4 className="text-xs font-black text-slate-800 line-clamp-2 mt-0.5 group-hover:text-indigo-600 transition-colors">
+
+                {/* 프로젝트명 */}
+                <h4 className="text-sm font-black text-slate-800 line-clamp-2 group-hover:text-indigo-600 transition-colors leading-tight">
                     {project.name}
                 </h4>
-                <p className="text-[10px] text-slate-400 font-bold mt-1">담당: {project.ownerName || '미지정'}</p>
+
+                {/* 담당자 + 진철도 */}
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                        <div className="w-5 h-5 rounded-full bg-indigo-100 border border-indigo-200 flex items-center justify-center">
+                            <User size={10} className="text-indigo-600" />
+                        </div>
+                        <span className="text-[10px] text-slate-500 font-bold truncate max-w-[80px]">
+                            {project.ownerName || '미지정'}
+                        </span>
+                    </div>
+                    <span className={`text-xs font-black ${(project.progress || 0) >= 80 ? 'text-emerald-600' : (project.progress || 0) >= 40 ? 'text-indigo-600' : 'text-amber-600'}`}>
+                        {project.progress || 0}%
+                    </span>
+                </div>
+
+                {/* 전체 진철도 바 */}
+                <div className="space-y-1">
+                    <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div 
+                            className={`h-full ${progressColor} rounded-full transition-all duration-500`} 
+                            style={{ width: `${project.progress || 0}%` }} 
+                        />
+                    </div>
+                    {/* Task 완료율 (Task가 있을 경우만) */}
+                    {taskPct !== null && (
+                        <div className="flex items-center gap-1.5">
+                            <div className="flex-1 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full bg-emerald-400 rounded-full transition-all duration-500" 
+                                    style={{ width: `${taskPct}%` }} 
+                                />
+                            </div>
+                            <span className="text-[8px] font-black text-slate-400 whitespace-nowrap">
+                                Task {doneTasks}/{allTasks.length}
+                            </span>
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {/* Progress Bar */}
-            <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${project.progress || 0}%` }} />
-            </div>
-
-            {/* Actions for Step Shift */}
-            <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+            {/* 하단: 단계 이동 */}
+            <div className="px-4 py-2 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center">
                 <button 
                     onClick={handlePrev}
                     disabled={currentIdx === 0}
-                    className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:pointer-events-none transition-colors"
-                    title="이전 단계로 이동"
+                    className="flex items-center gap-0.5 text-[9px] font-black text-slate-400 hover:text-indigo-600 disabled:opacity-20 disabled:pointer-events-none transition-colors py-0.5 px-1 rounded hover:bg-indigo-50"
+                    title="이전 단계"
                 >
-                    <ChevronRight className="rotate-180" size={14} />
+                    <ChevronLeft size={12} />
+                    {currentIdx > 0 ? PROCESS_STAGES[currentIdx - 1]?.label?.slice(0, 4) : ''}
                 </button>
-                <span className="text-[9px] font-black text-slate-400">단계 이동</span>
+                <div className="flex items-center gap-1">
+                    {currentStage && <currentStage.icon size={10} className={currentStage.color} />}
+                    <span className="text-[9px] font-black text-slate-500">{currentStage?.label}</span>
+                </div>
                 <button 
                     onClick={handleNext}
                     disabled={currentIdx === PROCESS_STAGES.length - 1}
-                    className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:pointer-events-none transition-colors"
-                    title="다음 단계로 이동"
+                    className="flex items-center gap-0.5 text-[9px] font-black text-slate-400 hover:text-indigo-600 disabled:opacity-20 disabled:pointer-events-none transition-colors py-0.5 px-1 rounded hover:bg-indigo-50"
+                    title="다음 단계"
                 >
-                    <ChevronRight size={14} />
+                    {currentIdx < PROCESS_STAGES.length - 1 ? PROCESS_STAGES[currentIdx + 1]?.label?.slice(0, 4) : ''}
+                    <ChevronRight size={12} />
                 </button>
             </div>
         </div>
