@@ -60,7 +60,7 @@ export default function StageTaskBoard({ tasks = [], users = [], onSelect, onUpd
                 <div className="text-center py-10 text-slate-300">
                     <div className="text-4xl mb-2">📋</div>
                     <p className="text-xs font-black">태스크가 없습니다</p>
-                    <p className="text-[10px] mt-1">아래 입력 폼에서 그룹과 첫 태스크를 추가하세요.</p>
+                    <p className="text-[10px] mt-1">상단의 '+ 그룹 추가' 버튼을 눌러 첫 태스크를 생성하세요.</p>
                 </div>
             )}
             {groups.map(g => (

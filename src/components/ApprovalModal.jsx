@@ -78,10 +78,10 @@ const ApprovalModal = ({ isOpen, onClose, poData, onSubmit }) => {
                     : ((poData.Qty || poData.TargetQty || 0) * (poData.UnitPrice || 0)) + (poData.ShippingFee || 0);
 
     return createPortal(
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[10002] flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-3xl shadow-xl flex flex-col max-h-[90vh] overflow-hidden text-left border border-slate-200">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[10002] flex items-center justify-center p-4 sm:p-6">
+            <div className="bg-white rounded-2xl w-full max-w-3xl shadow-xl flex flex-col max-h-full sm:max-h-[calc(100vh-3rem)] overflow-hidden text-left border border-slate-200">
                 {/* Compact Header */}
-                <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
                     <div className="flex items-center gap-2">
                         <FileText size={20} className="text-amber-600" />
                         <h2 className="text-lg font-black text-slate-800 tracking-tight">결재 기안서 작성</h2>
@@ -89,7 +89,7 @@ const ApprovalModal = ({ isOpen, onClose, poData, onSubmit }) => {
                     <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors"><X size={20} /></button>
                 </div>
 
-                <form onSubmit={handleFormSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+                <form onSubmit={handleFormSubmit} className="flex-1 overflow-y-auto min-h-0 p-6 space-y-6">
                     {/* Basic Info Section - Compact Grid */}
                     <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm border-b border-slate-100 pb-6">
                         <div className="space-y-3">

@@ -6,7 +6,7 @@ import {
     AlertTriangle, FileText, Link as LinkIcon, ExternalLink
 } from 'lucide-react';
 import RichMemoEditor from './common/RichMemoEditor';
-import { STATUS_OPTIONS, PRIORITY_OPTIONS } from './common/MondayBoard';
+import { STATUS_OPTIONS, PRIORITY_OPTIONS, TYPE_OPTIONS } from './common/MondayBoard';
 
 // 데이터 모델별 상이한 키값을 표준 키값으로 변환하는 헬퍼
 const mapToStandardStatus = (val) => {
@@ -110,9 +110,9 @@ export default function TaskDetailPanel({ isOpen, onClose, task, allTasks, onSel
             <div className="fixed inset-y-0 right-0 w-full md:w-[600px] bg-slate-50 shadow-2xl z-[150] flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-300">
                 
                 {/* Header */}
-                <div className="bg-white px-6 py-5 border-b border-slate-200 flex justify-between items-center shrink-0">
-                    <div className="text-left">
-                        <div className="flex items-center gap-2 mb-1">
+                <div className="bg-white px-6 py-5 border-b border-slate-200 flex justify-between items-start shrink-0">
+                    <div className="flex-1 mr-4 space-y-3">
+                        <div className="flex items-center gap-2">
                             {task.parentId && (
                                 <button 
                                     onClick={() => onSelectTask && onSelectTask(allTasks.find(t => t.id === task.parentId))}
@@ -128,9 +128,15 @@ export default function TaskDetailPanel({ isOpen, onClose, task, allTasks, onSel
                                 {priorityInfo.label}
                             </span>
                         </div>
-                        <h2 className="text-base font-black text-slate-900 truncate pr-4">{editForm.title}</h2>
+                        <input 
+                            type="text"
+                            value={editForm.title}
+                            onChange={(e) => setEditForm({...editForm, title: e.target.value})}
+                            placeholder="태스크 제목을 입력하세요"
+                            className="w-full text-lg font-black text-slate-900 bg-transparent outline-none placeholder-slate-300"
+                        />
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                         <button onClick={handleSave} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="저장">
                             <Save size={20}/>
                         </button>
@@ -142,61 +148,30 @@ export default function TaskDetailPanel({ isOpen, onClose, task, allTasks, onSel
 
                 {/* Body */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6 text-left">
-                    <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">태스크 제목</label>
-                            <input 
-                                type="text"
-                                value={editForm.title}
-                                onChange={(e) => setEditForm({...editForm, title: e.target.value})}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">제품명 / 시리즈</label>
-                            <input 
-                                type="text"
-                                value={editForm.TargetProductName}
-                                onChange={(e) => setEditForm({...editForm, TargetProductName: e.target.value})}
-                                placeholder="연관된 제품명이나 시리즈를 적어주세요."
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
-                            />
-                        </div>
-                    </div>
+                    
+                    {/* 컴팩트 속성 패널 */}
+                    <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-y-5 gap-x-6">
+                            
+                            <div className="space-y-1 border-l-2 border-slate-100 pl-2">
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">상태 (Status)</label>
+                                <select 
+                                    value={editForm.status}
+                                    onChange={(e) => setEditForm({...editForm, status: e.target.value})}
+                                    className="w-full text-xs font-bold text-slate-700 bg-transparent outline-none cursor-pointer hover:text-indigo-600"
+                                >
+                                    {Object.entries(STATUS_OPTIONS).map(([key, cfg]) => (
+                                        <option key={key} value={key}>{cfg.label}</option>
+                                    ))}
+                                </select>
+                            </div>
 
-                    <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-2 mb-3">일정 및 상태 설정</h3>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1.5 text-left">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                                    <Calendar size={12}/> 시작일
-                                </label>
-                                <input 
-                                    type="datetime-local"
-                                    value={editForm.startDate}
-                                    onChange={(e) => setEditForm({...editForm, startDate: e.target.value})}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
-                                />
-                            </div>
-                            <div className="space-y-1.5 text-left">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                                    <Calendar size={12}/> 마감 기한
-                                </label>
-                                <input 
-                                    type="datetime-local"
-                                    value={editForm.dueDate}
-                                    onChange={(e) => setEditForm({...editForm, dueDate: e.target.value})}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
-                                />
-                            </div>
-                            <div className="space-y-1.5 text-left">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                                    <AlertTriangle size={12}/> 중요도
-                                </label>
+                            <div className="space-y-1 border-l-2 border-slate-100 pl-2">
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">중요도 (Priority)</label>
                                 <select 
                                     value={editForm.priority}
                                     onChange={(e) => setEditForm({...editForm, priority: e.target.value})}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                                    className="w-full text-xs font-bold text-slate-700 bg-transparent outline-none cursor-pointer hover:text-indigo-600"
                                 >
                                     <option value="low">낮음</option>
                                     <option value="medium">보통</option>
@@ -204,34 +179,51 @@ export default function TaskDetailPanel({ isOpen, onClose, task, allTasks, onSel
                                     <option value="urgent">긴급</option>
                                 </select>
                             </div>
-                            <div className="space-y-1.5 text-left">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                                    유형 (Type)
-                                </label>
+
+                            <div className="space-y-1 border-l-2 border-slate-100 pl-2">
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">유형 (Type)</label>
                                 <select 
                                     value={editForm.type}
                                     onChange={(e) => setEditForm({...editForm, type: e.target.value})}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                                    className="w-full text-xs font-bold text-slate-700 bg-transparent outline-none cursor-pointer hover:text-indigo-600"
                                 >
                                     {Object.entries(TYPE_OPTIONS).map(([key, cfg]) => (
                                         <option key={key} value={key}>{cfg.label}</option>
                                     ))}
                                 </select>
                             </div>
-                            <div className="space-y-1.5 text-left">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                                    상태 변경
-                                </label>
-                                <select 
-                                    value={editForm.status}
-                                    onChange={(e) => setEditForm({...editForm, status: e.target.value})}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
-                                >
-                                    {Object.entries(STATUS_OPTIONS).map(([key, cfg]) => (
-                                        <option key={key} value={key}>{cfg.label}</option>
-                                    ))}
-                                </select>
+
+                            <div className="space-y-1 border-l-2 border-slate-100 pl-2">
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">시작일 (Start Date)</label>
+                                <input 
+                                    type="datetime-local"
+                                    value={editForm.startDate}
+                                    onChange={(e) => setEditForm({...editForm, startDate: e.target.value})}
+                                    className="w-full text-xs font-bold text-slate-700 bg-transparent outline-none hover:text-indigo-600"
+                                />
                             </div>
+
+                            <div className="space-y-1 border-l-2 border-slate-100 pl-2">
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">마감일 (Due Date)</label>
+                                <input 
+                                    type="datetime-local"
+                                    value={editForm.dueDate}
+                                    onChange={(e) => setEditForm({...editForm, dueDate: e.target.value})}
+                                    className="w-full text-xs font-bold text-slate-700 bg-transparent outline-none hover:text-indigo-600"
+                                />
+                            </div>
+
+                            <div className="space-y-1 border-l-2 border-slate-100 pl-2">
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">제품명 / 시리즈</label>
+                                <input 
+                                    type="text"
+                                    value={editForm.TargetProductName}
+                                    onChange={(e) => setEditForm({...editForm, TargetProductName: e.target.value})}
+                                    placeholder="입력..."
+                                    className="w-full text-xs font-bold text-slate-700 bg-transparent outline-none hover:text-indigo-600 placeholder-slate-300"
+                                />
+                            </div>
+
                         </div>
                     </div>
 

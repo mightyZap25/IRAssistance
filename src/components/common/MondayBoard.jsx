@@ -115,6 +115,7 @@ export default function MondayBoard({
     groups: customGroups,
     groupingField = 'status',
     onAddTask,
+    onCreateSubtask,
     allCategories,
     currentUser
 }) {
@@ -165,6 +166,7 @@ export default function MondayBoard({
                         onUpdateTask={onUpdateTask}
                         onDeleteTask={onDeleteTask}
                         onAddTask={onAddTask}
+                        onCreateSubtask={onCreateSubtask}
                         allCategories={allCategories}
                         currentUser={currentUser}
                     />
@@ -174,7 +176,7 @@ export default function MondayBoard({
     );
 }
 
-function MondayGroup({ group, tasks, allTasks, users, onSelect, onUpdateTask, onDeleteTask, onAddTask, allCategories, currentUser }) {
+function MondayGroup({ group, tasks, allTasks, users, onSelect, onUpdateTask, onDeleteTask, onAddTask, onCreateSubtask, allCategories, currentUser }) {
     const [isExpanded, setIsExpanded] = useState(true);
     const [isAdding, setIsAdding] = useState(false);
     const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -238,6 +240,7 @@ function MondayGroup({ group, tasks, allTasks, users, onSelect, onUpdateTask, on
                                     onUpdateTask={onUpdateTask}
                                     onDeleteTask={onDeleteTask}
                                     onAddTask={onAddTask}
+                                    onCreateSubtask={onCreateSubtask}
                                     groupId={group.id}
                                     allCategories={allCategories}
                                     currentUser={currentUser}
@@ -293,10 +296,12 @@ function MondayGroup({ group, tasks, allTasks, users, onSelect, onUpdateTask, on
     );
 }
 
-function MondayRow({ task, allTasks, users, groupColor, onSelect, onUpdateTask, onDeleteTask, onAddTask, groupId, isSubtask = false, allCategories, currentUser }) {
+function MondayRow({ task, allTasks, users, groupColor, onSelect, onUpdateTask, onDeleteTask, onAddTask, onCreateSubtask, groupId, isSubtask = false, allCategories, currentUser }) {
     const [activeDropdown, setActiveDropdown] = useState(null);
     const [targetRect, setTargetRect] = useState(null);
     const [isSubtasksExpanded, setIsSubtasksExpanded] = useState(true);
+    const [isAddingSubtask, setIsAddingSubtask] = useState(false);
+    const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
 
     // 이 테스크의 하위 테스크 추출
     const subtasks = allTasks ? allTasks.filter(t => t.parentId === task.id) : [];
@@ -681,12 +686,86 @@ function MondayRow({ task, allTasks, users, groupColor, onSelect, onUpdateTask, 
                     onUpdateTask={onUpdateTask}
                     onDeleteTask={onDeleteTask}
                     onAddTask={onAddTask}
+                    onCreateSubtask={onCreateSubtask}
                     groupId={groupId}
                     isSubtask={true}
                     allCategories={allCategories}
                     currentUser={currentUser}
                 />
             ))}
+
+            {!isSubtask && isSubtasksExpanded && (
+                isAddingSubtask ? (
+                    <tr className="border-b border-slate-100 h-9 bg-slate-50/10">
+                        <td className="px-2 text-center border-r border-slate-100"></td>
+                        <td colSpan={11} className="px-4 py-1.5 border-l-4 border-slate-300 border-r border-slate-100">
+                            <div className="flex items-center gap-2 pl-6">
+                                <CornerDownRight size={12} className="text-slate-300" />
+                                <input 
+                                    type="text"
+                                    autoFocus
+                                    value={newSubtaskTitle}
+                                    onChange={e => setNewSubtaskTitle(e.target.value)}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter') {
+                                            if (newSubtaskTitle.trim() && onCreateSubtask) {
+                                                onCreateSubtask(task.id, newSubtaskTitle);
+                                                setNewSubtaskTitle('');
+                                                setIsAddingSubtask(false);
+                                            }
+                                        } else if (e.key === 'Escape') {
+                                            setIsAddingSubtask(false);
+                                            setNewSubtaskTitle('');
+                                        }
+                                    }}
+                                    onBlur={() => {
+                                        // Allow short delay so save button can be clicked
+                                        setTimeout(() => {
+                                            setIsAddingSubtask(false);
+                                            setNewSubtaskTitle('');
+                                        }, 200);
+                                    }}
+                                    placeholder="새 하위 태스크 제목 입력... (엔터로 추가)"
+                                    className="flex-1 bg-white border border-slate-200 rounded px-2 py-1 text-[11px] outline-none focus:border-indigo-400"
+                                />
+                                <button 
+                                    className="bg-indigo-600 text-white px-3 py-1 rounded text-[10px] font-black"
+                                    onMouseDown={(e) => {
+                                        e.preventDefault(); // Prevent blur
+                                        if (newSubtaskTitle.trim() && onCreateSubtask) {
+                                            onCreateSubtask(task.id, newSubtaskTitle);
+                                            setNewSubtaskTitle('');
+                                            setIsAddingSubtask(false);
+                                        }
+                                    }}
+                                >
+                                    추가
+                                </button>
+                                <button 
+                                    className="p-1 text-slate-400 hover:text-slate-600"
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        setIsAddingSubtask(false);
+                                        setNewSubtaskTitle('');
+                                    }}
+                                >
+                                    <X size={14}/>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                ) : (
+                    <tr className="border-b border-slate-100 h-8 group/addsub">
+                        <td className="px-2 text-center border-r border-slate-100 text-transparent group-hover/addsub:text-slate-400 transition-colors"></td>
+                        <td colSpan={11} className="px-4 border-l-4 border-transparent border-r border-slate-100 cursor-pointer" onClick={() => setIsAddingSubtask(true)}>
+                            <div className="flex items-center gap-2 pl-6 text-[11px] font-bold text-slate-300 group-hover/addsub:text-indigo-500 transition-colors">
+                                <Plus size={12} />
+                                <span>하위 태스크 추가</span>
+                            </div>
+                        </td>
+                    </tr>
+                )
+            )}
         </React.Fragment>
     );
 }

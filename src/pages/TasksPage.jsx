@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { nasDbService } from '../services/nasDbService';
 import {
     getPersonalTasks,
     createPersonalTask,
@@ -10,7 +11,7 @@ import {
     Plus, Search, Filter, MoreVertical, CheckCircle2, Circle,
     Clock, AlertTriangle, Calendar, Trash2, Edit2, X, Check,
     Bell, BellOff, RotateCcw, ListChecks, LayoutGrid, List,
-    Link as LinkIcon
+    Link as LinkIcon, Briefcase
 } from 'lucide-react';
 import MondayBoard from '../components/common/MondayBoard';
 import TaskCardView from '../components/TaskCardView';
@@ -65,8 +66,50 @@ export default function TasksPage() {
     const fetchTasks = async () => {
         setLoading(true);
         try {
-            const data = await getPersonalTasks(currentUser.uid);
-            setTasks(data);
+            // 1. 개인 태스크 가져오기
+            const personalTasks = await getPersonalTasks(currentUser.uid);
+            
+            // 2. 프로젝트에서 할당된 태스크 가져오기
+            const projects = await nasDbService.getAll('projects');
+            const projectTasks = [];
+            
+            projects.forEach(project => {
+                if (project.tests) {
+                    Object.keys(project.tests).forEach(stageId => {
+                        const stageTasks = project.tests[stageId] || [];
+                        stageTasks.forEach(task => {
+                            if (task.assigneeUid === currentUser.uid) {
+                                projectTasks.push({
+                                    id: `proj_${project.id}_${task.id}`,
+                                    title: task.title || task.child,
+                                    description: `[프로젝트: ${project.title || '미지정'}]\n${task.notes || ''}`,
+                                    status: task.completed ? 'completed' : (task.status === 'in_progress' ? 'in_progress' : 'todo'),
+                                    priority: task.priority ? task.priority.toLowerCase() : 'medium',
+                                    dueDate: task.dueDate || task.endDate || null,
+                                    createdAt: new Date(task.updatedAt || Date.now()),
+                                    isProjectTask: true,
+                                    projectId: project.id,
+                                    stageId: stageId,
+                                    originalTaskId: task.id,
+                                    projectTitle: project.title,
+                                    ownerUid: currentUser.uid,
+                                    assigneeUid: task.assigneeUid || currentUser.uid
+                                });
+                            }
+                        });
+                    });
+                }
+            });
+
+            // 3. 병합 및 정렬
+            const allTasks = [...personalTasks, ...projectTasks];
+            allTasks.sort((a, b) => {
+                const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                return dateB - dateA;
+            });
+
+            setTasks(allTasks);
         } catch (error) {
             console.error("Failed to fetch tasks:", error);
         } finally {
@@ -143,10 +186,37 @@ export default function TasksPage() {
 
     const handleUpdateTask = async (taskId, updatedData) => {
         try {
-            await updatePersonalTask(taskId, updatedData);
-            fetchTasks();
-            if (selectedTask?.id === taskId) {
-                setSelectedTask(prev => ({ ...prev, ...updatedData }));
+            const taskObj = tasks.find(t => t.id === taskId);
+            if (taskObj && taskObj.isProjectTask) {
+                // 프로젝트 태스크 업데이트
+                const projects = await nasDbService.getAll('projects');
+                const project = projects.find(p => p.id === taskObj.projectId);
+                if (project && project.tests && project.tests[taskObj.stageId]) {
+                    const taskIndex = project.tests[taskObj.stageId].findIndex(t => t.id === taskObj.originalTaskId);
+                    if (taskIndex !== -1) {
+                        const projTask = project.tests[taskObj.stageId][taskIndex];
+                        if (updatedData.status) {
+                            projTask.completed = updatedData.status === 'completed';
+                            projTask.status = updatedData.status;
+                        }
+                        if (updatedData.title !== undefined) projTask.title = updatedData.title;
+                        if (updatedData.description !== undefined) projTask.notes = updatedData.description;
+                        if (updatedData.dueDate !== undefined) projTask.dueDate = updatedData.dueDate;
+                        
+                        await nasDbService.upsert('projects', project.id, { tests: project.tests });
+                        fetchTasks();
+                        if (selectedTask?.id === taskId) {
+                            setSelectedTask(prev => ({ ...prev, ...updatedData }));
+                        }
+                    }
+                }
+            } else {
+                // 개인 태스크 업데이트
+                await updatePersonalTask(taskId, updatedData);
+                fetchTasks();
+                if (selectedTask?.id === taskId) {
+                    setSelectedTask(prev => ({ ...prev, ...updatedData }));
+                }
             }
         } catch (error) {
             console.error("Failed to update task:", error);
@@ -161,6 +231,14 @@ export default function TasksPage() {
     const handleDelete = async (taskId) => {
         if (!window.confirm("이 태스크를 삭제하시겠습니까?")) return;
         try {
+            const taskObj = tasks.find(t => t.id === taskId);
+            if (taskObj && taskObj.isProjectTask) {
+                // 프로젝트 태스크는 개인 Task 화면에서 완전 삭제 대신 할당 해제를 수행할 수 있으나 
+                // 안전을 위해 여기서 삭제 기능은 제한합니다.
+                alert("프로젝트에 속한 태스크는 프로젝트 관리 화면에서 직접 삭제해야 합니다.");
+                return;
+            }
+            
             await deletePersonalTask(taskId);
             fetchTasks();
             if (selectedTask?.id === taskId) setSelectedTask(null);
@@ -282,6 +360,7 @@ export default function TasksPage() {
                             onUpdateTask={handleUpdateTask}
                             onDeleteTask={handleDelete}
                             onAddTask={handleQuickAddTask}
+                            onCreateSubtask={handleCreateSubtask}
                         />
                     ) : (
                         <TaskCardView

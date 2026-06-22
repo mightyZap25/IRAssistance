@@ -27,13 +27,22 @@ export async function getPersonalTasks(uid) {
             where('ownerUid', '==', uid)
         );
         const querySnapshot = await getDocs(q);
-        const tasks = querySnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            createdAt: doc.data().createdAt?.toDate(),
-            updatedAt: doc.data().updatedAt?.toDate(),
-            dueDate: doc.data().dueDate ? (doc.data().dueDate.toDate ? doc.data().dueDate.toDate() : new Date(doc.data().dueDate)) : null
-        }));
+        const tasks = querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            const safeDate = (val) => {
+                if (!val) return null;
+                if (typeof val.toDate === 'function') return val.toDate();
+                const d = new Date(val);
+                return isNaN(d.getTime()) ? null : d;
+            };
+            return {
+                id: doc.id,
+                ...data,
+                createdAt: safeDate(data.createdAt),
+                updatedAt: safeDate(data.updatedAt),
+                dueDate: safeDate(data.dueDate)
+            };
+        });
 
         // 인덱스 생성 전까지 메모리에서 정렬 처리 (createdAt 내림차순)
         return tasks.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));

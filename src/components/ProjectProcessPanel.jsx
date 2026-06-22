@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
     X, CheckCircle2, Circle, Clock, FileText, ChevronRight, 
     ArrowRight, Upload, ExternalLink, History, MessageSquare,
-    Trash2, Plus, Save, Briefcase, User, Layers, Layout, AlertCircle
+    Trash2, Plus, Save, Briefcase, User, Layers, Layout, AlertCircle,
+    Table, MonitorPlay, Link2, Bold, Italic, Underline, List, ListOrdered, Code, Type
 } from 'lucide-react';
 import { getIssuesByProject } from '../services/issueService';
 import StageTaskBoard from './common/StageTaskBoard';
+import MondayStyleBoard from './common/MondayStyleBoard';
 
 const STAGE_DOCUMENTS = {
     planning: ['제품 기획서', '시장 분석서', '개발 일정표'],
@@ -18,16 +19,20 @@ const STAGE_DOCUMENTS = {
 };
 
 export default function ProjectProcessPanel({ isOpen, onClose, project, stages, onUpdate, users, currentUser }) {
-    const [viewMode, setViewMode] = useState('overview'); // overview | issues | stage_detail
+    const [viewMode, setViewMode] = useState('main_table'); // main_table | overview | issues
     const [activeStageId, setActiveStageId] = useState(null);
     const [newTest, setNewTest] = useState({ parent: '', child: '' });
-    const [isAddingNewParent, setIsAddingNewParent] = useState(false);
-    const [inlineAddingGroup, setInlineAddingGroup] = useState(null);
-    const [inlineTaskName, setInlineTaskName] = useState('');
-    const [newLink, setNewLink] = useState({ title: '', url: '' }); // 링크 추가 상태 관리
+    const [isAddingGroup, setIsAddingGroup] = useState(false);
+    const [isAddingGlobalTask, setIsAddingGlobalTask] = useState(false);
+    const [globalTaskInput, setGlobalTaskInput] = useState({ stageId: stages[0]?.id || '', title: '' });
+    const [isEditingDesc, setIsEditingDesc] = useState(false);
+    const [descInput, setDescInput] = useState('');
     const [projectIssues, setProjectIssues] = useState([]);
     const [loadingIssues, setLoadingIssues] = useState(false);
     const [editingTest, setEditingTest] = useState(null); // The test task object currently opened in details
+    const [scheduleEditModal, setScheduleEditModal] = useState(null);
+    const [showActivityLog, setShowActivityLog] = useState(false);
+    const [newLink, setNewLink] = useState({ title: '', url: '' });
 
     useEffect(() => {
         if (isOpen && project) {
@@ -73,11 +78,51 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
         await onUpdate(project.id, { currentStage: stageId, progress, stageHistory: newHistory });
     };
 
-    const handleScheduleChange = async (stageId, field, value) => {
+    const handleScheduleChange = (group) => {
+        setScheduleEditModal({
+            stageId: group.id,
+            label: group.name,
+            start: group.schedule?.start || '',
+            end: group.schedule?.end || '',
+            reason: ''
+        });
+    };
+
+    const handleSaveSchedule = async () => {
+        if (!scheduleEditModal.reason.trim()) {
+            alert('일정 수정 사유를 반드시 입력해주세요.');
+            return;
+        }
+
+        const stageId = scheduleEditModal.stageId;
         const updatedSchedules = { ...project.schedules };
-        if (!updatedSchedules[stageId]) updatedSchedules[stageId] = { start: '', end: '', status: 'pending' };
-        updatedSchedules[stageId][field] = value;
-        await onUpdate(project.id, { schedules: updatedSchedules });
+        updatedSchedules[stageId] = {
+            ...updatedSchedules[stageId],
+            start: scheduleEditModal.start,
+            end: scheduleEditModal.end,
+            status: 'pending'
+        };
+
+        const newLogEntry = {
+            id: Date.now().toString(),
+            type: 'schedule_change',
+            stageId,
+            stageLabel: scheduleEditModal.label,
+            user: currentUser?.displayName || 'Unknown',
+            photoURL: currentUser?.photoURL || null,
+            date: new Date().toISOString(),
+            message: '일정 변경',
+            reason: scheduleEditModal.reason,
+            details: {
+                start: scheduleEditModal.start,
+                end: scheduleEditModal.end
+            }
+        };
+
+        const updatedLogs = [newLogEntry, ...(project.activityLog || [])];
+        
+        await onUpdate(project.id, { schedules: updatedSchedules, activityLog: updatedLogs });
+        setScheduleEditModal(null);
     };
 
     // 태스크 완료율 기반 프로젝트 진행률 자동 계산
@@ -88,34 +133,39 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
         return Math.round((done / allTasks.length) * 100);
     };
 
-    const handleAddTest = async (stageId, groupName, taskName) => {
-        const pName = groupName ?? newTest.parent;
-        const cName = taskName ?? newTest.child;
-        if (!pName || !cName) return;
-        const updatedTests = { ...(project.tests || {}) };
+    const handleAddTest = async (stageId, parentId, draftTaskObj = null) => {
+        let titleStr = '';
+        if (typeof draftTaskObj === 'string') {
+            titleStr = draftTaskObj;
+            draftTaskObj = {};
+        } else if (draftTaskObj && draftTaskObj.title) {
+            titleStr = draftTaskObj.title;
+        }
+
+        const updatedTests = { ...project.tests };
         if (!updatedTests[stageId]) updatedTests[stageId] = [];
-        updatedTests[stageId].push({ 
-            id: Date.now(), 
-            parent: pName,       // 그룹명 (호환성 유지)
-            title: cName,        // 타스크명 (통일된 필드명)
-            child: cName,        // 하위 호환성 유지
-            status: 'todo',      // 다단계 상태
-            completed: false,    // 호환성 유지
-            updatedAt: new Date().toISOString(),
-            startDate: project.schedules?.[stageId]?.start || '',
-            dueDate: project.schedules?.[stageId]?.end || '',
-            endDate: project.schedules?.[stageId]?.end || '',   // 호환성 유지
-            assigneeUid: '',
-            assigneeName: '',
-            priority: 'Medium',
+        const newTask = {
+            id: Date.now().toString(),
+            child: titleStr,
+            title: titleStr,
+            status: draftTaskObj?.status || 'todo',
+            completed: draftTaskObj?.status === 'done',
+            type: draftTaskObj?.type || '버그',
+            product: draftTaskObj?.product || '',
+            startDate: draftTaskObj?.startDate || project.schedules?.[stageId]?.start || '',
+            dueDate: draftTaskObj?.endDate || draftTaskObj?.dueDate || project.schedules?.[stageId]?.end || '',
+            endDate: draftTaskObj?.endDate || project.schedules?.[stageId]?.end || '',
+            assigneeUid: draftTaskObj?.assigneeUid || '',
+            assigneeName: draftTaskObj?.assigneeUid ? ((users || []).find(u => u.uid === draftTaskObj.assigneeUid)?.displayName || '') : '',
+            priority: draftTaskObj?.priority || 'Medium',
             difficulty: 'Medium',
             notes: ''
-        });
+        };
+        updatedTests[stageId].push(newTask);
         const newProgress = calcProgressFromTasks(updatedTests);
         await onUpdate(project.id, { tests: updatedTests, progress: newProgress });
-        setNewTest({ parent: pName, child: '' }); 
-        setInlineAddingGroup(null);
-        setInlineTaskName('');
+        setNewTest({ parent: '', child: '' }); 
+        setIsAddingGroup(false);
     };
 
     const toggleTest = async (stageId, testId) => {
@@ -199,388 +249,160 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
         await onUpdate(project.id, { memos: updatedMemos });
     };
 
-    return createPortal(
-        <div className="relative z-[9999]">
-            <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-[140]" onClick={onClose} />
-            <div className="fixed inset-y-0 right-0 w-full md:w-[750px] bg-slate-50 shadow-2xl z-[150] flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-300">
-                
-                {/* 1. Header */}
-                <div className="bg-white px-5 pt-4 pb-3 border-b border-slate-200 shrink-0">
-                    <div className="flex justify-between items-start">
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                                <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[9px] font-black border border-indigo-100 font-mono tracking-tighter uppercase">{project.code}</span>
-                                {/* 현재 단계 뱅지 */}
-                                {(() => {
-                                    const s = stages.find(st => st.id === project.currentStage);
-                                    return s ? (
-                                        <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-50 border border-amber-200 ${s.color}`}>
-                                            <s.icon size={10}/> {s.label}
-                                        </span>
-                                    ) : null;
-                                })()}
-                            </div>
-                            <h2 className="text-base font-black text-slate-900 leading-tight truncate">{project.name}</h2>
+    const editingStageId = useMemo(() => {
+        if (!editingTest) return null;
+        for (const stage of stages) {
+            if (project.tests?.[stage.id]?.find(t => t.id === editingTest.id)) {
+                return stage.id;
+            }
+        }
+        return null;
+    }, [editingTest, project.tests, stages]);
+
+    return (
+        <div className="flex-1 w-full min-h-0 bg-white flex flex-col animate-in fade-in duration-300 relative">
+            
+            {/* 1. Header (Monday Style) */}
+            <div className="bg-white px-8 pt-8 pb-6 border-b border-slate-200 shrink-0">
+                <div className="flex justify-between items-start mb-4">
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs font-bold text-slate-500 hover:underline cursor-pointer">Projects</span>
+                            <span className="text-slate-300">/</span>
+                            <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-black">{project.code || 'PRJ'}</span>
                         </div>
-                        <button onClick={onClose} className="ml-3 p-1.5 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg transition-all shrink-0">
+                        <h2 className="text-3xl font-black text-slate-900 leading-tight truncate tracking-tight">{project.name || project.title || '제목 없는 프로젝트'}</h2>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <button onClick={() => setShowActivityLog(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg transition-all shadow-sm">
+                            <History size={14} /> 활동 로그
+                        </button>
+                        <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg transition-all">
                             <X size={18}/>
                         </button>
                     </div>
-                    {/* 전체 진행률 바 */}
-                    <div className="mt-3 space-y-1">
-                        <div className="flex justify-between items-center">
-                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Overall Progress</span>
-                            <span className={`text-[10px] font-black ${
-                                (project.progress || 0) >= 80 ? 'text-emerald-600' :
-                                (project.progress || 0) >= 40 ? 'text-indigo-600' : 'text-amber-600'
-                            }`}>{project.progress || 0}%</span>
-                        </div>
-                        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div 
-                                className={`h-full rounded-full transition-all duration-700 ${
-                                    (project.progress || 0) >= 80 ? 'bg-emerald-500' :
-                                    (project.progress || 0) >= 40 ? 'bg-indigo-500' : 'bg-amber-400'
-                                }`}
-                                style={{ width: `${project.progress || 0}%` }}
+                </div>
+                {/* 프로젝트 소개(Description) */}
+                <div className="mt-2 group/desc relative max-w-4xl">
+                    {isEditingDesc ? (
+                        <div className="flex flex-col gap-2 animate-in fade-in">
+                            <textarea 
+                                autoFocus
+                                value={descInput}
+                                onChange={e => setDescInput(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-[13px] text-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none resize-none transition-all"
+                                rows="3"
+                                placeholder="프로젝트 목표나 소개를 적어주세요..."
                             />
+                            <div className="flex gap-2 justify-end">
+                                <button onClick={() => setIsEditingDesc(false)} className="px-3 py-1.5 text-[11px] font-bold text-slate-500 hover:bg-slate-100 rounded-lg">취소</button>
+                                <button onClick={() => {
+                                    onUpdate(project.id, { description: descInput });
+                                    setIsEditingDesc(false);
+                                }} className="px-3 py-1.5 text-[11px] font-bold bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm">저장</button>
+                            </div>
                         </div>
-                    </div>
-                </div>
-
-                {/* 2. Navigation Tabs */}
-                <div className="bg-white border-b border-slate-200 px-5 py-2 shrink-0 flex items-center gap-3 overflow-x-auto no-scrollbar shadow-sm">
-                    <div className="flex items-center gap-1.5 shrink-0">
-                        <button 
-                            onClick={() => { setViewMode('overview'); setActiveStageId(null); }}
-                            className={`flex flex-col items-center min-w-[60px] transition-all ${viewMode === 'overview' ? 'scale-105' : 'opacity-40 hover:opacity-100'}`}
+                    ) : (
+                        <div 
+                            className="text-[13px] text-slate-600 font-medium leading-relaxed whitespace-pre-wrap p-2 -ml-2 rounded-xl border border-transparent group-hover/desc:border-slate-200 group-hover/desc:bg-slate-50 cursor-pointer transition-all"
+                            onClick={() => {
+                                setDescInput(project.description || '');
+                                setIsEditingDesc(true);
+                            }}
                         >
-                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center border-2 mb-1 transition-all ${viewMode === 'overview' ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg ring-2 ring-indigo-50' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
-                                <Layout size={16} />
-                            </div>
-                            <span className={`text-[9px] font-black ${viewMode === 'overview' ? 'text-indigo-600' : 'text-slate-500'}`}>개요</span>
-                        </button>
-                        <button 
-                            onClick={() => { setViewMode('issues'); setActiveStageId(null); }}
-                            className={`flex flex-col items-center min-w-[60px] transition-all ${viewMode === 'issues' ? 'scale-105' : 'opacity-40 hover:opacity-100'}`}
-                        >
-                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center border-2 mb-1 transition-all ${viewMode === 'issues' ? 'bg-rose-600 border-rose-600 text-white shadow-lg ring-2 ring-rose-50' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
-                                <AlertCircle size={16} />
-                            </div>
-                            <span className={`text-[9px] font-black ${viewMode === 'issues' ? 'text-rose-600' : 'text-slate-500'}`}>이슈</span>
-                        </button>
-                    </div>
-                    <div className="w-px h-6 bg-slate-100 shrink-0 mx-0.5" />
-                    <div className="flex items-center gap-1">
-                        {stages.map((stage, idx) => {
-                            const isCurrent = project.currentStage === stage.id;
-                            const isActive = activeStageId === stage.id;
-                            const isCompleted = idx < currentStageIdx;
-                            // Task 완료율
-                            const stageTasks = project.tests?.[stage.id] || [];
-                            const doneCount = stageTasks.filter(t => t.status === 'done' || t.completed).length;
-                            const pct = stageTasks.length > 0 ? Math.round((doneCount / stageTasks.length) * 100) : null;
-                            return (
-                                <button key={stage.id} onClick={() => handleStageSelect(stage.id)} className={`flex flex-col items-center min-w-[75px] transition-all ${isActive ? 'scale-105' : 'opacity-50 hover:opacity-100'}`}>
-                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center border-2 mb-1 transition-all ${isActive ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg ring-2 ring-indigo-50' : isCurrent ? 'bg-amber-50 border-amber-200 text-amber-600' : isCompleted ? 'bg-emerald-50 border-emerald-500 text-emerald-600' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
-                                        {isCompleted ? <CheckCircle2 size={16} /> : <stage.icon size={14} />}
-                                    </div>
-                                    <span className={`text-[9px] font-black ${isActive ? 'text-indigo-600' : 'text-slate-500'}`}>{stage.label}</span>
-                                    {/* Task 완료율 배지 */}
-                                    {pct !== null && (
-                                        <span className={`text-[8px] font-black mt-0.5 px-1 py-0.5 rounded-full leading-none ${
-                                            pct === 100 
-                                                ? 'bg-emerald-100 text-emerald-700' 
-                                                : isActive 
-                                                    ? 'bg-indigo-100 text-indigo-700' 
-                                                    : 'bg-slate-100 text-slate-500'
-                                        }`}>
-                                            {pct}%
-                                        </span>
-                                    )}
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                {/* 3. Content */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
-                    {viewMode === 'overview' && (
-                        <div className="space-y-4 animate-in fade-in duration-300">
-                            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
-                                <h3 className="text-xs font-black text-slate-900 flex items-center gap-1.5 border-b pb-2"><Briefcase className="text-indigo-600" size={14}/> 프로젝트 프로필</h3>
-                                <div className="space-y-1">
-                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">상세 목표</label>
-                                    <div className="text-xs font-bold text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100">{project.description || '등록된 설명이 없습니다.'}</div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="p-3 rounded-xl bg-indigo-50/30 border border-indigo-100 space-y-0.5">
-                                        <label className="text-[8px] font-black text-indigo-400 uppercase flex items-center gap-1"><Clock size={10}/> 기간</label>
-                                        <div className="text-[10px] font-black text-indigo-900">{project.startDate || '미설정'} ~ {project.endDate || '미설정'}</div>
-                                    </div>
-                                    <div className="p-3 rounded-xl bg-emerald-50/30 border border-emerald-100 space-y-0.5">
-                                        <label className="text-[8px] font-black text-emerald-400 uppercase flex items-center gap-1"><Layers size={10}/> 전체 진척도</label>
-                                        <div className="flex items-center gap-2">
-                                            <div className="flex-1 h-1.5 bg-white rounded-full overflow-hidden border border-emerald-100"><div className="h-full bg-emerald-500" style={{ width: `${project.progress}%` }} /></div>
-                                            <span className="text-[10px] font-black text-emerald-700">{project.progress}%</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5">
-                                    <span>🚀</span> 로드맵 요약
-                                </h4>
-                                <div className="space-y-1.5">
-                                    {stages.map((s, idx) => {
-                                        const isCurrent = project.currentStage === s.id;
-                                        const isCompleted = idx < stages.findIndex(st => st.id === project.currentStage);
-                                        const isFuture = !isCurrent && !isCompleted;
-                                        const docCount = project.documents?.[s.id]?.length || 0;
-                                        const stageTasks = project.tests?.[s.id] || [];
-                                        const testDone = stageTasks.filter(t => t.status === 'done' || t.completed).length;
-                                        const testTotal = stageTasks.length;
-                                        const taskPct = testTotal > 0 ? Math.round((testDone / testTotal) * 100) : 0;
-                                        const schedStart = project.schedules?.[s.id]?.start;
-                                        const schedEnd = project.schedules?.[s.id]?.end;
-
-                                        return (
-                                            <div 
-                                                key={s.id} 
-                                                onClick={() => handleStageSelect(s.id)} 
-                                                className={`relative flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer group overflow-hidden ${
-                                                    isCurrent 
-                                                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' 
-                                                        : isCompleted 
-                                                            ? 'bg-emerald-50 border-emerald-200 hover:border-emerald-400' 
-                                                            : 'bg-white border-slate-200 hover:border-indigo-200 opacity-60 hover:opacity-100'
-                                                }`}
-                                            >
-                                                {/* 왜쪽 아이콘 */}
-                                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border-2 ${
-                                                    isCurrent 
-                                                        ? 'bg-white/20 border-white/30 text-white' 
-                                                        : isCompleted 
-                                                            ? 'bg-emerald-500 border-emerald-500 text-white'
-                                                            : 'bg-slate-50 border-slate-200 text-slate-400 group-hover:text-indigo-600'
-                                                }`}>
-                                                    {isCompleted 
-                                                        ? <CheckCircle2 size={16}/> 
-                                                        : <s.icon size={14}/>
-                                                    }
-                                                </div>
-
-                                                {/* 중앙 콘텐츠 */}
-                                                <div className="flex-1 min-w-0 space-y-1">
-                                                    <div className="flex justify-between items-center">
-                                                        <span className={`text-xs font-black truncate ${
-                                                            isCurrent ? 'text-white' : isCompleted ? 'text-emerald-800' : 'text-slate-700'
-                                                        }`}>{s.label}</span>
-                                                        <div className="flex items-center gap-2 shrink-0 ml-2">
-                                                            {testTotal > 0 && (
-                                                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${
-                                                                    isCurrent ? 'bg-white/20 text-white' : isCompleted ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
-                                                                }`}>
-                                                                    {testDone}/{testTotal}
-                                                                </span>
-                                                            )}
-                                                            {docCount > 0 && (
-                                                                <span className={`text-[9px] font-black ${
-                                                                    isCurrent ? 'text-white/70' : 'text-slate-400'
-                                                                }`}>📄 {docCount}</span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Task 완료율 바 */}
-                                                    {testTotal > 0 && (
-                                                        <div className={`w-full h-1 rounded-full overflow-hidden ${
-                                                            isCurrent ? 'bg-white/20' : 'bg-slate-200'
-                                                        }`}>
-                                                            <div 
-                                                                className={`h-full rounded-full transition-all ${
-                                                                    isCurrent ? 'bg-white' : isCompleted ? 'bg-emerald-500' : 'bg-indigo-400'
-                                                                }`} 
-                                                                style={{ width: `${taskPct}%` }} 
-                                                            />
-                                                        </div>
-                                                    )}
-
-                                                    {/* 일정 */}
-                                                    {(schedStart || schedEnd) && (
-                                                        <div className={`text-[8px] font-bold ${
-                                                            isCurrent ? 'text-white/60' : 'text-slate-400'
-                                                        }`}>
-                                                            {schedStart || '?'} ~ {schedEnd || '?'}
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                <ChevronRight size={14} className={isCurrent ? 'text-white/60' : 'text-slate-300 group-hover:text-indigo-500'}/>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
+                            {project.description || <span className="text-slate-400 italic">이 프로젝트에 대한 간단한 소개나 목표를 입력해주세요. (클릭하여 수정)</span>}
                         </div>
                     )}
+                </div>
+            </div>
 
-                    {viewMode === 'issues' && (
-                        <div className="space-y-4 animate-in slide-in-from-bottom-2 duration-300">
-                            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                                <h3 className="text-xs font-black text-slate-800 flex items-center gap-1.5 border-b pb-2"><AlertCircle size={14} className="text-rose-500"/> 이슈 트래커</h3>
-                                <div className="grid grid-cols-3 gap-3">
-                                    <div className="bg-slate-50 p-3 rounded-xl text-center"><div className="text-[8px] font-black text-slate-400">전체</div><div className="text-lg font-black">{projectIssues.length}</div></div>
-                                    <div className="bg-rose-50 p-3 rounded-xl text-center"><div className="text-[8px] font-black text-rose-400">진행중</div><div className="text-lg font-black text-rose-600">{projectIssues.filter(i => i.columnId !== 'done').length}</div></div>
-                                    <div className="bg-emerald-50 p-3 rounded-xl text-center"><div className="text-[8px] font-black text-emerald-400">완료</div><div className="text-lg font-black text-emerald-600">{projectIssues.filter(i => i.columnId === 'done').length}</div></div>
-                                </div>
-                                <div className="divide-y divide-slate-100 border-t">
-                                    {loadingIssues ? <div className="py-10 text-center animate-pulse text-xs font-black text-slate-400">LOADING ISSUES...</div> : 
-                                     projectIssues.length === 0 ? <div className="py-10 text-center text-[10px] text-slate-300 font-bold italic">NO ISSUES FOUND</div> :
-                                     projectIssues.map(issue => (
-                                        <div key={issue.id} className="py-3 flex items-center gap-3 group cursor-pointer" onClick={() => window.location.href='/project/issues'}>
-                                            <div className={`w-1 h-6 rounded-full ${issue.priority === 'urgent' ? 'bg-rose-500' : issue.priority === 'high' ? 'bg-orange-500' : 'bg-blue-500'}`} />
-                                            <div className="flex-1 min-w-0"><div className="text-[11px] font-black text-slate-800 truncate">{issue.title}</div><div className="text-[8px] font-bold text-slate-400 uppercase">{issue.category} · {issue.columnId}</div></div>
-                                            <ChevronRight size={14} className="text-slate-200 group-hover:text-indigo-500"/>
-                                        </div>
-                                     ))}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {viewMode === 'stage_detail' && activeStage && (
-                        <div className="space-y-4 animate-in slide-in-from-bottom-2 duration-300">
-                            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
-                                <div className="flex justify-between items-center border-b pb-2">
-                                    <h3 className="text-xs font-black text-slate-800 flex items-center gap-1.5"><Clock size={14} className="text-indigo-500"/> 일정 관리</h3>
-                                    <select value={project.schedules?.[activeStageId]?.status || 'pending'} onChange={(e) => handleScheduleChange(activeStageId, 'status', e.target.value)} className="text-[10px] font-black bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 outline-none">
-                                        <option value="pending">대기</option><option value="in_progress">진행중</option><option value="completed">완료</option><option value="delayed">지연</option>
+                {/* 2. Main Board Content (Monday Style List Only) */}
+                <div className="flex-1 overflow-y-auto bg-[#f5f6f8] flex flex-col">
+                    {/* 상단 컨트롤 바 */}
+                    <div className="px-8 py-4 flex justify-between items-center border-b border-slate-200 bg-white sticky top-0 z-10 shadow-sm">
+                        <div className="flex items-center gap-3">
+                            {isAddingGlobalTask ? (
+                                <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200 animate-in slide-in-from-left-4">
+                                    <select 
+                                        value={globalTaskInput.stageId} 
+                                        onChange={e => setGlobalTaskInput(prev => ({ ...prev, stageId: e.target.value }))}
+                                        className="text-[11px] font-bold bg-white border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-500 text-slate-700"
+                                    >
+                                        {stages.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                                     </select>
+                                    <input 
+                                        autoFocus
+                                        type="text" 
+                                        placeholder="새로운 업무명 입력" 
+                                        value={globalTaskInput.title}
+                                        onChange={e => setGlobalTaskInput(prev => ({ ...prev, title: e.target.value }))}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter' && globalTaskInput.title.trim()) {
+                                                handleAddTest(globalTaskInput.stageId, null, globalTaskInput.title.trim());
+                                                setGlobalTaskInput(prev => ({ ...prev, title: '' }));
+                                            }
+                                            if (e.key === 'Escape') setIsAddingGlobalTask(false);
+                                        }}
+                                        className="text-[11px] w-48 bg-white border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-500 font-medium"
+                                    />
+                                    <button onClick={() => {
+                                        if (globalTaskInput.title.trim()) {
+                                            handleAddTest(globalTaskInput.stageId, null, globalTaskInput.title.trim());
+                                            setGlobalTaskInput(prev => ({ ...prev, title: '' }));
+                                        }
+                                    }} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-[11px] font-black hover:bg-indigo-700 transition-colors shadow-sm">
+                                        추가
+                                    </button>
+                                    <button onClick={() => setIsAddingGlobalTask(false)} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
+                                        <X size={14} />
+                                    </button>
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase">시작</label><input type="date" value={project.schedules?.[activeStageId]?.start || ''} onChange={(e) => handleScheduleChange(activeStageId, 'start', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold" /></div>
-                                    <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase">완료</label><input type="date" value={project.schedules?.[activeStageId]?.end || ''} onChange={(e) => handleScheduleChange(activeStageId, 'end', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold" /></div>
-                                </div>
-                                {activeStageId !== project.currentStage && <button onClick={() => handleStageChange(activeStageId)} className="w-full bg-indigo-600 text-white py-2 rounded-xl text-[10px] font-black shadow-md hover:bg-indigo-700">단계를 [{activeStage.label}]로 변경</button>}
-                            </div>
-
-                                <div className="space-y-3">
-                                    {/* PROJECT TASK - StageTaskBoard */}
-                                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                                        <div className="flex justify-between items-center px-4 py-3 border-b border-slate-100">
-                                            <h3 className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-                                                <CheckCircle2 size={14} className="text-emerald-500"/>
-                                                PROJECT TASK
-                                            </h3>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[9px] font-black text-slate-400">
-                                                    {project.tests?.[activeStageId]?.filter(t => t.status === 'done' || t.completed).length || 0}
-                                                    /{project.tests?.[activeStageId]?.length || 0} 완료
-                                                </span>
-                                                {/* 신규 그룹 추가 */}
-                                                {newTest.parent ? (
-                                                    <div className="flex items-center gap-1.5 animate-in slide-in-from-right duration-200">
-                                                        <input
-                                                            type="text"
-                                                            autoFocus
-                                                            placeholder="첫 태스크명"
-                                                            value={newTest.child}
-                                                            onChange={e => setNewTest(p => ({ ...p, child: e.target.value }))}
-                                                            onKeyDown={e => {
-                                                                if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleAddTest(activeStageId);
-                                                                if (e.key === 'Escape') setNewTest({ parent: '', child: '' });
-                                                            }}
-                                                            className="w-32 bg-slate-50 border border-indigo-200 rounded-lg px-2 py-1 text-[10px] font-bold outline-none focus:ring-1 focus:ring-indigo-400"
-                                                        />
-                                                        <button
-                                                            onClick={() => handleAddTest(activeStageId)}
-                                                            disabled={!newTest.child}
-                                                            className="px-2 py-1 bg-indigo-600 text-white rounded-lg text-[9px] font-black disabled:opacity-40 hover:bg-indigo-700 transition-colors"
-                                                        >
-                                                            생성
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setNewTest({ parent: '', child: '' })}
-                                                            className="p-1 text-slate-300 hover:text-rose-400 transition-colors"
-                                                        >
-                                                            <X size={12}/>
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    <button
-                                                        onClick={() => {
-                                                            const g = window.prompt('신규 그룹명을 입력하세요 (예: 기구설계, 소프트웨어)');
-                                                            if (g?.trim()) setNewTest({ parent: g.trim(), child: '' });
-                                                        }}
-                                                        className="flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-xl text-[9px] font-black hover:bg-indigo-100 transition-colors"
-                                                    >
-                                                        <Plus size={11}/> 그룹 추가
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="p-3">
-                                            <StageTaskBoard
-                                                tasks={project.tests?.[activeStageId] || []}
-                                                users={users}
-                                                onSelect={setEditingTest}
-                                                onUpdateTask={(id, fields) => handleUpdateTestDetail(activeStageId, id, fields)}
-                                                onDeleteTask={(id) => removeTest(activeStageId, id)}
-                                                onAddTask={(groupName, taskName) => handleAddTest(activeStageId, groupName, taskName)}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-2">
-                                <h3 className="text-xs font-black text-slate-800 flex items-center gap-1.5 border-b pb-2"><MessageSquare size={14} className="text-blue-500"/> 업무 메모</h3>
-                                <textarea rows="3" value={project.memos?.[activeStageId] || ''} onChange={(e) => handleMemoChange(activeStageId, e.target.value)} placeholder="기록 사항..." className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-[10px] font-medium resize-none shadow-inner" />
-                            </div>
-
-                            {/* 기술 산출물 */}
-                            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
-                                <h3 className="text-xs font-black text-slate-800 border-b pb-2 flex justify-between items-center">
-                                    <span className="flex items-center gap-1.5"><FileText size={14} className="text-slate-400"/> 기술 산출물</span>
-                                    <span className="text-[9px] font-black text-slate-400">{project.documents?.[activeStageId]?.length || 0}/{STAGE_DOCUMENTS[activeStageId]?.length} 건</span>
-                                </h3>
-                                <div className="grid grid-cols-1 gap-1.5">
-                                    {STAGE_DOCUMENTS[activeStageId]?.map((docName, idx) => {
-                                        const uploadedDoc = project.documents?.[activeStageId]?.find(d => d.name === docName);
-                                        return (
-                                            <div key={idx} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all group/doc ${
-                                                uploadedDoc 
-                                                    ? 'bg-emerald-50 border-emerald-200 hover:border-emerald-300' 
-                                                    : 'bg-slate-50 border-slate-100 hover:border-slate-200'
-                                            }`}>
-                                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-black ${
-                                                    uploadedDoc ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400'
-                                                }`}>
-                                                    {uploadedDoc ? '✓' : `${idx + 1}`}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className={`text-[10px] font-black truncate ${uploadedDoc ? 'text-emerald-800' : 'text-slate-600'}`}>{docName}</p>
-                                                    <p className="text-[8px] text-slate-400 font-bold">
-                                                        {uploadedDoc ? `등록: ${uploadedDoc.updatedAt.split('T')[0]}` : '미등록'}
-                                                    </p>
-                                                </div>
-                                                {uploadedDoc 
-                                                    ? <a href={uploadedDoc.url} target="_blank" rel="noopener noreferrer" 
-                                                        className="shrink-0 flex items-center gap-1 px-2 py-1 bg-white text-emerald-600 rounded-lg border border-emerald-200 text-[9px] font-black shadow-sm hover:bg-emerald-50 transition-colors">
-                                                        <ExternalLink size={10}/> 열기
-                                                      </a>
-                                                    : <button onClick={() => addDocumentLink(activeStageId, docName)} 
-                                                        className="shrink-0 flex items-center gap-1 px-2 py-1 bg-white text-indigo-600 rounded-lg border border-indigo-100 text-[9px] font-black shadow-sm hover:bg-indigo-50 transition-colors">
-                                                        <Plus size={10}/> 등록
-                                                      </button>
-                                                }
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
+                            ) : (
+                                <button onClick={() => setIsAddingGlobalTask(true)} className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-[11px] font-black hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-100 flex items-center gap-1.5">
+                                    <Plus size={14}/> 새로 만들기
+                                </button>
+                            )}
                         </div>
-                    )}
+                        <div className="flex items-center gap-4 text-[11px] font-bold text-slate-500">
+                            <span>총 {stages.reduce((acc, stage) => acc + (project.tests?.[stage.id]?.length || 0), 0)} Items</span>
+                        </div>
+                    </div>
+
+                    {/* Main Board Table */}
+                    <div className="flex-1 p-8">
+                        <MondayStyleBoard
+                            explicitGroups={stages.map((stage) => ({
+                                id: stage.id,
+                                name: stage.label,
+                                items: project.tests?.[stage.id] || [],
+                                schedule: project.schedules?.[stage.id] || { start: '', end: '' }
+                            }))}
+                            users={users}
+                            onSelect={setEditingTest}
+                            onUpdateTask={(id, fields) => {
+                                let foundStageId = null;
+                                for (const stage of stages) {
+                                    if (project.tests?.[stage.id]?.find(t => t.id === id)) {
+                                        foundStageId = stage.id;
+                                        break;
+                                    }
+                                }
+                                if (foundStageId) handleUpdateTestDetail(foundStageId, id, fields);
+                            }}
+                            onDeleteTask={(id) => {
+                                let foundStageId = null;
+                                for (const stage of stages) {
+                                    if (project.tests?.[stage.id]?.find(t => t.id === id)) {
+                                        foundStageId = stage.id;
+                                        break;
+                                    }
+                                }
+                                if (foundStageId) removeTest(foundStageId, id);
+                            }}
+                            onAddTask={(stageId, taskName) => handleAddTest(stageId, null, taskName)}
+                            onUpdateGroupSchedule={handleScheduleChange}
+                        />
+                    </div>
                 </div>
 
                 {/* 4. Footer */}
@@ -597,267 +419,318 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                     </div>
                 </div>
 
-                {/* 5. Task Detail Modal */}
+                {/* 5. Task Detail Sidebar (Issue Tracker UI) */}
                 {editingTest && (
-                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-                        <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-                            {/* 모달 헤더 */}
-                            <div className={`px-5 pt-5 pb-4 border-b border-slate-100 flex justify-between items-start ${
-                                (() => {
-                                    const s = editingTest.status || (editingTest.completed ? 'done' : 'todo');
-                                    return s === 'done' ? 'bg-gradient-to-r from-emerald-50 to-white' :
-                                           s === 'working' ? 'bg-gradient-to-r from-amber-50 to-white' :
-                                           s === 'stuck' ? 'bg-gradient-to-r from-rose-50 to-white' :
-                                           'bg-slate-50/50';
-                                })()
-                            }`}>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest">TASK DETAILS</span>
-                                        {/* 현재 상태 표시 */}
-                                        {(() => {
-                                            const s = editingTest.status || (editingTest.completed ? 'done' : 'todo');
-                                            const cfg = {
-                                                todo:    { label: '작업 전', cls: 'bg-slate-200 text-slate-700' },
-                                                working: { label: '진행 중', cls: 'bg-amber-400 text-white' },
-                                                stuck:   { label: '막힐',   cls: 'bg-rose-500 text-white' },
-                                                done:    { label: '완료',   cls: 'bg-emerald-500 text-white' },
-                                            }[s] || { label: s, cls: 'bg-slate-100 text-slate-600' };
-                                            return <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${cfg.cls}`}>{cfg.label}</span>;
-                                        })()}
-                                    </div>
-                                    <h3 className="text-sm font-black text-slate-900 leading-snug">[{editingTest.parent}] {editingTest.title || editingTest.child}</h3>
-                                    {editingTest.dueDate && (
-                                        <p className="text-[9px] text-rose-500 font-black mt-1">
-                                            마감: {editingTest.dueDate || editingTest.endDate}
-                                        </p>
-                                    )}
+                    <>
+                        {/* 블러 배경 (Backdrop) */}
+                        <div 
+                            className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[150] animate-in fade-in duration-200" 
+                            onClick={() => setEditingTest(null)}
+                        />
+                        {/* 사이드바 본체 */}
+                        <div className="fixed top-0 right-0 w-[500px] h-screen bg-white shadow-[0_0_60px_rgba(0,0,0,0.2)] z-[160] flex flex-col border-l border-slate-200 animate-in slide-in-from-right-8 duration-200">
+                        {/* 헤더 */}
+                        <div className="px-6 pt-6 pb-4 flex justify-between items-start bg-white shrink-0">
+                            <div className="flex-1 min-w-0 pr-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-[11px] font-bold text-indigo-500 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded-md">
+                                        {editingTest.parent}
+                                    </span>
+                                    <span className="text-[11px] font-bold text-slate-400">
+                                        TSK-{editingTest.id.toString().slice(-4)}
+                                    </span>
                                 </div>
-                                <button type="button" onClick={() => setEditingTest(null)} className="ml-3 p-1.5 text-slate-400 hover:text-slate-700 bg-white/80 rounded-xl shrink-0 shadow-sm">
-                                    <X size={16}/>
+                                <h3 className="text-xl font-black text-slate-900 leading-tight">
+                                    {editingTest.title || editingTest.child}
+                                </h3>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button type="button" onClick={() => setEditingTest(null)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                                    <X size={18}/>
                                 </button>
                             </div>
-                            
-                            <div className="p-5 space-y-4 flex-1 overflow-y-auto text-xs">
+                        </div>
+                        
+                        <div className="flex-1 bg-white flex flex-col min-h-0">
+                            {/* Properties (Jira/Linear style metadata grid) */}
+                            <div className="px-6 py-4 grid grid-cols-2 gap-x-8 gap-y-4 border-y border-slate-100 bg-slate-50/50 shrink-0">
+                                
                                 {/* Status */}
-                                <div className="space-y-1.5">
-                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">진행 상태</label>
-                                    <div className="grid grid-cols-4 gap-1.5">
-                                        {[
-                                            { key: 'todo',    label: '작업 전', emoji: '⏳', cls: 'bg-slate-100 text-slate-700 border-slate-200' },
-                                            { key: 'working', label: '진행 중', emoji: '🔄', cls: 'bg-amber-400 text-white border-amber-400' },
-                                            { key: 'stuck',   label: '막힐',   emoji: '🚧', cls: 'bg-rose-500 text-white border-rose-500' },
-                                            { key: 'done',    label: '완료',   emoji: '✅', cls: 'bg-emerald-500 text-white border-emerald-500' },
-                                        ].map(opt => {
-                                            const curStatus = editingTest.status || (editingTest.completed ? 'done' : 'todo');
-                                            const isAct = curStatus === opt.key;
-                                            return (
-                                                <button
-                                                    key={opt.key}
-                                                    onClick={() => handleUpdateTestDetail(activeStageId, editingTest.id, { status: opt.key })}
-                                                    className={`flex flex-col items-center py-2 rounded-xl font-black text-[10px] border-2 transition-all ${
-                                                        isAct ? opt.cls + ' shadow-md scale-105' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'
-                                                    }`}
-                                                >
-                                                    <span className="text-lg">{opt.emoji}</span>
-                                                    <span>{opt.label}</span>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">상태</label>
+                                    <select 
+                                        value={editingTest.status || (editingTest.completed ? 'done' : 'todo')}
+                                        onChange={e => handleUpdateTestDetail(editingStageId, editingTest.id, { status: e.target.value })}
+                                        className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 shadow-sm"
+                                    >
+                                        <option value="todo">작업 전</option>
+                                        <option value="working">진행 중</option>
+                                        <option value="done">완료</option>
+                                        <option value="discard">폐기</option>
+                                    </select>
                                 </div>
 
-                                {/* 날짜 */}
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="space-y-1">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">시작일</label>
-                                        <input 
-                                            type="date" 
-                                            value={editingTest.startDate || ''} 
-                                            onChange={(e) => handleUpdateTestDetail(activeStageId, editingTest.id, { startDate: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold focus:ring-1 focus:ring-indigo-300 outline-none" 
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">마감일</label>
-                                        <input 
-                                            type="date" 
-                                            value={editingTest.dueDate || editingTest.endDate || ''} 
-                                            onChange={(e) => handleUpdateTestDetail(activeStageId, editingTest.id, { dueDate: e.target.value, endDate: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold focus:ring-1 focus:ring-indigo-300 outline-none" 
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* 담당자 - 아바타 버튼 그리드 */}
-                                <div className="space-y-2">
-                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">담당자</label>
-                                    <div className="flex flex-wrap gap-2">
-                                        {/* 담당자 없음 */}
-                                        <button
-                                            onClick={() => handleUpdateTestDetail(activeStageId, editingTest.id, { assigneeUid: '', assigneeName: '' })}
-                                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-black border-2 transition-all ${
-                                                !editingTest.assigneeUid 
-                                                    ? 'bg-slate-700 text-white border-slate-700 shadow-md' 
-                                                    : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'
-                                            }`}
-                                        >
-                                            <User size={11}/> 미지정
-                                        </button>
-                                        {(users || []).map(u => {
-                                            const isAssigned = editingTest.assigneeUid === u.uid;
-                                            return (
-                                                <button
-                                                    key={u.uid}
-                                                    onClick={() => handleUpdateTestDetail(activeStageId, editingTest.id, { assigneeUid: u.uid })}
-                                                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-black border-2 transition-all ${
-                                                        isAssigned 
-                                                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' 
-                                                            : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
-                                                    }`}
-                                                >
-                                                    {u.photoURL 
-                                                        ? <img src={u.photoURL} alt="" className="w-4 h-4 rounded-full"/>
-                                                        : <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black ${
-                                                            isAssigned ? 'bg-white/20' : 'bg-indigo-100 text-indigo-600'
-                                                          }`}>{u.displayName?.[0]}</div>
-                                                    }
-                                                    {u.displayName}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                {/* 우선순위 + 난이도 */}
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="space-y-1.5">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">우선순위</label>
-                                        <div className="flex gap-1">
-                                            {[{v:'High',l:'높음',c:'bg-rose-500 text-white'},{v:'Medium',l:'보통',c:'bg-amber-400 text-white'},{v:'Low',l:'낙음',c:'bg-slate-300 text-slate-700'}].map(opt => (
-                                                <button key={opt.v}
-                                                    onClick={() => handleUpdateTestDetail(activeStageId, editingTest.id, { priority: opt.v })}
-                                                    className={`flex-1 py-1.5 rounded-lg text-[9px] font-black transition-all border-2 ${
-                                                        (editingTest.priority || 'Medium') === opt.v 
-                                                            ? opt.c + ' border-transparent shadow-sm scale-105' 
-                                                            : 'bg-white text-slate-400 border-slate-200'
-                                                    }`}
-                                                >{opt.l}</button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">난이도</label>
-                                        <div className="flex gap-1">
-                                            {[{v:'High',l:'어려움',c:'bg-purple-500 text-white'},{v:'Medium',l:'보통',c:'bg-blue-400 text-white'},{v:'Low',l:'쉽음',c:'bg-slate-300 text-slate-700'}].map(opt => (
-                                                <button key={opt.v}
-                                                    onClick={() => handleUpdateTestDetail(activeStageId, editingTest.id, { difficulty: opt.v })}
-                                                    className={`flex-1 py-1.5 rounded-lg text-[9px] font-black transition-all border-2 ${
-                                                        (editingTest.difficulty || 'Medium') === opt.v 
-                                                            ? opt.c + ' border-transparent shadow-sm scale-105' 
-                                                            : 'bg-white text-slate-400 border-slate-200'
-                                                    }`}
-                                                >{opt.l}</button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* 링크 */}
-                                <div className="space-y-2">
-                                    <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                                        <ExternalLink size={11}/> 참조 문서 및 링크
-                                    </h4>
-                                    <div className="space-y-1.5">
-                                        {(editingTest.links || []).map((link, lIdx) => (
-                                            <div key={lIdx} className="flex items-center justify-between bg-slate-50 border border-slate-100 px-3 py-2 rounded-xl group/link">
-                                                <div className="flex flex-col min-w-0">
-                                                    <span className="text-[10px] font-black text-slate-700 truncate">{link.title}</span>
-                                                    <a href={link.url} target="_blank" rel="noreferrer" className="text-[8px] text-blue-500 hover:underline truncate">{link.url}</a>
-                                                </div>
-                                                <button 
-                                                    onClick={() => {
-                                                        const nextLinks = editingTest.links.filter((_, i) => i !== lIdx);
-                                                        handleUpdateTestDetail(activeStageId, editingTest.id, { links: nextLinks });
-                                                    }}
-                                                    className="p-1 text-slate-300 hover:text-rose-500 opacity-0 group-hover/link:opacity-100 transition-all"
-                                                >
-                                                    <X size={10}/>
-                                                </button>
-                                            </div>
+                                {/* Assignee */}
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">담당자</label>
+                                    <select 
+                                        value={editingTest.assigneeUid || ''}
+                                        onChange={e => handleUpdateTestDetail(editingStageId, editingTest.id, { assigneeUid: e.target.value })}
+                                        className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 shadow-sm"
+                                    >
+                                        <option value="">미지정</option>
+                                        {(users || []).map(u => (
+                                            <option key={u.uid} value={u.uid}>{u.displayName}</option>
                                         ))}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <input 
-                                            type="text" 
-                                            placeholder="문서명" 
-                                            value={newLink.title}
-                                            onChange={e => setNewLink(p => ({ ...p, title: e.target.value }))}
-                                            className="w-1/3 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none focus:ring-1 focus:ring-indigo-300" 
-                                        />
-                                        <input 
-                                            type="text" 
-                                            placeholder="URL (구글드라이브 등)" 
-                                            value={newLink.url}
-                                            onChange={e => setNewLink(p => ({ ...p, url: e.target.value }))}
-                                            onKeyDown={e => {
-                                                if (e.key === 'Enter' && newLink.title && newLink.url) {
-                                                    const nextLinks = [...(editingTest.links || []), { title: newLink.title, url: newLink.url }];
-                                                    handleUpdateTestDetail(activeStageId, editingTest.id, { links: nextLinks });
-                                                    setNewLink({ title: '', url: '' });
-                                                }
-                                            }}
-                                            className="flex-1 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none focus:ring-1 focus:ring-indigo-300" 
-                                        />
-                                        <button 
-                                            onClick={() => {
-                                                if (newLink.title && newLink.url) {
-                                                    const nextLinks = [...(editingTest.links || []), { title: newLink.title, url: newLink.url }];
-                                                    handleUpdateTestDetail(activeStageId, editingTest.id, { links: nextLinks });
-                                                    setNewLink({ title: '', url: '' });
-                                                }
-                                            }}
-                                            className="px-3 py-1 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-lg text-[10px] font-black hover:bg-indigo-100 transition-colors"
-                                        >
-                                            추가
-                                        </button>
-                                    </div>
+                                    </select>
                                 </div>
 
-                                {/* 메모 */}
-                                <div className="space-y-1.5">
-                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">메모 및 상세 내역</label>
-                                    <textarea 
-                                        rows="5" 
-                                        value={editingTest.notes || ''} 
-                                        onChange={(e) => handleUpdateTestDetail(activeStageId, editingTest.id, { notes: e.target.value })}
-                                        placeholder="이 TASK의 상세 지침, 실행 로그, 참고 사항 등..." 
-                                        className="w-full bg-amber-50/50 border border-amber-200/80 rounded-2xl p-4 text-[11px] font-medium resize-none text-slate-800 placeholder-slate-400/70 focus:outline-none focus:ring-1 focus:ring-amber-300" 
+                                {/* Priority */}
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">우선순위</label>
+                                    <select 
+                                        value={editingTest.priority || 'Medium'}
+                                        onChange={e => handleUpdateTestDetail(editingStageId, editingTest.id, { priority: e.target.value })}
+                                        className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 shadow-sm"
+                                    >
+                                        <option value="High">🔴 높음</option>
+                                        <option value="Medium">🟠 보통</option>
+                                        <option value="Low">⚪️ 낮음</option>
+                                    </select>
+                                </div>
+
+                                {/* Dates */}
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">마감일</label>
+                                    <input 
+                                        type="date" 
+                                        value={editingTest.dueDate || editingTest.endDate || ''} 
+                                        onChange={e => handleUpdateTestDetail(editingStageId, editingTest.id, { dueDate: e.target.value, endDate: e.target.value })}
+                                        className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 shadow-sm"
                                     />
                                 </div>
                             </div>
 
-                            <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex gap-3 shrink-0">
+                            {/* Description & Links */}
+                            <div className="p-6 flex-1 flex flex-col gap-6 min-h-0">
+                                {/* Description */}
+                                <div className="flex flex-col gap-2 flex-1 min-h-0">
+                                    <label className="text-[12px] font-black text-slate-800 flex items-center gap-1.5">
+                                        <FileText size={14} className="text-slate-400" /> 상세 설명 (Description)
+                                    </label>
+                                    <div className="flex flex-col flex-1 min-h-0 bg-white border border-slate-200 rounded-xl overflow-hidden focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all shadow-sm">
+                                        {/* Mock Toolbar */}
+                                        <div className="flex items-center gap-1 px-3 py-2 bg-slate-50 border-b border-slate-100 shrink-0">
+                                            <div className="flex items-center gap-1 border-r border-slate-200 pr-2 mr-1">
+                                                <button className="p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700 rounded transition-colors"><Type size={13} /></button>
+                                                <button className="p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700 rounded transition-colors"><Bold size={13} /></button>
+                                                <button className="p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700 rounded transition-colors"><Italic size={13} /></button>
+                                                <button className="p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700 rounded transition-colors"><Underline size={13} /></button>
+                                            </div>
+                                            <div className="flex items-center gap-1 border-r border-slate-200 pr-2 mr-1">
+                                                <button className="p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700 rounded transition-colors"><List size={13} /></button>
+                                                <button className="p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700 rounded transition-colors"><ListOrdered size={13} /></button>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                <button className="p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700 rounded transition-colors"><Link2 size={13} /></button>
+                                                <button className="p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700 rounded transition-colors"><Code size={13} /></button>
+                                                <button className="p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700 rounded transition-colors"><Upload size={13} /></button>
+                                            </div>
+                                        </div>
+                                        {/* Textarea */}
+                                        <textarea 
+                                            value={editingTest.notes || ''} 
+                                            onChange={e => handleUpdateTestDetail(editingStageId, editingTest.id, { notes: e.target.value })}
+                                            placeholder="이 이슈에 대한 상세 설명, 실행 컨텍스트, 배경 등을 작성하세요..." 
+                                            className="w-full h-full flex-1 p-4 text-[13px] font-medium resize-none overflow-y-auto text-slate-800 placeholder-slate-400 outline-none" 
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Links */}
+                                <div className="flex flex-col gap-2 shrink-0">
+                                    <label className="text-[12px] font-black text-slate-800 flex items-center gap-1.5">
+                                        <ExternalLink size={14} className="text-slate-400" /> 참조 링크
+                                    </label>
+                                    <div className="flex flex-col gap-2">
+                                        {/* 빠른 템플릿 추가 버튼 */}
+                                        <div className="flex gap-2 mb-1">
+                                            <button 
+                                                onClick={() => setNewLink({ title: '구글 문서', url: 'https://docs.google.com/document/d/' })} 
+                                                className="px-2 py-1 text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-100 rounded flex items-center gap-1 hover:bg-blue-100 transition-colors"
+                                            >
+                                                <FileText size={10}/> 구글 문서
+                                            </button>
+                                            <button 
+                                                onClick={() => setNewLink({ title: '구글 스프레드시트', url: 'https://docs.google.com/spreadsheets/d/' })} 
+                                                className="px-2 py-1 text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 rounded flex items-center gap-1 hover:bg-emerald-100 transition-colors"
+                                            >
+                                                <Table size={10}/> 구글 시트
+                                            </button>
+                                        </div>
+                                        
+                                        {(editingTest.links || []).map((link, lIdx) => {
+                                            const isDoc = link.url.includes('docs.google.com/document');
+                                            const isSheet = link.url.includes('docs.google.com/spreadsheets');
+                                            const isFigma = link.url.includes('figma.com');
+                                            const Icon = isDoc ? FileText : isSheet ? Table : isFigma ? Layout : Link2;
+                                            const iconColor = isDoc ? 'text-blue-500' : isSheet ? 'text-emerald-500' : isFigma ? 'text-purple-500' : 'text-slate-400';
+
+                                            return (
+                                                <div key={lIdx} className="flex items-center justify-between bg-slate-50 border border-slate-100 px-3 py-2.5 rounded-lg group/link transition-all hover:border-indigo-100 hover:shadow-sm">
+                                                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                                        <div className={`p-1.5 bg-white rounded-md border border-slate-100 shadow-sm ${iconColor}`}>
+                                                            <Icon size={14} />
+                                                        </div>
+                                                        <div className="flex flex-col min-w-0">
+                                                            <span className="text-[11px] font-bold text-slate-700 truncate">{link.title}</span>
+                                                            <a href={link.url} target="_blank" rel="noreferrer" className="text-[10px] text-indigo-500 hover:underline truncate">{link.url}</a>
+                                                        </div>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => {
+                                                            const nextLinks = editingTest.links.filter((_, i) => i !== lIdx);
+                                                            handleUpdateTestDetail(editingStageId, editingTest.id, { links: nextLinks });
+                                                        }}
+                                                        className="p-1.5 text-slate-300 hover:text-rose-500 opacity-0 group-hover/link:opacity-100 transition-all rounded-md hover:bg-rose-50"
+                                                    >
+                                                        <X size={12}/>
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                        <div className="flex gap-2 mt-1">
+                                            <input 
+                                                type="text" 
+                                                placeholder="문서명" 
+                                                value={newLink.title}
+                                                onChange={e => setNewLink(p => ({ ...p, title: e.target.value }))}
+                                                className="w-[120px] bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] font-bold outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200" 
+                                            />
+                                            <input 
+                                                type="text" 
+                                                placeholder="URL 입력 후 엔터" 
+                                                value={newLink.url}
+                                                onChange={e => setNewLink(p => ({ ...p, url: e.target.value }))}
+                                                onKeyDown={e => {
+                                                    if (e.key === 'Enter' && newLink.title && newLink.url) {
+                                                        const nextLinks = [...(editingTest.links || []), { title: newLink.title, url: newLink.url }];
+                                                        handleUpdateTestDetail(editingStageId, editingTest.id, { links: nextLinks });
+                                                        setNewLink({ title: '', url: '' });
+                                                    }
+                                                }}
+                                                className="flex-1 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] font-bold outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200" 
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* 모달 푸터 (하단 고정) */}
+                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center shrink-0">
+                            <span className="text-[10px] font-bold text-slate-400">
+                                마지막 수정: {new Date(editingTest.updatedAt).toLocaleString('ko-KR')}
+                            </span>
+                            <div className="flex items-center gap-2">
                                 <button 
                                     type="button" 
-                                    onClick={() => { removeTest(activeStageId, editingTest.id); setEditingTest(null); }} 
-                                    className="flex items-center gap-1.5 px-4 py-2 bg-white text-rose-500 hover:bg-rose-50 border border-rose-200 transition-all font-black text-[10px] rounded-xl shadow-sm"
+                                    onClick={() => { 
+                                        if(window.confirm('이 이슈를 완전히 삭제하시겠습니까?')) {
+                                            removeTest(editingStageId, editingTest.id); 
+                                            setEditingTest(null); 
+                                        }
+                                    }} 
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-rose-500 hover:bg-rose-50 border border-rose-200 transition-all font-black text-[11px] rounded-lg shadow-sm"
                                 >
-                                    <Trash2 size={12}/> 삭제
+                                    <Trash2 size={12}/> 이슈 삭제
                                 </button>
                                 <button 
                                     type="button" 
                                     onClick={() => setEditingTest(null)} 
-                                    className="flex-1 py-2 bg-indigo-600 text-white hover:bg-indigo-700 transition-all font-black text-[10px] rounded-xl shadow-md shadow-indigo-100"
+                                    className="px-4 py-1.5 bg-indigo-600 text-white hover:bg-indigo-700 transition-all font-black text-[11px] rounded-lg shadow-md shadow-indigo-100"
                                 >
                                     저장 및 닫기
                                 </button>
                             </div>
                         </div>
-                    </div>
+                        </div>
+                    </>
                 )}
-            </div>
-        </div>,
-        document.body
+
+                {/* 6. Activity Log Sidebar */}
+                {showActivityLog && (
+                    <>
+                        {/* 블러 배경 (Backdrop) */}
+                        <div 
+                            className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[150] animate-in fade-in duration-200" 
+                            onClick={() => setShowActivityLog(false)}
+                        />
+                        <div className="fixed top-0 right-0 w-[400px] h-screen bg-white shadow-2xl z-[170] flex flex-col border-l border-slate-200 animate-in slide-in-from-right-8 duration-200">
+                            <div className="px-6 py-5 flex justify-between items-center border-b border-slate-200 bg-white shrink-0">
+                                <div className="flex items-center gap-2">
+                                    <History size={18} className="text-indigo-500" />
+                                    <h3 className="text-lg font-black text-slate-800">프로젝트 활동 로그</h3>
+                            </div>
+                            <button onClick={() => setShowActivityLog(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                                <X size={18}/>
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto bg-slate-50 p-6 flex flex-col gap-6">
+                            {(project.activityLog || []).length === 0 ? (
+                                <div className="text-center py-10 flex flex-col items-center gap-3">
+                                    <MessageSquare size={32} className="text-slate-200" />
+                                    <p className="text-xs font-bold text-slate-400">아직 기록된 활동 로그가 없습니다.</p>
+                                </div>
+                            ) : (
+                                (project.activityLog || []).slice().reverse().map((log, idx) => (
+                                    <div key={idx} className="flex gap-4 relative">
+                                        {/* 타임라인 선 */}
+                                        {idx !== (project.activityLog?.length || 1) - 1 && (
+                                            <div className="absolute left-[15px] top-[30px] bottom-[-20px] w-[2px] bg-slate-200 rounded-full" />
+                                        )}
+                                        {/* 아바타 */}
+                                        <div className="w-8 h-8 rounded-full bg-indigo-100 border-2 border-white shadow-sm flex items-center justify-center shrink-0 z-10 text-indigo-700 font-black text-[10px]">
+                                            {log.user?.slice(0,2) || 'UK'}
+                                        </div>
+                                        {/* 로그 컨텐츠 */}
+                                        <div className="flex-1 bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[12px] font-black text-slate-800">{log.user || '알 수 없음'}</span>
+                                                    <span className="text-[10px] font-bold text-indigo-500">{log.stageName || log.stageId || '프로젝트'}</span>
+                                                </div>
+                                                <span className="text-[9px] font-bold text-slate-400">
+                                                    {new Date(log.timestamp).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            </div>
+                                            <p className="text-[11px] text-slate-600 font-bold mb-3">일정을 변경했습니다.</p>
+                                            
+                                            {/* 변경 내역 박스 */}
+                                            <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 space-y-2">
+                                                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
+                                                    <Clock size={12} className="text-amber-500"/>
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <span className="line-through opacity-60 text-slate-400">{log.changes?.oldStart || '미정'} ~ {log.changes?.oldEnd || '미정'}</span>
+                                                        <ArrowRight size={10} className="text-slate-300"/>
+                                                        <span className="text-amber-600">{log.changes?.newStart || '미정'} ~ {log.changes?.newEnd || '미정'}</span>
+                                                    </div>
+                                                </div>
+                                                {log.reason && (
+                                                    <div className="flex items-start gap-2 text-[10px] font-bold text-slate-500 pt-2 border-t border-slate-100">
+                                                        <MessageSquare size={12} className="text-indigo-400 mt-0.5 shrink-0"/>
+                                                        <p className="text-slate-700 leading-relaxed">"{log.reason}"</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                        </div>
+                    </>
+                )}
+        </div>
     );
 }
