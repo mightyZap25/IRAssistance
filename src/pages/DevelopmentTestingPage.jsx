@@ -96,14 +96,17 @@ export default function DevelopmentTestingPage() {
                         <div className="p-2.5 bg-purple-600 rounded-2xl shadow-xl shadow-purple-100">
                             <Microscope size={28} className="text-white" />
                         </div>
-                        개발 성능 및 품질테스트
+                        성능 및 품질 테스트
                     </h1>
                     <p className="text-sm text-slate-500 font-bold mt-2 ml-1">
                         개발 단계 프로젝트 및 설계 변경(ECN) 품목의 성능·기능 검증 데이터를 관리합니다.
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <button className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl font-black text-sm shadow-md shadow-indigo-100 transition-all transform hover:scale-[1.02]">
+                    <button 
+                        onClick={() => handleOpenModal({ refType: 'Manual', refId: 'Manual Test', title: '수동 테스트 요청', partId: '-' })}
+                        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl font-black text-sm shadow-md shadow-indigo-100 transition-all transform hover:scale-[1.02]"
+                    >
                         <Plus size={18} /> 테스트 요청
                     </button>
                 </div>

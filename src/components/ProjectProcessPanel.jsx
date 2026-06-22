@@ -17,7 +17,7 @@ const STAGE_DOCUMENTS = {
     mp_transfer: ['양산 이관 승인서', '최종 BOM', '포장 사양서'],
 };
 
-export default function ProjectProcessPanel({ isOpen, onClose, project, stages, onUpdate }) {
+export default function ProjectProcessPanel({ isOpen, onClose, project, stages, onUpdate, users }) {
     const [viewMode, setViewMode] = useState('overview'); // overview | issues | stage_detail
     const [activeStageId, setActiveStageId] = useState(null);
     const [newTest, setNewTest] = useState({ parent: '', child: '' });
@@ -314,10 +314,11 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                                 </h3>
                                 <div className="space-y-4">
                                     <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 space-y-2">
-                                        <div className="flex items-center justify-between"><label className="text-[8px] font-black text-slate-400 uppercase">신규 분류 등록</label></div>
+                                        <div className="flex items-center justify-between"><label className="text-[8px] font-black text-slate-400 uppercase">신규 분류(그룹) 및 태스크 등록</label></div>
                                         <div className="flex gap-2">
-                                            <input type="text" placeholder="새 분류 명칭 (예: 기능검증)" value={newTest.parent} onChange={(e) => setNewTest({...newTest, parent: e.target.value})} className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[10px] font-black" />
-                                            <button type="button" onClick={() => { if(newTest.parent) handleAddTest(activeStageId); }} className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-[10px] font-black">분류 생성</button>
+                                            <input type="text" placeholder="분류 명칭 (예: 기구설계)" value={newTest.parent} onChange={(e) => setNewTest({...newTest, parent: e.target.value})} className="w-1/3 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[10px] font-black" />
+                                            <input type="text" placeholder="첫 번째 태스크 명칭 (필수)" value={newTest.child} onChange={(e) => setNewTest({...newTest, child: e.target.value})} onKeyDown={(e) => { if(e.key === 'Enter') handleAddTest(activeStageId); }} className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[10px] font-black" />
+                                            <button type="button" onClick={() => handleAddTest(activeStageId)} className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-[10px] font-black whitespace-nowrap">태스크 생성</button>
                                         </div>
                                     </div>
 

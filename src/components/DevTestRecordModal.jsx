@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { 
     X, Microscope, Save, Plus, Trash2, 
@@ -22,6 +22,11 @@ export default function DevTestRecordModal({ item, isOpen, onClose, onSave }) {
         remarks: ''
     });
 
+    const [targetCategory, setTargetCategory] = useState('Actuator');
+    const [targetPartId, setTargetPartId] = useState('');
+    const [allParts, setAllParts] = useState([]);
+    const [bomFolders, setBomFolders] = useState([]);
+
     useEffect(() => {
         if (isOpen && item) {
             setTestData({
@@ -32,8 +37,77 @@ export default function DevTestRecordModal({ item, isOpen, onClose, onSave }) {
                 results: [],
                 remarks: ''
             });
+            setTargetCategory('Actuator');
+            setTargetPartId('');
+
+            if (item.refType === 'Manual') {
+                const fetchData = async () => {
+                    try {
+                        const partsResp = await fetch('http://localhost:5050/api/db/parts');
+                        const partsData = await partsResp.json();
+                        
+                        const valid = partsData.filter(p => {
+                            const cls = (p.Class || '').toLowerCase();
+                            return cls !== 'bom_category' && cls !== 'bom_series';
+                        });
+                        setAllParts(valid);
+
+                        const mockBomFolders = partsData.filter(p => {
+                            const cls = (p.Class || '').toLowerCase();
+                            return cls === 'bom_category' || cls === 'bom_series';
+                        }).map(p => {
+                            const cls = (p.Class || '').toLowerCase();
+                            return {
+                                id: p.id,
+                                name: p.Name,
+                                type: cls === 'bom_category' ? 'category' : 'series',
+                                parentId: p.ParentFolderId || null
+                            };
+                        });
+
+                        const foldersResp = await fetch('http://localhost:5050/api/db/bom_folders');
+                        const foldersData = foldersResp.ok ? await foldersResp.json() : [];
+                        setBomFolders([...mockBomFolders, ...foldersData]);
+                    } catch (err) {
+                        console.error(err);
+                    }
+                };
+                fetchData();
+            }
         }
     }, [isOpen, item]);
+
+    const filteredModels = useMemo(() => {
+        return allParts.filter(p => {
+            const cls = (p.Class || '').toLowerCase();
+            const cat = (p.Category || '').toLowerCase();
+            const name = (p.Name || '').toLowerCase();
+            
+            const boardCatIds = bomFolders.filter(f => f.type === 'category' && (
+                f.name?.toLowerCase().includes('board') || f.name?.toLowerCase().includes('pcb') || f.name?.includes('보드')
+            )).map(f => f.id);
+            const actuatorCatIds = bomFolders.filter(f => f.type === 'category' && (
+                f.name?.toLowerCase().includes('actuator') || f.name?.includes('액추')
+            )).map(f => f.id);
+
+            // Actuator 판정 로직: BOM 카테고리가 Actuator이거나, 레거시 카테고리가 완제품/product/actuator 등인 경우
+            const isActuatorByBOM = p.ProductCategoryId && actuatorCatIds.includes(p.ProductCategoryId);
+            const isProductLegacy = cat.includes('완제품') || cat.includes('product') || cat.includes('actuator') || cls.includes('actuator') || (p.PartID && p.PartID.match(/^(12|17|22|32)/));
+            const isActuatorLegacy = cls.includes('actuator') || cat.includes('actuator') || cls === '' || !cls;
+            const isActuator = isActuatorByBOM || (isProductLegacy && isActuatorLegacy);
+
+            // Board 판정 로직: 일반 회로 부품을 제외하고 BOM 상의 Board 카테고리에 명시적으로 속하는 부품만 포함
+            const isBoard = p.ProductCategoryId && boardCatIds.includes(p.ProductCategoryId);
+
+            if (targetCategory === 'Actuator') {
+                return isActuator;
+            } else if (targetCategory === 'Board') {
+                return isBoard;
+            } else {
+                return !isActuator && !isBoard;
+            }
+        }).sort((a,b) => (a.Name || '').localeCompare(b.Name || ''));
+    }, [allParts, targetCategory, bomFolders]);
 
     const handleAddItem = () => {
         setTestData(prev => ({
@@ -58,14 +132,23 @@ export default function DevTestRecordModal({ item, isOpen, onClose, onSave }) {
 
     const handleSubmit = async () => {
         if (!testData.tester) return alert('테스터 성명을 입력해주세요.');
+        if (item.refType === 'Manual' && !targetPartId) return alert('대상 모델(완성품/부품)을 선택해주세요.');
         
         setLoading(true);
         try {
+            let partName = item.title;
+            let finalPartId = item.partId;
+            if (item.refType === 'Manual') {
+                const selectedPart = allParts.find(p => p.PartID === targetPartId);
+                partName = selectedPart ? selectedPart.Name : '수동 등록';
+                finalPartId = targetPartId;
+            }
+
             const payload = {
                 refType: item.refType,
                 refId: item.refId,
-                partId: item.partId,
-                partName: item.title,
+                partId: finalPartId,
+                partName: partName,
                 ...testData,
                 completedAt: serverTimestamp()
             };
@@ -96,9 +179,9 @@ export default function DevTestRecordModal({ item, isOpen, onClose, onSave }) {
                             <Microscope className="text-white" size={24} />
                         </div>
                         <div>
-                            <h2 className="text-xl font-black text-slate-900 tracking-tight">개발 성능 및 품질 테스트 기록</h2>
+                            <h2 className="text-xl font-black text-slate-900 tracking-tight">성능 및 품질 테스트</h2>
                             <p className="text-xs text-slate-500 font-bold mt-0.5">
-                                [{item.refType}] {item.refId} | {item.title}
+                                [{item?.refType}] {item?.refId} | {item?.title}
                             </p>
                         </div>
                     </div>
@@ -106,6 +189,40 @@ export default function DevTestRecordModal({ item, isOpen, onClose, onSave }) {
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar bg-white">
+                    {/* Target Selection for Manual Request */}
+                    {item?.refType === 'Manual' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6 border-b border-slate-100">
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 ml-1">대상 모델 분류</label>
+                                <select 
+                                    value={targetCategory}
+                                    onChange={e => {
+                                        setTargetCategory(e.target.value);
+                                        setTargetPartId('');
+                                    }}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-xs font-black outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-sm"
+                                >
+                                    <option value="Actuator">Actuator</option>
+                                    <option value="Board">Board</option>
+                                    <option value="Part">Part (일반 부품)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 ml-1">완성품/부품 리스트</label>
+                                <select 
+                                    value={targetPartId}
+                                    onChange={e => setTargetPartId(e.target.value)}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-xs font-black outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-sm"
+                                >
+                                    <option value="">대상을 선택하세요</option>
+                                    {filteredModels.map(p => (
+                                        <option key={p.PartID} value={p.PartID}>{p.PartID} | {p.Name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Basic Info Row */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
@@ -131,20 +248,22 @@ export default function DevTestRecordModal({ item, isOpen, onClose, onSave }) {
                                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-xs font-black outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-sm"
                             />
                         </div>
-                        <div>
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 ml-1">최종 테스트 판정</label>
-                            <div className="flex bg-slate-50 p-1 rounded-2xl border border-slate-200 shadow-sm">
-                                {['Pass', 'Fail'].map(res => (
-                                    <button
-                                        key={res}
-                                        onClick={() => setTestData({...testData, result: res})}
-                                        className={`flex-1 py-2 rounded-xl text-[10px] font-black transition-all ${testData.result === res ? (res === 'Pass' ? 'bg-emerald-500 text-white shadow-md' : 'bg-rose-500 text-white shadow-md') : 'text-slate-400 hover:text-slate-600'}`}
-                                    >
-                                        {res === 'Pass' ? '합격' : '불합격'}
-                                    </button>
-                                ))}
+                        {item?.refType !== 'Manual' && (
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 ml-1">최종 테스트 판정</label>
+                                <div className="flex bg-slate-50 p-1 rounded-2xl border border-slate-200 shadow-sm">
+                                    {['Pass', 'Fail'].map(res => (
+                                        <button
+                                            key={res}
+                                            onClick={() => setTestData({...testData, result: res})}
+                                            className={`flex-1 py-2 rounded-xl text-[10px] font-black transition-all ${testData.result === res ? (res === 'Pass' ? 'bg-emerald-500 text-white shadow-md' : 'bg-rose-500 text-white shadow-md') : 'text-slate-400 hover:text-slate-600'}`}
+                                        >
+                                            {res === 'Pass' ? '합격' : '불합격'}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
 
                     {/* Detailed Items Section */}
@@ -194,14 +313,13 @@ export default function DevTestRecordModal({ item, isOpen, onClose, onSave }) {
                                             </div>
                                             <div className="md:col-span-1">
                                                 <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block ml-1">판정</label>
-                                                <select 
+                                                <input 
+                                                    type="text"
                                                     value={res.isPass}
-                                                    onChange={e => handleUpdateItem(res.id, 'isPass', e.target.value === 'true')}
-                                                    className="w-full bg-transparent text-[11px] font-bold outline-none"
-                                                >
-                                                    <option value="true">OK</option>
-                                                    <option value="false">NG</option>
-                                                </select>
+                                                    onChange={e => handleUpdateItem(res.id, 'isPass', e.target.value)}
+                                                    placeholder="예: OK, NG, N/A"
+                                                    className="w-full bg-transparent text-[11px] font-bold outline-none border-b border-transparent group-focus-within:border-purple-100"
+                                                />
                                             </div>
                                             <div className="md:col-span-1">
                                                 <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block ml-1">특이사항</label>
@@ -242,11 +360,11 @@ export default function DevTestRecordModal({ item, isOpen, onClose, onSave }) {
                             <p className="text-[9px] text-slate-400 font-bold mt-2 ml-1">측정 데이터가 많거나 템플릿 사용 시 구글 시트 링크를 여기에 첨부하세요.</p>
                         </div>
                         <div>
-                            <label className="text-[11px] font-black text-slate-800 uppercase mb-3 block">종합 의견 (Remarks)</label>
+                            <label className="text-[11px] font-black text-slate-800 uppercase mb-3 block">노트 (Note)</label>
                             <textarea 
                                 value={testData.remarks}
                                 onChange={e => setTestData({...testData, remarks: e.target.value})}
-                                placeholder="테스트 환경 및 종합 판정 배경을 입력하세요."
+                                placeholder="테스트 환경, 특이사항, 노트 등을 입력하세요."
                                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-xs font-bold outline-none focus:ring-2 focus:ring-purple-500 transition-all min-h-[100px] shadow-sm resize-none"
                             />
                         </div>
