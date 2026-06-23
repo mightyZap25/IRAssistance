@@ -1,4 +1,4 @@
-# 시스템 환경설정 (Settings) 사용자 매뉴얼
+﻿# 시스템 환경설정 (Settings) 사용자 매뉴얼
 
 시스템 환경설정은 ERP 전체의 기간계 데이터베이스(PostgreSQL) 접속 관리, 외부 고객 지원 이메일 수집을 위한 메일 서버 연동, 서드파티 서비스 API 관리, 메일 템플릿 및 결재 시스템 통제, 그리고 데스크톱 앱의 실시간 자동 업데이트를 총괄 제어하는 관리자 전용 제어 탑입니다.
 
@@ -43,7 +43,7 @@
 *   ERP 내에서 구매 발주서(PO) 발송이나 협력사 단가 견적을 메일로 자동 발송할 때 사용될 기본 메일 제목 양식 및 본문(인사말) 구조를 사전 정의합니다. 제목 기입 시 `{PONumber}`, `{PartName}` 등의 파라미터 예약 키 바인딩을 지원합니다.
 
 ### 2.5 결재 워크플로우 설정
-*   **결재 우회 (Admin Bypass)**: 관리자가 부재중이거나 설계 변경 ECN의 긴급 적용이 필요한 경우 결재 단계를 스킵하고 즉시 통과시킬 수 있는 마스터 승인 권한 허용 옵션을 토글합니다.
+*   **결재 우회 (Admin Bypass)**: 관리자가 부재중이거나 설계 변경 ECO의 긴급 적용이 필요한 경우 결재 단계를 스킵하고 즉시 통과시킬 수 있는 마스터 승인 권한 허용 옵션을 토글합니다.
 
 ### 2.6 공급사/제조사 동기화
 *   ERP 내에 등록된 부품 마스터 DB를 전체 검색하여, 해당 부품의 공급업체(Maker)와 제조업체(Manufacturer) 목록 중 아직 SCM 공급사 대장에 누락된 신규 업체를 자동 검출하여 SCM 데이터베이스에 시딩(Seeding)합니다.
@@ -68,3 +68,4 @@
 ### 3.2 Firebase Firestore 매핑
 *   **설정 보관**: 이메일 연동 매개변수, ECount 및 Google API 키, 문서 템플릿 텍스트, 결재 우회 토글 변수 등은 Firestore의 전역 `config` 컬렉션에 영구 보존 및 제어됩니다.
 *   **공급사 동기화 스크립트**: [supplierAutoRegister.js](file:///D:/workspace/IR_Assistant/src/services/supplierAutoRegister.js)와 직접 동기화되어 `syncAllPartsToSupplierDB()`가 트리거되면 Firestore 내 `parts` 컬렉션을 순차 검색하여 신규 `vendors`와 `manufacturers` 컬렉션에 자동 마이그레이션 적용을 완수합니다.
+

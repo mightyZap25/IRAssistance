@@ -573,9 +573,17 @@ function MondayRow({
     const [isStatusOpen, setIsStatusOpen] = useState(false);
     const [isAssigneeOpen, setIsAssigneeOpen] = useState(false);
     const [isTypeOpen, setIsTypeOpen] = useState(false);
+    const [isPriorityOpen, setIsPriorityOpen] = useState(false);
     const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
     const [newCustomType, setNewCustomType] = useState('');
     const [isAddingNewType, setIsAddingNewType] = useState(false);
+
+    const [isEditingNotes, setIsEditingNotes] = useState(false);
+    const [notesInput, setNotesInput] = useState(task.notes || '');
+
+    useEffect(() => {
+        setNotesInput(task.notes || '');
+    }, [task.notes]);
 
     const curStatus = task.status || (task.completed ? 'done' : 'todo');
     const statusCfg = STATUS_CONFIG[curStatus] || STATUS_CONFIG.todo;
@@ -589,21 +597,25 @@ function MondayRow({
     const isHovered = hoveredTaskId === task.id;
 
     useEffect(() => {
-        const handleScrollOrClickOutside = () => {
+        const handleScrollOrClickOutside = (e) => {
+            if (e && e.target && e.target.closest && e.target.closest('.overflow-y-auto')) {
+                return;
+            }
             setIsStatusOpen(false);
             setIsAssigneeOpen(false);
             setIsTypeOpen(false);
+            setIsPriorityOpen(false);
             setIsAddingNewType(false);
             setNewCustomType('');
         };
 
-        if (isStatusOpen || isAssigneeOpen || isTypeOpen) {
+        if (isStatusOpen || isAssigneeOpen || isTypeOpen || isPriorityOpen) {
             window.addEventListener('scroll', handleScrollOrClickOutside, true);
             return () => {
                 window.removeEventListener('scroll', handleScrollOrClickOutside, true);
             };
         }
-    }, [isStatusOpen, isAssigneeOpen, isTypeOpen]);
+    }, [isStatusOpen, isAssigneeOpen, isTypeOpen, isPriorityOpen]);
 
     const handleStatusClick = (e) => {
         e.stopPropagation();
@@ -616,6 +628,7 @@ function MondayRow({
         setIsStatusOpen(!isStatusOpen);
         setIsAssigneeOpen(false);
         setIsTypeOpen(false);
+        setIsPriorityOpen(false);
     };
 
     const handleAssigneeClick = (e) => {
@@ -629,6 +642,7 @@ function MondayRow({
         setIsAssigneeOpen(!isAssigneeOpen);
         setIsStatusOpen(false);
         setIsTypeOpen(false);
+        setIsPriorityOpen(false);
     };
 
     const handleTypeClick = (e) => {
@@ -642,6 +656,21 @@ function MondayRow({
         setIsTypeOpen(!isTypeOpen);
         setIsStatusOpen(false);
         setIsAssigneeOpen(false);
+        setIsPriorityOpen(false);
+    };
+
+    const handlePriorityClick = (e) => {
+        e.stopPropagation();
+        const rect = e.currentTarget.getBoundingClientRect();
+        setDropdownPosition({
+            top: rect.bottom,
+            left: rect.left,
+            width: rect.width
+        });
+        setIsPriorityOpen(!isPriorityOpen);
+        setIsStatusOpen(false);
+        setIsAssigneeOpen(false);
+        setIsTypeOpen(false);
     };
 
     return (
@@ -898,15 +927,76 @@ function MondayRow({
             </div>
 
             {/* 9. 우선순위 (컬러 블록) */}
-            <div className="w-[110px] border-r border-slate-200 shrink-0 p-1.5 border-b border-b-white">
-                <div className={`w-full h-full flex items-center justify-center text-[12px] font-black ${pCfg.bg} ${pCfg.text}`}>
+            <div className="w-[110px] border-r border-slate-200 shrink-0 p-1.5 border-b border-b-white relative">
+                <div 
+                    onClick={handlePriorityClick}
+                    className={`w-full h-full flex items-center justify-center text-[12px] font-black cursor-pointer hover:opacity-90 active:scale-95 transition-all ${pCfg.bg} ${pCfg.text}`}
+                >
                     {pCfg.label}
                 </div>
+
+                {isPriorityOpen && (
+                    <>
+                        <div className="fixed inset-0 z-[940]" onClick={() => setIsPriorityOpen(false)} />
+                        <div 
+                            className="fixed bg-white shadow-2xl z-[950] animate-in fade-in zoom-in-95 duration-100 flex flex-col overflow-hidden ring-1 ring-black/5 rounded-lg"
+                            style={{ 
+                                top: dropdownPosition.top + 4, 
+                                left: dropdownPosition.left, 
+                                width: dropdownPosition.width 
+                            }}
+                        >
+                            {Object.entries(PRIORITY_CONFIG).map(([key, cfg]) => (
+                                <button 
+                                    key={key} 
+                                    onClick={(e) => { 
+                                        e.stopPropagation(); 
+                                        onUpdateTask?.(task.id, { priority: key }); 
+                                        setIsPriorityOpen(false); 
+                                    }}
+                                    className={`w-full py-2 text-[12px] font-black transition-all hover:brightness-95 active:brightness-90 ${cfg.bg} ${cfg.text} border-b border-black/10 last:border-0`}
+                                >
+                                    {cfg.label}
+                                </button>
+                            ))}
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* 10. 설명 / 메모 */}
             <div className="w-[150px] border-r border-slate-200 flex items-center px-3 shrink-0">
-                <span className="text-[11px] font-bold text-slate-500 truncate">{task.notes || '내용 없음'}</span>
+                {isEditingNotes ? (
+                    <input
+                        autoFocus
+                        type="text"
+                        value={notesInput}
+                        onChange={(e) => setNotesInput(e.target.value)}
+                        onBlur={() => {
+                            setIsEditingNotes(false);
+                            onUpdateTask?.(task.id, { notes: notesInput });
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                setIsEditingNotes(false);
+                                onUpdateTask?.(task.id, { notes: notesInput });
+                            }
+                            if (e.key === 'Escape') {
+                                setNotesInput(task.notes || '');
+                                setIsEditingNotes(false);
+                            }
+                        }}
+                        className="w-full bg-white px-1.5 py-0.5 text-[11px] border border-indigo-400 focus:border-indigo-500 rounded outline-none"
+                    />
+                ) : (
+                    <span 
+                        onClick={() => setIsEditingNotes(true)}
+                        className="text-[11px] font-bold text-slate-500 truncate cursor-pointer w-full hover:bg-slate-100 hover:text-indigo-650 px-1 py-0.5 rounded transition-all"
+                        title={task.notes || '클릭하여 입력'}
+                    >
+                        {task.notes || <span className="text-slate-300 font-medium italic">입력 안됨</span>}
+                    </span>
+                )}
             </div>
 
             {/* 11. 첨부파일 */}

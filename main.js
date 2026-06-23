@@ -4,6 +4,10 @@ import pkg from 'electron-updater';
 const { autoUpdater } = pkg;
 import { fork } from 'child_process';
 import url from 'url';
+import http from 'http';
+import dotenv from 'dotenv';
+dotenv.config();
+
 
 // Override default User Agent to completely bypass Google's "secure browser" check on login popups and webviews
 app.userAgentFallback = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
@@ -206,77 +210,212 @@ app.on('will-quit', () => {
 // Auto Update Feature
 // ==========================================
 
-autoUpdater.logger = console;
-autoUpdater.autoDownload = false;
-
-// 강제로 개발 모드에서도 업데이트 활성화 및 깃허브 저장소 피드 수동 등록
-autoUpdater.forceDevUpdateConfig = true;
-try {
-    autoUpdater.setFeedURL({
-        provider: 'github',
-        owner: 'mightyZap25',
-        repo: 'IRAssistance'
-    });
-} catch (e) {
-    console.error('[Electron Main] Failed to set autoUpdater Feed URL:', e);
-}
-
 function sendUpdateMessage(status, data = {}) {
     if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('update-message', { status, ...data });
     }
 }
 
-autoUpdater.on('checking-for-update', () => {
-    sendUpdateMessage('checking');
-});
+if (app.isPackaged) {
+    // === 패키징(배포) 빌드에서만 업데이트 기능 활성화 ===
+    // 깃허브에 신규 릴리즈가 있고, 버전이 현재 앱보다 높을 때만 팝업이 뜹니다.
+    autoUpdater.logger = console;
+    autoUpdater.autoDownload = false;
 
-autoUpdater.on('update-available', (info) => {
-    sendUpdateMessage('available', { info });
-});
-
-autoUpdater.on('update-not-available', (info) => {
-    sendUpdateMessage('not-available', { info });
-});
-
-autoUpdater.on('error', (err) => {
-    sendUpdateMessage('error', { error: err == null ? "unknown" : (err.stack || err).toString() });
-});
-
-autoUpdater.on('download-progress', (progressObj) => {
-    sendUpdateMessage('downloading', {
-        percent: progressObj.percent,
-        bytesPerSecond: progressObj.bytesPerSecond,
-        transferred: progressObj.transferred,
-        total: progressObj.total
-    });
-});
-
-autoUpdater.on('update-downloaded', (info) => {
-    sendUpdateMessage('downloaded', { info });
-});
-
-ipcMain.on('check-for-updates', (event, options) => {
-    const isAuto = options?.isAuto;
-    if (!app.isPackaged && isAuto) {
-        sendUpdateMessage('not-available');
-        return;
+    try {
+        autoUpdater.setFeedURL({
+            provider: 'github',
+            owner: 'mightyZap25',
+            repo: 'IRAssistance'
+        });
+    } catch (e) {
+        console.error('[Electron Main] Failed to set autoUpdater Feed URL:', e);
     }
-    autoUpdater.checkForUpdates().catch(err => {
-        sendUpdateMessage('error', { error: err.message });
-    });
-});
 
-ipcMain.on('start-download', () => {
-    autoUpdater.downloadUpdate().catch(err => {
-        sendUpdateMessage('error', { error: err.message });
+    autoUpdater.on('checking-for-update', () => {
+        sendUpdateMessage('checking');
     });
-});
 
-ipcMain.on('restart-app', () => {
-    autoUpdater.quitAndInstall();
-});
+    autoUpdater.on('update-available', (info) => {
+        sendUpdateMessage('available', { info });
+    });
+
+    autoUpdater.on('update-not-available', (info) => {
+        sendUpdateMessage('not-available', { info });
+    });
+
+    autoUpdater.on('error', (err) => {
+        sendUpdateMessage('error', { error: err == null ? "unknown" : (err.stack || err).toString() });
+    });
+
+    autoUpdater.on('download-progress', (progressObj) => {
+        sendUpdateMessage('downloading', {
+            percent: progressObj.percent,
+            bytesPerSecond: progressObj.bytesPerSecond,
+            transferred: progressObj.transferred,
+            total: progressObj.total
+        });
+    });
+
+    autoUpdater.on('update-downloaded', (info) => {
+        sendUpdateMessage('downloaded', { info });
+    });
+
+    ipcMain.on('check-for-updates', (event) => {
+        autoUpdater.checkForUpdates().catch(err => {
+            sendUpdateMessage('error', { error: err.message });
+        });
+    });
+
+    ipcMain.on('start-download', () => {
+        autoUpdater.downloadUpdate().catch(err => {
+            sendUpdateMessage('error', { error: err.message });
+        });
+    });
+
+    ipcMain.on('restart-app', () => {
+        autoUpdater.quitAndInstall();
+    });
+
+} else {
+    // === 개발 모드: 업데이트 기능 전체 비활성화 ===
+    // autoUpdater를 초기화하지 않으므로 어떤 이벤트도 발생하지 않음
+    // 프론트엔드에서 check 요청이 오면 업데이트 없음으로 즉시 응답
+    ipcMain.on('check-for-updates', () => {
+        sendUpdateMessage('not-available');
+    });
+    ipcMain.on('start-download', () => {});
+    ipcMain.on('restart-app', () => {});
+    console.log('[Electron Main] Dev Mode: autoUpdater is completely disabled.');
+}
 
 ipcMain.handle('get-app-version', () => {
     return app.getVersion();
+});
+
+// ==========================================
+// Google OAuth 2.0 (Electron BrowserWindow 팝업)
+// ==========================================
+
+ipcMain.handle('google-oauth-signin', async () => {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) {
+        throw new Error('Google OAuth 설정이 없습니다. .env 파일에 GOOGLE_CLIENT_ID와 GOOGLE_CLIENT_SECRET을 설정해주세요.');
+    }
+
+    const SCOPES = [
+        'openid', 'email', 'profile',
+        'https://www.googleapis.com/auth/drive',
+        'https://www.googleapis.com/auth/drive.file',
+        'https://www.googleapis.com/auth/calendar'
+    ].join(' ');
+
+    const REDIRECT_URI = 'http://localhost:9876/oauth/callback';
+
+    const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' +
+        `client_id=${encodeURIComponent(clientId)}` +
+        `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+        `&response_type=code` +
+        `&scope=${encodeURIComponent(SCOPES)}` +
+        `&access_type=offline` +
+        `&prompt=select_account`;
+
+    return new Promise((resolve, reject) => {
+        let authCode = null;
+        let authWin = null;
+
+        // 로컬 콜백 수신용 HTTP 서버
+        const oauthServer = http.createServer((req, rsp) => {
+            const reqUrl = new URL(req.url, 'http://localhost:9876');
+            if (reqUrl.pathname === '/oauth/callback') {
+                authCode = reqUrl.searchParams.get('code');
+                rsp.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+                rsp.end(`<html><body style="font-family:sans-serif;text-align:center;padding:50px;background:#f0f4ff">
+                    <h2 style="color:#4f46e5">✅ Google 로그인 완료!</h2>
+                    <p style="color:#64748b">이 창을 닫아주세요.</p>
+                    <script>setTimeout(()=>window.close(),1500)</script>
+                </body></html>`);
+                oauthServer.close();
+                // 콜백 받으면 창 자동 닫기
+                if (authWin && !authWin.isDestroyed()) {
+                    setTimeout(() => {
+                        if (authWin && !authWin.isDestroyed()) authWin.close();
+                    }, 1500);
+                }
+            }
+        });
+
+        oauthServer.on('error', (err) => {
+            reject(new Error('OAuth 콜백 서버 시작 실패: ' + err.message));
+        });
+
+        oauthServer.listen(9876, () => {
+            console.log('[OAuth] 콜백 서버 시작됨 (포트 9876)');
+
+            // Google 로그인 팝업 창
+            authWin = new BrowserWindow({
+                width: 520,
+                height: 680,
+                title: 'Google 계정으로 로그인',
+                autoHideMenuBar: true,
+                webPreferences: { nodeIntegration: false, contextIsolation: true }
+            });
+
+            authWin.loadURL(authUrl);
+
+            authWin.on('closed', async () => {
+                oauthServer.close();
+
+                if (!authCode) {
+                    reject(new Error('로그인이 취소되었습니다.'));
+                    return;
+                }
+
+                try {
+                    // Authorization Code → Access Token 교환
+                    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: new URLSearchParams({
+                            code: authCode,
+                            client_id: clientId,
+                            client_secret: clientSecret,
+                            redirect_uri: REDIRECT_URI,
+                            grant_type: 'authorization_code'
+                        }).toString()
+                    });
+
+                    const tokenData = await tokenRes.json();
+                    if (tokenData.error) {
+                        reject(new Error('토큰 교환 실패: ' + (tokenData.error_description || tokenData.error)));
+                        return;
+                    }
+
+                    // 사용자 정보 조회
+                    const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+                        headers: { Authorization: `Bearer ${tokenData.access_token}` }
+                    });
+                    const userInfo = await userInfoRes.json();
+
+                    console.log('[OAuth] 로그인 성공:', userInfo.email);
+
+                    resolve({
+                        accessToken: tokenData.access_token,
+                        refreshToken: tokenData.refresh_token,
+                        expiresIn: tokenData.expires_in,
+                        user: {
+                            uid: userInfo.id,
+                            email: userInfo.email,
+                            displayName: userInfo.name,
+                            photoURL: userInfo.picture
+                        }
+                    });
+                } catch (err) {
+                    reject(new Error('인증 처리 오류: ' + err.message));
+                }
+            });
+        });
+    });
 });

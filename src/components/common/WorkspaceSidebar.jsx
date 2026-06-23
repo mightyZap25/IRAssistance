@@ -14,6 +14,8 @@ export default function WorkspaceSidebar({
     onSelectBoard,
     onCreateWorkspace,
     onCreateFolder,
+    onRenameFolder,
+    onDeleteFolder,
     onCreateBoard,
     onUpdateBoard
 }) {
@@ -33,6 +35,11 @@ export default function WorkspaceSidebar({
 
     const [addingBoardFolderId, setAddingBoardFolderId] = useState(null);
     const [folderBoardNameInput, setFolderBoardNameInput] = useState('');
+
+    // Folder edit states
+    const [editingFolderId, setEditingFolderId] = useState(null);
+    const [editingFolderName, setEditingFolderName] = useState('');
+    const [activeMenuFolderId, setActiveMenuFolderId] = useState(null);
 
     // DND visual states
     const [draggedOverFolderId, setDraggedOverFolderId] = useState(null);
@@ -329,22 +336,106 @@ export default function WorkspaceSidebar({
                             >
                                 <div 
                                     onClick={() => toggleFolder(folder.id)}
-                                    className="flex items-center gap-1 px-2 py-1.5 hover:bg-slate-200/50 rounded-lg cursor-pointer transition-colors group"
+                                    className="flex items-center gap-1 px-2 py-1.5 hover:bg-slate-200/50 rounded-lg cursor-pointer transition-colors group relative"
                                 >
                                     {isOpen ? <ChevronDown size={14} className="text-slate-400" /> : <ChevronRight size={14} className="text-slate-400" />}
                                     <Folder size={14} className={isOpen ? "text-indigo-500" : "text-slate-400"} />
-                                    <span className="flex-1 text-[11px] font-black text-slate-700 truncate">{folder.name}</span>
-                                    <button 
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setAddingBoardFolderId(folder.id);
-                                            setFolderBoardNameInput('');
-                                            setOpenFolders(prev => ({ ...prev, [folder.id]: true }));
-                                        }}
-                                        className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-indigo-600 transition-opacity"
-                                    >
-                                        <Plus size={12} />
-                                    </button>
+                                    
+                                    {editingFolderId === folder.id ? (
+                                        <input
+                                            autoFocus
+                                            type="text"
+                                            value={editingFolderName}
+                                            onChange={e => setEditingFolderName(e.target.value)}
+                                            onClick={e => e.stopPropagation()}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter') {
+                                                    if (editingFolderName.trim()) {
+                                                        onRenameFolder?.(folder.id, editingFolderName.trim());
+                                                    }
+                                                    setEditingFolderId(null);
+                                                }
+                                                if (e.key === 'Escape') {
+                                                    setEditingFolderId(null);
+                                                }
+                                            }}
+                                            onBlur={() => {
+                                                if (editingFolderName.trim()) {
+                                                    onRenameFolder?.(folder.id, editingFolderName.trim());
+                                                }
+                                                setEditingFolderId(null);
+                                            }}
+                                            className="flex-1 bg-white border border-slate-350 rounded px-1.5 py-0.5 text-[11px] font-bold outline-none focus:border-indigo-500"
+                                        />
+                                    ) : (
+                                        <span 
+                                            onDoubleClick={(e) => {
+                                                e.stopPropagation();
+                                                setEditingFolderId(folder.id);
+                                                setEditingFolderName(folder.name);
+                                            }}
+                                            className="flex-1 text-[11px] font-black text-slate-700 truncate"
+                                            title="더블클릭하여 폴더 이름 변경"
+                                        >
+                                            {folder.name}
+                                        </span>
+                                    )}
+
+                                    {/* Action Buttons */}
+                                    <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActiveMenuFolderId(activeMenuFolderId === folder.id ? null : folder.id);
+                                            }}
+                                            className="p-0.5 text-slate-400 hover:text-slate-700 transition-colors"
+                                            title="더보기"
+                                        >
+                                            <MoreHorizontal size={12} />
+                                        </button>
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setAddingBoardFolderId(folder.id);
+                                                setFolderBoardNameInput('');
+                                                setOpenFolders(prev => ({ ...prev, [folder.id]: true }));
+                                            }}
+                                            className="p-0.5 text-slate-400 hover:text-indigo-600 transition-colors"
+                                            title="새 프로젝트 추가"
+                                        >
+                                            <Plus size={12} />
+                                        </button>
+                                    </div>
+
+                                    {/* Folder Action Popover Menu */}
+                                    {activeMenuFolderId === folder.id && (
+                                        <>
+                                            <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setActiveMenuFolderId(null); }} />
+                                            <div className="absolute right-2 top-8 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1.5 w-28 animate-in fade-in slide-in-from-top-2 duration-100 flex flex-col text-left">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setEditingFolderId(folder.id);
+                                                        setEditingFolderName(folder.name);
+                                                        setActiveMenuFolderId(null);
+                                                    }}
+                                                    className="px-3 py-1.5 text-[10px] font-black text-slate-650 hover:bg-slate-50 transition-colors text-left"
+                                                >
+                                                    이름 변경
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onDeleteFolder?.(folder.id);
+                                                        setActiveMenuFolderId(null);
+                                                    }}
+                                                    className="px-3 py-1.5 text-[10px] font-black text-rose-505 hover:bg-rose-50 transition-colors border-t border-slate-100 text-left"
+                                                >
+                                                    폴더 삭제
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                                 
                                 {/* Boards inside folder */}

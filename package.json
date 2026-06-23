@@ -10,7 +10,7 @@
         "dev": "concurrently \"vite\" \"node server.js\"",
         "dev:frontend": "vite",
         "dev:backend": "node server.js",
-        "electron:dev": "concurrently \"vite\" \"electron .\"",
+        "electron:dev": "concurrently \"vite\" \"node electron-wait.js\"",
         "electron:build": "vite build && electron-builder",
         "build": "vite build",
         "lint": "eslint .",

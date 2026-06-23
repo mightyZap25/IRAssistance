@@ -160,7 +160,7 @@ export default function PRTimelineGraph({ pr }) {
                                                 <div className="w-1 h-1 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                                                 <div className="w-1 h-1 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                                             </div>
-                                            <span className="text-[10px] font-black uppercase tracking-widest">Processing</span>
+                                            <span className="text-[10px] font-black uppercase tracking-widest">처리 중</span>
                                         </div>
                                     )}
                                 </div>

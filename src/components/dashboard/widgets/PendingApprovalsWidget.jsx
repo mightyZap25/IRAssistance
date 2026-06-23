@@ -47,7 +47,7 @@ export default function PendingApprovalsWidget({ user, viewType = 'list' }) {
             const ecnData = ecnSnap.docs.map(doc => ({ 
                 id: doc.id, 
                 ...doc.data(), 
-                _type: 'ECN',
+                _type: 'ECO',
                 _date: doc.data().CreatedAt?.toDate() || new Date()
             }));
 
@@ -68,8 +68,8 @@ export default function PendingApprovalsWidget({ user, viewType = 'list' }) {
     };
 
     const handleItemClick = (item) => {
-        if (item._type === 'ECN') {
-            navigate('/ecn');
+        if (item._type === 'ECO') {
+            navigate('/eco');
         } else {
             setSelectedApproval(item);
             setIsReviewModalOpen(true);

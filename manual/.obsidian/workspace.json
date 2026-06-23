@@ -27,12 +27,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "3 ECNPage.md",
+                "file": "11 입출고 내역.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "3 ECNPage"
+              "title": "11 입출고 내역"
             }
           }
         ],
@@ -200,6 +200,16 @@
   },
   "active": "123b1a4b635fb9ef",
   "lastOpenFiles": [
+    "10 외주 관리.md",
+    "9 발주 관리.md",
+    "8 생산 계획.md",
+    "7 생산 의뢰.md",
+    "6 제조사 관리.md",
+    "5 공급사 관리.md",
+    "4 고객사 관리.md",
+    "3 ECO 승인.md",
+    "2 BOM 관리.md",
+    "1 부품 관리.md",
     "33 WorkspaceMemoPage.md",
     "32 LeaveManagementPage.md",
     "31 WorkspaceFilesPage.md",
@@ -216,16 +226,6 @@
     "20 ProjectManagementPage.md",
     "19 ProjectDashboardPage.md",
     "18 QualityDashboardPage.md",
-    "17 QualityProcessPage.md",
-    "16 QAProcessPage.md",
-    "15 QAConfigPage.md",
-    "14 ReturnProcessingPage.md",
-    "13 WarehousePlacementPage.md",
-    "12 InventoryPage.md",
-    "11 TransactionsPage.md",
-    "10 OutsourcingPage.md",
-    "9 PurchasingPage.md",
-    "8 ProductionExecutionPage.md",
     "img/bom main ui.png",
     "Pasted image 20260619131200.png",
     "Pasted image 20260619131153.png",

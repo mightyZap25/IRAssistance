@@ -279,7 +279,7 @@ export default function Header() {
             {/* Left: Welcome */}
             <div className="flex items-center gap-3">
                 <h2 className="text-sm font-bold text-slate-700">
-                    Welcome back, {userProfile?.displayName || currentUser?.displayName || 'User'}
+                    어서오세요, {userProfile?.displayName || currentUser?.displayName || '사용자'}님
                 </h2>
                 
                 {/* Mode Indicator */}
@@ -294,7 +294,7 @@ export default function Header() {
                         className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-black border border-emerald-200 cursor-pointer"
                         title="클릭하여 LOCAL 모드로 전환"
                     >
-                        CLOUD DB
+                        클라우드 DB
                     </span>
                 ) : (
                     <span 
@@ -307,10 +307,11 @@ export default function Header() {
                         className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-black border border-amber-200 animate-pulse cursor-pointer"
                         title="클릭하여 Firebase 모드로 전환"
                     >
-                        LOCAL DB (테스트)
+                        로컬 DB (테스트)
                     </span>
                 )}
             </div>
+
 
             {/* Right: Actions & Profile */}
             <div className="flex items-center gap-3">
@@ -467,7 +468,7 @@ export default function Header() {
                                 </span>
                             )}
                             <span className="text-[9px] text-slate-400 font-mono uppercase tracking-wider font-bold">
-                                {devRoleOverride || rawUserProfile?.role || 'Guest'}
+                                {devRoleOverride || rawUserProfile?.role || '게스트'}
                             </span>
                         </div>
                     </div>
@@ -488,7 +489,7 @@ export default function Header() {
                             <div className="p-2">
                                 <button onClick={logout} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-50 rounded-lg transition-colors font-bold">
                                     <LogOut size={16} />
-                                    Sign Out
+                                    로그아웃
                                 </button>
                             </div>
                         </div>
@@ -564,7 +565,7 @@ export default function Header() {
                             <Move size={10} /> 상단 드래그 이동 / 하단 리사이즈
                         </span>
                         <div className="flex items-center gap-2 pr-4">
-                            <span className="text-[9px] font-black text-indigo-600">AUTO-SYNC ACTIVE</span>
+                            <span className="text-[9px] font-black text-indigo-600">자동 동기화 활성</span>
                         </div>
                         
                         {/* Resize Handle */}

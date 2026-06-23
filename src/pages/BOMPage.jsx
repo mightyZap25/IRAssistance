@@ -864,7 +864,7 @@ const BOMPage = () => {
             try {
                 const partId = isCreatingNew ? (bomData.PartID.includes('NEW') ? bomData.PartID : bomData.PartID) : bomData.PartID;
                 if (ecnData && ecnData.updateType === 'ECN') {
-                    await createNotificationByRoute('/ecn', 'ECN 대기 등록', `부품 [${partId}] ${bomData.Name}에 대한 설계변경 내역이 ECN 대기 리스트에 등록되었습니다.`);
+                    await createNotificationByRoute('/eco', 'ECO 대기 등록', `부품 [${partId}] ${bomData.Name}에 대한 설계변경 내역이 ECO 대기 리스트에 등록되었습니다.`);
                 } else {
                     const action = isCreatingNew ? '신규 등록' : 'BOM 수정';
                     await createNotificationByRoute('/bom', `BOM ${action}`, `BOM [${partId}] ${bomData.Name}이(가) ${action}되었습니다.`);
@@ -874,7 +874,7 @@ const BOMPage = () => {
             }
 
             if (ecnData?.updateType === 'ECN') {
-                alert('BOM 변경 사항이 ECN 대기 리스트에 임시 등록되었습니다. ECN 결재선 지정을 위해 ECN 승인서를 작성해주세요.');
+                alert('BOM 변경 사항이 ECO 대기 리스트에 임시 등록되었습니다. ECO 결재선 지정을 위해 ECO 승인서를 작성해주세요.');
             } else {
                 alert('BOM 변경 사항이 성공적으로 저장되었습니다.');
             }

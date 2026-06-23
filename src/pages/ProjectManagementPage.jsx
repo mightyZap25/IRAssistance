@@ -106,6 +106,36 @@ export default function ProjectManagementPage() {
         }
     };
 
+    const handleRenameFolder = async (folderId, newName) => {
+        try {
+            const existing = folders.find(f => f.id === folderId);
+            if (!existing) return;
+            const updated = { ...existing, name: newName };
+            await nasDbService.upsert('folders', folderId, updated);
+            setFolders(prev => prev.map(f => f.id === folderId ? updated : f));
+        } catch (err) {
+            console.error("Folder rename failed:", err);
+            alert("폴더 이름 변경 실패: " + err.message);
+        }
+    };
+
+    const handleDeleteFolder = async (folderId) => {
+        if (!window.confirm("정말로 이 폴더를 삭제하시겠습니까?\n(폴더 안의 프로젝트들은 삭제되지 않고 '미분류'로 이동합니다.)")) return;
+        try {
+            await nasDbService.delete('folders', folderId);
+            setFolders(prev => prev.filter(f => f.id !== folderId));
+            
+            // 이 폴더에 소속된 프로젝트들의 folderId를 null로 업데이트
+            const affectedProjects = projects.filter(p => p.folderId === folderId);
+            await Promise.all(affectedProjects.map(p => 
+                handleUpdateProject(p.id, { folderId: null })
+            ));
+        } catch (err) {
+            console.error("Folder deletion failed:", err);
+            alert("폴더 삭제 실패: " + err.message);
+        }
+    };
+
     const handleCreateBoard = async (name, folderId) => {
         if (!activeWorkspaceId) return;
 
@@ -201,6 +231,8 @@ export default function ProjectManagementPage() {
                     onSelectBoard={setActiveBoardId}
                     onCreateWorkspace={handleCreateWorkspace}
                     onCreateFolder={handleCreateFolder}
+                    onRenameFolder={handleRenameFolder}
+                    onDeleteFolder={handleDeleteFolder}
                     onCreateBoard={handleCreateBoard}
                     onUpdateBoard={handleUpdateProject}
                 />

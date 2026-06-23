@@ -13,13 +13,13 @@ import {
 } from 'lucide-react';
 
 const ROLE_MENU_MAP = {
-    admin: ['/', '/settings', '/parts', '/bom', '/customers', '/prod-requests', '/prod-execution', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/ecn', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
-    engineer: ['/', '/parts', '/bom', '/ecn', '/inventory', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
-    sales: ['/', '/customers', '/prod-requests', '/inventory', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
-    qa: ['/', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/inventory', '/transactions', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
-    production: ['/', '/prod-execution', '/prod-requests', '/inventory', '/purchasing', '/outsourcing', '/transactions', '/vendors', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
-    manager: ['/', '/customers', '/prod-requests', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
-    viewer: ['/', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/files', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
+    admin: ['/', '/settings', '/parts', '/bom', '/customers', '/prod-requests', '/prod-execution', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/eco', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
+    engineer: ['/', '/parts', '/bom', '/eco', '/inventory', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
+    sales: ['/', '/customers', '/prod-requests', '/inventory', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
+    qa: ['/', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/inventory', '/transactions', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
+    production: ['/', '/prod-execution', '/prod-requests', '/inventory', '/purchasing', '/outsourcing', '/transactions', '/vendors', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
+    manager: ['/', '/customers', '/prod-requests', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
+    viewer: ['/', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
 };
 
 export default function Sidebar() {
@@ -63,7 +63,7 @@ export default function Sidebar() {
                 { name: '고객사 관리', path: '/customers', icon: Building2 },
                 { name: '제조사 관리', path: '/manufacturers', icon: Factory },
                 { name: '공급사 관리', path: '/vendors', icon: Users },
-                { name: 'ECN 승인', path: '/ecn', icon: AlertCircle, badge: pendingEcnCount > 0 ? pendingEcnCount : null }
+                { name: 'ECO 승인', path: '/eco', icon: AlertCircle, badge: pendingEcnCount > 0 ? pendingEcnCount : null }
             ]
         }
     ];
@@ -126,7 +126,7 @@ export default function Sidebar() {
                 { name: '회의 및 미팅', path: '/workspace/meetings', icon: Users },
                 { name: '통합 메일', path: '/workspace/mail', icon: Mail },
                 { name: '메모장', path: '/workspace/memo', icon: StickyNote },
-                { name: '파일 공유', path: '/workspace/files', icon: Cloud },
+                { name: 'Google Drive', path: '/workspace/drive', icon: Cloud },
                 { name: 'Google Chat', path: '/workspace/chat', icon: MessageSquare }
             ]
         }
@@ -150,7 +150,7 @@ export default function Sidebar() {
     const fAdmin = filterGroups(ADMIN_GROUPS);
 
     const roleInfo = {
-        admin: { label: 'Admin', color: 'bg-rose-500' },
+        admin: { label: '최고관리자', color: 'bg-rose-500' },
         engineer: { label: '개발', color: 'bg-blue-500' },
         sales: { label: '영업', color: 'bg-amber-500' },
         qa: { label: 'QA', color: 'bg-purple-500' },
@@ -171,7 +171,7 @@ export default function Sidebar() {
             <div className="mx-3 mt-3 px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl flex items-center gap-2">
                 <span className={`w-2.5 h-2.5 rounded-full ${roleInfo.color} shrink-0`}/>
                 <div className="min-w-0">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Current Role</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">현재 권한</p>
                     <p className="text-xs font-black text-slate-700 truncate">{roleInfo.label}</p>
                 </div>
             </div>
@@ -184,13 +184,13 @@ export default function Sidebar() {
                 )}
 
                 {[
-                    { g: fPlm, t: 'PLM' },
-                    { g: fScm, t: 'SCM' },
-                    { g: fQa, t: 'QA' },
-                    { g: fProj, t: 'PROJ' },
-                    { g: fSales, t: 'SALES' },
-                    { g: fCollab, t: 'COLLAB' },
-                    { g: fAdmin, t: 'ADMIN' }
+                    { g: fPlm, t: '제품 관리 (PLM)' },
+                    { g: fScm, t: '공급망 (SCM)' },
+                    { g: fQa, t: '품질 (QA)' },
+                    { g: fProj, t: '프로젝트 (PM)' },
+                    { g: fSales, t: '영업 및 정산' },
+                    { g: fCollab, t: '협업 오피스' },
+                    { g: fAdmin, t: '시스템 관리' }
                 ].map(sec => sec.g.length > 0 && (
                     <div key={sec.t} className="space-y-2">
                         <div className="px-3 text-[11px] font-black text-slate-400 uppercase tracking-wider">{sec.t}</div>

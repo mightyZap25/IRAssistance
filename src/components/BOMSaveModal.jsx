@@ -7,7 +7,7 @@ export default function BOMSaveModal({
     onSave, 
     onClose, 
     title = "BOM 변경 사항 저장", 
-    subTitle = "Engineering Change Notification (ECN) Draft", 
+    subTitle = "Engineering Change Order (ECO) Draft", 
     changes = [] 
 }) {
     const [reason, setReason] = useState('');
@@ -129,7 +129,7 @@ export default function BOMSaveModal({
                                     <AlertCircle size={20} />
                                 </div>
                                 <div className="text-center">
-                                    <span className="text-xs font-black block">정식 ECN 기안</span>
+                                    <span className="text-xs font-black block">정식 ECO 기안</span>
                                     <span className="text-[9px] font-bold opacity-60 uppercase tracking-tighter mt-0.5 block">Review Required</span>
                                 </div>
                                 {updateType === 'ECN' && <CheckCircle2 size={16} className="absolute top-3 right-3 text-amber-500" />}

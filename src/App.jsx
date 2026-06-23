@@ -9,7 +9,7 @@ import DashboardPage from './pages/DashboardPage'
 import PartsPage from './pages/PartsPage'
 import BOMPage from './pages/BOMPage'
 import CustomersPage from './pages/CustomersPage'
-import ECNPage from './pages/ECNPage'
+import ECOPage from './pages/ECOPage'
 import InventoryPage from './pages/InventoryPage'
 import ManufacturersPage from './pages/ManufacturersPage'
 import VendorsPage from './pages/VendorsPage'
@@ -20,7 +20,7 @@ import TransactionsPage from './pages/TransactionsPage'
 import OutsourcingPage from './pages/OutsourcingPage'
 import WarehousePlacementPage from './pages/WarehousePlacementPage'
 import ReturnProcessingPage from './pages/ReturnProcessingPage'
-import WorkspaceFilesPage from './pages/WorkspaceFilesPage'
+import GoogleDrivePage from './pages/GoogleDrivePage'
 import WorkspaceCalendarPage from './pages/WorkspaceCalendarPage'
 import WorkspaceMailPage from './pages/WorkspaceMailPage'
 import WorkspaceMemoPage from './pages/WorkspaceMemoPage'
@@ -84,10 +84,10 @@ function AppContent() {
                 </PrivateRoute>
             } />
 
-            <Route path="/ecn" element={
+            <Route path="/eco" element={
                 <PrivateRoute>
                     <Layout>
-                        <ECNPage />
+                        <ECOPage />
                     </Layout>
                 </PrivateRoute>
             } />
@@ -204,10 +204,10 @@ function AppContent() {
                 </PrivateRoute>
             } />
 
-            <Route path="/workspace/files" element={
+            <Route path="/workspace/drive" element={
                 <PrivateRoute>
                     <Layout>
-                        <WorkspaceFilesPage />
+                        <GoogleDrivePage />
                     </Layout>
                 </PrivateRoute>
             } />

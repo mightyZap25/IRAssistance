@@ -114,50 +114,23 @@ export default function SettingsPage() {
     }, []);
 
     const handleCheckForUpdates = () => {
+        if (!window.electronAPI) return; // Electron 환경에서만 동작
         setUpdateStatus('checking');
         setUpdateError(null);
         setDownloadPercent(0);
-        if (window.electronAPI) {
-            window.electronAPI.checkForUpdates();
-        } else {
-            // Mocking for browser/demo mode
-            setTimeout(() => {
-                setUpdateStatus('available');
-                setUpdateInfo({
-                    version: '1.0.1',
-                    releaseDate: new Date().toISOString(),
-                    releaseNotes: '이것은 브라우저 데모 환경의 가짜 업데이트 정보입니다.'
-                });
-            }, 1000);
-        }
+        window.electronAPI.checkForUpdates();
     };
 
     const handleStartDownload = () => {
+        if (!window.electronAPI) return; // Electron 환경에서만 동작
         setUpdateStatus('downloading');
         setDownloadPercent(0);
-        if (window.electronAPI) {
-            window.electronAPI.startDownload();
-        } else {
-            // Mocking for browser/demo mode
-            let percent = 0;
-            const timer = setInterval(() => {
-                percent += 20;
-                setDownloadPercent(percent);
-                if (percent >= 100) {
-                    clearInterval(timer);
-                    setUpdateStatus('downloaded');
-                }
-            }, 500);
-        }
+        window.electronAPI.startDownload();
     };
 
     const handleRestartApp = () => {
-        if (window.electronAPI) {
-            window.electronAPI.restartApp();
-        } else {
-            alert('앱 재시작을 수행합니다 (브라우저 모드이므로 페이지가 새로고침됩니다).');
-            window.location.reload();
-        }
+        if (!window.electronAPI) return; // Electron 환경에서만 동작
+        window.electronAPI.restartApp();
     };
 
     const [emailSettings, setEmailSettings] = useState({
@@ -689,7 +662,7 @@ export default function SettingsPage() {
                         {activeTab === 'approval' && (
                             <div className="max-w-2xl animate-fade-in">
                                 <h2 className="text-lg font-black text-slate-900 mb-2">결재 워크플로우 및 권한 상세 설정</h2>
-                                <p className="text-sm text-slate-500 font-medium mb-8">ECN, 생산 등 시스템 전반의 프로세스 흐름을 제어합니다.</p>
+                                <p className="text-sm text-slate-500 font-medium mb-8">ECO, 생산 등 시스템 전반의 프로세스 흐름을 제어합니다.</p>
                                 
                                 <form onSubmit={handleSaveApproval} className="space-y-6">
                                     <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200 space-y-4">
@@ -711,7 +684,7 @@ export default function SettingsPage() {
                                         <div className="space-y-3 mt-3 flex flex-col gap-3">
                                             <label className="flex items-center gap-3 cursor-pointer">
                                                 <input type="checkbox" checked={approvalSettings.requireSalesApprovalForDerivatives} onChange={e => setApprovalSettings({...approvalSettings, requireSalesApprovalForDerivatives: e.target.checked})} className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500" />
-                                                <span className="text-sm font-bold text-slate-700">ECN 파생 모델(Derivatives) 변경 시 영업부서 검토 필수화</span>
+                                                <span className="text-sm font-bold text-slate-700">ECO 파생 모델(Derivatives) 변경 시 영업부서 검토 필수화</span>
                                             </label>
                                             <label className="flex items-center gap-3 cursor-pointer">
                                                 <input type="checkbox" checked={approvalSettings.requireQAForProduction} onChange={e => setApprovalSettings({...approvalSettings, requireQAForProduction: e.target.checked})} className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500" />

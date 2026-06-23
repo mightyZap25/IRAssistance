@@ -385,7 +385,7 @@ export default function DashboardPage() {
                                             >
                                                 <option value="parts">부품 (Parts)</option>
                                                 <option value="boms">BOM</option>
-                                                <option value="ecns">ECN</option>
+                                                <option value="ecns">ECO</option>
                                                 <option value="purchaseOrders">발주 (Purchase Orders)</option>
                                                 <option value="productionRequests">생산의뢰</option>
                                             </select>

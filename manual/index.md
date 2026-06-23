@@ -1,4 +1,4 @@
-# IR Assistant ERP 사용자 매뉴얼 통합 인덱스
+﻿# IR Assistant ERP 사용자 매뉴얼 통합 인덱스
 
 IR Assistant ERP 시스템의 모든 기능 체계와 각 페이지별 상세 사용자 매뉴얼을 안내하는 전사 통합 인덱스 허브입니다. 본 문서를 통해 전체 도메인 구조를 파악하고 원하는 기능의 매뉴얼로 편리하게 이동할 수 있습니다.
 
@@ -20,7 +20,7 @@ graph TD
 
     DOM1 --> D1_1[부품 관리 Parts]
     DOM1 --> D1_2[BOM 관리]
-    DOM1 --> D1_3[설계 변경 ECN]
+    DOM1 --> D1_3[설계 변경 ECO]
     DOM1 --> D1_4[고객사/협력사 관리]
 
     DOM2 --> D2_1[생산 의뢰/실행]
@@ -57,7 +57,7 @@ graph TD
 ### 2.1 ERP 핵심 마스터 데이터 & 제품 수명주기 (PLM)
 *   [부품 관리 사용자 매뉴얼](file:///D:/workspace/IR_Assistant/manual/PartsPage.md): 원부자재/반제품 규격 관리, 리비전, 대체 자재 및 사용처(BOM Used In) 추적.
 *   [BOM 관리 사용자 매뉴얼](file:///D:/workspace/IR_Assistant/manual/BOMPage.md): 자재명세서 트리 빌더, 정전개/역전개 조회 및 소요량 산정.
-*   [설계 변경(ECN) 사용자 매뉴얼](file:///D:/workspace/IR_Assistant/manual/ECNPage.md): 엔지니어링 변경 통보 결재 및 부품 리비전 갱신 프로세스.
+*   [설계 변경(ECO) 사용자 매뉴얼](file:///D:/workspace/IR_Assistant/manual/ECOPage.md): 엔지니어링 변경 통보 결재 및 부품 리비전 갱신 프로세스.
 *   [고객사 관리 사용자 매뉴얼](file:///D:/workspace/IR_Assistant/manual/CustomersPage.md): 전사 수주 대상 고객사 프로필 및 납품처 정보 관리.
 *   [공급사 관리 사용자 매뉴얼](file:///D:/workspace/IR_Assistant/manual/VendorsPage.md): 자재 매입 대상 협력업체 단가 및 평가 관리.
 *   [제조업체 관리 사용자 매뉴얼](file:///D:/workspace/IR_Assistant/manual/ManufacturersPage.md): 원천 소스 제조업체 정보 및 MPN 자재 매칭 대장.
@@ -92,12 +92,13 @@ graph TD
 ### 2.6 협업 & 공통 오피스
 *   [엔터프라이즈 캔버스 대시보드 사용자 매뉴얼](file:///D:/workspace/IR_Assistant/manual/DashboardPage.md): 반응형 그리드 캔버스 드래그앤드롭 위젯 커스터마이징 및 데이터 필터링.
 *   [통합 메일 센터 사용자 매뉴얼](file:///D:/workspace/IR_Assistant/manual/WorkspaceMailPage.md): Gmail API 실시간 통합 메일 송수신 및 아카이빙.
-*   [통합 일정 관리 사용자 매뉴얼](file:///D:/workspace/IR_Assistant/manual/WorkspaceCalendarPage.md): 근태, 프로젝트, 태스크, ECN 이슈 일정 크로스 스캔 캘린더.
+*   [통합 일정 관리 사용자 매뉴얼](file:///D:/workspace/IR_Assistant/manual/WorkspaceCalendarPage.md): 근태, 프로젝트, 태스크, ECO 이슈 일정 크로스 스캔 캘린더.
 *   [구글 챗 연동 사용자 매뉴얼](file:///D:/workspace/IR_Assistant/manual/GoogleChatPage.md): ERP 통합 환경 내부 Google Chat 임베딩 및 미디어 연동 권한 제어.
 *   [클라우드 메모 사용자 매뉴얼](file:///D:/workspace/IR_Assistant/manual/WorkspaceMemoPage.md): Google Drive API 연동 멀티파트 HTML 실시간 메모장.
 *   [회의 및 미팅 관리 사용자 매뉴얼](file:///D:/workspace/IR_Assistant/manual/MeetingsPage.md): 회의록 아카이브 및 구글 시트 주간 업무 보고 minimal 임베딩 관리.
-*   [파일 및 드라이브 연동 사용자 매뉴얼](file:///D:/workspace/IR_Assistant/manual/WorkspaceFilesPage.md): 지정 구글 공유 폴더 트리 내비게이션, 오피스 문서 복제 및 ERP 내부 편집.
+*   [파일 및 드라이브 연동 사용자 매뉴얼](file:///D:/workspace/IR_Assistant/manual/GoogleDrivePage.md): 지정 구글 공유 폴더 트리 내비게이션, 오피스 문서 복제 및 ERP 내부 편집.
 *   [통합 근태 대시보드 사용자 매뉴얼](file:///D:/workspace/IR_Assistant/manual/LeaveManagementPage.md): 지오로케이션(GPS) 자동 출근, 근로 시간 실시간 타이머, 연차/휴가/외근 다단계 결재선 기안 및 구글 캘린더 자동 동기화.
 
 ### 2.7 시스템 관리 (Admin)
 *   [시스템 환경설정 사용자 매뉴얼](file:///D:/workspace/IR_Assistant/manual/SettingsPage.md): 최고 관리자 전용 DB 커넥션 갱신, IMAP, 외부 API 키 관리, 이메일 템플릿, 결재 우회 및 앱 자동 업데이트 관리.
+

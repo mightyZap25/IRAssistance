@@ -9,6 +9,7 @@ import {
 import { getIssuesByProject } from '../services/issueService';
 import StageTaskBoard from './common/StageTaskBoard';
 import MondayStyleBoard from './common/MondayStyleBoard';
+import RichMemoEditor from './common/RichMemoEditor';
 
 const STAGE_DOCUMENTS = {
     planning: ['제품 기획서', '시장 분석서', '개발 일정표'],
@@ -611,7 +612,7 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                             onDeleteTask={(id) => {
                                 let foundStageId = null;
                                 for (const stage of allStages) {
-                                    if (project.tests?.[stage.id]?.find(t => t.id === id)) {
+                                    if (project.tests?.[stage.id]?.find(t => t.id === id)) { 
                                         foundStageId = stage.id;
                                         break;
                                     }
@@ -636,156 +637,182 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                     </div>
                 </div>
 
-                {/* 5. Task Detail Sidebar (Issue Tracker UI) */}
+                {/* 5. Task Detail Sidebar (Task/Issue Detail Panel) */}
                 {editingTest && (
                     <>
                         {/* 블러 배경 (Backdrop) */}
                         <div 
-                            className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[150] animate-in fade-in duration-200" 
+                            className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-[150] animate-in fade-in duration-200" 
                             onClick={() => setEditingTest(null)}
                         />
-                        {/* 사이드바 본체 */}
-                        <div className="fixed top-0 right-0 w-[500px] h-screen bg-white shadow-[0_0_60px_rgba(0,0,0,0.2)] z-[160] flex flex-col border-l border-slate-200 animate-in slide-in-from-right-8 duration-200">
-                        {/* 헤더 */}
-                        <div className="px-6 pt-6 pb-4 flex justify-between items-start bg-white shrink-0">
-                            <div className="flex-1 min-w-0 pr-4">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-[11px] font-bold text-indigo-500 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded-md">
-                                        {editingTest.parent}
-                                    </span>
-                                    <span className="text-[11px] font-bold text-slate-400">
-                                        TSK-{editingTest.id.toString().slice(-4)}
-                                    </span>
-                                </div>
-                                <h3 className="text-xl font-black text-slate-900 leading-tight">
-                                    {editingTest.title || editingTest.child}
-                                </h3>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <button type="button" onClick={() => setEditingTest(null)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
-                                    <X size={18}/>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div className="flex-1 bg-white flex flex-col min-h-0">
-                            {/* Properties (Jira/Linear style metadata grid) */}
-                            <div className="px-6 py-4 grid grid-cols-2 gap-x-8 gap-y-4 border-y border-slate-100 bg-slate-50/50 shrink-0">
-                                
-                                {/* Status */}
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">상태</label>
-                                    <select 
-                                        value={editingTest.status || (editingTest.completed ? 'done' : 'todo')}
-                                        onChange={e => handleUpdateTestDetail(editingStageId, editingTest.id, { status: e.target.value })}
-                                        className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 shadow-sm"
-                                    >
-                                        <option value="todo">작업 전</option>
-                                        <option value="working">진행 중</option>
-                                        <option value="done">완료</option>
-                                        <option value="discard">폐기</option>
-                                    </select>
-                                </div>
-
-                                {/* Assignee */}
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">담당자</label>
-                                    <select 
-                                        value={editingTest.assigneeUid || ''}
-                                        onChange={e => handleUpdateTestDetail(editingStageId, editingTest.id, { assigneeUid: e.target.value })}
-                                        className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 shadow-sm"
-                                    >
-                                        <option value="">미지정</option>
-                                        {(users || []).map(u => (
-                                            <option key={u.uid} value={u.uid}>{u.displayName}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {/* Priority */}
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">우선순위</label>
-                                    <select 
-                                        value={editingTest.priority || 'Medium'}
-                                        onChange={e => handleUpdateTestDetail(editingStageId, editingTest.id, { priority: e.target.value })}
-                                        className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 shadow-sm"
-                                    >
-                                        <option value="High">🔴 높음</option>
-                                        <option value="Medium">🟠 보통</option>
-                                        <option value="Low">⚪️ 낮음</option>
-                                    </select>
-                                </div>
-
-                                {/* Dates */}
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">마감일</label>
+                        {/* 사이드바 본체 - TaskDetailPanel과 디자인 일치 */}
+                        <div className="fixed inset-y-0 right-0 w-full md:w-[600px] bg-slate-50 shadow-2xl z-[160] flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-300">
+                            
+                            {/* Header */}
+                            <div className="bg-white px-6 py-5 border-b border-slate-200 flex justify-between items-start shrink-0">
+                                <div className="flex-1 mr-4 space-y-3">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded-md">
+                                            {editingTest.parent || 'Project Issue'}
+                                        </span>
+                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black text-white ${
+                                            editingTest.status === 'done' ? 'bg-[#00c875]' : 
+                                            editingTest.status === 'working' ? 'bg-[#fdab3d]' : 
+                                            editingTest.status === 'discard' ? 'bg-[#333333]' : 'bg-[#c4c4c4]'
+                                        }`}>
+                                            {editingTest.status === 'done' ? '완료' : 
+                                             editingTest.status === 'working' ? '진행 중' : 
+                                             editingTest.status === 'discard' ? '폐기' : '작업 전'}
+                                        </span>
+                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black text-white ${
+                                            editingTest.priority === 'High' ? 'bg-[#e2445c]' : 
+                                            editingTest.priority === 'Medium' ? 'bg-[#7888f4]' : 'bg-[#c4c4c4]'
+                                        }`}>
+                                            {editingTest.priority === 'High' ? '높음' : 
+                                             editingTest.priority === 'Medium' ? '보통' : '낮음'}
+                                        </span>
+                                    </div>
                                     <input 
-                                        type="date" 
-                                        value={editingTest.dueDate || editingTest.endDate || ''} 
-                                        onChange={e => handleUpdateTestDetail(editingStageId, editingTest.id, { dueDate: e.target.value, endDate: e.target.value })}
-                                        className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 shadow-sm"
+                                        type="text"
+                                        value={editingTest.title || editingTest.child || ''}
+                                        onChange={(e) => handleUpdateTestDetail(editingStageId, editingTest.id, { title: e.target.value })}
+                                        placeholder="태스크 제목을 입력하세요"
+                                        className="w-full text-lg font-black text-slate-900 bg-transparent outline-none placeholder-slate-300 border-none"
                                     />
                                 </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <button onClick={() => setEditingTest(null)} className="p-2 text-indigo-650 hover:bg-indigo-50 rounded-xl transition-all" title="저장 후 닫기">
+                                        <Save size={20}/>
+                                    </button>
+                                    <button onClick={() => setEditingTest(null)} className="p-2 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-xl">
+                                        <X size={20}/>
+                                    </button>
+                                </div>
                             </div>
 
-                            {/* Description & Links */}
-                            <div className="p-6 flex-1 flex flex-col gap-6 min-h-0">
-                                {/* Description */}
-                                <div className="flex flex-col gap-2 flex-1 min-h-0">
-                                    <label className="text-[12px] font-black text-slate-800 flex items-center gap-1.5">
-                                        <FileText size={14} className="text-slate-400" /> 상세 설명 (Description)
-                                    </label>
-                                    <div className="flex flex-col flex-1 min-h-0 bg-white border border-slate-200 rounded-xl overflow-hidden focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all shadow-sm">
-                                        {/* Mock Toolbar */}
-                                        <div className="flex items-center gap-1 px-3 py-2 bg-slate-50 border-b border-slate-100 shrink-0">
-                                            <div className="flex items-center gap-1 border-r border-slate-200 pr-2 mr-1">
-                                                <button className="p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700 rounded transition-colors"><Type size={13} /></button>
-                                                <button className="p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700 rounded transition-colors"><Bold size={13} /></button>
-                                                <button className="p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700 rounded transition-colors"><Italic size={13} /></button>
-                                                <button className="p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700 rounded transition-colors"><Underline size={13} /></button>
-                                            </div>
-                                            <div className="flex items-center gap-1 border-r border-slate-200 pr-2 mr-1">
-                                                <button className="p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700 rounded transition-colors"><List size={13} /></button>
-                                                <button className="p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700 rounded transition-colors"><ListOrdered size={13} /></button>
-                                            </div>
-                                            <div className="flex items-center gap-1">
-                                                <button className="p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700 rounded transition-colors"><Link2 size={13} /></button>
-                                                <button className="p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700 rounded transition-colors"><Code size={13} /></button>
-                                                <button className="p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700 rounded transition-colors"><Upload size={13} /></button>
-                                            </div>
+                            {/* Body */}
+                            <div className="flex-1 overflow-y-auto p-6 space-y-6 text-left">
+                                
+                                {/* 컴팩트 속성 패널 */}
+                                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-y-5 gap-x-6">
+                                        
+                                        <div className="space-y-1 border-l-2 border-slate-100 pl-2">
+                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">상태 (Status)</label>
+                                            <select 
+                                                value={editingTest.status || 'todo'}
+                                                onChange={(e) => handleUpdateTestDetail(editingStageId, editingTest.id, { status: e.target.value })}
+                                                className="w-full text-xs font-bold text-slate-700 bg-transparent outline-none cursor-pointer hover:text-indigo-600 border-none p-0"
+                                            >
+                                                <option value="todo">작업 전</option>
+                                                <option value="working">진행 중</option>
+                                                <option value="done">완료</option>
+                                                <option value="discard">폐기</option>
+                                            </select>
                                         </div>
-                                        {/* Textarea */}
-                                        <textarea 
-                                            value={editingTest.notes || ''} 
-                                            onChange={e => handleUpdateTestDetail(editingStageId, editingTest.id, { notes: e.target.value })}
-                                            placeholder="이 이슈에 대한 상세 설명, 실행 컨텍스트, 배경 등을 작성하세요..." 
-                                            className="w-full h-full flex-1 p-4 text-[13px] font-medium resize-none overflow-y-auto text-slate-800 placeholder-slate-400 outline-none" 
+
+                                        <div className="space-y-1 border-l-2 border-slate-100 pl-2">
+                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">중요도 (Priority)</label>
+                                            <select 
+                                                value={editingTest.priority || 'Medium'}
+                                                onChange={(e) => handleUpdateTestDetail(editingStageId, editingTest.id, { priority: e.target.value })}
+                                                className="w-full text-xs font-bold text-slate-700 bg-transparent outline-none cursor-pointer hover:text-indigo-600 border-none p-0"
+                                            >
+                                                <option value="Low">낮음</option>
+                                                <option value="Medium">보통</option>
+                                                <option value="High">높음</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-1 border-l-2 border-slate-100 pl-2">
+                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">유형 (Type)</label>
+                                            <select 
+                                                value={editingTest.type || '기타'}
+                                                onChange={(e) => handleUpdateTestDetail(editingStageId, editingTest.id, { type: e.target.value })}
+                                                className="w-full text-xs font-bold text-slate-700 bg-transparent outline-none cursor-pointer hover:text-indigo-600 border-none p-0"
+                                            >
+                                                {(allTaskTypes || ['버그', '기능', '기타']).map(t => (
+                                                    <option key={t} value={t}>{t}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-1 border-l-2 border-slate-100 pl-2">
+                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">담당자 (Assignee)</label>
+                                            <select 
+                                                value={editingTest.assigneeUid || ''}
+                                                onChange={(e) => handleUpdateTestDetail(editingStageId, editingTest.id, { assigneeUid: e.target.value })}
+                                                className="w-full text-xs font-bold text-slate-700 bg-transparent outline-none cursor-pointer hover:text-indigo-600 border-none p-0"
+                                            >
+                                                <option value="">미지정</option>
+                                                {(users || []).map(u => (
+                                                    <option key={u.uid} value={u.uid}>{u.displayName}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-1 border-l-2 border-slate-100 pl-2">
+                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">시작일 (Start Date)</label>
+                                            <input 
+                                                type="date"
+                                                value={editingTest.startDate || ''}
+                                                onChange={(e) => handleUpdateTestDetail(editingStageId, editingTest.id, { startDate: e.target.value })}
+                                                className="w-full text-xs font-bold text-slate-700 bg-transparent outline-none hover:text-indigo-600 border-none p-0"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1 border-l-2 border-slate-100 pl-2">
+                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">마감일 (Due Date)</label>
+                                            <input 
+                                                type="date"
+                                                value={editingTest.dueDate || editingTest.endDate || ''}
+                                                onChange={(e) => handleUpdateTestDetail(editingStageId, editingTest.id, { dueDate: e.target.value, endDate: e.target.value })}
+                                                className="w-full text-xs font-bold text-slate-700 bg-transparent outline-none hover:text-indigo-600 border-none p-0"
+                                            />
+                                        </div>
+
+                                    </div>
+                                </div>
+
+                                {/* 상세 설명 (Rich Memo) */}
+                                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                            <FileText size={12}/> 상세 설명 (Rich Memo)
+                                        </label>
+                                        <RichMemoEditor 
+                                            value={editingTest.notes || ''}
+                                            onChange={(val) => handleUpdateTestDetail(editingStageId, editingTest.id, { notes: val })}
+                                            placeholder="상세 설명 및 배경을 작성하세요. 표, 리스트, 서식 등을 사용하여 꾸밀 수 있습니다."
+                                            showToggle={true}
                                         />
                                     </div>
                                 </div>
 
-                                {/* Links */}
-                                <div className="flex flex-col gap-2 shrink-0">
-                                    <label className="text-[12px] font-black text-slate-800 flex items-center gap-1.5">
-                                        <ExternalLink size={14} className="text-slate-400" /> 참조 링크
-                                    </label>
-                                    <div className="flex flex-col gap-2">
+                                {/* 참조 링크 (디자인 일치) */}
+                                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4 text-left">
+                                    <h3 className="text-xs font-black text-slate-800 border-b pb-2 flex items-center gap-1.5">
+                                        <ExternalLink size={14} className="text-slate-400" /> 참조 링크 목록
+                                    </h3>
+                                    
+                                    <div className="space-y-2">
                                         {/* 빠른 템플릿 추가 버튼 */}
-                                        <div className="flex gap-2 mb-1">
+                                        <div className="flex gap-2">
                                             <button 
                                                 onClick={() => setNewLink({ title: '구글 문서', url: 'https://docs.google.com/document/d/' })} 
-                                                className="px-2 py-1 text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-100 rounded flex items-center gap-1 hover:bg-blue-100 transition-colors"
+                                                className="px-2.5 py-1 text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-150 rounded flex items-center gap-1 hover:bg-blue-100 transition-colors"
                                             >
-                                                <FileText size={10}/> 구글 문서
+                                                <FileText size={10}/> 구글 문서 템플릿
                                             </button>
                                             <button 
                                                 onClick={() => setNewLink({ title: '구글 스프레드시트', url: 'https://docs.google.com/spreadsheets/d/' })} 
-                                                className="px-2 py-1 text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 rounded flex items-center gap-1 hover:bg-emerald-100 transition-colors"
+                                                className="px-2.5 py-1 text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-150 rounded flex items-center gap-1 hover:bg-emerald-100 transition-colors"
                                             >
-                                                <Table size={10}/> 구글 시트
+                                                <Table size={10}/> 구글 시트 템플릿
                                             </button>
                                         </div>
-                                        
+
+                                        {/* 등록된 링크 카드 목록 */}
                                         {(editingTest.links || []).map((link, lIdx) => {
                                             const isDoc = link.url.includes('docs.google.com/document');
                                             const isSheet = link.url.includes('docs.google.com/spreadsheets');
@@ -794,14 +821,14 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                                             const iconColor = isDoc ? 'text-blue-500' : isSheet ? 'text-emerald-500' : isFigma ? 'text-purple-500' : 'text-slate-400';
 
                                             return (
-                                                <div key={lIdx} className="flex items-center justify-between bg-slate-50 border border-slate-100 px-3 py-2.5 rounded-lg group/link transition-all hover:border-indigo-100 hover:shadow-sm">
+                                                <div key={lIdx} className="flex items-center justify-between bg-slate-50 border border-slate-100 px-3 py-2.5 rounded-xl group/link hover:border-indigo-100 hover:bg-indigo-50/10 transition-all">
                                                     <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                                         <div className={`p-1.5 bg-white rounded-md border border-slate-100 shadow-sm ${iconColor}`}>
                                                             <Icon size={14} />
                                                         </div>
                                                         <div className="flex flex-col min-w-0">
                                                             <span className="text-[11px] font-bold text-slate-700 truncate">{link.title}</span>
-                                                            <a href={link.url} target="_blank" rel="noreferrer" className="text-[10px] text-indigo-500 hover:underline truncate">{link.url}</a>
+                                                            <a href={link.url} target="_blank" rel="noreferrer" className="text-[10px] text-indigo-600 hover:underline truncate flex items-center gap-0.5">{link.url} <Link2 size={8}/></a>
                                                         </div>
                                                     </div>
                                                     <button 
@@ -809,24 +836,26 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                                                             const nextLinks = editingTest.links.filter((_, i) => i !== lIdx);
                                                             handleUpdateTestDetail(editingStageId, editingTest.id, { links: nextLinks });
                                                         }}
-                                                        className="p-1.5 text-slate-300 hover:text-rose-500 opacity-0 group-hover/link:opacity-100 transition-all rounded-md hover:bg-rose-50"
+                                                        className="p-1.5 text-slate-350 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover/link:opacity-100"
                                                     >
-                                                        <X size={12}/>
+                                                        <X size={14}/>
                                                     </button>
                                                 </div>
                                             );
                                         })}
-                                        <div className="flex gap-2 mt-1">
+
+                                        {/* 신규 링크 입력 폼 */}
+                                        <div className="flex gap-2 pt-2">
                                             <input 
                                                 type="text" 
-                                                placeholder="문서명" 
+                                                placeholder="링크 제목 (예: 디자인 피그마)" 
                                                 value={newLink.title}
                                                 onChange={e => setNewLink(p => ({ ...p, title: e.target.value }))}
-                                                className="w-[120px] bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] font-bold outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200" 
+                                                className="w-[140px] bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all" 
                                             />
                                             <input 
                                                 type="text" 
-                                                placeholder="URL 입력 후 엔터" 
+                                                placeholder="URL 주소 입력 후 엔터..." 
                                                 value={newLink.url}
                                                 onChange={e => setNewLink(p => ({ ...p, url: e.target.value }))}
                                                 onKeyDown={e => {
@@ -836,45 +865,47 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                                                         setNewLink({ title: '', url: '' });
                                                     }
                                                 }}
-                                                className="flex-1 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] font-bold outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200" 
+                                                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all" 
                                             />
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* 삭제하기 버튼 */}
+                                <div className="pt-4">
+                                    <button 
+                                        onClick={() => { 
+                                            if (window.confirm('이 태스크/이슈를 영구 삭제하시겠습니까?')) {
+                                                removeTest(editingStageId, editingTest.id); 
+                                                setEditingTest(null); 
+                                            }
+                                        }}
+                                        className="w-full py-3 rounded-2xl border-2 border-dashed border-rose-200 text-rose-500 text-xs font-black hover:bg-rose-50 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <Trash2 size={14}/> 태스크 삭제하기
+                                    </button>
+                                </div>
+
                             </div>
-                        </div>
                         
                         {/* 모달 푸터 (하단 고정) */}
                         <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center shrink-0">
                             <span className="text-[10px] font-bold text-slate-400">
-                                마지막 수정: {new Date(editingTest.updatedAt).toLocaleString('ko-KR')}
+                                마지막 수정: {editingTest.updatedAt ? new Date(editingTest.updatedAt).toLocaleString('ko-KR') : ''}
                             </span>
                             <div className="flex items-center gap-2">
-                                <button 
-                                    type="button" 
-                                    onClick={() => { 
-                                        if(window.confirm('이 이슈를 완전히 삭제하시겠습니까?')) {
-                                            removeTest(editingStageId, editingTest.id); 
-                                            setEditingTest(null); 
-                                        }
-                                    }} 
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-rose-500 hover:bg-rose-50 border border-rose-200 transition-all font-black text-[11px] rounded-lg shadow-sm"
-                                >
-                                    <Trash2 size={12}/> 이슈 삭제
-                                </button>
                                 <button 
                                     type="button" 
                                     onClick={() => setEditingTest(null)} 
                                     className="px-4 py-1.5 bg-indigo-600 text-white hover:bg-indigo-700 transition-all font-black text-[11px] rounded-lg shadow-md shadow-indigo-100"
                                 >
-                                    저장 및 닫기
+                                    닫기
                                 </button>
                             </div>
                         </div>
                         </div>
                     </>
                 )}
-
                 {/* 6. Activity Log Sidebar */}
                 {showActivityLog && (
                     <>
@@ -888,11 +919,11 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                                 <div className="flex items-center gap-2">
                                     <History size={18} className="text-indigo-500" />
                                     <h3 className="text-lg font-black text-slate-800">프로젝트 활동 로그</h3>
+                                </div>
+                                <button onClick={() => setShowActivityLog(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                                    <X size={18}/>
+                                </button>
                             </div>
-                            <button onClick={() => setShowActivityLog(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
-                                <X size={18}/>
-                            </button>
-                        </div>
                         <div className="flex-1 overflow-y-auto bg-slate-50 p-6 flex flex-col gap-6">
                             {(project.activityLog || []).length === 0 ? (
                                 <div className="text-center py-10 flex flex-col items-center gap-3">

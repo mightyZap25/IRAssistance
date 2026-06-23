@@ -366,6 +366,206 @@ app.delete('/api/db/:collection/:id', async (req, res) => {
     }
 });
 
+// ==========================================
+// Mock Firebase (mockFirebase.js) 호환 API 엔드포인트
+// ==========================================
+
+// 1. GET: 컬렉션 내의 문서 목록 조회 (where, orderBy, limit 필터 지원)
+app.get('/api/collections/:collection/docs', async (req, res) => {
+    const { collection } = req.params;
+    if (!validateCollection(collection)) {
+        return res.status(400).json({ error: 'Invalid collection name' });
+    }
+    try {
+        await ensureTableExists(collection);
+        const result = await pool.query(`SELECT id, data FROM "${collection}"`);
+        
+        // MockFirebase.js가 기대하는 { id, data } 형식으로 객체 구조화
+        let items = result.rows.map(row => ({
+            id: row.id,
+            data: { ...row.data, id: row.id }
+        }));
+        
+        // where 필터 파싱 및 적용
+        let wheres = [];
+        if (req.query.where) {
+            try {
+                if (Array.isArray(req.query.where)) {
+                    wheres = req.query.where.map(w => JSON.parse(w));
+                } else {
+                    wheres = [JSON.parse(req.query.where)];
+                }
+            } catch (parseErr) {
+                console.error("[DB Server] Where clause parse error:", parseErr);
+            }
+        }
+        
+        for (const w of wheres) {
+            const { field, op, val } = w;
+            items = items.filter(item => {
+                const itemVal = item.data ? item.data[field] : undefined;
+                if (op === '==' || op === '===') return itemVal === val;
+                if (op === '!=') return itemVal !== val;
+                if (op === '>') return itemVal > val;
+                if (op === '>=') return itemVal >= val;
+                if (op === '<') return itemVal < val;
+                if (op === '<=') return itemVal <= val;
+                if (op === 'array-contains') {
+                    return Array.isArray(itemVal) && itemVal.includes(val);
+                }
+                return true;
+            });
+        }
+        
+        // orderBy 정렬 파싱 및 적용
+        let orderBys = [];
+        if (req.query.orderBy) {
+            try {
+                if (Array.isArray(req.query.orderBy)) {
+                    orderBys = req.query.orderBy.map(o => JSON.parse(o));
+                } else {
+                    orderBys = [JSON.parse(req.query.orderBy)];
+                }
+            } catch (parseErr) {
+                console.error("[DB Server] OrderBy clause parse error:", parseErr);
+            }
+        }
+        for (const o of orderBys) {
+            const { field, dir } = o;
+            const isAsc = dir !== 'desc';
+            items.sort((a, b) => {
+                const valA = a.data ? a.data[field] : undefined;
+                const valB = b.data ? b.data[field] : undefined;
+                if (valA === undefined || valA === null) return isAsc ? 1 : -1;
+                if (valB === undefined || valB === null) return isAsc ? -1 : 1;
+                if (valA < valB) return isAsc ? -1 : 1;
+                if (valA > valB) return isAsc ? 1 : -1;
+                return 0;
+            });
+        }
+        
+        // limit 제한 적용
+        if (req.query.limit) {
+            const lim = parseInt(req.query.limit);
+            if (!isNaN(lim)) {
+                items = items.slice(0, lim);
+            }
+        }
+        
+        res.json({ docs: items });
+    } catch (err) {
+        console.error(`Error query docs from ${collection}:`, err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 2. GET: 특정 문서 상세 정보 조회
+app.get('/api/collections/:collection/docs/:id', async (req, res) => {
+    const { collection, id } = req.params;
+    if (!validateCollection(collection)) {
+        return res.status(400).json({ error: 'Invalid collection name' });
+    }
+    try {
+        await ensureTableExists(collection);
+        const result = await pool.query(`SELECT data FROM "${collection}" WHERE id = $1`, [id]);
+        if (result.rows.length === 0) {
+            return res.json({ data: null }); // Firebase-like: empty snapshot
+        }
+        res.json({ data: { ...result.rows[0].data, id } });
+    } catch (err) {
+        console.error(`Error get doc ${id} from ${collection}:`, err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 3. POST: 문서 생성 (ID 자동 생성 지원)
+app.post('/api/collections/:collection/docs', async (req, res) => {
+    const { collection } = req.params;
+    const docData = req.body;
+    if (!validateCollection(collection)) {
+        return res.status(400).json({ error: 'Invalid collection name' });
+    }
+    try {
+        await ensureTableExists(collection);
+        const id = docData.id || 'auto_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
+        const finalData = { ...docData, id };
+        await pool.query(
+            `INSERT INTO "${collection}" (id, data) VALUES ($1, $2)
+             ON CONFLICT (id) DO UPDATE SET data = $2`,
+            [id, JSON.stringify(finalData)]
+        );
+        res.json({ id });
+    } catch (err) {
+        console.error(`Error add doc in ${collection}:`, err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 4. PUT: 문서 전체 덮어쓰기 (setDoc 용)
+app.put('/api/collections/:collection/docs/:id', async (req, res) => {
+    const { collection, id } = req.params;
+    const docData = req.body;
+    if (!validateCollection(collection)) {
+        return res.status(400).json({ error: 'Invalid collection name' });
+    }
+    try {
+        await ensureTableExists(collection);
+        const finalData = { ...docData, id };
+        await pool.query(
+            `INSERT INTO "${collection}" (id, data) VALUES ($1, $2)
+             ON CONFLICT (id) DO UPDATE SET data = $2`,
+            [id, JSON.stringify(finalData)]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        console.error(`Error put doc ${id} in ${collection}:`, err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 5. PATCH: 문서 일부 수정 (updateDoc / setDoc merge용)
+app.patch('/api/collections/:collection/docs/:id', async (req, res) => {
+    const { collection, id } = req.params;
+    const updateData = req.body;
+    if (!validateCollection(collection)) {
+        return res.status(400).json({ error: 'Invalid collection name' });
+    }
+    try {
+        await ensureTableExists(collection);
+        const getRes = await pool.query(`SELECT data FROM "${collection}" WHERE id = $1`, [id]);
+        let currentData = {};
+        if (getRes.rows.length > 0) {
+            currentData = getRes.rows[0].data;
+        }
+        const finalData = { ...currentData, ...updateData, id };
+        await pool.query(
+            `INSERT INTO "${collection}" (id, data) VALUES ($1, $2)
+             ON CONFLICT (id) DO UPDATE SET data = $2`,
+            [id, JSON.stringify(finalData)]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        console.error(`Error patch doc ${id} in ${collection}:`, err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 6. DELETE: 문서 삭제
+app.delete('/api/collections/:collection/docs/:id', async (req, res) => {
+    const { collection, id } = req.params;
+    if (!validateCollection(collection)) {
+        return res.status(400).json({ error: 'Invalid collection name' });
+    }
+    try {
+        await ensureTableExists(collection);
+        await pool.query(`DELETE FROM "${collection}" WHERE id = $1`, [id]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error(`Error delete doc ${id} in ${collection}:`, err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Serve built frontend assets in production/Electron mode
 const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath));
@@ -381,5 +581,7 @@ console.log(`[DB Server] Static assets hosting enabled: ${distPath}`);
 // Start server
 app.listen(PORT, () => {
     console.log(`[Postgres Proxy Server] Running on http://localhost:${PORT}`);
-    console.log(`[Postgres Proxy Server] Active configuration: ${currentConfig.user}@${currentConfig.host}:${currentConfig.port}`);
+    const activeProfile = currentConfig.currentProfile || 'local';
+    const activeConfig = currentConfig[activeProfile] || {};
+    console.log(`[Postgres Proxy Server] Active configuration: ${activeConfig.user}@${activeConfig.host}:${activeConfig.port}`);
 });

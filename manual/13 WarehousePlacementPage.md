@@ -1,4 +1,4 @@
-# 창고 입고 배치 매뉴얼 (WarehousePlacementPage.md)
+﻿# 창고 입고 배치 매뉴얼 (WarehousePlacementPage.md)
 
 ## 1. 메뉴 개요 및 경로
 * **메뉴 경로**: 재고 관리 > 창고 입고 배치
@@ -13,3 +13,4 @@
   * 창고 레이아웃(Rack, Shelf, Bin)의 시각화 맵 지원.
   * 부품 특성(온습도 민감도, 무거운 중량물 등)에 따른 적치 제안(Placement Suggestion) 엔진 구축.
   * 입출고 동선을 최소화하는 적치 알고리즘 탑재 예정.
+
