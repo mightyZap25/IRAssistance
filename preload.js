@@ -2,7 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
     isElectron: true,
-    checkForUpdates: () => ipcRenderer.send('check-for-updates'),
+    checkForUpdates: (options) => ipcRenderer.send('check-for-updates', options),
     startDownload: () => ipcRenderer.send('start-download'),
     restartApp: () => ipcRenderer.send('restart-app'),
     getAppVersion: () => ipcRenderer.invoke('get-app-version'),

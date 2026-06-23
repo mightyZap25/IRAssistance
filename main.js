@@ -209,6 +209,18 @@ app.on('will-quit', () => {
 autoUpdater.logger = console;
 autoUpdater.autoDownload = false;
 
+// 강제로 개발 모드에서도 업데이트 활성화 및 깃허브 저장소 피드 수동 등록
+autoUpdater.forceDevUpdateConfig = true;
+try {
+    autoUpdater.setFeedURL({
+        provider: 'github',
+        owner: 'mightyZap25',
+        repo: 'IRAssistance'
+    });
+} catch (e) {
+    console.error('[Electron Main] Failed to set autoUpdater Feed URL:', e);
+}
+
 function sendUpdateMessage(status, data = {}) {
     if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('update-message', { status, ...data });
@@ -244,55 +256,25 @@ autoUpdater.on('update-downloaded', (info) => {
     sendUpdateMessage('downloaded', { info });
 });
 
-ipcMain.on('check-for-updates', () => {
-    if (!app.isPackaged) {
-        // Dev mode mocking
-        sendUpdateMessage('checking');
-        setTimeout(() => {
-            sendUpdateMessage('available', {
-                info: {
-                    version: '1.0.1',
-                    releaseDate: new Date().toISOString(),
-                    releaseNotes: '이것은 개발 모드 모의(Mock) 업데이트 정보입니다. 기능 테스트용입니다.'
-                }
-            });
-        }, 1500);
-    } else {
-        autoUpdater.checkForUpdates().catch(err => {
-            sendUpdateMessage('error', { error: err.message });
-        });
+ipcMain.on('check-for-updates', (event, options) => {
+    const isAuto = options?.isAuto;
+    if (!app.isPackaged && isAuto) {
+        sendUpdateMessage('not-available');
+        return;
     }
+    autoUpdater.checkForUpdates().catch(err => {
+        sendUpdateMessage('error', { error: err.message });
+    });
 });
 
 ipcMain.on('start-download', () => {
-    if (!app.isPackaged) {
-        sendUpdateMessage('downloading', { percent: 0 });
-        let percent = 0;
-        const interval = setInterval(() => {
-            percent += 20;
-            sendUpdateMessage('downloading', { percent });
-            if (percent >= 100) {
-                clearInterval(interval);
-                sendUpdateMessage('downloaded', {
-                    info: { version: '1.0.1' }
-                });
-            }
-        }, 800);
-    } else {
-        autoUpdater.downloadUpdate().catch(err => {
-            sendUpdateMessage('error', { error: err.message });
-        });
-    }
+    autoUpdater.downloadUpdate().catch(err => {
+        sendUpdateMessage('error', { error: err.message });
+    });
 });
 
 ipcMain.on('restart-app', () => {
-    if (!app.isPackaged) {
-        console.log('[Electron Main] Mocking Restart & Install');
-        app.relaunch();
-        app.exit(0);
-    } else {
-        autoUpdater.quitAndInstall();
-    }
+    autoUpdater.quitAndInstall();
 });
 
 ipcMain.handle('get-app-version', () => {

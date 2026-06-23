@@ -16,13 +16,13 @@ const PROCESS_STAGES = [
 
 export default function ProjectManagementPage() {
     const { currentUser, userProfile } = useAuth();
-    
+
     // States for Monday.com hierarchy
     const [workspaces, setWorkspaces] = useState([]);
     const [folders, setFolders] = useState([]);
     const [projects, setProjects] = useState([]); // boards
     const [users, setUsers] = useState([]);
-    
+
     const [activeWorkspaceId, setActiveWorkspaceId] = useState(null);
     const [activeBoardId, setActiveBoardId] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -47,7 +47,7 @@ export default function ProjectManagementPage() {
             const wsList = await nasDbService.getAll('workspaces');
             const fList = await nasDbService.getAll('folders');
             const pList = await nasDbService.getAll('projects');
-            
+
             // Default workspace creation if empty
             if (wsList.length === 0) {
                 const defaultWs = { id: 'ws_main', name: 'Main Workspace', createdAt: new Date().toISOString() };
@@ -57,7 +57,7 @@ export default function ProjectManagementPage() {
 
             setWorkspaces(wsList);
             setFolders(fList);
-            
+
             // Map legacy projects to default workspace if they lack workspaceId
             const mappedProjects = await Promise.all(pList.map(async p => {
                 if (!p.workspaceId) {
@@ -69,7 +69,7 @@ export default function ProjectManagementPage() {
             }));
 
             setProjects(mappedProjects);
-            
+
             if (wsList.length > 0 && !activeWorkspaceId) {
                 setActiveWorkspaceId(wsList[0].id);
             }
@@ -81,120 +81,154 @@ export default function ProjectManagementPage() {
     };
 
     const handleCreateWorkspace = async (name) => {
-        const id = 'ws_' + Date.now();
-        const newWs = { id, name, createdAt: new Date().toISOString() };
-        await nasDbService.upsert('workspaces', id, newWs);
-        setWorkspaces(prev => [...prev, newWs]);
-        setActiveWorkspaceId(id);
+        try {
+            const id = 'ws_' + Date.now();
+            const newWs = { id, name, createdAt: new Date().toISOString() };
+            await nasDbService.upsert('workspaces', id, newWs);
+            setWorkspaces(prev => [...prev, newWs]);
+            setActiveWorkspaceId(id);
+        } catch (err) {
+            console.error("Workspace creation failed:", err);
+            alert("워크스페이스 생성 실패: " + err.message);
+        }
     };
 
     const handleCreateFolder = async (name) => {
         if (!activeWorkspaceId) return;
-        const id = 'fd_' + Date.now();
-        const newFd = { id, name, workspaceId: activeWorkspaceId, createdAt: new Date().toISOString() };
-        await nasDbService.upsert('folders', id, newFd);
-        setFolders(prev => [...prev, newFd]);
+        try {
+            const id = 'fd_' + Date.now();
+            const newFd = { id, name, workspaceId: activeWorkspaceId, createdAt: new Date().toISOString() };
+            await nasDbService.upsert('folders', id, newFd);
+            setFolders(prev => [...prev, newFd]);
+        } catch (err) {
+            console.error("Folder creation failed:", err);
+            alert("폴더 생성 실패: " + err.message);
+        }
     };
 
     const handleCreateBoard = async (name, folderId) => {
         if (!activeWorkspaceId) return;
-        
-        // Generate code
-        const year = new Date().getFullYear();
-        const prefix = `IR-${year}-`;
-        let maxIdx = 0;
-        projects.forEach(p => {
-            if (p.code && p.code.startsWith(prefix)) {
-                const idxStr = p.code.replace(prefix, '');
-                const idx = parseInt(idxStr, 10);
-                if (!isNaN(idx) && idx > maxIdx) maxIdx = idx;
-            }
-        });
-        const code = `${prefix}${String(maxIdx + 1).padStart(3, '0')}`;
 
-        const id = 'pj_' + Date.now();
-        
-        // Initial setup for board
-        const initialSchedules = {};
-        ['planning', 'development', 'dev_pp', 'qa_test', 'prod_pp', 'mp_transfer'].forEach(s => {
-            initialSchedules[s] = { start: '', end: '', status: 'pending' };
-        });
+        try {
+            // Generate code
+            const year = new Date().getFullYear();
+            const prefix = `IR-${year}-`;
+            let maxIdx = 0;
+            projects.forEach(p => {
+                if (p.code && p.code.startsWith(prefix)) {
+                    const idxStr = p.code.replace(prefix, '');
+                    const idx = parseInt(idxStr, 10);
+                    if (!isNaN(idx) && idx > maxIdx) maxIdx = idx;
+                }
+            });
+            const code = `${prefix}${String(maxIdx + 1).padStart(3, '0')}`;
 
-        const newBoard = {
-            id,
-            name,
-            code,
-            workspaceId: activeWorkspaceId,
-            folderId: folderId || null,
-            currentStage: 'planning',
-            progress: 10,
-            owner: currentUser.email,
-            ownerName: userProfile?.name || currentUser?.displayName,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            schedules: initialSchedules,
-            stageHistory: [{ stage: 'planning', date: new Date().toISOString(), note: '프로젝트 생성' }],
-            documents: { planning: [], development: [], dev_pp: [], qa_test: [], prod_pp: [], mp_transfer: [] }
-        };
+            const id = 'pj_' + Date.now();
 
-        await nasDbService.upsert('projects', id, newBoard);
-        setProjects(prev => [newBoard, ...prev]);
-        setActiveBoardId(id);
+            // Initial setup for board
+            const initialSchedules = {};
+            ['planning', 'development', 'dev_pp', 'qa_test', 'prod_pp', 'mp_transfer'].forEach(s => {
+                initialSchedules[s] = { start: '', end: '', status: 'pending' };
+            });
+
+            const newBoard = {
+                id,
+                name,
+                code,
+                workspaceId: activeWorkspaceId,
+                folderId: folderId || null,
+                currentStage: 'planning',
+                progress: 10,
+                owner: currentUser?.email || 'admin@irrocot.com',
+                ownerName: userProfile?.name || currentUser?.displayName || '로컬 마스터',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                schedules: initialSchedules,
+                stageHistory: [{ stage: 'planning', date: new Date().toISOString(), note: '프로젝트 생성' }],
+                documents: { planning: [], development: [], dev_pp: [], qa_test: [], prod_pp: [], mp_transfer: [] }
+            };
+
+            await nasDbService.upsert('projects', id, newBoard);
+            setProjects(prev => [newBoard, ...prev]);
+            setActiveBoardId(id);
+        } catch (err) {
+            console.error("Board creation failed:", err);
+            alert("보드 생성 실패: " + err.message);
+        }
     };
 
     const handleUpdateProject = async (projectId, updateData) => {
         try {
-            const updated = { ...updateData, updatedAt: new Date().toISOString() };
+            const existingProject = projects.find(p => p.id === projectId) || {};
+            const updated = { ...existingProject, ...updateData, updatedAt: new Date().toISOString() };
             await nasDbService.upsert('projects', projectId, updated);
-            
-            setProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...updated } : p));
+
+            setProjects(prev => prev.map(p => p.id === projectId ? updated : p));
         } catch (err) {
             console.error("Project update failed:", err);
+        }
+    };
+
+    const handleDeleteProject = async (projectId) => {
+        if (!window.confirm("정말로 이 프로젝트(보드)를 삭제하시겠습니까?")) return;
+        try {
+            await nasDbService.delete('projects', projectId);
+            setProjects(prev => prev.filter(p => p.id !== projectId));
+            setActiveBoardId(null);
+        } catch (err) {
+            console.error("Project deletion failed:", err);
+            alert("프로젝트 삭제 실패: " + err.message);
         }
     };
 
     const selectedProject = projects.find(p => p.id === activeBoardId);
 
     if (loading) {
-        return <div className="h-full flex items-center justify-center font-black text-slate-400">Loading Monday Workspace...</div>;
+        return <div className="h-full flex items-center justify-center font-black text-slate-400">Loading IR Workspace...</div>;
     }
 
     return (
-        <div className="h-full flex bg-white overflow-hidden rounded-2xl border border-slate-200/80 shadow-sm">
-            {/* Sidebar (Workspaces > Folders > Boards) */}
-            <WorkspaceSidebar 
-                workspaces={workspaces}
-                folders={folders}
-                boards={projects}
-                activeWorkspaceId={activeWorkspaceId}
-                activeBoardId={activeBoardId}
-                onSelectWorkspace={setActiveWorkspaceId}
-                onSelectBoard={setActiveBoardId}
-                onCreateWorkspace={handleCreateWorkspace}
-                onCreateFolder={handleCreateFolder}
-                onCreateBoard={handleCreateBoard}
-            />
+        <div className="p-5 bg-slate-50 h-full w-full flex flex-col overflow-hidden font-sans">
+            <div className="flex-1 flex bg-white overflow-hidden rounded-2xl border border-slate-200/80 shadow-sm min-h-0">
+                {/* Sidebar (Workspaces > Folders > Boards) */}
+                <WorkspaceSidebar
+                    workspaces={workspaces}
+                    folders={folders}
+                    boards={projects}
+                    activeWorkspaceId={activeWorkspaceId}
+                    activeBoardId={activeBoardId}
+                    onSelectWorkspace={setActiveWorkspaceId}
+                    onSelectBoard={setActiveBoardId}
+                    onCreateWorkspace={handleCreateWorkspace}
+                    onCreateFolder={handleCreateFolder}
+                    onCreateBoard={handleCreateBoard}
+                    onUpdateBoard={handleUpdateProject}
+                />
 
-            {/* Main Board View */}
-            <div className="flex-1 relative overflow-hidden bg-white flex flex-col">
-                {selectedProject ? (
-                    <ProjectProcessPanel 
-                        isOpen={true} 
-                        onClose={() => setActiveBoardId(null)} 
-                        project={selectedProject}
-                        stages={PROCESS_STAGES}
-                        onUpdate={handleUpdateProject}
-                        users={users}
-                    />
-                ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-slate-400 space-y-4">
-                        <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center border-4 border-white shadow-sm">
-                            <Briefcase size={32} className="text-slate-300"/>
+                {/* Main Board View */}
+                <div className="flex-1 relative overflow-hidden bg-white flex flex-col">
+                    {selectedProject ? (
+                        <ProjectProcessPanel
+                            isOpen={true}
+                            onClose={() => setActiveBoardId(null)}
+                            project={selectedProject}
+                            stages={PROCESS_STAGES}
+                            onUpdate={handleUpdateProject}
+                            onDelete={handleDeleteProject}
+                            users={users}
+                            currentUser={currentUser}
+                            userProfile={userProfile}
+                        />
+                    ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center text-slate-400 space-y-4">
+                            <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center border-4 border-white shadow-sm">
+                                <Briefcase size={32} className="text-slate-300" />
+                            </div>
+                            <h2 className="text-lg font-black text-slate-500">좌측에서 보드를 선택하거나 새로 생성하세요</h2>
+
                         </div>
-                        <h2 className="text-lg font-black text-slate-500">좌측에서 보드를 선택하거나 새로 생성하세요</h2>
-                        <p className="text-xs font-bold text-slate-400">Monday.com 스타일 워크스페이스</p>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
         </div>
     );

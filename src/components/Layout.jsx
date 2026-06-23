@@ -4,6 +4,7 @@ import Sidebar from './Sidebar';
 import Header from './Header'; // Will create next
 import { useAuth } from '../contexts/AuthContext';
 import { useTaskAlarm } from '../hooks/useTaskAlarm';
+import UpdateNotificationModal from './common/UpdateNotificationModal';
 
 export default function Layout({ children }) {
     const { currentUser } = useAuth();
@@ -12,7 +13,7 @@ export default function Layout({ children }) {
     const location = useLocation();
     
     // Determine if we should use full width (e.g., for dashboard, google chat)
-    const isFullPage = location.pathname.includes('/dashboard') || location.pathname.includes('/workspace/chat') || location.pathname.includes('/hr/attendance');
+    const isFullPage = location.pathname.includes('/dashboard') || location.pathname.includes('/workspace/chat') || location.pathname.includes('/hr/attendance') || location.pathname.includes('/project/management');
     const isGoogleChat = location.pathname.includes('/workspace/chat');
 
     const isElectron = window.electronAPI?.isElectron || 
@@ -47,6 +48,9 @@ export default function Layout({ children }) {
                     <div className={`${isFullPage ? 'max-w-none w-full h-[calc(100vh-48px)]' : 'max-w-[1300px] mx-auto'} animate-fade-in`} style={{ display: (isGoogleChat && isElectron) ? 'none' : 'block' }}>
                         {children}
                     </div>
+
+                    {/* 전역 자동 업데이트 체크 및 알림 모달 */}
+                    {isElectron && <UpdateNotificationModal />}
                 </main>
             </div>
         </div>

@@ -106,3 +106,26 @@ export async function saveUserDashboardLayout(uid, layout) {
         updatedAt: serverTimestamp()
     }, { merge: true });
 }
+
+export const ROLE_LABELS = {
+    [USER_ROLES.ADMIN]: '마스터 관리자 (Admin)',
+    [USER_ROLES.MANAGER]: '부서장 / 매니저 (Manager)',
+    [USER_ROLES.ENGINEER]: '개발 엔지니어 (Engineer)',
+    [USER_ROLES.SALES]: '영업 본부 (Sales)',
+    [USER_ROLES.QA]: '품질 보증 (QA)',
+    [USER_ROLES.PRODUCTION]: '생산 / 제조 (Production)',
+    [USER_ROLES.VIEWER]: '일반 조회원 (Viewer)'
+};
+
+/**
+ * 사용자의 권한(Role)과 부서(Department) 정보를 업데이트합니다.
+ */
+export async function updateUserRoleAndDepartment(uid, role, department) {
+    if (!uid) return;
+    const userRef = doc(db, 'users', uid);
+    await setDoc(userRef, {
+        role,
+        department,
+        updatedAt: serverTimestamp()
+    }, { merge: true });
+}

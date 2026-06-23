@@ -3,6 +3,7 @@ import { Save, ShieldAlert, Mail, Database, Server, FileText, GitMerge, RefreshC
 import { useAuth } from '../contexts/AuthContext';
 import RoleGuard from '../components/common/RoleGuard';
 import { syncAllPartsToSupplierDB } from '../services/supplierAutoRegister';
+import { getAllUsers, updateUserRoleAndDepartment, USER_ROLES, ROLE_LABELS } from '../services/userService';
 
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState('database');
@@ -17,6 +18,72 @@ export default function SettingsPage() {
     const [downloadPercent, setDownloadPercent] = useState(0);
     const [updateInfo, setUpdateInfo] = useState(null);
     const [updateError, setUpdateError] = useState(null);
+
+    // User Roles Mapping States
+    const [usersList, setUsersList] = useState([]);
+    const [loadingUsers, setLoadingUsers] = useState(false);
+    const [userUpdates, setUserUpdates] = useState({}); // { [uid]: { role, department } }
+    const [savingRoles, setSavingRoles] = useState(false);
+
+    React.useEffect(() => {
+        if (activeTab === 'roles') {
+            setLoadingUsers(true);
+            getAllUsers()
+                .then(list => {
+                    setUsersList(list || []);
+                    const initialUpdates = {};
+                    list.forEach(u => {
+                        initialUpdates[u.uid] = {
+                            role: u.role || 'viewer',
+                            department: u.department || ''
+                        };
+                    });
+                    setUserUpdates(initialUpdates);
+                })
+                .catch(err => console.error("Failed to load users:", err))
+                .finally(() => setLoadingUsers(false));
+        }
+    }, [activeTab]);
+
+    const handleSaveRoles = async (e) => {
+        e.preventDefault();
+        
+        // 관리자 권한 최소 1명 존재성 및 본인 권한 보호 방어
+        const myUid = userProfile?.uid || userProfile?.id;
+        if (myUid && userUpdates[myUid] && userUpdates[myUid].role !== 'admin') {
+            const hasOtherAdmin = usersList.some(u => u.uid !== myUid && (userUpdates[u.uid]?.role === 'admin' || (!userUpdates[u.uid] && u.role === 'admin')));
+            if (!hasOtherAdmin) {
+                alert('최소한 한 명의 마스터 관리자(Admin)가 존재해야 합니다. 본인의 관리자 권한을 해제할 수 없습니다.');
+                return;
+            }
+        }
+
+        setSavingRoles(true);
+        try {
+            const promises = Object.entries(userUpdates).map(async ([uid, data]) => {
+                const originalUser = usersList.find(u => u.uid === uid);
+                if (!originalUser) return;
+                
+                const isRoleChanged = originalUser.role !== data.role;
+                const isDeptChanged = originalUser.department !== data.department;
+                
+                if (isRoleChanged || isDeptChanged) {
+                    await updateUserRoleAndDepartment(uid, data.role, data.department);
+                }
+            });
+
+            await Promise.all(promises);
+            alert('권한 및 부서 매핑이 정상적으로 저장되었습니다.');
+            
+            const list = await getAllUsers();
+            setUsersList(list || []);
+        } catch (err) {
+            console.error("Error saving roles:", err);
+            alert('저장 중 오류가 발생했습니다: ' + err.message);
+        } finally {
+            setSavingRoles(false);
+        }
+    };
 
     React.useEffect(() => {
         if (window.electronAPI) {
@@ -663,10 +730,134 @@ export default function SettingsPage() {
                         )}
 
                         {activeTab === 'roles' && (
-                            <div className="max-w-2xl animate-fade-in text-center py-20">
-                                <ShieldAlert size={48} className="text-slate-300 mx-auto mb-4" />
-                                <h2 className="text-lg font-black text-slate-900 mb-2">권한 및 역할 매핑</h2>
-                                <p className="text-sm text-slate-500 font-medium">유저별 세부 권한 매핑 기능은 준비 중입니다.</p>
+                            <div className="max-w-4xl animate-fade-in text-slate-800">
+                                <div className="flex justify-between items-center mb-6">
+                                    <div>
+                                        <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                                            <ShieldAlert className="text-indigo-600" size={22} /> 가입 사용자 권한 및 부서 설정
+                                        </h2>
+                                        <p className="text-sm text-slate-500 font-medium mt-1">
+                                            가입된 팀원들의 계정을 확인하고, 각 팀원의 역할 권한(Role)과 부서(Department)를 매핑합니다.
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={handleSaveRoles}
+                                        disabled={loadingUsers || savingRoles || usersList.length === 0}
+                                        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black px-5 py-2.5 rounded-xl text-sm shadow-md transition-all disabled:opacity-50"
+                                    >
+                                        <Save size={16} /> 변경 사항 저장
+                                    </button>
+                                </div>
+
+                                {loadingUsers ? (
+                                    <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
+                                        <RefreshCw size={36} className="animate-spin text-indigo-500" />
+                                        <span className="text-sm font-bold">가입 사용자 목록을 읽어오는 중...</span>
+                                    </div>
+                                ) : usersList.length === 0 ? (
+                                    <div className="text-center py-20 bg-slate-50 border border-slate-200 border-dashed rounded-2xl">
+                                        <ShieldAlert size={40} className="text-slate-300 mx-auto mb-3" />
+                                        <p className="text-sm font-black text-slate-500">가입된 사용자가 없습니다</p>
+                                        <p className="text-xs text-slate-400 mt-1">사용자 계정이 가입되면 여기에 자동으로 표시됩니다.</p>
+                                    </div>
+                                ) : (
+                                    <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-black text-slate-400 uppercase tracking-wider select-none h-11">
+                                                    <th className="px-6">사용자 정보</th>
+                                                    <th className="px-6 w-[180px]">이메일 주소</th>
+                                                    <th className="px-6 w-[160px]">소속 부서 (Department)</th>
+                                                    <th className="px-6 w-[200px]">시스템 역할 권한 (Role)</th>
+                                                    <th className="px-6 w-[130px] text-right">최근 로그인</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-150">
+                                                {usersList.map((user) => {
+                                                    const currentUpdate = userUpdates[user.uid] || {
+                                                        role: user.role || 'viewer',
+                                                        department: user.department || ''
+                                                    };
+                                                    
+                                                    const formattedDate = user.lastLogin?.toDate 
+                                                        ? user.lastLogin.toDate().toLocaleDateString('ko-KR', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})
+                                                        : (user.lastLogin ? new Date(user.lastLogin).toLocaleDateString('ko-KR', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}) : '기록 없음');
+
+                                                    return (
+                                                        <tr key={user.uid} className="hover:bg-slate-50/50 transition-colors h-14 text-xs font-bold text-slate-700">
+                                                            {/* 정보 */}
+                                                            <td className="px-6">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="w-8 h-8 rounded-full bg-indigo-500 text-white flex items-center justify-center overflow-hidden font-black text-xs shadow-inner animate-fade-in">
+                                                                        {user.photoURL ? (
+                                                                            <img src={user.photoURL} alt="" className="w-full h-full object-cover" />
+                                                                        ) : (
+                                                                            user.displayName?.[0] || '?'
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="flex flex-col">
+                                                                        <span className="font-black text-slate-900 text-xs">{user.displayName || '이름 없음'}</span>
+                                                                        <span className="text-[10px] text-slate-400 font-bold mt-0.5">UID: {user.uid.slice(0, 8)}...</span>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            
+                                                            {/* 이메일 */}
+                                                            <td className="px-6 text-slate-500 text-xs font-medium truncate max-w-[180px]" title={user.email}>
+                                                                {user.email}
+                                                            </td>
+                                                            
+                                                            {/* 부서 */}
+                                                            <td className="px-6">
+                                                                <input
+                                                                    type="text"
+                                                                    value={currentUpdate.department}
+                                                                    onChange={(e) => {
+                                                                        setUserUpdates({
+                                                                            ...userUpdates,
+                                                                            [user.uid]: {
+                                                                                ...currentUpdate,
+                                                                                department: e.target.value
+                                                                            }
+                                                                        });
+                                                                    }}
+                                                                    placeholder="부서명 입력 (예: R&D)"
+                                                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all shadow-inner"
+                                                                />
+                                                            </td>
+                                                            
+                                                            {/* 권한 */}
+                                                            <td className="px-6">
+                                                                <select
+                                                                    value={currentUpdate.role}
+                                                                    onChange={(e) => {
+                                                                        setUserUpdates({
+                                                                            ...userUpdates,
+                                                                            [user.uid]: {
+                                                                                ...currentUpdate,
+                                                                                role: e.target.value
+                                                                            }
+                                                                        });
+                                                                    }}
+                                                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-black text-slate-700 outline-none focus:bg-white focus:border-indigo-500 transition-all shadow-inner"
+                                                                >
+                                                                    {Object.entries(ROLE_LABELS).map(([val, label]) => (
+                                                                        <option key={val} value={val}>{label}</option>
+                                                                    ))}
+                                                                </select>
+                                                            </td>
+                                                            
+                                                            {/* 최근로그인 */}
+                                                            <td className="px-6 text-right text-[10px] text-slate-400 font-medium">
+                                                                {formattedDate}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
                             </div>
                         )}
 

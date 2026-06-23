@@ -3,7 +3,8 @@ import {
     X, CheckCircle2, Circle, Clock, FileText, ChevronRight, 
     ArrowRight, Upload, ExternalLink, History, MessageSquare,
     Trash2, Plus, Save, Briefcase, User, Layers, Layout, AlertCircle,
-    Table, MonitorPlay, Link2, Bold, Italic, Underline, List, ListOrdered, Code, Type
+    Table, MonitorPlay, Link2, Bold, Italic, Underline, List, ListOrdered, Code, Type,
+    CalendarDays, Edit3
 } from 'lucide-react';
 import { getIssuesByProject } from '../services/issueService';
 import StageTaskBoard from './common/StageTaskBoard';
@@ -18,15 +19,14 @@ const STAGE_DOCUMENTS = {
     mp_transfer: ['양산 이관 승인서', '최종 BOM', '포장 사양서'],
 };
 
-export default function ProjectProcessPanel({ isOpen, onClose, project, stages, onUpdate, users, currentUser }) {
+const DEFAULT_TASK_TYPES = ['버그', '기능', '개선', '문서 작성', '미팅', '기획', '테스트', '기타'];
+
+export default function ProjectProcessPanel({ isOpen, onClose, project, stages, onUpdate, onDelete, users, currentUser, userProfile }) {
     const [viewMode, setViewMode] = useState('main_table'); // main_table | overview | issues
     const [activeStageId, setActiveStageId] = useState(null);
     const [newTest, setNewTest] = useState({ parent: '', child: '' });
     const [isAddingGroup, setIsAddingGroup] = useState(false);
-    const [isAddingGlobalTask, setIsAddingGlobalTask] = useState(false);
-    const [globalTaskInput, setGlobalTaskInput] = useState({ stageId: stages[0]?.id || '', title: '' });
-    const [isEditingDesc, setIsEditingDesc] = useState(false);
-    const [descInput, setDescInput] = useState('');
+    const [newGroupName, setNewGroupName] = useState('');
     const [projectIssues, setProjectIssues] = useState([]);
     const [loadingIssues, setLoadingIssues] = useState(false);
     const [editingTest, setEditingTest] = useState(null); // The test task object currently opened in details
@@ -34,11 +34,130 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
     const [showActivityLog, setShowActivityLog] = useState(false);
     const [newLink, setNewLink] = useState({ title: '', url: '' });
 
+    const allStages = useMemo(() => {
+        const defaultStages = stages || [];
+        const custom = project.customStages || [];
+        const combined = [...defaultStages, ...custom];
+        if (project.stageOrder && project.stageOrder.length > 0) {
+            return [...combined].sort((a, b) => {
+                const idxA = project.stageOrder.indexOf(a.id);
+                const idxB = project.stageOrder.indexOf(b.id);
+                if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                if (idxA !== -1) return -1;
+                if (idxB !== -1) return 1;
+                return 0;
+            });
+        }
+        return combined;
+    }, [stages, project.customStages, project.stageOrder]);
+
+    const handleReorderGroups = async (newStageIds) => {
+        await onUpdate(project.id, { stageOrder: newStageIds });
+    };
+
+    const handleReorderTasks = async (draggedTaskId, targetTaskId, targetStageId, position) => {
+        const updatedTests = { ...project.tests };
+        
+        let draggedTask = null;
+        let sourceStageId = null;
+        
+        for (const stageId of Object.keys(updatedTests)) {
+            const idx = updatedTests[stageId]?.findIndex(t => t.id === draggedTaskId);
+            if (idx !== -1 && idx !== undefined) {
+                [draggedTask] = updatedTests[stageId].splice(idx, 1);
+                sourceStageId = stageId;
+                break;
+            }
+        }
+        
+        if (!draggedTask) return;
+        
+        if (targetTaskId) {
+            const targetIdx = updatedTests[targetStageId]?.findIndex(t => t.id === targetTaskId);
+            if (targetIdx !== -1 && targetIdx !== undefined) {
+                const insertIdx = position === 'before' ? targetIdx : targetIdx + 1;
+                updatedTests[targetStageId].splice(insertIdx, 0, draggedTask);
+            } else {
+                updatedTests[targetStageId].push(draggedTask);
+            }
+        } else {
+            if (!updatedTests[targetStageId]) updatedTests[targetStageId] = [];
+            updatedTests[targetStageId].push(draggedTask);
+        }
+        
+        const newProgress = calcProgressFromTasks(updatedTests);
+        await onUpdate(project.id, { tests: updatedTests, progress: newProgress });
+    };
+
+    const allTaskTypes = useMemo(() => {
+        return [...DEFAULT_TASK_TYPES, ...(project.customTaskTypes || [])];
+    }, [project.customTaskTypes]);
+
+    const handleAddCustomType = async (newType) => {
+        const trimmed = newType.trim();
+        if (!trimmed) return;
+        const currentCustom = project.customTaskTypes || [];
+        if (DEFAULT_TASK_TYPES.includes(trimmed) || currentCustom.includes(trimmed)) {
+            alert('이미 존재하는 유형입니다.');
+            return;
+        }
+        await onUpdate(project.id, { customTaskTypes: [...currentCustom, trimmed] });
+    };
+
+    const handleCreateGroup = () => {
+        setIsAddingGroup(true);
+    };
+
+    const handleCreateGroupSubmit = async () => {
+        if (!newGroupName || !newGroupName.trim()) return;
+
+        const custom = project.customStages || [];
+        const newGroup = {
+            id: 'custom_' + Date.now(),
+            label: newGroupName.trim(),
+            color: 'text-indigo-500',
+            bgColor: 'bg-indigo-50'
+        };
+
+        const updatedCustomStages = [...custom, newGroup];
+
+        // schedules에도 초기화
+        const updatedSchedules = { ...(project.schedules || {}) };
+        updatedSchedules[newGroup.id] = { start: '', end: '', status: 'pending' };
+
+        // documents에도 초기화
+        const updatedDocs = { ...(project.documents || {}) };
+        updatedDocs[newGroup.id] = [];
+
+        // tests에도 초기화
+        const updatedTests = { ...(project.tests || {}) };
+        updatedTests[newGroup.id] = [];
+
+        await onUpdate(project.id, {
+            customStages: updatedCustomStages,
+            schedules: updatedSchedules,
+            documents: updatedDocs,
+            tests: updatedTests
+        });
+
+        setIsAddingGroup(false);
+        setNewGroupName('');
+    };
+    const [isEditingHeader, setIsEditingHeader] = useState(false);
+    const [headerInput, setHeaderInput] = useState({
+        name: '',
+        description: '',
+        targetModel: '',
+        projectStartDate: '',
+        projectEndDate: ''
+    });
+
     useEffect(() => {
         if (isOpen && project) {
             setViewMode('overview');
             setActiveStageId(null);
             fetchIssues();
+            setIsEditingHeader(false);
         }
     }, [isOpen, project]);
 
@@ -57,8 +176,8 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
 
     if (!isOpen || !project) return null;
 
-    const currentStageIdx = stages.findIndex(s => s.id === project.currentStage);
-    const activeStage = activeStageId ? stages.find(s => s.id === activeStageId) : null;
+    const currentStageIdx = allStages.findIndex(s => s.id === project.currentStage);
+    const activeStage = activeStageId ? allStages.find(s => s.id === activeStageId) : null;
 
     // Actions
     const handleStageSelect = (stageId) => {
@@ -68,11 +187,11 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
 
 
     const handleStageChange = async (stageId) => {
-        if (!window.confirm(`프로젝트 단계를 [${stages.find(s => s.id === stageId).label}]로 변경하시겠습니까?`)) return;
-        const newIdx = stages.findIndex(s => s.id === stageId);
-        const progress = Math.round(((newIdx + 1) / stages.length) * 100);
+        if (!window.confirm(`프로젝트 단계를 [${allStages.find(s => s.id === stageId).label}]로 변경하시겠습니까?`)) return;
+        const newIdx = allStages.findIndex(s => s.id === stageId);
+        const progress = Math.round(((newIdx + 1) / allStages.length) * 100);
         const newHistory = [
-            { stage: stageId, date: new Date().toISOString(), note: `단계 변경: ${stages.find(s => s.id === project.currentStage).label} ➔ ${stages.find(s => s.id === stageId).label}` },
+            { stage: stageId, date: new Date().toISOString(), note: `단계 변경: ${allStages.find(s => s.id === project.currentStage).label} ➔ ${allStages.find(s => s.id === stageId).label}` },
             ...(project.stageHistory || [])
         ];
         await onUpdate(project.id, { currentStage: stageId, progress, stageHistory: newHistory });
@@ -95,6 +214,8 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
         }
 
         const stageId = scheduleEditModal.stageId;
+        const oldSchedule = project.schedules?.[stageId] || { start: '', end: '' };
+
         const updatedSchedules = { ...project.schedules };
         updatedSchedules[stageId] = {
             ...updatedSchedules[stageId],
@@ -107,15 +228,17 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
             id: Date.now().toString(),
             type: 'schedule_change',
             stageId,
-            stageLabel: scheduleEditModal.label,
-            user: currentUser?.displayName || 'Unknown',
+            stageName: scheduleEditModal.label,
+            user: userProfile?.name || currentUser?.displayName || currentUser?.email || 'Unknown',
             photoURL: currentUser?.photoURL || null,
-            date: new Date().toISOString(),
+            timestamp: new Date().toISOString(),
             message: '일정 변경',
             reason: scheduleEditModal.reason,
-            details: {
-                start: scheduleEditModal.start,
-                end: scheduleEditModal.end
+            changes: {
+                oldStart: oldSchedule.start,
+                oldEnd: oldSchedule.end,
+                newStart: scheduleEditModal.start,
+                newEnd: scheduleEditModal.end
             }
         };
 
@@ -251,127 +374,223 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
 
     const editingStageId = useMemo(() => {
         if (!editingTest) return null;
-        for (const stage of stages) {
+        for (const stage of allStages) {
             if (project.tests?.[stage.id]?.find(t => t.id === editingTest.id)) {
                 return stage.id;
             }
         }
         return null;
-    }, [editingTest, project.tests, stages]);
+    }, [editingTest, project.tests, allStages]);
 
     return (
         <div className="flex-1 w-full min-h-0 bg-white flex flex-col animate-in fade-in duration-300 relative">
             
             {/* 1. Header (Monday Style) */}
-            <div className="bg-white px-8 pt-8 pb-6 border-b border-slate-200 shrink-0">
-                <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                            <span className="text-xs font-bold text-slate-500 hover:underline cursor-pointer">Projects</span>
-                            <span className="text-slate-300">/</span>
-                            <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-black">{project.code || 'PRJ'}</span>
-                        </div>
-                        <h2 className="text-3xl font-black text-slate-900 leading-tight truncate tracking-tight">{project.name || project.title || '제목 없는 프로젝트'}</h2>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                        <button onClick={() => setShowActivityLog(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg transition-all shadow-sm">
-                            <History size={14} /> 활동 로그
-                        </button>
-                        <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg transition-all">
-                            <X size={18}/>
-                        </button>
-                    </div>
-                </div>
-                {/* 프로젝트 소개(Description) */}
-                <div className="mt-2 group/desc relative max-w-4xl">
-                    {isEditingDesc ? (
-                        <div className="flex flex-col gap-2 animate-in fade-in">
-                            <textarea 
-                                autoFocus
-                                value={descInput}
-                                onChange={e => setDescInput(e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-[13px] text-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none resize-none transition-all"
-                                rows="3"
-                                placeholder="프로젝트 목표나 소개를 적어주세요..."
-                            />
-                            <div className="flex gap-2 justify-end">
-                                <button onClick={() => setIsEditingDesc(false)} className="px-3 py-1.5 text-[11px] font-bold text-slate-500 hover:bg-slate-100 rounded-lg">취소</button>
-                                <button onClick={() => {
-                                    onUpdate(project.id, { description: descInput });
-                                    setIsEditingDesc(false);
-                                }} className="px-3 py-1.5 text-[11px] font-bold bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm">저장</button>
+            {isEditingHeader ? (
+                /* Edit Mode */
+                <div className="bg-white px-8 pt-8 pb-6 border-b border-slate-200 shrink-0">
+                    <div className="flex justify-between items-start mb-4">
+                        <div className="flex-1 min-w-0 pr-8">
+                            <div className="flex items-center gap-2 mb-3">
+                                <span className="text-xs font-bold text-slate-500">Projects</span>
+                                <span className="text-slate-300">/</span>
+                                <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-black">{project.code || 'PRJ'}</span>
                             </div>
-                        </div>
-                    ) : (
-                        <div 
-                            className="text-[13px] text-slate-600 font-medium leading-relaxed whitespace-pre-wrap p-2 -ml-2 rounded-xl border border-transparent group-hover/desc:border-slate-200 group-hover/desc:bg-slate-50 cursor-pointer transition-all"
-                            onClick={() => {
-                                setDescInput(project.description || '');
-                                setIsEditingDesc(true);
-                            }}
-                        >
-                            {project.description || <span className="text-slate-400 italic">이 프로젝트에 대한 간단한 소개나 목표를 입력해주세요. (클릭하여 수정)</span>}
-                        </div>
-                    )}
-                </div>
-            </div>
-
-                {/* 2. Main Board Content (Monday Style List Only) */}
-                <div className="flex-1 overflow-y-auto bg-[#f5f6f8] flex flex-col">
-                    {/* 상단 컨트롤 바 */}
-                    <div className="px-8 py-4 flex justify-between items-center border-b border-slate-200 bg-white sticky top-0 z-10 shadow-sm">
-                        <div className="flex items-center gap-3">
-                            {isAddingGlobalTask ? (
-                                <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200 animate-in slide-in-from-left-4">
-                                    <select 
-                                        value={globalTaskInput.stageId} 
-                                        onChange={e => setGlobalTaskInput(prev => ({ ...prev, stageId: e.target.value }))}
-                                        className="text-[11px] font-bold bg-white border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-500 text-slate-700"
-                                    >
-                                        {stages.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-                                    </select>
-                                    <input 
-                                        autoFocus
-                                        type="text" 
-                                        placeholder="새로운 업무명 입력" 
-                                        value={globalTaskInput.title}
-                                        onChange={e => setGlobalTaskInput(prev => ({ ...prev, title: e.target.value }))}
-                                        onKeyDown={e => {
-                                            if (e.key === 'Enter' && globalTaskInput.title.trim()) {
-                                                handleAddTest(globalTaskInput.stageId, null, globalTaskInput.title.trim());
-                                                setGlobalTaskInput(prev => ({ ...prev, title: '' }));
-                                            }
-                                            if (e.key === 'Escape') setIsAddingGlobalTask(false);
-                                        }}
-                                        className="text-[11px] w-48 bg-white border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-500 font-medium"
+                            
+                            <div className="space-y-4 max-w-2xl bg-slate-50/50 p-6 rounded-2xl border border-slate-200/80 animate-in fade-in">
+                                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">프로젝트 정보 수정</h3>
+                                
+                                {/* 프로젝트 이름 */}
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-[11px] font-black text-slate-600">프로젝트명</label>
+                                    <input
+                                        type="text"
+                                        value={headerInput.name}
+                                        onChange={e => setHeaderInput(p => ({ ...p, name: e.target.value }))}
+                                        className="w-full bg-white border border-slate-350 rounded-xl px-3.5 py-2 text-sm font-bold text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                                        placeholder="프로젝트명을 입력하세요"
                                     />
-                                    <button onClick={() => {
-                                        if (globalTaskInput.title.trim()) {
-                                            handleAddTest(globalTaskInput.stageId, null, globalTaskInput.title.trim());
-                                            setGlobalTaskInput(prev => ({ ...prev, title: '' }));
-                                        }
-                                    }} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-[11px] font-black hover:bg-indigo-700 transition-colors shadow-sm">
-                                        추가
+                                </div>
+
+                                {/* 개발개요 */}
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-[11px] font-black text-slate-600">개발개요</label>
+                                    <textarea
+                                        value={headerInput.description}
+                                        onChange={e => setHeaderInput(p => ({ ...p, description: e.target.value }))}
+                                        rows="2"
+                                        className="w-full bg-white border border-slate-350 rounded-xl px-3.5 py-2 text-sm font-bold text-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none resize-none transition-all"
+                                        placeholder="개발개요 및 간단한 설명글을 입력하세요"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    {/* 대상 모델 */}
+                                    <div className="flex flex-col gap-1.5">
+                                        <label className="text-[11px] font-black text-slate-600">대상 모델</label>
+                                        <input
+                                            type="text"
+                                            value={headerInput.targetModel}
+                                            onChange={e => setHeaderInput(p => ({ ...p, targetModel: e.target.value }))}
+                                            className="w-full bg-white border border-slate-350 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                                            placeholder="현 모델 및 신규 모델 가칭"
+                                        />
+                                    </div>
+
+                                    {/* 기간 */}
+                                    <div className="flex flex-col gap-1.5">
+                                        <label className="text-[11px] font-black text-slate-600">개발 기간</label>
+                                        <div className="flex items-center gap-1.5">
+                                            <input
+                                                type="date"
+                                                value={headerInput.projectStartDate}
+                                                onChange={e => setHeaderInput(p => ({ ...p, projectStartDate: e.target.value }))}
+                                                className="flex-1 bg-white border border-slate-350 rounded-xl px-2.5 py-1.5 text-[11px] font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all"
+                                            />
+                                            <span className="text-slate-400 font-bold">~</span>
+                                            <input
+                                                type="date"
+                                                value={headerInput.projectEndDate}
+                                                onChange={e => setHeaderInput(p => ({ ...p, projectEndDate: e.target.value }))}
+                                                className="flex-1 bg-white border border-slate-350 rounded-xl px-2.5 py-1.5 text-[11px] font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* 버튼 */}
+                                <div className="flex gap-2 justify-end pt-2 border-t border-slate-200">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsEditingHeader(false)}
+                                        className="px-3.5 py-2 text-xs font-bold text-slate-500 hover:bg-slate-200/50 rounded-xl transition-all"
+                                    >
+                                        취소
                                     </button>
-                                    <button onClick={() => setIsAddingGlobalTask(false)} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
-                                        <X size={14} />
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            onUpdate(project.id, {
+                                                name: headerInput.name.trim(),
+                                                description: headerInput.description.trim(),
+                                                targetModel: headerInput.targetModel.trim(),
+                                                projectStartDate: headerInput.projectStartDate,
+                                                projectEndDate: headerInput.projectEndDate
+                                            });
+                                            setIsEditingHeader(false);
+                                        }}
+                                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-100 transition-all"
+                                    >
+                                        저장
                                     </button>
                                 </div>
-                            ) : (
-                                <button onClick={() => setIsAddingGlobalTask(true)} className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-[11px] font-black hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-100 flex items-center gap-1.5">
-                                    <Plus size={14}/> 새로 만들기
-                                </button>
-                            )}
+                            </div>
                         </div>
-                        <div className="flex items-center gap-4 text-[11px] font-bold text-slate-500">
-                            <span>총 {stages.reduce((acc, stage) => acc + (project.tests?.[stage.id]?.length || 0), 0)} Items</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                            <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg transition-all">
+                                <X size={18}/>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                /* View Mode */
+                <div className="bg-white px-8 py-4 border-b border-slate-200 shrink-0 animate-in fade-in duration-200">
+                    <div className="flex justify-between items-center">
+                        <div className="flex-1 min-w-0 pr-6">
+                            <div className="flex items-center gap-2 mb-0.5">
+                                <span className="text-[10px] font-bold text-slate-400 hover:underline cursor-pointer">Projects</span>
+                                <span className="text-slate-300">/</span>
+                                <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[9px] font-black">{project.code || 'PRJ'}</span>
+                            </div>
+                            <h2 className="text-xl font-black text-slate-900 leading-tight truncate tracking-tight">
+                                {project.name || project.title || '제목 없는 프로젝트'}
+                            </h2>
+                        </div>
+                        
+                        <div className="flex items-center gap-1.5 shrink-0">
+                            <button 
+                                onClick={() => {
+                                    setHeaderInput({
+                                        name: project.name || project.title || '',
+                                        description: project.description || '',
+                                        targetModel: project.targetModel || '',
+                                        projectStartDate: project.projectStartDate || '',
+                                        projectEndDate: project.projectEndDate || ''
+                                    });
+                                    setIsEditingHeader(true);
+                                }} 
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg transition-all shadow-sm"
+                            >
+                                <Edit3 size={12} /> 정보 수정
+                            </button>
+                            <button 
+                                onClick={() => onDelete?.(project.id)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black text-rose-500 hover:text-rose-605 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-lg transition-all shadow-sm"
+                            >
+                                <Trash2 size={12} /> 삭제
+                            </button>
+                            <button onClick={() => setShowActivityLog(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg transition-all shadow-sm">
+                                <History size={12} /> 활동 로그
+                            </button>
+                            <div className="text-[10px] font-bold text-slate-400 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg shadow-sm">
+                                총 {allStages.reduce((acc, stage) => acc + (project.tests?.[stage.id]?.length || 0), 0)}개 업무
+                            </div>
+                            <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg transition-all">
+                                <X size={16}/>
+                            </button>
                         </div>
                     </div>
 
+                    {/* 프로젝트 메타데이터 인라인 바 (개발개요, 기간, 대상 모델) */}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-2.5 text-[11px] text-slate-600 animate-in fade-in duration-200">
+                        {/* 개발개요 */}
+                        <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/50 px-2.5 py-1 rounded-lg">
+                            <FileText size={12} className="text-indigo-500" />
+                            <span className="font-black text-slate-400">개발개요</span>
+                            <span className="text-slate-300">|</span>
+                            <span className="font-bold text-slate-700 max-w-[250px] truncate" title={project.description}>
+                                {project.description || <span className="text-slate-400 font-medium italic">미등록</span>}
+                            </span>
+                        </div>
+
+                        {/* 기간 */}
+                        <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/50 px-2.5 py-1 rounded-lg">
+                            <CalendarDays size={12} className="text-indigo-500" />
+                            <span className="font-black text-slate-400">기간</span>
+                            <span className="text-slate-300">|</span>
+                            <span className="font-bold text-slate-700">
+                                {project.projectStartDate || project.projectEndDate ? (
+                                    <span>
+                                        {project.projectStartDate ? new Date(project.projectStartDate).toLocaleDateString('ko-KR') : '미정'}
+                                        {' ~ '}
+                                        {project.projectEndDate ? new Date(project.projectEndDate).toLocaleDateString('ko-KR') : '미정'}
+                                    </span>
+                                ) : (
+                                    <span className="text-slate-400 font-medium italic">미지정</span>
+                                )}
+                            </span>
+                        </div>
+
+                        {/* 대상 모델 */}
+                        <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/50 px-2.5 py-1 rounded-lg">
+                            <Layers size={12} className="text-indigo-500" />
+                            <span className="font-black text-slate-400">대상 모델</span>
+                            <span className="text-slate-300">|</span>
+                            <span className="font-bold text-slate-700 max-w-[180px] truncate" title={project.targetModel}>
+                                {project.targetModel || <span className="text-slate-400 font-medium italic">미등록</span>}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+                {/* 2. Main Board Content (Monday Style List Only) */}
+                <div className="flex-1 overflow-y-auto bg-[#f5f6f8] flex flex-col relative">
                     {/* Main Board Table */}
                     <div className="flex-1 p-8">
                         <MondayStyleBoard
-                            explicitGroups={stages.map((stage) => ({
+                            explicitGroups={allStages.map((stage) => ({
                                 id: stage.id,
                                 name: stage.label,
                                 items: project.tests?.[stage.id] || [],
@@ -381,7 +600,7 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                             onSelect={setEditingTest}
                             onUpdateTask={(id, fields) => {
                                 let foundStageId = null;
-                                for (const stage of stages) {
+                                for (const stage of allStages) {
                                     if (project.tests?.[stage.id]?.find(t => t.id === id)) {
                                         foundStageId = stage.id;
                                         break;
@@ -391,7 +610,7 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                             }}
                             onDeleteTask={(id) => {
                                 let foundStageId = null;
-                                for (const stage of stages) {
+                                for (const stage of allStages) {
                                     if (project.tests?.[stage.id]?.find(t => t.id === id)) {
                                         foundStageId = stage.id;
                                         break;
@@ -401,18 +620,16 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                             }}
                             onAddTask={(stageId, taskName) => handleAddTest(stageId, null, taskName)}
                             onUpdateGroupSchedule={handleScheduleChange}
+                            onReorderGroups={handleReorderGroups}
+                            onReorderTasks={handleReorderTasks}
+                            taskTypes={allTaskTypes}
+                            onAddCustomType={handleAddCustomType}
                         />
                     </div>
                 </div>
 
                 {/* 4. Footer */}
-                <div className="px-5 py-3 bg-white border-t border-slate-100 shrink-0 flex items-center justify-between">
-                    <button 
-                        onClick={() => { if(window.confirm("프로젝트를 삭제하시겠습니까?")) { onClose(); } }} 
-                        className="flex items-center gap-1.5 text-rose-400 text-[9px] font-black hover:text-rose-600 uppercase tracking-widest px-2 py-1 hover:bg-rose-50 rounded-lg transition-all"
-                    >
-                        <Trash2 size={11}/> 삭제
-                    </button>
+                <div className="px-5 py-3 bg-white border-t border-slate-100 shrink-0 flex items-center justify-end">
                     <div className="flex items-center gap-1.5 text-[8px] font-black text-slate-300">
                         <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
                         Sync: {project.updatedAt?.toDate ? project.updatedAt.toDate().toLocaleTimeString('ko-KR') : 'N/A'}
@@ -731,6 +948,62 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                         </div>
                     </>
                 )}
+
+            {/* 플로팅 새 그룹 추가 버튼 (FAB) */}
+            <button
+                onClick={handleCreateGroup}
+                className="fixed bottom-8 right-8 z-[180] w-12 h-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full flex items-center justify-center shadow-2xl shadow-indigo-300/40 hover:shadow-indigo-400/50 transition-all hover:scale-110 active:scale-95 group hover:-translate-y-0.5"
+                title="새 그룹 추가"
+            >
+                <Plus size={22} className="transition-transform group-hover:rotate-90 duration-200" />
+            </button>
+
+            {/* 새 그룹 추가 미니 팝업 다이얼로그 */}
+            {isAddingGroup && (
+                <>
+                    <div 
+                        className="fixed inset-0 bg-slate-900/10 backdrop-blur-[1px] z-[190] animate-in fade-in duration-200" 
+                        onClick={() => { setIsAddingGroup(false); setNewGroupName(''); }}
+                    />
+                    <div className="fixed bottom-24 right-8 z-[200] w-72 bg-white rounded-2xl border border-slate-200/80 shadow-2xl p-4 animate-in fade-in slide-in-from-bottom-4 duration-200">
+                        <h4 className="text-xs font-black text-slate-800 mb-2.5 flex items-center gap-1.5">
+                            🆕 새 그룹 추가
+                        </h4>
+                        <input
+                            autoFocus
+                            type="text"
+                            value={newGroupName}
+                            onChange={e => setNewGroupName(e.target.value)}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleCreateGroupSubmit();
+                                if (e.key === 'Escape') {
+                                    setIsAddingGroup(false);
+                                    setNewGroupName('');
+                                }
+                            }}
+                            placeholder="그룹 명칭을 입력하세요..."
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all"
+                        />
+                        <div className="flex gap-2 justify-end mt-3">
+                            <button
+                                type="button"
+                                onClick={() => { setIsAddingGroup(false); setNewGroupName(''); }}
+                                className="px-2.5 py-1.5 text-[10px] font-black text-slate-450 hover:text-slate-600 transition-colors"
+                            >
+                                취소
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleCreateGroupSubmit}
+                                disabled={!newGroupName.trim()}
+                                className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition-all shadow-sm ${newGroupName.trim() ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-100' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                            >
+                                추가
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 }
