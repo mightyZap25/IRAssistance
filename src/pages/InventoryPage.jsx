@@ -204,6 +204,7 @@ export default function InventoryPage() {
                 <div className="flex gap-2">
                     <button 
                         onClick={() => setIsSettingsOpen(true)}
+                        data-tour="inventory-risk-settings-btn"
                         className="flex items-center gap-2 bg-white hover:bg-slate-50 text-rose-600 border-2 border-rose-100 font-extrabold py-3 px-6 rounded-2xl shadow-sm transition-all hover:scale-105"
                     >
                         <ShieldAlert size={18} /><span>위험재고 기준 설정</span>

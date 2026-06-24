@@ -501,6 +501,7 @@ export default function VendorsPage() {
                     </div>
                 </div>
                 <button onClick={() => { setEditTarget(null); setIsModalOpen(true); }}
+                    data-tour="vendors-register-btn"
                     className="flex items-center gap-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-extrabold py-2.5 px-4 rounded-xl shadow-md transition-all hover:scale-105">
                     <Plus size={16} /> 업체 등록
                 </button>

@@ -970,6 +970,7 @@ const BOMPage = () => {
                 <div className="relative flex items-center gap-2">
                     <button 
                         onClick={() => setIsCategoryModalOpen(true)}
+                        data-tour="bom-category-manager-btn"
                         className="flex items-center gap-2 bg-white/50 hover:bg-white dark:bg-slate-800/50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold py-2 px-3 rounded-xl transition-colors border border-slate-200/50 dark:border-slate-700 shadow-sm text-sm"
                     >
                         <Layers size={16} className="text-indigo-500" />
@@ -1006,6 +1007,7 @@ const BOMPage = () => {
                     </div>
                     <button
                         onClick={() => setIsImportModalOpen(true)}
+                        data-tour="bom-import-btn"
                         className="w-full mt-3 flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-650 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 font-bold text-xs shadow-md shadow-blue-100 hover:scale-[1.01] active:scale-[0.99] transition-all"
                     >
                         <FileSpreadsheet size={14} />
@@ -1027,6 +1029,7 @@ const BOMPage = () => {
                             </button>
                             <button 
                                 onClick={(e) => { e.stopPropagation(); handleStartNewBOM('product'); }}
+                                data-tour="bom-register-btn"
                                 className="p-1 text-blue-600 hover:bg-blue-100 rounded ml-1"
                                 title="신규 완제품 생성"
                             >
@@ -1145,6 +1148,7 @@ const BOMPage = () => {
                             </button>
                             <button 
                                 onClick={(e) => { e.stopPropagation(); handleStartNewBOM('assembly'); }}
+                                data-tour="bom-register-btn"
                                 className="p-1 text-amber-600 hover:bg-amber-100 rounded opacity-0 group-hover/section:opacity-100 transition-opacity ml-1"
                                 title="신규 조립품 BOM 생성"
                             >
@@ -1247,10 +1251,10 @@ const BOMPage = () => {
                                                 <Ban size={16} /> 단종 처리
                                             </button>
                                         )}
-                                        <button onClick={handleDeriveBOM} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-bold text-sm shadow-md shadow-emerald-100 transition-all">
+                                        <button onClick={handleDeriveBOM} data-tour="bom-derive-btn" className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-bold text-sm shadow-md shadow-emerald-100 transition-all">
                                             <GitCompare size={16} /> 파생발의
                                         </button>
-                                        <button onClick={handleComparePrevious} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-bold text-sm shadow-sm transition-all">
+                                        <button onClick={handleComparePrevious} data-tour="bom-compare-btn" className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-bold text-sm shadow-sm transition-all">
                                             <GitCompare size={16} /> 이전 리비전과 비교
                                         </button>
                                         {bomData && (() => {
@@ -1278,13 +1282,14 @@ const BOMPage = () => {
                                                             setEditingSpecs(merged);
                                                         }
                                                     }} 
+                                                    data-tour="bom-edit-btn"
                                                     className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-sm shadow-md shadow-indigo-100 transition-all"
                                                 >
                                                     <Edit3 size={16} /> 수정
                                                 </button>
                                             );
                                         })()}
-                                        <button onClick={() => setIsExportModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-bold text-sm shadow-sm">
+                                        <button onClick={() => setIsExportModalOpen(true)} data-tour="bom-export-btn" className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-bold text-sm shadow-sm">
                                             <Download size={16} /> 내보내기
                                         </button>
                                     </>
@@ -1554,7 +1559,7 @@ const BOMPage = () => {
                                 </div>
                             </div>
 
-                            <div className="col-span-3 min-h-0">
+                            <div className="col-span-3 min-h-0" data-tour="bom-structure">
                                 <BOMStructurePanel 
                                     bomData={bomData}
                                     isEditMode={isEditMode}

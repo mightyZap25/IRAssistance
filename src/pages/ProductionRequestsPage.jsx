@@ -1346,18 +1346,18 @@ export default function ProductionRequestsPage() {
         <div className="h-full flex flex-col space-y-5">
             <div className="flex justify-between items-end">
                 <div><h1 className="text-3xl font-black text-slate-900 tracking-tight">생산 의뢰 관리</h1><p className="text-sm font-bold text-slate-500 mt-1.5">생산 의뢰 및 이력 추적</p></div>
-                <button onClick={() => setIsCreateOpen(true)} className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-black flex items-center gap-2 shadow-lg"><Plus size={18}/> 신규 의뢰</button>
+                <button data-tour="pr-register-btn" onClick={() => setIsCreateOpen(true)} className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-black flex items-center gap-2 shadow-lg"><Plus size={18}/> 신규 의뢰</button>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex-1 flex flex-col min-h-0 overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
-                    <div className="flex space-x-6">
-                        <button onClick={() => setActiveTab('CURRENT')} className={`text-sm font-black pb-4 -mb-4 border-b-2 ${activeTab === 'CURRENT' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>진행 현황</button>
-                        <button onClick={() => setActiveTab('HISTORY')} className={`text-sm font-black pb-4 -mb-4 border-b-2 ${activeTab === 'HISTORY' ? 'border-slate-600 text-slate-600' : 'border-transparent text-slate-400'}`}>전체 이력</button>
+                    <div className="flex space-x-6" data-tour="pr-tabs">
+                        <button data-tour="pr-tab-current" onClick={() => setActiveTab('CURRENT')} className={`text-sm font-black pb-4 -mb-4 border-b-2 ${activeTab === 'CURRENT' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>진행 현황</button>
+                        <button data-tour="pr-tab-history" onClick={() => setActiveTab('HISTORY')} className={`text-sm font-black pb-4 -mb-4 border-b-2 ${activeTab === 'HISTORY' ? 'border-slate-600 text-slate-600' : 'border-transparent text-slate-400'}`}>전체 이력</button>
                     </div>
                     <div className="relative"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/><input type="text" placeholder="검색..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9 pr-4 py-2 text-sm font-bold bg-white border border-slate-200 rounded-xl outline-none w-64 shadow-sm"/></div>
                 </div>
-                <div className="flex-1 overflow-hidden">
+                <div className="flex-1 overflow-hidden" data-tour="pr-list-row">
                     {loading ? <div className="flex items-center justify-center h-full">Loading...</div> : 
                     <MasterDataGrid 
                         data={(activeTab === 'CURRENT' ? [...currentData.active, ...currentData.production] : currentData.history).map(pr => {

@@ -6,7 +6,12 @@ import { fork } from 'child_process';
 import url from 'url';
 import http from 'http';
 import dotenv from 'dotenv';
-dotenv.config();
+// 개발 환경: __dirname 기준 / 패키징 환경: app.getAppPath() 기준으로 .env 경로 명시
+const envPath = app.isPackaged
+    ? path.join(process.resourcesPath, '.env')
+    : path.join(path.dirname(url.fileURLToPath(import.meta.url)), '.env');
+dotenv.config({ path: envPath });
+console.log('[Electron Main] .env 로드 경로:', envPath);
 
 
 // Override default User Agent to completely bypass Google's "secure browser" check on login popups and webviews
@@ -22,11 +27,15 @@ const PORT = 5050;
 
 // Start Express Backend Server as a child process
 function startBackend() {
-    const serverPath = path.join(process.cwd(), 'server.js');
+    const serverPath = path.join(app.getAppPath(), 'server.js');
     console.log(`[Electron Main] Starting Backend Server: ${serverPath}`);
     
     serverProcess = fork(serverPath, [], {
-        env: { ...process.env, PORT: PORT.toString() }
+        env: { 
+            ...process.env, 
+            PORT: PORT.toString(),
+            ELECTRON_RESOURCES_PATH: app.isPackaged ? process.resourcesPath : app.getAppPath()
+        }
     });
 
     serverProcess.on('error', (err) => {
@@ -44,17 +53,13 @@ function createWindow() {
         height: 850,
         minWidth: 1024,
         minHeight: 720,
-        title: 'IR Assistant ERP',
-        icon: fsExists(path.join(process.cwd(), 'app_tray_icon.png')) 
-            ? path.join(process.cwd(), 'app_tray_icon.png') 
-            : (fsExists(path.join(process.cwd(), 'dist', 'favicon.ico')) 
-                ? path.join(process.cwd(), 'dist', 'favicon.ico') 
-                : undefined),
+        title: 'IR Assistant',
+        icon: path.join(app.getAppPath(), 'app_tray_icon.png'),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
             webviewTag: true, // Crucial for Google Chat iframe/webview embedding
-            preload: path.join(process.cwd(), 'preload.js') // Empty or utility if needed
+            preload: path.join(app.getAppPath(), 'preload.js') // app.getAppPath()는 패키징 환경(asar)에서도 올바른 경로 반환
         }
     });
 
@@ -109,9 +114,7 @@ function createWindow() {
 }
 
 function createTray() {
-    const preferredIconPath = path.join(process.cwd(), 'app_tray_icon.png');
-    const builtIconPath = path.join(process.cwd(), 'dist', 'favicon.ico');
-    const activeIconPath = fsExists(preferredIconPath) ? preferredIconPath : builtIconPath;
+    const activeIconPath = path.join(app.getAppPath(), 'app_tray_icon.png');
     
     tray = new Tray(activeIconPath);
     

@@ -596,6 +596,7 @@ export default function PartsDetailPanel({ partId, parts, filteredParts = [], on
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
+                                    data-tour={`detail-tab-${tab.id}`}
                                     className={`flex-1 py-2 rounded-xl text-[11px] font-black transition-all ${activeTab === tab.id ? 'bg-white dark:bg-slate-900 shadow-md text-indigo-650 dark:text-indigo-400 font-extrabold border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
                                 >
                                     {tab.label}
@@ -909,7 +910,7 @@ export default function PartsDetailPanel({ partId, parts, filteredParts = [], on
 
     return createPortal(
         (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300 detail-panel-portal transition-all duration-300">
                 {/* Glass Backdrop */}
                 <div 
                     className="absolute inset-0 bg-slate-900/50 backdrop-blur-md transition-opacity"

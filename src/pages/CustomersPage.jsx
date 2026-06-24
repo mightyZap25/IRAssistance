@@ -109,6 +109,7 @@ export default function CustomersPage() {
                 <div className="relative">
                     <button
                         onClick={handleCreate}
+                        data-tour="customers-register-btn"
                         className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold py-2.5 px-3 rounded-2xl transition-all shadow-lg shadow-blue-200 dark:shadow-none hover:scale-[1.02] transform"
                     >
                         <Plus size={18} />

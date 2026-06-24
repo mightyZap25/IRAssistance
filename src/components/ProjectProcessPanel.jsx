@@ -502,7 +502,7 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                             <div className="flex items-center gap-2 mb-0.5">
                                 <span className="text-[10px] font-bold text-slate-400 hover:underline cursor-pointer">Projects</span>
                                 <span className="text-slate-300">/</span>
-                                <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[9px] font-black">{project.code || 'PRJ'}</span>
+                                <span data-tour="pm-project-card" className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[9px] font-black">{project.code || 'PRJ'}</span>
                             </div>
                             <h2 className="text-xl font-black text-slate-900 leading-tight truncate tracking-tight">
                                 {project.name || project.title || '제목 없는 프로젝트'}
@@ -531,7 +531,11 @@ export default function ProjectProcessPanel({ isOpen, onClose, project, stages, 
                             >
                                 <Trash2 size={12} /> 삭제
                             </button>
-                            <button onClick={() => setShowActivityLog(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg transition-all shadow-sm">
+                            <button 
+                                data-tour="pm-view-toggle"
+                                onClick={() => setShowActivityLog(true)} 
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg transition-all shadow-sm"
+                            >
                                 <History size={12} /> 활동 로그
                             </button>
                             <div className="text-[10px] font-bold text-slate-400 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg shadow-sm">

@@ -843,6 +843,7 @@ const ECOPage = () => {
                             </div>
                             <button
                                 onClick={openCreateModal}
+                                data-tour="eco-register-btn"
                                 className="px-5 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 shadow-md shadow-indigo-100 transition-all flex items-center gap-2"
                             >
                                 <PlusCircle size={16} /> ECO 승인서 작성

@@ -164,6 +164,7 @@ export default function PartsPage() {
                     <RoleGuard requiredRole={USER_ROLES.ENGINEER}>
                         <button
                             onClick={() => setIsImportModalOpen(true)}
+                            data-tour="parts-import-btn"
                             className="flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold py-2.5 px-3 rounded-2xl transition-all shadow-lg shadow-emerald-200 dark:shadow-none hover:scale-[1.02] transform"
                         >
                             <Layers size={18} />
@@ -171,6 +172,7 @@ export default function PartsPage() {
                         </button>
                         <button
                             onClick={openCreateModal}
+                            data-tour="parts-register-btn"
                             className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-extrabold py-2.5 px-3 rounded-2xl transition-all shadow-lg shadow-indigo-200 dark:shadow-none hover:scale-[1.02] transform"
                         >
                             <Plus size={18} />

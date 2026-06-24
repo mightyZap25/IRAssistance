@@ -373,7 +373,7 @@ export default function MasterDataGrid({
     const portalTarget = document.getElementById('grid-column-selector-portal');
 
     const columnSelectorUI = (
-        <div className="relative">
+        <div className="relative" data-tour="grid-col-settings">
             <button
                 onClick={() => setIsColSelectorOpen(!isColSelectorOpen)}
                 className={`flex items-center gap-2 px-4 py-2 border rounded-xl font-black text-xs transition-all shadow-sm ${isColSelectorOpen ? 'bg-indigo-50 text-indigo-600 border-indigo-200/70' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-50'}`}
@@ -424,7 +424,7 @@ export default function MasterDataGrid({
                         {/* Left: Search & Total Count */}
                         <div className="flex flex-wrap gap-4 items-center flex-1 min-w-0">
                             {enableSearch && (
-                                <div className="relative min-w-[200px] max-w-sm flex-1">
+                                <div className="relative min-w-[200px] max-w-sm flex-1" data-tour="grid-search">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                                     <input
                                         type="text"
@@ -447,6 +447,7 @@ export default function MasterDataGrid({
                             {enableFilter && (
                                 <button
                                     onClick={() => setIsFilterOpen(!isFilterOpen)}
+                                    data-tour="grid-advanced-filter"
                                     className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg font-black text-xs transition-all whitespace-nowrap ${isFilterOpen || activeFilters.length > 0 ? 'bg-indigo-50 text-indigo-600 border-indigo-200/70' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-50 shadow-sm'}`}
                                 >
                                     <SlidersHorizontal size={13} />
@@ -458,7 +459,7 @@ export default function MasterDataGrid({
                             {columnSelectorUI}
 
                             {enableViewModeToggle && (
-                                <div className="flex bg-slate-100/80 dark:bg-slate-800/60 p-0.5 rounded-lg border border-slate-200/50 shadow-sm shrink-0">
+                                <div data-tour="grid-view-toggle" className="flex bg-slate-100/80 dark:bg-slate-800/60 p-0.5 rounded-lg border border-slate-200/50 shadow-sm shrink-0">
                                     <button
                                         onClick={() => onViewModeChange('card')}
                                         className={`p-1.5 rounded transition-all ${viewMode === 'card' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm border border-slate-200/50' : 'text-slate-400 hover:text-slate-700'}`}
@@ -500,7 +501,7 @@ export default function MasterDataGrid({
                 </div>
             ) : (
                 /* Scrollable table content with dynamic border-spacing for padding */
-                <div className="flex-1 overflow-auto custom-scrollbar relative pr-1">
+                <div className="flex-1 overflow-auto custom-scrollbar relative pr-1" data-tour="grid-table">
                     <table className="w-full text-left text-xs text-slate-650 dark:text-slate-350 border-separate border-spacing-y-2">
                         <thead className="text-xs uppercase text-slate-450 font-black tracking-widest sticky top-0 z-20">
                             <tr>

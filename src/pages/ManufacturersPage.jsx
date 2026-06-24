@@ -341,6 +341,7 @@ export default function ManufacturersPage() {
                     </div>
                 </div>
                 <button onClick={() => { setEditTarget(null); setIsModalOpen(true); }}
+                    data-tour="manufacturers-register-btn"
                     className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold py-2.5 px-4 rounded-xl shadow-md transition-all hover:scale-105">
                     <Plus size={16} /> 제조사 등록
                 </button>

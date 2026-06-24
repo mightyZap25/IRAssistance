@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth, DEV_ROLES } from '../contexts/AuthContext';
 import { db, collection, query, where, orderBy, onSnapshot, doc, updateDoc, setDoc, serverTimestamp, getDoc } from '../firebase';
-import { LogOut, User, Bell, FlaskConical, ChevronDown, Check, StickyNote, X, Maximize2, Minimize2, Move, Printer } from 'lucide-react';
+import { LogOut, User, Bell, FlaskConical, ChevronDown, Check, StickyNote, X, Maximize2, Minimize2, Move, Printer, HelpCircle } from 'lucide-react';
 import RichMemoEditor from './common/RichMemoEditor';
 
-export default function Header() {
+export default function Header({ isHelpOpen, onToggleHelp }) {
     const { currentUser, userProfile, rawUserProfile, devRoleOverride, setDevRoleOverride, logout } = useAuth();
     const [devMenuOpen, setDevMenuOpen] = useState(false);
     const [notiMenuOpen, setNotiMenuOpen] = useState(false);
@@ -387,6 +387,15 @@ export default function Header() {
 
                 {/* Divider */}
                 <div className="h-6 w-[1px] bg-slate-200 mx-1"/>
+
+                {/* 사용자 도움말 (매뉴얼) 토글 버튼 */}
+                <button
+                    onClick={onToggleHelp}
+                    className={`p-1.5 hover:bg-slate-100 rounded-full transition-all duration-200 ${isHelpOpen ? 'text-indigo-650 bg-indigo-50/50 shadow-inner' : 'text-slate-400 hover:text-indigo-600'}`}
+                    title="사용자 가이드 및 매뉴얼"
+                >
+                    <HelpCircle size={18} />
+                </button>
 
                 {/* Floating Notepad Toggle */}
                 <button

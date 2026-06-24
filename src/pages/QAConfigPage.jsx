@@ -171,7 +171,7 @@ export default function QAConfigPage() {
                 </div>
             </div>
 
-            <div className="flex items-center gap-3 mb-6 shrink-0">
+            <div className="flex items-center gap-3 mb-6 shrink-0" data-tour="qa-config-tabs">
                 <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shadow-inner">
                     <button 
                         onClick={() => setActiveTab('parts')}
@@ -302,6 +302,7 @@ export default function QAConfigPage() {
                                 </h4>
                                 <button 
                                     onClick={handleAutoRegisterStandard}
+                                    data-tour="qa-config-auto-btn"
                                     className="flex items-center gap-2 px-5 py-2.5 bg-teal-50 text-teal-700 border border-teal-100 rounded-2xl text-[11px] font-black hover:bg-teal-600 hover:text-white transition-all shadow-sm"
                                 >
                                     <Zap size={14} /> 표준 불량 세트 자동 등록

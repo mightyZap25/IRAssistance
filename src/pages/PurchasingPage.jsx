@@ -165,7 +165,7 @@ export default function PurchasingPage() {
                     <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-xl shadow-indigo-100"><ShoppingCart size={24} /></div>
                     <div><h1 className="text-xl font-black tracking-tight text-slate-900">발주 관리</h1><p className="text-slate-500 text-xs font-bold uppercase tracking-widest italic">Phase 4: Full Pipeline with Expense Resolution</p></div>
                 </div>
-                <button onClick={() => setIsCreateModalOpen(true)} className="flex items-center gap-2 bg-indigo-600 text-white font-extrabold py-3 px-6 rounded-2xl shadow-xl hover:bg-indigo-700 transition-all hover:scale-105">
+                <button onClick={() => setIsCreateModalOpen(true)} data-tour="purchasing-register-btn" className="flex items-center gap-2 bg-indigo-600 text-white font-extrabold py-3 px-6 rounded-2xl shadow-xl hover:bg-indigo-700 transition-all hover:scale-105">
                     <Plus size={18} /><span>신규 발주 요청서 작성</span>
                 </button>
             </div>

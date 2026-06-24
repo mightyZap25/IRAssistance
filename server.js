@@ -24,7 +24,51 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
 const PORT = process.env.PORT || 5050;
-const CONFIG_FILE = path.join(process.cwd(), 'db_config.json');
+
+// OS별 안전한 AppData(사용자 폴더) 경로에 db_config.json 위치 설정 및 복사 초기화
+const getDbConfigPath = () => {
+    const appData = process.env.APPDATA || (process.platform === 'darwin' ? path.join(process.env.HOME, 'Library/Application Support') : path.join(process.env.HOME, '.config'));
+    const configFolder = path.join(appData, 'IR-Assistant-ERP');
+    if (!fs.existsSync(configFolder)) {
+        fs.mkdirSync(configFolder, { recursive: true });
+    }
+    
+    const userConfigFile = path.join(configFolder, 'db_config.json');
+    
+    // AppData 폴더에 db_config.json이 없는 경우, 템플릿 복사 시도
+    if (!fs.existsSync(userConfigFile)) {
+        const resourcesPath = process.env.ELECTRON_RESOURCES_PATH || process.cwd();
+        const possibleResourcesPaths = [
+            resourcesPath,
+            path.join(resourcesPath, 'resources'),
+            path.join(__dirname, '..', '..'),
+            process.cwd()
+        ];
+        
+        let templateCopied = false;
+        for (const p of possibleResourcesPaths) {
+            const templatePath = path.join(p, 'db_config.json');
+            if (fs.existsSync(templatePath)) {
+                try {
+                    fs.copyFileSync(templatePath, userConfigFile);
+                    console.log(`[DB Config] Initialized configuration template from: ${templatePath}`);
+                    templateCopied = true;
+                    break;
+                } catch (e) {
+                    console.error(`Failed to copy config template from ${templatePath}:`, e);
+                }
+            }
+        }
+        
+        if (!templateCopied) {
+            console.log('[DB Config] No database configuration template found. Fallback profile will be created.');
+        }
+    }
+    
+    return userConfigFile;
+};
+
+const CONFIG_FILE = getDbConfigPath();
 
 // Helper: Load Database Configuration (JSON first, then .env)
 const loadDbConfig = () => {

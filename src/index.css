@@ -58,3 +58,8 @@
 .react-grid-placeholder { background: rgba(0,0,0,0.05) !important; border-radius: 1rem; margin: 0; padding: 0; z-index: 2 !important; }
 .react-resizable-handle { position: absolute; width: 12px; height: 12px; bottom: 4px; right: 4px; cursor: se-resize; border-right: 2px solid rgba(0,0,0,0.1); border-bottom: 2px solid rgba(0,0,0,0.1); border-radius: 2px; }
 .react-resizable-handle::after { content: ""; position: absolute; right: 2px; bottom: 2px; width: 4px; height: 4px; border-right: 2px solid rgba(0,0,0,0.2); border-bottom: 2px solid rgba(0,0,0,0.2); }
+
+/* 도움말이 열려있을 때 상세 모달 팝업의 가로 위치를 가이드 너비(380px)만큼 우측에서 밀어냅니다. */
+body.help-drawer-open .detail-panel-portal {
+    padding-right: 395px; /* 가이드 너비 380px + 여백 15px */
+}

@@ -195,7 +195,7 @@ export default function QAProcessPage() {
             </div>
 
             {/* Tabs */}
-            <div className="flex items-center gap-3 mb-6 shrink-0">
+            <div className="flex items-center gap-3 mb-6 shrink-0" data-tour="qa-process-tabs">
                 <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shadow-inner">
                     {TABS.map(tab => (
                         <button 

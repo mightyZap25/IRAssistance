@@ -335,6 +335,7 @@ export default function WorkspaceSidebar({
                                 onDrop={(e) => handleFolderDrop(e, folder.id)}
                             >
                                 <div 
+                                    data-tour="pm-folder-item"
                                     onClick={() => toggleFolder(folder.id)}
                                     className="flex items-center gap-1 px-2 py-1.5 hover:bg-slate-200/50 rounded-lg cursor-pointer transition-colors group relative"
                                 >
