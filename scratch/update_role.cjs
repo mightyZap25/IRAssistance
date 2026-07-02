@@ -43,16 +43,16 @@ async function run() {
     let found = false;
     for (const row of res.rows) {
       console.log(`ID: ${row.id}, Email: ${row.data.email}, Role: ${row.data.role}`);
-      if (row.data.email === 'jogak@irrobot.com') {
+      if (row.data.email === 'jogak@mightyzap.com') {
         const updatedData = { ...row.data, role: 'admin', department: 'Master Admin' };
         await pool.query('UPDATE "users" SET data = $1 WHERE id = $2', [JSON.stringify(updatedData), row.id]);
-        console.log(`Successfully updated jogak@irrobot.com user role to 'admin' (Master)!`);
+        console.log(`Successfully updated jogak@mightyzap.com user role to 'admin' (Master)!`);
         found = true;
       }
     }
 
     if (!found) {
-        console.log("jogak@irrobot.com not found in 'users' table.");
+        console.log("jogak@mightyzap.com not found in 'users' table.");
     }
   } catch (err) {
     console.error("Error executing database operation:", err);

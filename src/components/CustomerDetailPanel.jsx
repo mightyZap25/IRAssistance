@@ -36,10 +36,10 @@ export default function CustomerDetailPanel({ customer, onClose, onEdit, inline 
 
                 // 2. Fetch Integrated History (Mocking Emails, Quotes, Invoices for now)
                 const mockIntegrated = [
-                    { id: 'mail-1', type: 'EMAIL', Subject: '[수신] 도면 변경 건 문의', Content: '요청하신 변경 도면 검토 결과 회신드립니다.', CreatedAt: { toDate: () => new Date(Date.now() - 86400000 * 1) }, Sender: 'cs@irrobot.com' },
+                    { id: 'mail-1', type: 'EMAIL', Subject: '[수신] 도면 변경 건 문의', Content: '요청하신 변경 도면 검토 결과 회신드립니다.', CreatedAt: { toDate: () => new Date(Date.now() - 86400000 * 1) }, Sender: 'cs@mightyzap.com' },
                     { id: 'quote-1', type: 'QUOTE', Subject: '부품 발주 견적서 발행', Content: '총 금액: ₩12,500,000 (VAT 별도)', CreatedAt: { toDate: () => new Date(Date.now() - 86400000 * 3) } },
                     { id: 'invoice-1', type: 'INVOICE', Subject: '세금계산서 국세청 전송 완료', Content: '공급가액: ₩5,000,000 / 세액: ₩500,000', CreatedAt: { toDate: () => new Date(Date.now() - 86400000 * 7) } },
-                    { id: 'mail-2', type: 'EMAIL', Subject: '완제품 납품 일정 안내', Content: '6월 중순 납품 예정인 제품들의 생산이 완료되어 일정을 안내드립니다.', CreatedAt: { toDate: () => new Date(Date.now() - 86400000 * 5) }, Sender: 'sales@irrobot.com' }
+                    { id: 'mail-2', type: 'EMAIL', Subject: '완제품 납품 일정 안내', Content: '6월 중순 납품 예정인 제품들의 생산이 완료되어 일정을 안내드립니다.', CreatedAt: { toDate: () => new Date(Date.now() - 86400000 * 5) }, Sender: 'sales@mightyzap.com' }
                 ];
                 setEmailHistory(mockIntegrated);
                 

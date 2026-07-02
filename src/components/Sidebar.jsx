@@ -9,23 +9,26 @@ import {
     FileCheck, BookOpen, AlertCircle, Building2,
     PlayCircle, ChevronDown, UserCheck, Briefcase, 
     ListTodo, CalendarDays, Cloud, Mail, Activity,
-    TrendingUp, FileText, CreditCard, StickyNote, MessageSquare, Microscope
+    TrendingUp, FileText, CreditCard, StickyNote, MessageSquare, Microscope,
+    DollarSign, BarChart2, Wrench, HeadphonesIcon, Globe, Cpu,
+    ClipboardCheck, Clock, Receipt, Contact, Boxes, FlaskConical
 } from 'lucide-react';
 
 const ROLE_MENU_MAP = {
-    admin: ['/', '/settings', '/parts', '/bom', '/customers', '/prod-requests', '/prod-execution', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/eco', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
-    engineer: ['/', '/parts', '/bom', '/eco', '/inventory', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
-    sales: ['/', '/customers', '/prod-requests', '/inventory', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
-    qa: ['/', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/inventory', '/transactions', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
-    production: ['/', '/prod-execution', '/prod-requests', '/inventory', '/purchasing', '/outsourcing', '/transactions', '/vendors', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
-    manager: ['/', '/customers', '/prod-requests', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
-    viewer: ['/', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat'],
+    admin: ['/', '/settings', '/parts', '/bom', '/customers', '/prod-requests', '/prod-execution', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/eco', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/odoo/apps', '/odoo/view'],
+    engineer: ['/', '/parts', '/bom', '/eco', '/inventory', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/odoo/view'],
+    sales: ['/', '/customers', '/prod-requests', '/inventory', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/odoo/view'],
+    qa: ['/', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/inventory', '/transactions', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/odoo/view'],
+    production: ['/', '/prod-execution', '/prod-requests', '/inventory', '/purchasing', '/outsourcing', '/transactions', '/vendors', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/odoo/view'],
+    manager: ['/', '/customers', '/prod-requests', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/odoo/view'],
+    viewer: ['/', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/odoo/view'],
 };
 
 export default function Sidebar() {
     const { currentUser, userProfile } = useAuth();
     const [pendingEcnCount, setPendingEcnCount] = useState(0);
     const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
+    const [odooMenus, setOdooMenus] = useState([]);
 
     useEffect(() => {
         if (!currentUser) return;
@@ -46,86 +49,35 @@ export default function Sidebar() {
         return () => { unsubEcn(); unsubLeave(); unsubFlex(); };
     }, [currentUser]);
 
+    useEffect(() => {
+        const handleOdooMenus = (e) => {
+            setOdooMenus(e.detail);
+        };
+        window.addEventListener('odoo-menus-loaded', handleOdooMenus);
+        return () => window.removeEventListener('odoo-menus-loaded', handleOdooMenus);
+    }, []);
+
     const role = userProfile?.role || 'viewer';
     const allowedPaths = ROLE_MENU_MAP[role] || ROLE_MENU_MAP.viewer;
-    const isAllowed = (path) => allowedPaths.includes(path);
+    const isAllowed = (path) => {
+        if (path.startsWith('/odoo/view')) {
+            return allowedPaths.includes('/odoo/view');
+        }
+        return allowedPaths.includes(path);
+    };
 
     const filterGroups = (groups) => groups
         .map(group => ({ ...group, items: group.items.filter(item => isAllowed(item.path)) }))
         .filter(group => group.items.length > 0);
 
-    const PLM_GROUPS = [
-        {
-            title: 'ERP 핵심 & PLM',
-            items: [
-                { name: '부품 관리', path: '/parts', icon: Settings },
-                { name: 'BOM 관리', path: '/bom', icon: Layers },
-                { name: '고객사 관리', path: '/customers', icon: Building2 },
-                { name: '제조사 관리', path: '/manufacturers', icon: Factory },
-                { name: '공급사 관리', path: '/vendors', icon: Users },
-                { name: 'ECO 승인', path: '/eco', icon: AlertCircle, badge: pendingEcnCount > 0 ? pendingEcnCount : null }
-            ]
-        }
-    ];
 
-    const SCM_GROUPS = [
-        {
-            title: '생산 & 공급망 SCM',
-            items: [
-                { name: '생산 의뢰', path: '/prod-requests', icon: ClipboardList },
-                { name: '생산 계획', path: '/prod-execution', icon: PlayCircle },
-                { name: '발주 관리', path: '/purchasing', icon: ShoppingCart },
-                { name: '외주 관리', path: '/outsourcing', icon: Truck },
-                { name: '입출고 내역', path: '/transactions', icon: History }
-            ]
-        }
-    ];
-
-    const QA_GROUPS = [
-        {
-            title: '재고 & 품질 QA',
-            items: [
-                { name: '품질 대시보드', path: '/qa/dashboard', icon: TrendingUp },
-                { name: '재고 현황', path: '/inventory', icon: Package },
-                { name: '품질 공정 관리', path: '/qa/process', icon: Activity },
-                { name: '품질 기준 설정', path: '/qa/config', icon: Settings },
-                { name: '개발 성능 테스트', path: '/qa/dev-testing', icon: Microscope }
-            ]
-        }
-    ];
-
-    const PROJECT_MENU_GROUPS = [
-        {
-            title: '프로젝트 & 작업 PM',
-            items: [
-                { name: '프로젝트 현황판', path: '/project/dashboard', icon: LayoutDashboard },
-                { name: '개발 프로젝트', path: '/project/management', icon: Briefcase },
-                { name: '이슈 트랙커', path: '/project/issues', icon: AlertCircle },
-                { name: 'TASK', path: '/project/tasks', icon: ListTodo },
-                { name: '업무 캘린더', path: '/project/task-calendar', icon: CalendarDays }
-            ]
-        }
-    ];
-
-    const SALES_MENU_GROUPS = [
-        {
-            title: '영업 & 정산',
-            items: [
-                { name: '매출 대시보드', path: '/sales/dashboard', icon: TrendingUp },
-                { name: '수금 및 영수증', path: '/sales/billing', icon: CreditCard }
-            ]
-        }
-    ];
 
     const COLLAB_MENU_GROUPS = [
         {
             title: '협업 & 공통 오피스',
             items: [
                 { name: '근태 관리', path: '/hr/attendance', icon: UserCheck, badge: pendingApprovalCount > 0 ? pendingApprovalCount : null },
-                { name: '통합 일정', path: '/workspace/calendar', icon: CalendarDays },
-                { name: '회의 및 미팅', path: '/workspace/meetings', icon: Users },
                 { name: '통합 메일', path: '/workspace/mail', icon: Mail },
-                { name: '메모장', path: '/workspace/memo', icon: StickyNote },
                 { name: 'Google Drive', path: '/workspace/drive', icon: Cloud },
                 { name: 'Google Chat', path: '/workspace/chat', icon: MessageSquare }
             ]
@@ -141,11 +93,105 @@ export default function Sidebar() {
         }
     ];
 
-    const fPlm = filterGroups(PLM_GROUPS);
-    const fScm = filterGroups(SCM_GROUPS);
-    const fQa = filterGroups(QA_GROUPS);
-    const fProj = filterGroups(PROJECT_MENU_GROUPS);
-    const fSales = filterGroups(SALES_MENU_GROUPS);
+    // Odoo 영문 메뉴명 → 한글 변환 맵
+    const ODOO_NAME_MAP = {
+        'Sales': '영업',
+        'Purchase': '구매',
+        'Inventory': '재고 관리',
+        'Manufacturing': '제조',
+        'Accounting': '회계',
+        'Invoicing': '청구서',
+        'Project': '프로젝트',
+        'Employees': '직원 관리',
+        'Attendances': '근태 관리',
+        'Time Off': '휴가 관리',
+        'Payroll': '급여',
+        'Expenses': '경비',
+        'Helpdesk': '헬프데스크',
+        'Website': '웹사이트',
+        'eCommerce': '전자상거래',
+        'CRM': 'CRM (고객관리)',
+        'Discuss': '메신저',
+        'Contacts': '연락처',
+        'Technical': '기술설정',
+        'Settings': '설정',
+        'Apps': '앱 센터',
+        'Email Marketing': '이메일 마케팅',
+        'Field Service': '현장 서비스',
+        'IoT': 'IoT',
+        'Maintenance': '설비 관리',
+        'Quality': '품질 관리',
+        'Repairs': '수리',
+        'Sign': '전자서명',
+        'Timesheets': '근무시간',
+        'Rental': '렌탈',
+        'Lunch': '식사 관리',
+        'Events': '이벤트',
+        'Surveys': '설문조사',
+        'Live Chat': '실시간 채팅',
+        'Documents': '문서 관리',
+        'Consolidation': '연결 회계',
+    };
+
+    // Odoo 메뉴명 → 아이콘 맵
+    const ODOO_ICON_MAP = {
+        'Sales': TrendingUp,
+        'Purchase': ShoppingCart,
+        'Inventory': Boxes,
+        'Manufacturing': Factory,
+        'Accounting': DollarSign,
+        'Invoicing': Receipt,
+        'Project': Briefcase,
+        'Employees': Users,
+        'Attendances': UserCheck,
+        'Time Off': CalendarDays,
+        'Payroll': CreditCard,
+        'Expenses': FileText,
+        'Helpdesk': HeadphonesIcon,
+        'Website': Globe,
+        'eCommerce': ShoppingCart,
+        'CRM': Building2,
+        'Discuss': MessageSquare,
+        'Contacts': Contact,
+        'Technical': Cpu,
+        'Settings': Settings,
+        'Apps': Package,
+        'Email Marketing': Mail,
+        'Field Service': Truck,
+        'IoT': Cpu,
+        'Maintenance': Wrench,
+        'Quality': ClipboardCheck,
+        'Repairs': Wrench,
+        'Sign': FileCheck,
+        'Timesheets': Clock,
+        'Rental': FileText,
+        'Lunch': StickyNote,
+        'Events': CalendarDays,
+        'Surveys': ClipboardList,
+        'Live Chat': MessageSquare,
+        'Documents': BookOpen,
+        'Consolidation': BarChart2,
+    };
+
+    // 사이드바에서 숨길 Odoo 메뉴 목록
+    const ODOO_HIDDEN_MENUS = new Set([
+        'Tests', 'Link Tracker',
+    ]);
+
+    const ODOO_DYNAMIC_GROUPS = odooMenus.length > 0 ? [
+        {
+            title: 'Odoo 서비스',
+            items: odooMenus
+                .filter(app => !ODOO_HIDDEN_MENUS.has(app.name))
+                .map(app => ({
+                    name: ODOO_NAME_MAP[app.name] || app.name,
+                    path: `/odoo/view?menu_id=${app.menu_id}`,
+                    icon: ODOO_ICON_MAP[app.name] || Package
+                }))
+        }
+    ] : [];
+
+    const fOdoo = filterGroups(ODOO_DYNAMIC_GROUPS);
     const fCollab = filterGroups(COLLAB_MENU_GROUPS);
     const fAdmin = filterGroups(ADMIN_GROUPS);
 
@@ -184,11 +230,7 @@ export default function Sidebar() {
                 )}
 
                 {[
-                    { g: fPlm, t: '제품 관리 (PLM)' },
-                    { g: fScm, t: '공급망 (SCM)' },
-                    { g: fQa, t: '품질 (QA)' },
-                    { g: fProj, t: '프로젝트 (PM)' },
-                    { g: fSales, t: '영업 및 정산' },
+                    { g: fOdoo, t: 'odoo' },
                     { g: fCollab, t: '협업 오피스' },
                     { g: fAdmin, t: '시스템 관리' }
                 ].map(sec => sec.g.length > 0 && (

@@ -66,7 +66,7 @@ export default function Layout({ children }) {
                         </div>
                     )}
                     
-                    <div className={`${isFullPage ? 'max-w-none w-full h-[calc(100vh-48px)]' : 'max-w-[1300px] mx-auto'} animate-fade-in`} style={{ display: (isGoogleChat && isElectron) ? 'none' : 'block' }}>
+                    <div className={`${isFullPage ? 'max-w-none w-full h-[calc(100vh-48px)]' : 'max-w-[1300px] mx-auto h-[calc(100vh-96px)]'} animate-fade-in`} style={{ display: (isGoogleChat && isElectron) ? 'none' : 'block' }}>
                         {children}
                     </div>
 

@@ -110,7 +110,7 @@ export default function WorkspaceMailPage() {
                 {
                     id: 'm3',
                     sender: '박지민 팀장',
-                    email: 'jm.park@irrobot.com',
+                    email: 'jm.park@mightyzap.com',
                     subject: '주간 업무 보고 및 다음주 생산 계획 공유',
                     content: '금주 이슈 사항 정리 및 차주 생산 계획 공유드립니다. 월요일 회의 때 논의 예정입니다.',
                     date: '2026-06-01 17:45',
@@ -123,7 +123,7 @@ export default function WorkspaceMailPage() {
                 {
                     id: 'm4',
                     sender: '해외영업팀',
-                    email: 'global@irrobot.com',
+                    email: 'global@mightyzap.com',
                     subject: '[RE] Export Inquiry for E-Series Models',
                     content: 'The client from Singapore is asking about the certification details for E-Series. Can we provide the CE docs?',
                     date: '2026-06-01 14:20',
@@ -555,7 +555,7 @@ export default function WorkspaceMailPage() {
                                             <p className="text-base font-black text-slate-900">{selectedEmail.sender}</p>
                                             <span className="text-[10px] font-bold text-slate-400">&lt;{selectedEmail.email}&gt;</span>
                                         </div>
-                                        <p className="text-xs font-bold text-slate-400 mt-0.5">To: Me &lt;{userProfile?.email || 'user@irrobot.com'}&gt;</p>
+                                        <p className="text-xs font-bold text-slate-400 mt-0.5">To: Me &lt;{userProfile?.email || 'user@mightyzap.com'}&gt;</p>
                                     </div>
                                 </div>
                                 <div className="text-right">

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Calendar, Clock, AlertTriangle } from 'lucide-react';
-import { createPersonalTask } from '../services/taskService';
+// import { createPersonalTask } from '../services/taskService';
 
 export default function QuickTaskCreateModal({ isOpen, onClose, selectedDate, uid, onSuccess }) {
     const [title, setTitle] = useState('');
@@ -25,7 +25,8 @@ export default function QuickTaskCreateModal({ isOpen, onClose, selectedDate, ui
                 alarmEnabled: false,
                 recurring: 'none'
             };
-            await createPersonalTask(uid, taskData);
+            // await createPersonalTask(uid, taskData);
+            alert("개인 할 일은 Odoo 시스템에 직접 등록해주세요.");
             setTitle('');
             setPriority('medium');
             onSuccess();

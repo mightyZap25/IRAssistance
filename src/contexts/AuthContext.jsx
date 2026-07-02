@@ -25,7 +25,7 @@ export function AuthProvider({ children }) {
     const [devRoleOverride, setDevRoleOverride] = useState(null); // 임시 역할 오버라이드
 
     // Domain restriction configuration
-    const ALLOWED_DOMAINS = ['irrocot.com', 'irrobot.com'];
+    const ALLOWED_DOMAINS = ['mightyzap.com'];
 
     async function login() {
         try {

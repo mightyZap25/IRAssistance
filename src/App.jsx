@@ -1,43 +1,18 @@
 import React from 'react'
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
-import Login from './components/Login'
-import GoogleChatPage from './pages/GoogleChatPage'
 
+import Login from './components/Login'
 import Layout from './components/Layout'
-import DashboardPage from './pages/DashboardPage'
-import PartsPage from './pages/PartsPage'
-import BOMPage from './pages/BOMPage'
-import CustomersPage from './pages/CustomersPage'
-import ECOPage from './pages/ECOPage'
-import InventoryPage from './pages/InventoryPage'
-import ManufacturersPage from './pages/ManufacturersPage'
-import VendorsPage from './pages/VendorsPage'
-import ProductionRequestsPage from './pages/ProductionRequestsPage'
-import ProductionExecutionPage from './pages/ProductionExecutionPage'
-import PurchasingPage from './pages/PurchasingPage'
-import TransactionsPage from './pages/TransactionsPage'
-import OutsourcingPage from './pages/OutsourcingPage'
-import WarehousePlacementPage from './pages/WarehousePlacementPage'
-import ReturnProcessingPage from './pages/ReturnProcessingPage'
+import OdooWebView from './components/OdooWebView'
+
+// 커스텀 Google Workspace 화면들 및 기타 유지 화면들
+import GoogleChatPage from './pages/GoogleChatPage'
 import GoogleDrivePage from './pages/GoogleDrivePage'
 import WorkspaceCalendarPage from './pages/WorkspaceCalendarPage'
 import WorkspaceMailPage from './pages/WorkspaceMailPage'
 import WorkspaceMemoPage from './pages/WorkspaceMemoPage'
 import MeetingsPage from './pages/MeetingsPage'
-import LeaveManagementPage from './pages/LeaveManagementPage'
-import QAConfigPage from './pages/QAConfigPage'
-import QAProcessPage from './pages/QAProcessPage'
-import QualityDashboardPage from './pages/QualityDashboardPage'
-import DevelopmentTestingPage from './pages/DevelopmentTestingPage'
-import ProjectDashboardPage from './pages/ProjectDashboardPage'
-import ProjectIssuesPage from './pages/ProjectIssuesPage'
-import TasksPage from './pages/TasksPage'
-import TaskCalendarPage from './pages/TaskCalendarPage'
-import ProjectManagementPage from './pages/ProjectManagementPage'
-import SalesDashboardPage from './pages/SalesDashboardPage'
-
-import BillingPage from './pages/BillingPage'
 import SettingsPage from './pages/SettingsPage'
 
 function PrivateRoute({ children }) {
@@ -51,279 +26,35 @@ function AppContent() {
         <Routes>
             <Route path="/login" element={!currentUser ? <Login /> : <Navigate to="/" />} />
 
-            {/* Protected Routes */}
-            <Route path="/" element={
-                <PrivateRoute>
-                    <Layout>
-                        <DashboardPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
+            {/* Odoo Webview 공통 연결 라우트 (기존 ERP 페이지들을 모두 이걸로 대체) */}
+            {[
+                '/', '/parts', '/bom', '/customers', '/eco', '/inventory', 
+                '/manufacturers', '/vendors', '/prod-requests', '/prod-execution', 
+                '/purchasing', '/qa/config', '/qa/process', '/qa/dashboard', 
+                '/qa/dev-testing', '/receiving/placement', '/receiving/returns', 
+                '/transactions', '/outsourcing', '/hr/attendance', 
+                '/project/dashboard', '/project/issues', '/project/tasks', 
+                '/project/task-calendar', '/project/management', 
+                '/sales/dashboard', '/sales/billing', '/odoo/apps', '/odoo/view'
+            ].map(path => (
+                <Route key={path} path={path} element={
+                    <PrivateRoute>
+                        <Layout>
+                            <OdooWebView />
+                        </Layout>
+                    </PrivateRoute>
+                } />
+            ))}
 
-            <Route path="/parts" element={
-                <PrivateRoute>
-                    <Layout>
-                        <PartsPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
+            {/* 별도 유지하는 커스텀 React 화면들 (Google 통합 및 설정) */}
+            <Route path="/workspace/drive" element={<PrivateRoute><Layout><GoogleDrivePage /></Layout></PrivateRoute>} />
+            <Route path="/workspace/calendar" element={<PrivateRoute><Layout><WorkspaceCalendarPage /></Layout></PrivateRoute>} />
+            <Route path="/workspace/mail" element={<PrivateRoute><Layout><WorkspaceMailPage /></Layout></PrivateRoute>} />
+            <Route path="/workspace/memo" element={<PrivateRoute><Layout><WorkspaceMemoPage /></Layout></PrivateRoute>} />
+            <Route path="/workspace/chat" element={<PrivateRoute><Layout><GoogleChatPage /></Layout></PrivateRoute>} />
+            <Route path="/workspace/meetings" element={<PrivateRoute><Layout><MeetingsPage /></Layout></PrivateRoute>} />
+            <Route path="/settings" element={<PrivateRoute><Layout><SettingsPage /></Layout></PrivateRoute>} />
 
-            <Route path="/bom" element={
-                <PrivateRoute>
-                    <Layout>
-                        <BOMPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/customers" element={
-                <PrivateRoute>
-                    <Layout>
-                        <CustomersPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/eco" element={
-                <PrivateRoute>
-                    <Layout>
-                        <ECOPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/inventory" element={
-                <PrivateRoute>
-                    <Layout>
-                        <InventoryPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/manufacturers" element={
-                <PrivateRoute>
-                    <Layout>
-                        <ManufacturersPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/vendors" element={
-                <PrivateRoute>
-                    <Layout>
-                        <VendorsPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/prod-requests" element={
-                <PrivateRoute>
-                    <Layout>
-                        <ProductionRequestsPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/prod-execution" element={
-                <PrivateRoute>
-                    <Layout>
-                        <ProductionExecutionPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/purchasing" element={
-                <PrivateRoute>
-                    <Layout>
-                        <PurchasingPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/qa/config" element={
-                <PrivateRoute>
-                    <Layout>
-                        <QAConfigPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/qa/process" element={
-                <PrivateRoute>
-                    <Layout>
-                        <QAProcessPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/qa/dashboard" element={
-                <PrivateRoute>
-                    <Layout>
-                        <QualityDashboardPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/qa/dev-testing" element={
-                <PrivateRoute>
-                    <Layout>
-                        <DevelopmentTestingPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/receiving/placement" element={
-                <PrivateRoute>
-                    <Layout>
-                        <WarehousePlacementPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/receiving/returns" element={
-                <PrivateRoute>
-                    <Layout>
-                        <ReturnProcessingPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/transactions" element={
-                <PrivateRoute>
-                    <Layout>
-                        <TransactionsPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/outsourcing" element={
-                <PrivateRoute>
-                    <Layout>
-                        <OutsourcingPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/workspace/drive" element={
-                <PrivateRoute>
-                    <Layout>
-                        <GoogleDrivePage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/workspace/calendar" element={
-                <PrivateRoute>
-                    <Layout>
-                        <WorkspaceCalendarPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/workspace/mail" element={
-                <PrivateRoute>
-                    <Layout>
-                        <WorkspaceMailPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/workspace/memo" element={
-                <PrivateRoute>
-                    <Layout>
-                        <WorkspaceMemoPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/workspace/chat" element={
-                <PrivateRoute>
-                    <Layout>
-                        <GoogleChatPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/workspace/meetings" element={
-                <PrivateRoute>
-                    <Layout>
-                        <MeetingsPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/hr/attendance" element={
-                <PrivateRoute>
-                    <Layout>
-                        <LeaveManagementPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/project/dashboard" element={
-                <PrivateRoute>
-                    <Layout>
-                        <ProjectDashboardPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/project/issues" element={
-                <PrivateRoute>
-                    <Layout>
-                        <ProjectIssuesPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/project/tasks" element={
-                <PrivateRoute>
-                    <Layout>
-                        <TasksPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/project/task-calendar" element={
-                <PrivateRoute>
-                    <Layout>
-                        <TaskCalendarPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/project/management" element={
-                <PrivateRoute>
-                    <Layout>
-                        <ProjectManagementPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/sales/dashboard" element={
-                <PrivateRoute>
-                    <Layout>
-                        <SalesDashboardPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            <Route path="/sales/billing" element={
-                <PrivateRoute>
-                    <Layout>
-                        <BillingPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
-
-            
-            <Route path="/settings" element={
-                <PrivateRoute>
-                    <Layout>
-                        <SettingsPage />
-                    </Layout>
-                </PrivateRoute>
-            } />
             {/* Catch all */}
             <Route path="*" element={<Navigate to="/" />} />
         </Routes>

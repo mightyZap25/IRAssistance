@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { collection, getDocs, query, where, orderBy } from '../firebase';
-import { getPersonalTasks } from '../services/taskService';
+// Task service removed for Odoo migration
 import {
     ChevronLeft, ChevronRight, Calendar as CalendarIcon,
     Clock, AlertTriangle, CheckCircle2, Circle,
@@ -53,7 +53,7 @@ export default function WorkspaceCalendarPage() {
         setLoading(true);
         try {
             // 1. Fetch personal tasks
-            const taskData = await getPersonalTasks(currentUser.uid);
+            const taskData = [];
 
             // 2. Fetch projects
             const projSnap = await getDocs(collection(db, 'projects'));

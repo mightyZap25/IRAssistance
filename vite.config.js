@@ -16,6 +16,12 @@ export default defineConfig({
                 target: 'http://localhost:5050',
                 changeOrigin: true,
                 secure: false
+            },
+            '/odoo-api': {
+                target: 'http://192.168.0.7:8069',
+                changeOrigin: true,
+                secure: false,
+                rewrite: (path) => path.replace(/^\/odoo-api/, '')
             }
         }
     }

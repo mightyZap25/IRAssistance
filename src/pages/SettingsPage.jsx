@@ -2,15 +2,12 @@ import React, { useState } from 'react';
 import { Save, ShieldAlert, Mail, Database, Server, FileText, GitMerge, RefreshCw, Building2, Briefcase } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import RoleGuard from '../components/common/RoleGuard';
-import { syncAllPartsToSupplierDB } from '../services/supplierAutoRegister';
 import { getAllUsers, updateUserRoleAndDepartment, USER_ROLES, ROLE_LABELS } from '../services/userService';
 
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState('database');
     const { userProfile } = useAuth();
     const [loading, setLoading] = useState(false);
-    const [syncLoading, setSyncLoading] = useState(false);
-    const [syncResult, setSyncResult] = useState(null);
 
     // Auto Update States
     const [currentVersion, setCurrentVersion] = useState('0.0.0');
@@ -327,20 +324,6 @@ export default function SettingsPage() {
         }, 800);
     };
 
-    const handleSyncSuppliers = async () => {
-        if (!window.confirm('기존 등록된 모든 부품(Parts)을 스캔하여 미등록 공급사 및 제조사를 자동으로 추가합니다. 진행하시겠습니까?')) return;
-        setSyncLoading(true);
-        setSyncResult(null);
-        try {
-            const result = await syncAllPartsToSupplierDB();
-            setSyncResult({ success: true, ...result });
-        } catch (err) {
-            setSyncResult({ success: false, error: err.message });
-        } finally {
-            setSyncLoading(false);
-        }
-    };
-
     return (
         <RoleGuard requiredRole="admin">
             <div className="flex flex-col h-[calc(100vh-7.5rem)] overflow-hidden gap-4 animate-fade-in text-slate-800 p-4">
@@ -378,9 +361,6 @@ export default function SettingsPage() {
                         </button>
                         <button onClick={() => setActiveTab('roles')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-bold ${activeTab === 'roles' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'text-slate-600 hover:bg-slate-50'}`}>
                             <ShieldAlert size={18} /> 권한 및 부서 매핑
-                        </button>
-                        <button onClick={() => setActiveTab('sync')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-bold ${activeTab === 'sync' ? 'bg-teal-50 text-teal-700 border border-teal-100' : 'text-slate-600 hover:bg-slate-50'}`}>
-                            <RefreshCw size={18} /> 공급사/제조사 동기화
                         </button>
                         <button onClick={() => setActiveTab('update')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-bold ${activeTab === 'update' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'text-slate-600 hover:bg-slate-50'}`}>
                             <RefreshCw size={18} /> 시스템 자동 업데이트
@@ -831,75 +811,6 @@ export default function SettingsPage() {
                                         </table>
                                     </div>
                                 )}
-                            </div>
-                        )}
-
-                        {activeTab === 'sync' && (
-                            <div className="max-w-2xl animate-fade-in">
-                                <h2 className="text-lg font-black text-slate-900 mb-2">공급사 / 제조사 DB 일괄 동기화</h2>
-                                <p className="text-sm text-slate-500 font-medium mb-6">
-                                    부품(Parts) 및 BOM 목록에 등록된 공급사·제조사 이름을 스캔하여,
-                                    아직 <strong>공급사 관리(vendors)</strong> 또는 <strong>제조사 관리(manufacturers)</strong> DB에
-                                    등록되어 있지 않은 항목을 자동으로 추가합니다.
-                                </p>
-
-                                <div className="bg-teal-50 border border-teal-100 rounded-2xl p-5 space-y-4">
-                                    <div className="flex items-start gap-3">
-                                        <div className="p-2.5 bg-teal-600 rounded-xl text-white shrink-0">
-                                            <RefreshCw size={20} />
-                                        </div>
-                                        <div>
-                                            <h3 className="font-black text-teal-800 text-sm">전체 Parts 스캔 및 자동 등록</h3>
-                                            <p className="text-xs text-teal-600 font-medium mt-1">
-                                                DB에 저장된 모든 부품의 Maker, Supplier, Manufacturer 필드를 읽어
-                                                대소문자 무시 중복 검사 후 미등록 항목만 신규 추가합니다.
-                                                이미 등록된 데이터는 변경되지 않습니다.
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {syncResult && (
-                                        <div className={`p-4 rounded-xl border text-sm font-bold ${
-                                            syncResult.success
-                                                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                                                : 'bg-rose-50 border-rose-200 text-rose-700'
-                                        }`}>
-                                            {syncResult.success ? (
-                                                <>
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <span className="text-emerald-500">✓</span> 동기화 완료!
-                                                    </div>
-                                                    <div className="flex items-center gap-4 text-xs">
-                                                        <span className="flex items-center gap-1.5">
-                                                            <Briefcase size={14} /> 신규 공급사: <strong>{syncResult.addedSuppliers}개</strong>
-                                                        </span>
-                                                        <span className="flex items-center gap-1.5">
-                                                            <Building2 size={14} /> 신규 제조사: <strong>{syncResult.addedManufacturers}개</strong>
-                                                        </span>
-                                                    </div>
-                                                </>
-                                            ) : (
-                                                <span>오류 발생: {syncResult.error}</span>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    <button
-                                        onClick={handleSyncSuppliers}
-                                        disabled={syncLoading}
-                                        className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-black px-5 py-2.5 rounded-xl text-sm shadow-md transition-all disabled:opacity-50"
-                                    >
-                                        <RefreshCw size={16} className={syncLoading ? 'animate-spin' : ''} />
-                                        {syncLoading ? '스캔 중...' : '지금 동기화 실행'}
-                                    </button>
-                                </div>
-
-                                <div className="mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-500 font-medium space-y-1">
-                                    <p>💡 <strong>자동 등록 규칙:</strong></p>
-                                    <p>• 신규 Part 또는 BOM 등록/수정 시 자동으로 실행됩니다.</p>
-                                    <p>• 이 버튼은 기존에 이미 저장된 부품 데이터에서 누락된 항목을 <strong>한 번에 정리</strong>할 때 사용합니다.</p>
-                                    <p>• 자동 등록된 항목은 공급사/제조사 관리 페이지에서 추가 정보(주소, 연락처 등)를 입력할 수 있습니다.</p>
-                                </div>
                             </div>
                         )}
 

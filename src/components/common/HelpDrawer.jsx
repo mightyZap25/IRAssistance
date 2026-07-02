@@ -203,7 +203,7 @@ export default function HelpDrawer({ isOpen, onClose, pathname, onStartTour, onT
             }
         });
         onHintNumbersChange?.(calculatedNumbers);
-    }, [pathname, rawUserProfile => {} /* bypass empty warning */]); // pathname 변경 시 재계산
+    }, [pathname]); // pathname 변경 시 재계산
 
     if (!isOpen) return null;
 
