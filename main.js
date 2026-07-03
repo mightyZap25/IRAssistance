@@ -1,7 +1,10 @@
-import { app, BrowserWindow, Tray, Menu, shell, session, ipcMain, nativeTheme } from 'electron';
+import { app, BrowserWindow, Tray, Menu, shell, session, ipcMain, nativeTheme, dialog } from 'electron';
 import path from 'path';
+import { createRequire } from 'module';
 import pkg from 'electron-updater';
 const { autoUpdater } = pkg;
+const _require = createRequire(import.meta.url);
+const fs = _require('fs');
 import { fork } from 'child_process';
 import url from 'url';
 import http from 'http';
@@ -158,7 +161,6 @@ function createTray() {
 }
 
 // Helper: Sync fs check
-import fs from 'fs';
 function fsExists(p) {
     try {
         fs.accessSync(p);
@@ -701,4 +703,66 @@ ipcMain.handle('clear-google-cookies', async () => {
 ipcMain.on('set-theme', (event, theme) => {
     console.log('[Electron Main] Setting theme to:', theme);
     nativeTheme.themeSource = theme;
+});
+
+// ===== Markdown Notes (Obsidian-like) File System Handlers =====
+
+ipcMain.handle('notes:openFolder', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openDirectory'],
+        title: '노트 폴더 선택 (Obsidian Vault 또는 일반 폴더)'
+    });
+    if (result.canceled || !result.filePaths.length) return null;
+    return result.filePaths[0];
+});
+
+ipcMain.handle('notes:listDir', async (event, dirPath) => {
+    try {
+        const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+        return entries
+            .filter(e => !e.name.startsWith('.'))
+            .map(e => ({
+                name: e.name,
+                path: path.join(dirPath, e.name),
+                isDir: e.isDirectory(),
+            }))
+            .sort((a, b) => {
+                if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+                return a.name.localeCompare(b.name, 'ko');
+            });
+    } catch { return []; }
+});
+
+ipcMain.handle('notes:readFile', async (event, filePath) => {
+    try { return fs.readFileSync(filePath, 'utf-8'); }
+    catch { return null; }
+});
+
+ipcMain.handle('notes:writeFile', async (event, filePath, content) => {
+    try { fs.writeFileSync(filePath, content, 'utf-8'); return true; }
+    catch { return false; }
+});
+
+ipcMain.handle('notes:createFile', async (event, dirPath, fileName) => {
+    const filePath = path.join(dirPath, fileName.endsWith('.md') ? fileName : fileName + '.md');
+    try {
+        if (!fs.existsSync(filePath)) fs.writeFileSync(filePath, `# ${fileName.replace(/\.md$/, '')}\n\n`, 'utf-8');
+        return filePath;
+    } catch { return null; }
+});
+
+ipcMain.handle('notes:createDir', async (event, dirPath, dirName) => {
+    const newPath = path.join(dirPath, dirName);
+    try { fs.mkdirSync(newPath, { recursive: true }); return newPath; }
+    catch { return null; }
+});
+
+ipcMain.handle('notes:deleteFile', async (event, filePath) => {
+    try { fs.unlinkSync(filePath); return true; }
+    catch { return false; }
+});
+
+ipcMain.handle('notes:renameFile', async (event, oldPath, newPath) => {
+    try { fs.renameSync(oldPath, newPath); return true; }
+    catch { return false; }
 });

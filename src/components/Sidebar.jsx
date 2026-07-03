@@ -12,17 +12,17 @@ import {
     TrendingUp, FileText, CreditCard, StickyNote, MessageSquare, Microscope,
     DollarSign, BarChart2, Wrench, HeadphonesIcon, Globe, Cpu,
     ClipboardCheck, Clock, Receipt, Contact, Boxes, FlaskConical,
-    LogOut, User, ChevronLeft, ChevronRight, Sparkles, Sun, Moon
+    LogOut, User, ChevronLeft, ChevronRight, Sparkles, Sun, Moon, NotebookPen
 } from 'lucide-react';
 
 const ROLE_MENU_MAP = {
-    admin: ['/', '/settings', '/parts', '/bom', '/customers', '/prod-requests', '/prod-execution', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/eco', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/odoo/apps', '/odoo/view'],
-    engineer: ['/', '/parts', '/bom', '/eco', '/inventory', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/odoo/view'],
-    sales: ['/', '/customers', '/prod-requests', '/inventory', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/odoo/view'],
-    qa: ['/', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/inventory', '/transactions', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/odoo/view'],
-    production: ['/', '/prod-execution', '/prod-requests', '/inventory', '/purchasing', '/outsourcing', '/transactions', '/vendors', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/odoo/view'],
-    manager: ['/', '/customers', '/prod-requests', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/eco', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/odoo/view'],
-    viewer: ['/', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/odoo/view'],
+    admin: ['/', '/settings', '/parts', '/bom', '/customers', '/prod-requests', '/prod-execution', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/eco', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/workspace/notes', '/odoo/apps', '/odoo/view'],
+    engineer: ['/', '/parts', '/bom', '/eco', '/inventory', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/workspace/notes', '/odoo/view'],
+    sales: ['/', '/customers', '/prod-requests', '/inventory', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/workspace/notes', '/odoo/view'],
+    qa: ['/', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/inventory', '/transactions', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/workspace/notes', '/odoo/view'],
+    production: ['/', '/prod-execution', '/prod-requests', '/inventory', '/purchasing', '/outsourcing', '/transactions', '/vendors', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/workspace/notes', '/odoo/view'],
+    manager: ['/', '/customers', '/prod-requests', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/eco', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/workspace/notes', '/odoo/view'],
+    viewer: ['/', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/workspace/notes', '/odoo/view'],
 };
 
 export default function Sidebar({ isCollapsed, toggleSidebar }) {
@@ -33,6 +33,10 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
     const [odooMenus, setOdooMenus] = useState([]);
     const [appVersion, setAppVersion] = useState('0.9.2');
     const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+    const [tooltip, setTooltip] = useState(null); // { label, y }
+    const [collapsedSections, setCollapsedSections] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('sidebar_sections') || '{}'); } catch { return {}; }
+    });
     const [darkMode, setDarkMode] = useState(() => {
         return localStorage.getItem('theme') === 'dark';
     });
@@ -113,7 +117,8 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                 { name: 'Google Drive', path: '/workspace/drive', icon: Cloud },
                 { name: 'Google Chat', path: '/workspace/chat', icon: MessageSquare },
                 { name: 'Gemini', path: '/workspace/gemini', icon: Sparkles },
-                { name: 'NotebookLM', path: '/workspace/notebooklm', icon: BookOpen }
+                { name: 'NotebookLM', path: '/workspace/notebooklm', icon: BookOpen },
+                { name: '노트', path: '/workspace/notes', icon: NotebookPen }
             ]
         }
     ];
@@ -252,6 +257,20 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
 
     return (
         <aside className={`${isCollapsed ? 'w-16' : 'w-64'} bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col h-screen fixed left-0 top-0 z-50 transition-all duration-300 no-print`}>
+            {/* Fixed tooltip rendered outside overflow containers */}
+            {isCollapsed && tooltip && (
+                <div
+                    className="fixed z-[200] pointer-events-none"
+                    style={{ left: 68, top: tooltip.y - 14 }}
+                >
+                    <div className="flex items-center gap-0">
+                        <span className="w-0 h-0 border-y-[5px] border-y-transparent border-r-[6px] border-r-slate-800 dark:border-r-slate-600" />
+                        <span className="px-2.5 py-1.5 bg-slate-800 dark:bg-slate-600 text-white text-[11px] font-semibold rounded-lg shadow-xl whitespace-nowrap">
+                            {tooltip.label}
+                        </span>
+                    </div>
+                </div>
+            )}
             {/* Header */}
             <div className={`h-16 flex items-center border-b border-slate-100 dark:border-slate-800 shrink-0 ${isCollapsed ? 'justify-center' : 'justify-between px-6'}`}>
                 {!isCollapsed ? (
@@ -419,62 +438,82 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
             {/* Navigation Menus */}
             <nav className={`flex-1 overflow-y-auto py-3 space-y-5 custom-scrollbar ${isCollapsed ? 'px-2 flex flex-col items-center' : 'px-3'}`}>
                 {[
-                    { g: fOdoo, t: 'odoo' },
-                    { g: fCollab, t: '구글 워크스페이스' },
-                    { g: fAdmin, t: '시스템 관리' }
+                    { g: fOdoo, t: 'odoo', label: 'Odoo ERP' },
+                    { g: fCollab, t: '구글 워크스페이스', label: '구글 워크스페이스' },
+                    { g: fAdmin, t: '시스템 관리', label: '시스템 관리' }
                 ].map(sec => sec.g.length > 0 && (
                     <div key={sec.t} className={`w-full ${isCollapsed ? 'space-y-3 flex flex-col items-center' : 'space-y-2'}`}>
                         {!isCollapsed ? (
-                            <div className="px-3 text-[11px] font-black text-slate-400 dark:text-slate-500 tracking-wider">{sec.t}</div>
+                            <button
+                                className="w-full flex items-center justify-between px-3 py-0.5 group"
+                                onClick={() => {
+                                    const next = { ...collapsedSections, [sec.t]: !collapsedSections[sec.t] };
+                                    setCollapsedSections(next);
+                                    localStorage.setItem('sidebar_sections', JSON.stringify(next));
+                                }}
+                            >
+                                <span className="text-[11px] font-black text-slate-400 dark:text-slate-500 tracking-wider group-hover:text-slate-600 dark:group-hover:text-slate-400 transition-colors">{sec.label}</span>
+                                <ChevronDown
+                                    size={11}
+                                    className={`text-slate-300 dark:text-slate-600 group-hover:text-slate-400 transition-all duration-200 ${collapsedSections[sec.t] ? '-rotate-90' : ''}`}
+                                />
+                            </button>
                         ) : (
                             <div className="w-8 h-px bg-slate-100 dark:bg-slate-800 my-1" />
                         )}
-                        
-                        <div className={isCollapsed ? 'w-full flex flex-col items-center gap-1.5' : 'space-y-1 pl-2 border-l border-slate-100 dark:border-slate-800 ml-2'}>
-                            {sec.g.map((group, idx) => (
-                                <div key={idx} className={`w-full ${isCollapsed ? 'flex flex-col items-center gap-1' : 'space-y-0.5'}`}>
-                                    {!isCollapsed && (
-                                        <div className={`text-[9px] uppercase font-extrabold px-3 ${GROUP_COLOR_MAP[group.title] || 'text-slate-400 dark:text-slate-500'}`}>
-                                            {group.title}
-                                        </div>
-                                    )}
-                                    {group.items.map(item => (
-                                        <NavLink 
-                                            key={item.path} 
-                                            to={item.path} 
-                                            className={({ isActive }) => 
-                                                isCollapsed
-                                                    ? `flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 group relative ${
-                                                        checkActive(item.path) 
-                                                            ? 'bg-sky-50 dark:bg-sky-955/40 text-sky-700 dark:text-sky-400 border border-sky-100 dark:border-sky-900/50' 
-                                                            : 'hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-500 dark:text-slate-400'
-                                                    }`
-                                                    : `flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
-                                                        checkActive(item.path) 
-                                                            ? 'bg-sky-50 dark:bg-sky-955/40 text-sky-700 dark:text-sky-400 border border-sky-100 dark:border-sky-900/50 font-bold' 
-                                                            : 'hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-500 dark:text-slate-400 font-medium'
-                                                    }`
-                                            }
-                                            title={isCollapsed ? item.name : undefined}
-                                        >
-                                            <item.icon size={16} /> 
-                                            {!isCollapsed && <span className="text-xs flex-1">{item.name}</span>}
-                                            {item.badge && (
-                                                isCollapsed ? (
-                                                    <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-pulse">
-                                                        {item.badge}
-                                                    </span>
-                                                ) : (
-                                                    <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
-                                                        {item.badge}
-                                                    </span>
-                                                )
-                                            )}
-                                        </NavLink>
-                                    ))}
-                                </div>
-                            ))}
-                        </div>
+
+                        {/* Section items - hidden when collapsed section */}
+                        {!collapsedSections[sec.t] && (
+                            <div className={isCollapsed ? 'w-full flex flex-col items-center gap-1.5' : 'space-y-1 pl-2 border-l border-slate-100 dark:border-slate-800 ml-2'}>
+                                {sec.g.map((group, idx) => (
+                                    <div key={idx} className={`w-full ${isCollapsed ? 'flex flex-col items-center gap-1' : 'space-y-0.5'}`}>
+                                        {!isCollapsed && (
+                                            <div className={`text-[9px] uppercase font-extrabold px-3 ${GROUP_COLOR_MAP[group.title] || 'text-slate-400 dark:text-slate-500'}`}>
+                                                {group.title}
+                                            </div>
+                                        )}
+                                        {group.items.map(item => (
+                                            <NavLink 
+                                                key={item.path} 
+                                                to={item.path} 
+                                                className={({ isActive }) => 
+                                                    isCollapsed
+                                                        ? `flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 relative ${
+                                                            checkActive(item.path) 
+                                                                ? 'bg-sky-50 dark:bg-sky-955/40 text-sky-700 dark:text-sky-400 border border-sky-100 dark:border-sky-900/50' 
+                                                                : 'hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-500 dark:text-slate-400'
+                                                        }`
+                                                        : `flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                                                            checkActive(item.path) 
+                                                                ? 'bg-sky-50 dark:bg-sky-955/40 text-sky-700 dark:text-sky-400 border border-sky-100 dark:border-sky-900/50 font-bold' 
+                                                                : 'hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-500 dark:text-slate-400 font-medium'
+                                                        }`
+                                                }
+                                                onMouseEnter={isCollapsed ? (e) => {
+                                                    const rect = e.currentTarget.getBoundingClientRect();
+                                                    setTooltip({ label: item.name, y: rect.top + rect.height / 2 });
+                                                } : undefined}
+                                                onMouseLeave={isCollapsed ? () => setTooltip(null) : undefined}
+                                            >
+                                                <item.icon size={16} /> 
+                                                {!isCollapsed && <span className="text-xs flex-1">{item.name}</span>}
+                                                {item.badge && (
+                                                    isCollapsed ? (
+                                                        <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-pulse">
+                                                            {item.badge}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
+                                                            {item.badge}
+                                                        </span>
+                                                    )
+                                                )}
+                                            </NavLink>
+                                        ))}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 ))}
             </nav>

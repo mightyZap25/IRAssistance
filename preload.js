@@ -9,6 +9,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     googleOAuthSignIn: () => ipcRenderer.invoke('google-oauth-signin'),
     clearGoogleCookies: () => ipcRenderer.invoke('clear-google-cookies'),
     setTheme: (theme) => ipcRenderer.send('set-theme', theme),
+    // Notes (Obsidian-like) file system API
+    notes: {
+        openFolder:  ()              => ipcRenderer.invoke('notes:openFolder'),
+        listDir:     (dirPath)       => ipcRenderer.invoke('notes:listDir', dirPath),
+        readFile:    (filePath)      => ipcRenderer.invoke('notes:readFile', filePath),
+        writeFile:   (filePath, content) => ipcRenderer.invoke('notes:writeFile', filePath, content),
+        createFile:  (dirPath, name) => ipcRenderer.invoke('notes:createFile', dirPath, name),
+        createDir:   (dirPath, name) => ipcRenderer.invoke('notes:createDir', dirPath, name),
+        deleteFile:  (filePath)      => ipcRenderer.invoke('notes:deleteFile', filePath),
+        renameFile:  (oldPath, newPath) => ipcRenderer.invoke('notes:renameFile', oldPath, newPath),
+    },
     onUpdateMessage: (callback) => {
         const subscription = (event, ...args) => callback(...args);
         ipcRenderer.on('update-message', subscription);

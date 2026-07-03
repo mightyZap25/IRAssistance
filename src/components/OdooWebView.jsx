@@ -167,6 +167,150 @@ export default function OdooWebView() {
                     align-items: center !important;
                 }
                 
+                /* ===== 인사 직원 칸반 카드 프리미엄 스타일링 (글로벌) ===== */
+                
+                /* 카드 기본 형태 - 둥근 모서리, 심플한 아웃라인, 배경 없음, 그림자 제거 */
+                .o_kanban_record {
+                    border-radius: 12px !important;
+                    background-color: transparent !important;
+                    background-image: none !important;
+                    border: 1px solid #e2e8f0 !important;
+                    box-shadow: none !important;
+                    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                    overflow: hidden !important;
+                }
+                
+                .o_kanban_record:hover {
+                    transform: translateY(-1.5px) !important;
+                }
+                
+                /* 카드 왼쪽의 단색 영역 (컬러 바, 왼쪽 테두리 색상, 이미지 채우기 배경색) 제거 */
+                .o_kanban_color_bar, .o_color_bar {
+                    display: none !important;
+                }
+                
+                .o_kanban_record[class*="oe_kanban_color_"], 
+                .o_kanban_record[class*="o_kanban_color_"] {
+                    border-left-width: 1px !important;
+                }
+                
+                /* 이미지 영역 전체 (모든 Odoo 칸반 사진 영역 클래스 포함) */
+                .o_kanban_view .o_kanban_image_fill_left,
+                .o_kanban_view .o_kanban_image,
+                .o_kanban_view .o_kanban_image_placeholder,
+                .o_kanban_view .o_avatar_year,
+                .o_kanban_view .o_image_holder,
+                .o_kanban_view .oe_kanban_avatar {
+                    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E");
+                    background-size: 28px 28px;
+                    background-repeat: no-repeat;
+                    background-position: center;
+                    border-radius: 50% !important;
+                    background-color: transparent !important;
+                    border: 1px solid #e2e8f0 !important;
+                    color: transparent !important;
+                    font-size: 0 !important;
+                    position: absolute !important;
+                    top: 50% !important;
+                    left: 16px !important;
+                    transform: translateY(-50%) !important;
+                    width: 60px !important;
+                    height: 60px !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    box-shadow: none !important;
+                    overflow: hidden !important;
+                }
+                
+                /* 만약 텍스트 노드가 바로 안에 있는 경우 숨기기 */
+                .o_kanban_view .o_kanban_image_fill_left span,
+                .o_kanban_view .o_kanban_image span,
+                .o_kanban_view .o_kanban_image_placeholder span,
+                .o_kanban_view .o_image_holder span,
+                .o_kanban_view .o_kanban_image_fill_left div,
+                .o_kanban_view .o_kanban_image div,
+                .o_kanban_view .o_kanban_image_placeholder div,
+                .o_kanban_view .o_image_holder div {
+                    display: none !important;
+                    opacity: 0 !important;
+                    color: transparent !important;
+                }
+
+                .o_kanban_view .o_kanban_image_fill_left img, 
+                .o_kanban_view .o_kanban_image img,
+                .o_kanban_view .o_kanban_image_placeholder img {
+                    width: 100% !important;
+                    height: 100% !important;
+                    border-radius: 50% !important;
+                    object-fit: cover !important;
+                }
+                
+                /* HR 직원 카드 (o_kanban_view 안 카드) 내부 레이아웃 */
+                .o_hr_employee_kanban .o_kanban_record .o_card_info,
+                .o_employee_kanban .o_kanban_record .o_card_info,
+                .o_kanban_view .o_kanban_record .oe_kanban_card {
+                    padding: 16px !important;
+                }
+                
+                /* 직원 이름 폰트 크기 및 두께 */
+                .o_kanban_record .o_card_name,
+                .o_kanban_record .o_primary,
+                .o_kanban_record strong.d-block,
+                .o_kanban_record .o_field_char.o_bold,
+                .o_employee_kanban .o_kanban_record h3,
+                .o_employee_kanban .o_kanban_record .o_kanban_record_title {
+                    font-size: 14px !important;
+                    font-weight: 700 !important;
+                    letter-spacing: -0.01em !important;
+                }
+                
+                /* 직책/부서 서브텍스트 */
+                .o_kanban_record .o_secondary,
+                .o_kanban_record .o_subtitle,
+                .o_kanban_record small,
+                .o_employee_kanban .o_kanban_record .o_field_widget:not(.o_field_many2one):not(.o_field_char) {
+                    font-size: 11.5px !important;
+                    font-weight: 500 !important;
+                    opacity: 0.75 !important;
+                }
+                
+                /* 직원 사진(아바타) - 크고 둥글게 */
+                .o_kanban_record .o_avatar,
+                .o_kanban_record img.o_avatar,
+                .o_employee_kanban .o_kanban_image img {
+                    width: 60px !important;
+                    height: 60px !important;
+                    border-radius: 50% !important;
+                    object-fit: cover !important;
+                    border: 2px solid rgba(37, 99, 235, 0.12) !important;
+                }
+                
+                /* 칸반 헤더(상태) 바 */
+                .o_kanban_grouped .o_column_title {
+                    font-family: 'Outfit', 'Inter', -apple-system, sans-serif !important;
+                    font-weight: 700 !important;
+                    font-size: 12px !important;
+                    text-transform: uppercase !important;
+                    letter-spacing: 0.04em !important;
+                }
+                
+                /* 상태 dot(채용 단계) 색상 뱃지 */
+                .o_kanban_record .o_status {
+                    border-radius: 50% !important;
+                    width: 10px !important;
+                    height: 10px !important;
+                }
+                
+                /* 카드 하단 푸터 버튼들 (메시지, 활동 등) */
+                .o_kanban_record .oe_kanban_action_button,
+                .o_kanban_record .o_kanban_manage_button_area .btn {
+                    border-radius: 8px !important;
+                    font-size: 12px !important;
+                    font-weight: 600 !important;
+                    padding: 4px 10px !important;
+                }
+                
                 @media (prefers-color-scheme: light) {
                     /* Odoo 전체 기본 테마(보라색)를 세련된 파란색(Blue 600)으로 강제 덮어쓰기 */
                     :root {
@@ -252,6 +396,18 @@ export default function OdooWebView() {
                         color: #2563eb !important; /* Blue-600 */
                         font-weight: 750 !important;
                     }
+                    
+                    /* 칸반 카드 라이트모드 아웃라인 & 호버 효과 */
+                    .o_kanban_record,
+                    .o_kanban_record[class*="oe_kanban_color_"], 
+                    .o_kanban_record[class*="o_kanban_color_"] {
+                        border-color: #e2e8f0 !important;
+                        background-color: #ffffff !important; /* 라이트모드에서는 깔끔한 백그라운드 */
+                    }
+                    .o_kanban_record:hover {
+                        border-color: #3b82f6 !important; /* 호버 시 파란 아웃라인 */
+                        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.04) !important;
+                    }
                 }
 
                 @media (prefers-color-scheme: dark) {
@@ -275,7 +431,7 @@ export default function OdooWebView() {
                     }
                     
                     /* Card, sheet, row, and list backgrounds -> invert to #1e293b (slate-800) */
-                    .o_form_sheet, .o_kanban_record, .o_list_view, .table, .table td, .table th, tr, td, th, .dropdown-menu, .modal-content, .o_searchview {
+                    .o_form_sheet, .o_list_view, .table, .table td, .table th, tr, td, th, .dropdown-menu, .modal-content, .o_searchview {
                         background-color: #dbedff !important;
                         border-color: #c8dcf0 !important; /* Inverts to border slate-700 */
                         color: #111111 !important; /* Inverts to white text */
@@ -360,9 +516,22 @@ export default function OdooWebView() {
                     img, video, .o_avatar, .o_user_avatar, .o_image, .o_mimetype_icon, [style*="background-image"] {
                         filter: invert(1) hue-rotate(180deg) !important;
                     }
+                    
+                    /* 칸반 카드 다크모드 아웃라인 & 호버 효과 */
+                    .o_kanban_record,
+                    .o_kanban_record[class*="oe_kanban_color_"], 
+                    .o_kanban_record[class*="o_kanban_color_"] {
+                        border-color: #cbd5e1 !important; /* Inverts to slate-700 border */
+                        background-color: transparent !important; /* 내부 배경색 제거 */
+                        color: #111111 !important;
+                    }
+                    .o_kanban_record:hover {
+                        border-color: #c4d6f9 !important; /* Inverts to blue border */
+                        background-color: transparent !important;
+                    }
                 }
             `).catch(() => {});
-
+            
             // webview 내부(= Odoo 서버와 같은 origin)에서 JSON-RPC 호출
             // → CORS 없음, Odoo 세션 쿠키 자동 포함
             try {
