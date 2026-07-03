@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, query, where, onSnapshot } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,24 +11,43 @@ import {
     ListTodo, CalendarDays, Cloud, Mail, Activity,
     TrendingUp, FileText, CreditCard, StickyNote, MessageSquare, Microscope,
     DollarSign, BarChart2, Wrench, HeadphonesIcon, Globe, Cpu,
-    ClipboardCheck, Clock, Receipt, Contact, Boxes, FlaskConical
+    ClipboardCheck, Clock, Receipt, Contact, Boxes, FlaskConical,
+    LogOut, User, ChevronLeft, ChevronRight, Sparkles, Sun, Moon
 } from 'lucide-react';
 
 const ROLE_MENU_MAP = {
-    admin: ['/', '/settings', '/parts', '/bom', '/customers', '/prod-requests', '/prod-execution', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/eco', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/odoo/apps', '/odoo/view'],
-    engineer: ['/', '/parts', '/bom', '/eco', '/inventory', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/odoo/view'],
-    sales: ['/', '/customers', '/prod-requests', '/inventory', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/odoo/view'],
-    qa: ['/', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/inventory', '/transactions', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/odoo/view'],
-    production: ['/', '/prod-execution', '/prod-requests', '/inventory', '/purchasing', '/outsourcing', '/transactions', '/vendors', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/odoo/view'],
-    manager: ['/', '/customers', '/prod-requests', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/odoo/view'],
-    viewer: ['/', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/odoo/view'],
+    admin: ['/', '/settings', '/parts', '/bom', '/customers', '/prod-requests', '/prod-execution', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/eco', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/odoo/apps', '/odoo/view'],
+    engineer: ['/', '/parts', '/bom', '/eco', '/inventory', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/odoo/view'],
+    sales: ['/', '/customers', '/prod-requests', '/inventory', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/odoo/view'],
+    qa: ['/', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/inventory', '/transactions', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/odoo/view'],
+    production: ['/', '/prod-execution', '/prod-requests', '/inventory', '/purchasing', '/outsourcing', '/transactions', '/vendors', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/odoo/view'],
+    manager: ['/', '/customers', '/prod-requests', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/eco', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/odoo/view'],
+    viewer: ['/', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/odoo/view'],
 };
 
-export default function Sidebar() {
-    const { currentUser, userProfile } = useAuth();
+export default function Sidebar({ isCollapsed, toggleSidebar }) {
+    const { currentUser, userProfile, logout } = useAuth();
+    const location = useLocation();
     const [pendingEcnCount, setPendingEcnCount] = useState(0);
     const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
     const [odooMenus, setOdooMenus] = useState([]);
+    const [appVersion, setAppVersion] = useState('0.9.2');
+    const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+    const [darkMode, setDarkMode] = useState(() => {
+        return localStorage.getItem('theme') === 'dark';
+    });
+
+    useEffect(() => {
+        const theme = darkMode ? 'dark' : 'light';
+        if (darkMode) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+        if (window.electronAPI?.setTheme) {
+            window.electronAPI.setTheme(theme);
+        }
+    }, [darkMode]);
 
     useEffect(() => {
         if (!currentUser) return;
@@ -54,6 +73,11 @@ export default function Sidebar() {
             setOdooMenus(e.detail);
         };
         window.addEventListener('odoo-menus-loaded', handleOdooMenus);
+
+        if (window.electronAPI?.getAppVersion) {
+            window.electronAPI.getAppVersion().then(setAppVersion).catch(() => {});
+        }
+
         return () => window.removeEventListener('odoo-menus-loaded', handleOdooMenus);
     }, []);
 
@@ -70,16 +94,26 @@ export default function Sidebar() {
         .map(group => ({ ...group, items: group.items.filter(item => isAllowed(item.path)) }))
         .filter(group => group.items.length > 0);
 
-
+    const checkActive = (path) => {
+        const currentPath = location.pathname + location.search;
+        if (path === '/') {
+            return location.pathname === '/';
+        }
+        if (path.startsWith('/odoo/view')) {
+            return currentPath === path || currentPath.startsWith(path + '&');
+        }
+        return currentPath.startsWith(path);
+    };
 
     const COLLAB_MENU_GROUPS = [
         {
-            title: '협업 & 공통 오피스',
+            title: '구글 워크스페이스',
             items: [
-                { name: '근태 관리', path: '/hr/attendance', icon: UserCheck, badge: pendingApprovalCount > 0 ? pendingApprovalCount : null },
-                { name: '통합 메일', path: '/workspace/mail', icon: Mail },
+                { name: 'Gmail', path: '/workspace/mail', icon: Mail },
                 { name: 'Google Drive', path: '/workspace/drive', icon: Cloud },
-                { name: 'Google Chat', path: '/workspace/chat', icon: MessageSquare }
+                { name: 'Google Chat', path: '/workspace/chat', icon: MessageSquare },
+                { name: 'Gemini', path: '/workspace/gemini', icon: Sparkles },
+                { name: 'NotebookLM', path: '/workspace/notebooklm', icon: BookOpen }
             ]
         }
     ];
@@ -96,100 +130,111 @@ export default function Sidebar() {
     // Odoo 영문 메뉴명 → 한글 변환 맵
     const ODOO_NAME_MAP = {
         'Sales': '영업',
-        'Purchase': '구매',
-        'Inventory': '재고 관리',
-        'Manufacturing': '제조',
-        'Accounting': '회계',
-        'Invoicing': '청구서',
-        'Project': '프로젝트',
-        'Employees': '직원 관리',
-        'Attendances': '근태 관리',
-        'Time Off': '휴가 관리',
-        'Payroll': '급여',
-        'Expenses': '경비',
-        'Helpdesk': '헬프데스크',
-        'Website': '웹사이트',
-        'eCommerce': '전자상거래',
-        'CRM': 'CRM (고객관리)',
-        'Discuss': '메신저',
-        'Contacts': '연락처',
-        'Technical': '기술설정',
-        'Settings': '설정',
-        'Apps': '앱 센터',
-        'Email Marketing': '이메일 마케팅',
-        'Field Service': '현장 서비스',
-        'IoT': 'IoT',
-        'Maintenance': '설비 관리',
-        'Quality': '품질 관리',
-        'Repairs': '수리',
-        'Sign': '전자서명',
-        'Timesheets': '근무시간',
-        'Rental': '렌탈',
-        'Lunch': '식사 관리',
-        'Events': '이벤트',
-        'Surveys': '설문조사',
-        'Live Chat': '실시간 채팅',
-        'Documents': '문서 관리',
-        'Consolidation': '연결 회계',
+        'Purchase': '구매 & 외주',
+        'Inventory': '재고',
+        'Manufacturing': '생산',
+        'Quality': '품질',
+        'PLM': '도면 & BOM & ECO',
+        'Invoicing': '회계 & 재무',
+        'Attendances': '근태',
+        'Time Off': '휴가',
+        'Employees': '인사',
+        'Projects': '프로젝트',
+        'Maintenance': '설비 보전',
+        'IoT': 'IoT 기기',
+        'Helpdesk': '고객 서비스'
     };
 
-    // Odoo 메뉴명 → 아이콘 맵
+    // Odoo 메뉴명 → 카테고리 맵
+    const ODOO_CATEGORY_MAP = {
+        'Sales': '영업 & 마케팅',
+        'Purchase': '재고 & 구매 & 서비스',
+        'Inventory': '재고 & 구매 & 서비스',
+        'Helpdesk': '재고 & 구매 & 서비스',
+        'Maintenance': '재고 & 구매 & 서비스',
+        'Manufacturing': '제조 & 품질 & 기기',
+        'Quality': '제조 & 품질 & 기기',
+        'PLM': '제조 & 품질 & 기기',
+        'IoT': '제조 & 품질 & 기기',
+        'Invoicing': '회계 & 재무',
+        'Attendances': '인사 & 근태 & 급여',
+        'Time Off': '인사 & 근태 & 급여',
+        'Employees': '인사 & 근태 & 급여',
+        'Projects': '협업 & 기타'
+    };
+
+    // Odoo 메뉴별 어울리는 Lucide 아이콘 매핑
     const ODOO_ICON_MAP = {
         'Sales': TrendingUp,
         'Purchase': ShoppingCart,
-        'Inventory': Boxes,
+        'Inventory': Package,
         'Manufacturing': Factory,
-        'Accounting': DollarSign,
-        'Invoicing': Receipt,
-        'Project': Briefcase,
-        'Employees': Users,
+        'Quality': FileCheck,
+        'PLM': Layers,
+        'Invoicing': CreditCard,
         'Attendances': UserCheck,
         'Time Off': CalendarDays,
-        'Payroll': CreditCard,
-        'Expenses': FileText,
-        'Helpdesk': HeadphonesIcon,
-        'Website': Globe,
-        'eCommerce': ShoppingCart,
-        'CRM': Building2,
-        'Discuss': MessageSquare,
-        'Contacts': Contact,
-        'Technical': Cpu,
-        'Settings': Settings,
-        'Apps': Package,
-        'Email Marketing': Mail,
-        'Field Service': Truck,
-        'IoT': Cpu,
+        'Employees': Users,
+        'Projects': ClipboardList,
         'Maintenance': Wrench,
-        'Quality': ClipboardCheck,
-        'Repairs': Wrench,
-        'Sign': FileCheck,
-        'Timesheets': Clock,
-        'Rental': FileText,
-        'Lunch': StickyNote,
-        'Events': CalendarDays,
-        'Surveys': ClipboardList,
-        'Live Chat': MessageSquare,
-        'Documents': BookOpen,
-        'Consolidation': BarChart2,
+        'IoT': Cpu,
+        'Helpdesk': HeadphonesIcon
     };
 
-    // 사이드바에서 숨길 Odoo 메뉴 목록
+    // UI에 보여줄 카테고리 순서 정의
+    const ODOO_CATEGORY_ORDER = [
+        '영업 & 마케팅',
+        '재고 & 구매 & 서비스',
+        '제조 & 품질 & 기기',
+        '회계 & 재무',
+        '인사 & 근태 & 급여',
+        '협업 & 기타',
+        '기타 서비스'
+    ];
+
+    const GROUP_COLOR_MAP = {
+        '영업 & 마케팅': 'text-indigo-500',
+        '재고 & 구매 & 서비스': 'text-emerald-600',
+        '제조 & 품질 & 기기': 'text-amber-600',
+        '회계 & 재무': 'text-rose-500',
+        '인사 & 근태 & 급여': 'text-sky-600',
+        '협업 & 기타': 'text-purple-500',
+        '기타 서비스': 'text-slate-500',
+        '구글 워크스페이스': 'text-blue-500',
+        '시스템 제어': 'text-slate-500'
+    };
+
     const ODOO_HIDDEN_MENUS = new Set([
-        'Tests', 'Link Tracker',
+        'Discuss', 'Calendar', 'Contacts', 'To-Do', 'Dashboards', 'App Store', 'Settings', 'Apps'
     ]);
 
-    const ODOO_DYNAMIC_GROUPS = odooMenus.length > 0 ? [
-        {
-            title: 'Odoo 서비스',
-            items: odooMenus
-                .filter(app => !ODOO_HIDDEN_MENUS.has(app.name))
-                .map(app => ({
+    const getOdooDynamicGroups = () => {
+        if (odooMenus.length === 0) return [];
+
+        const groupsMap = {};
+        odooMenus
+            .filter(app => !ODOO_HIDDEN_MENUS.has(app.name))
+            .forEach(app => {
+                const cat = ODOO_CATEGORY_MAP[app.name] || '기타 서비스';
+                if (!groupsMap[cat]) {
+                    groupsMap[cat] = [];
+                }
+                groupsMap[cat].push({
                     name: ODOO_NAME_MAP[app.name] || app.name,
                     path: `/odoo/view?menu_id=${app.menu_id}`,
                     icon: ODOO_ICON_MAP[app.name] || Package
-                }))
-        }
-    ] : [];
+                });
+            });
+
+        return ODOO_CATEGORY_ORDER
+            .filter(cat => groupsMap[cat] && groupsMap[cat].length > 0)
+            .map(cat => ({
+                title: cat,
+                items: groupsMap[cat]
+            }));
+    };
+
+    const ODOO_DYNAMIC_GROUPS = getOdooDynamicGroups();
 
     const fOdoo = filterGroups(ODOO_DYNAMIC_GROUPS);
     const fCollab = filterGroups(COLLAB_MENU_GROUPS);
@@ -206,44 +251,225 @@ export default function Sidebar() {
     }[role] || { label: '뷰어', color: 'bg-slate-400' };
 
     return (
-        <aside className="w-64 bg-white border-r border-slate-200 flex flex-col h-screen fixed left-0 top-0 z-50 transition-all duration-300 no-print">
-            <div className="h-16 flex items-center px-6 border-b border-slate-100 shrink-0">
-                <div className="font-black text-xl text-slate-800 tracking-tight flex items-center gap-2">
-                    <span className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">IR</span>
-                    <span>IR Assistant</span>
-                </div>
+        <aside className={`${isCollapsed ? 'w-16' : 'w-64'} bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col h-screen fixed left-0 top-0 z-50 transition-all duration-300 no-print`}>
+            {/* Header */}
+            <div className={`h-16 flex items-center border-b border-slate-100 dark:border-slate-800 shrink-0 ${isCollapsed ? 'justify-center' : 'justify-between px-6'}`}>
+                {!isCollapsed ? (
+                    <>
+                        <div className="font-black text-xl text-slate-800 dark:text-slate-100 tracking-tight flex items-center gap-2 animate-fade-in">
+                            <span className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold">IR</span>
+                            <span>IR Assistant</span>
+                        </div>
+                        <button 
+                            onClick={toggleSidebar} 
+                            className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-655 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95 animate-fade-in"
+                            title="메뉴 접기"
+                        >
+                            <ChevronLeft size={16} />
+                        </button>
+                    </>
+                ) : (
+                    <button 
+                        onClick={toggleSidebar} 
+                        className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-655 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95 hover:scale-105"
+                        title="메뉴 펼치기"
+                    >
+                        <ChevronRight size={18} />
+                    </button>
+                )}
             </div>
 
-            <div className="mx-3 mt-3 px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl flex items-center gap-2">
-                <span className={`w-2.5 h-2.5 rounded-full ${roleInfo.color} shrink-0`}/>
-                <div className="min-w-0">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">현재 권한</p>
-                    <p className="text-xs font-black text-slate-700 truncate">{roleInfo.label}</p>
-                </div>
-            </div>
+            {/* Profile Card */}
+            <div className={`relative ${isCollapsed ? 'mx-2 mt-3 flex flex-col items-center gap-2' : 'mx-3 mt-3 p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200/60 dark:border-slate-800/80 rounded-2xl flex flex-col gap-2.5'}`}>
+                {isCollapsed ? (
+                    <>
+                        <button 
+                            onClick={() => setProfileMenuOpen(v => !v)} 
+                            className={`w-9 h-9 rounded-full overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-150 shadow-sm hover:scale-105 transition-all relative ${profileMenuOpen ? 'ring-2 ring-blue-500' : ''}`}
+                            title="계정 정보"
+                        >
+                            {currentUser?.photoURL ? (
+                                <img src={currentUser.photoURL} alt="Profile" className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-slate-400 bg-slate-200 dark:bg-slate-800">
+                                    <User size={16} />
+                                </div>
+                            )}
+                        </button>
+                        <button
+                            onClick={() => window.dispatchEvent(new CustomEvent('toggle-floating-memo'))}
+                            className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-amber-600 dark:hover:text-amber-500 rounded-lg transition-all active:scale-95 shadow-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
+                            title="개인 메모장"
+                        >
+                            <StickyNote size={15} />
+                        </button>
+                    </>
+                ) : (
+                    <div className="flex items-center justify-between gap-2.5">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            {/* Profile Image */}
+                            <div className="w-9 h-9 rounded-full overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-150 shrink-0">
+                                {currentUser?.photoURL ? (
+                                    <img src={currentUser.photoURL} alt="Profile" className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-slate-400 bg-slate-200 dark:bg-slate-800">
+                                        <User size={16} />
+                                    </div>
+                                )}
+                            </div>
+                            {/* User Details */}
+                            <div className="min-w-0 flex-1">
+                                <p className="text-[11px] font-black text-slate-800 dark:text-slate-200 truncate">
+                                    {userProfile?.displayName || currentUser?.displayName || '사용자'}
+                                </p>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="text-[9px] text-slate-400 dark:text-slate-500 truncate max-w-[120px] font-semibold">
+                                        {userProfile?.department || '부서 미지정'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
 
-            <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-5 custom-scrollbar">
-                {isAllowed('/') && (
-                    <NavLink to="/" className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive ? 'bg-sky-50 text-sky-700 border border-sky-100 font-bold' : 'hover:bg-slate-50 text-slate-600 font-bold'}`}>
-                        <LayoutDashboard size={18} /> <span className="text-sm">통합 현황판</span>
-                    </NavLink>
+                        {/* Action Buttons: Memo and Gear Icon */}
+                        <div className="flex items-center gap-1 shrink-0">
+                            <button
+                                onClick={() => window.dispatchEvent(new CustomEvent('toggle-floating-memo'))}
+                                className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-amber-600 dark:hover:text-amber-500 rounded-lg transition-colors"
+                                title="개인 메모장"
+                            >
+                                <StickyNote size={14} />
+                            </button>
+                            <button
+                                onClick={() => setProfileMenuOpen(v => !v)}
+                                className={`p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-slate-655 dark:hover:text-slate-350 transition-colors ${profileMenuOpen ? 'bg-slate-200 dark:bg-slate-800 text-slate-655 dark:text-slate-200' : ''}`}
+                                title="계정 설정"
+                            >
+                                <Settings size={14} />
+                            </button>
+                        </div>
+                    </div>
                 )}
 
+                {/* Dropdown Popover */}
+                {profileMenuOpen && (
+                    <>
+                        <div className="fixed inset-0 z-45" onClick={() => setProfileMenuOpen(false)} />
+                        <div className={`absolute border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-[0_20px_50px_rgba(15,23,42,0.15)] z-50 p-3 flex flex-col gap-2.5 text-left bg-white/95 dark:bg-slate-950/95 backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-150 ${isCollapsed ? 'left-12 top-0 w-56' : 'left-0 right-0 top-full mt-2'}`}>
+                            <div className="px-1 py-0.5">
+                                <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">연동 계정 관리</p>
+                            </div>
+                            
+                            {/* Google Account */}
+                            <div className="flex flex-col gap-1.5 p-2 bg-slate-50/70 dark:bg-slate-900/70 border border-slate-100 dark:border-slate-800/60 rounded-xl">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="w-3.5 h-3.5 rounded-full bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 flex items-center justify-center font-black text-[8px]">G</span>
+                                        <span className="text-slate-800 dark:text-slate-200 font-black text-[9px]">Google Workspace</span>
+                                    </div>
+                                    <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-400">연동됨</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-1.5">
+                                    <p className="text-[8px] text-slate-500 dark:text-slate-400 font-semibold truncate flex-1" title={currentUser?.email}>
+                                        {currentUser?.email}
+                                    </p>
+                                    <button
+                                        onClick={() => {
+                                            setProfileMenuOpen(false);
+                                            logout();
+                                        }}
+                                        className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/40 text-red-500 transition-colors active:scale-90"
+                                        title="구글 계정 바꾸기"
+                                    >
+                                        <LogOut size={10} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Odoo Account */}
+                            <div className="flex flex-col gap-1.5 p-2 bg-slate-50/70 dark:bg-slate-900/70 border border-slate-100 dark:border-slate-800/60 rounded-xl">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="w-3.5 h-3.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-650 dark:text-emerald-400 flex items-center justify-center font-black text-[8px]">O</span>
+                                        <span className="text-slate-800 dark:text-slate-200 font-black text-[9px]">Odoo ERP</span>
+                                    </div>
+                                    <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-400">연동됨</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-1.5">
+                                    <p className="text-[8px] text-slate-500 dark:text-slate-400 font-semibold truncate flex-1" title={currentUser?.email}>
+                                        {currentUser?.email}
+                                    </p>
+                                    <button
+                                        onClick={() => {
+                                            setProfileMenuOpen(false);
+                                            window.dispatchEvent(new CustomEvent('clear-odoo-session'));
+                                            alert("Odoo 세션이 초기화되었습니다. Odoo 뷰에서 다시 로그인해 주세요.");
+                                        }}
+                                        className="p-1 rounded hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-500 transition-colors active:scale-90"
+                                        title="Odoo 계정 바꾸기"
+                                    >
+                                        <LogOut size={10} />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                )}
+            </div>
+
+            {/* Navigation Menus */}
+            <nav className={`flex-1 overflow-y-auto py-3 space-y-5 custom-scrollbar ${isCollapsed ? 'px-2 flex flex-col items-center' : 'px-3'}`}>
                 {[
                     { g: fOdoo, t: 'odoo' },
-                    { g: fCollab, t: '협업 오피스' },
+                    { g: fCollab, t: '구글 워크스페이스' },
                     { g: fAdmin, t: '시스템 관리' }
                 ].map(sec => sec.g.length > 0 && (
-                    <div key={sec.t} className="space-y-2">
-                        <div className="px-3 text-[11px] font-black text-slate-400 uppercase tracking-wider">{sec.t}</div>
-                        <div className="space-y-1 pl-2 border-l border-slate-100 ml-2">
+                    <div key={sec.t} className={`w-full ${isCollapsed ? 'space-y-3 flex flex-col items-center' : 'space-y-2'}`}>
+                        {!isCollapsed ? (
+                            <div className="px-3 text-[11px] font-black text-slate-400 dark:text-slate-500 tracking-wider">{sec.t}</div>
+                        ) : (
+                            <div className="w-8 h-px bg-slate-100 dark:bg-slate-800 my-1" />
+                        )}
+                        
+                        <div className={isCollapsed ? 'w-full flex flex-col items-center gap-1.5' : 'space-y-1 pl-2 border-l border-slate-100 dark:border-slate-800 ml-2'}>
                             {sec.g.map((group, idx) => (
-                                <div key={idx} className="space-y-0.5">
-                                    <div className="text-[9px] uppercase font-extrabold text-slate-400 px-3">{group.title}</div>
+                                <div key={idx} className={`w-full ${isCollapsed ? 'flex flex-col items-center gap-1' : 'space-y-0.5'}`}>
+                                    {!isCollapsed && (
+                                        <div className={`text-[9px] uppercase font-extrabold px-3 ${GROUP_COLOR_MAP[group.title] || 'text-slate-400 dark:text-slate-500'}`}>
+                                            {group.title}
+                                        </div>
+                                    )}
                                     {group.items.map(item => (
-                                        <NavLink key={item.path} to={item.path} className={({ isActive }) => `flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${isActive ? 'bg-sky-50 text-sky-700 border border-sky-100 font-bold' : 'hover:bg-slate-50 text-slate-500 font-medium'}`}>
-                                            <item.icon size={16} /> <span className="text-xs flex-1">{item.name}</span>
-                                            {item.badge && <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">{item.badge}</span>}
+                                        <NavLink 
+                                            key={item.path} 
+                                            to={item.path} 
+                                            className={({ isActive }) => 
+                                                isCollapsed
+                                                    ? `flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 group relative ${
+                                                        checkActive(item.path) 
+                                                            ? 'bg-sky-50 dark:bg-sky-955/40 text-sky-700 dark:text-sky-400 border border-sky-100 dark:border-sky-900/50' 
+                                                            : 'hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-500 dark:text-slate-400'
+                                                    }`
+                                                    : `flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                                                        checkActive(item.path) 
+                                                            ? 'bg-sky-50 dark:bg-sky-955/40 text-sky-700 dark:text-sky-400 border border-sky-100 dark:border-sky-900/50 font-bold' 
+                                                            : 'hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-500 dark:text-slate-400 font-medium'
+                                                    }`
+                                            }
+                                            title={isCollapsed ? item.name : undefined}
+                                        >
+                                            <item.icon size={16} /> 
+                                            {!isCollapsed && <span className="text-xs flex-1">{item.name}</span>}
+                                            {item.badge && (
+                                                isCollapsed ? (
+                                                    <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-pulse">
+                                                        {item.badge}
+                                                    </span>
+                                                ) : (
+                                                    <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
+                                                        {item.badge}
+                                                    </span>
+                                                )
+                                            )}
                                         </NavLink>
                                     ))}
                                 </div>
@@ -252,6 +478,34 @@ export default function Sidebar() {
                     </div>
                 ))}
             </nav>
+
+            {/* Sidebar Utility Bottom */}
+            {isCollapsed ? (
+                <div className="py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 shrink-0 flex flex-col items-center">
+                    <button
+                        onClick={() => setDarkMode(prev => !prev)}
+                        className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-850 text-slate-400 dark:text-slate-500 hover:text-blue-500 dark:hover:text-blue-400 rounded-lg transition-colors"
+                        title={darkMode ? "라이트 모드로 전환" : "다크 모드로 전환"}
+                    >
+                        {darkMode ? <Sun size={15} /> : <Moon size={15} />}
+                    </button>
+                </div>
+            ) : (
+                <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 shrink-0 flex items-center justify-between">
+                    {/* Crescent moon toggle to the left of the version */}
+                    <button
+                        onClick={() => setDarkMode(prev => !prev)}
+                        className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                        title={darkMode ? "라이트 모드로 전환" : "다크 모드로 전환"}
+                    >
+                        {darkMode ? <Sun size={15} /> : <Moon size={15} />}
+                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                            {darkMode ? "라이트 모드" : "다크 모드"}
+                        </span>
+                    </button>
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-600">v{appVersion}</span>
+                </div>
+            )}
         </aside>
     );
 }

@@ -100,64 +100,266 @@ export default function OdooWebView() {
                 .o_menu_toggle { display: none !important; }
                 .o_menu_apps { display: none !important; }
                 
+                /* Odoo 우측 상단 사용자 프로필 메뉴 숨기기 */
+                .o_user_menu, .o_user_menu_wrapper, .o_menu_systray .o_user_menu, [data-menu-xmlid="base.menu_user"] {
+                    display: none !important;
+                }
+
                 /* 좌측 마진 추가 */
                 .o_menu_brand { margin-left: 24px !important; }
                 
-                /* Odoo 전체 기본 테마(보라색)를 세련된 파란색(Blue 600)으로 강제 덮어쓰기 */
-                :root {
-                    --o-brand-odoo: #2563eb !important;
-                    --o-brand-primary: #2563eb !important;
-                    --primary: #2563eb !important;
-                    --bs-primary: #2563eb !important;
-                    --bs-primary-rgb: 37, 99, 235 !important;
-                }
-                
-                /* 버튼 및 포인트 컬러 강제 오버라이드 */
-                .btn-primary {
-                    background-color: #2563eb !important;
-                    border-color: #2563eb !important;
-                    color: white !important;
-                }
-                .btn-primary:hover {
-                    background-color: #1d4ed8 !important;
-                    border-color: #1d4ed8 !important;
-                }
-                .text-primary {
-                    color: #2563eb !important;
-                }
-                .bg-primary {
+                /* Odoo 기본 보라색 로더 및 프로그레스바 강제 제거 */
+                .o_loading, .bg-primary, .progress-bar {
                     background-color: #2563eb !important;
                 }
                 
-                /* 상단바 색상 변경 (연한 회색 배경 + 어두운 글씨) */
-                .o_navbar, .o_main_navbar { 
-                    background-color: #f8fafc !important; 
-                    background-image: none !important;
-                    border-bottom: 1px solid #e2e8f0 !important; 
-                }
-                /* 서브메뉴(버튼) 영역 강제 투명화 및 배경 초기화 (보라색 제거) */
+                /* 서브메뉴(버튼) 영역 강제 투명화 및 배경 초기화 (보라색 제거) - 글로벌 적용 */
                 .o_menu_sections, .o_menu_sections > *, .o_menu_sections .o_nav_entry, .o_navbar_apps_menu {
                     background-color: transparent !important;
                     background-image: none !important;
                 }
                 
-                /* 상단바 글씨 색상 */
-                .o_navbar .o_nav_entry, 
-                .o_navbar .dropdown-toggle,
-                .o_main_navbar > a,
-                .o_main_navbar > button,
-                .o_menu_brand {
-                    color: #475569 !important;
+                /* 글로벌 폰트 및 상단바 높이 개편 */
+                .o_main_navbar, .o_navbar, .o_menu_brand, .o_menu_sections, .o_menu_sections a, .o_menu_sections button, .o_menu_sections .o_nav_entry {
+                    font-family: 'Outfit', 'Inter', -apple-system, sans-serif !important;
+                    font-size: 13px !important;
+                    font-weight: 600 !important;
+                    letter-spacing: -0.01em !important;
                 }
-                /* 상단바 마우스 오버(Hover) 시 효과 */
-                .o_navbar .o_nav_entry:hover, 
-                .o_navbar .dropdown-toggle:hover, 
-                .o_navbar .o_nav_entry.show, 
-                .o_navbar .dropdown-toggle.show,
-                .o_main_navbar > a:hover,
-                .o_main_navbar > button:hover {
-                    background-color: #e2e8f0 !important;
-                    color: #0f172a !important;
+                
+                .o_navbar, .o_main_navbar {
+                    height: 48px !important;
+                    padding: 0 16px !important;
+                    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03) !important;
+                }
+                
+                /* 상단 앱 대메뉴 브랜드 타이틀 스타일 다듬기 */
+                .o_menu_brand {
+                    font-size: 14px !important;
+                    font-weight: 800 !important;
+                    text-transform: uppercase !important;
+                    letter-spacing: -0.02em !important;
+                    margin-left: 20px !important;
+                    padding-right: 15px !important;
+                    border-right: 1px solid #cbd5e1 !important;
+                    height: 24px !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    align-self: center !important; /* 수직 중앙 정렬 */
+                }
+                
+                /* 서브메뉴 컨테이너 자체 수직 정렬 */
+                .o_menu_sections {
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    align-self: center !important; /* 수직 중앙 정렬 */
+                }
+                
+                /* 서브메뉴 아이템들을 이쁜 라운드 필(Pill) 형태로 렌더링 */
+                .o_menu_sections a, .o_menu_sections button, .o_menu_sections .o_nav_entry {
+                    padding: 6px 12px !important;
+                    margin: 0 4px !important;
+                    border-radius: 8px !important;
+                    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                    height: auto !important;
+                    line-height: normal !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                }
+                
+                @media (prefers-color-scheme: light) {
+                    /* Odoo 전체 기본 테마(보라색)를 세련된 파란색(Blue 600)으로 강제 덮어쓰기 */
+                    :root {
+                        --o-brand-odoo: #2563eb !important;
+                        --o-brand-primary: #2563eb !important;
+                        --primary: #2563eb !important;
+                        --bs-primary: #2563eb !important;
+                        --bs-primary-rgb: 37, 99, 235 !important;
+                        
+                        /* Light mode subtle primary overrides (replace light purple with light blue) */
+                        --o-brand-light: #eff6ff !important;
+                        --bs-primary-bg-subtle: #dbeafe !important;
+                        --bs-primary-border-subtle: #bfdbfe !important;
+                        --bs-primary-text-emphasis: #1e40af !important;
+                    }
+                    
+                    /* 버튼 및 포인트 컬러 강제 오버라이드 (상단 버튼 및 스테이지 셰브론 포함) */
+                    .btn-primary,
+                    .o_control_panel .btn-primary,
+                    .o_statusbar_buttons .btn-primary,
+                    .o_statusbar_status .btn-primary,
+                    .o_statusbar_status .btn-primary:disabled,
+                    .o_statusbar_status .btn-primary.disabled,
+                    .o_statusbar_status .o_arrow_button_active,
+                    .o_arrow_button.btn-primary,
+                    .o_arrow_button.active,
+                    .o_form_buttons_edit .btn-primary {
+                        background-color: #2563eb !important;
+                        border-color: #2563eb !important;
+                        color: white !important;
+                    }
+                    .btn-primary:hover,
+                    .o_control_panel .btn-primary:hover,
+                    .o_statusbar_buttons .btn-primary:hover,
+                    .o_form_buttons_edit .btn-primary:hover {
+                        background-color: #1d4ed8 !important;
+                        border-color: #1d4ed8 !important;
+                    }
+                    .text-primary {
+                        color: #2563eb !important;
+                    }
+                    .bg-primary {
+                        background-color: #2563eb !important;
+                    }
+                    
+                    /* 기본 아바타 백그라운드 보라색/랜덤색을 깔끔한 블루-슬레이트로 변경 */
+                    .o_avatar, .o_user_avatar, .o_image, .o_mimetype_icon {
+                        background-color: #3b82f6 !important;
+                        color: #ffffff !important;
+                    }
+                    
+                    /* 상단바 색상 변경 (연한 회색 배경 + 어두운 글씨) */
+                    .o_navbar, .o_main_navbar { 
+                        background-color: #f8fafc !important; 
+                        background-image: none !important;
+                        border-bottom: 1px solid #e2e8f0 !important; 
+                    }
+                    
+                    /* 상단바 일반 메뉴 글씨 색상 */
+                    .o_navbar .o_nav_entry, 
+                    .o_navbar .dropdown-toggle,
+                    .o_main_navbar > a,
+                    .o_main_navbar > button,
+                    .o_menu_brand {
+                        color: #475569 !important; /* Slate-600 */
+                    }
+                    
+                    /* 상단바 마우스 오버(Hover) 시 효과 - 슬레이트 연한 회색 라운드 필(Pill) */
+                    .o_menu_sections a:hover, 
+                    .o_menu_sections button:hover, 
+                    .o_menu_sections .o_nav_entry:hover,
+                    .o_navbar .dropdown-toggle:hover {
+                        background-color: #f1f5f9 !important; /* Slate-100 */
+                        color: #0f172a !important; /* Slate-900 */
+                    }
+                    
+                    /* 상단바 액티브(Selected) 활성화 효과 - 소프트 블루 라운드 필(Pill) */
+                    .o_menu_sections a.active, 
+                    .o_menu_sections button.active,
+                    .o_menu_sections .o_nav_entry.active,
+                    .o_menu_sections .show > .dropdown-toggle {
+                        background-color: #eff6ff !important; /* Blue-50 */
+                        color: #2563eb !important; /* Blue-600 */
+                        font-weight: 750 !important;
+                    }
+                }
+
+                @media (prefers-color-scheme: dark) {
+                    /* Odoo Smart Dark Mode Inversion filter */
+                    html {
+                        filter: invert(0.9) hue-rotate(180deg) !important;
+                        background-color: #defaff !important; /* Inverts to slate-900 */
+                    }
+                    
+                    /* Override dark mode variables under the filter */
+                    :root {
+                        --o-brand-light: #cbd5e1 !important; /* Inverts to dark slate hover */
+                        --bs-primary-bg-subtle: #dbedff !important; /* Inverts to slate-800 */
+                        --bs-primary-border-subtle: #c8dcf0 !important; /* Inverts to slate-700 border */
+                        --bs-primary-text-emphasis: #111111 !important; /* Inverts to white */
+                    }
+                    
+                    /* Page backgrounds -> invert to #0f172a (slate-900) */
+                    body, .o_web_client, .o_action_manager, .o_content, .o_form_sheet_bg, .o_view_controller, .o_settings_container {
+                        background-color: #defaff !important;
+                    }
+                    
+                    /* Card, sheet, row, and list backgrounds -> invert to #1e293b (slate-800) */
+                    .o_form_sheet, .o_kanban_record, .o_list_view, .table, .table td, .table th, tr, td, th, .dropdown-menu, .modal-content, .o_searchview {
+                        background-color: #dbedff !important;
+                        border-color: #c8dcf0 !important; /* Inverts to border slate-700 */
+                        color: #111111 !important; /* Inverts to white text */
+                    }
+                    
+                    /* Secondary elements (headers, panel headers) -> invert to slate-950/900 */
+                    .o_control_panel, .o_navbar, .o_main_navbar, .modal-header, .modal-footer {
+                        background-color: #e2e8f0 !important;
+                        border-bottom: 1px solid #cbd5e1 !important;
+                    }
+                    
+                    /* Inputs and search -> invert to slate-800 background, white text */
+                    input, select, textarea, .o_input, .o_searchview_input {
+                        background-color: #dbedff !important;
+                        color: #111111 !important;
+                        border-color: #c8dcf0 !important;
+                    }
+                    
+                    /* Active/selected tabs and badges -> blue accent */
+                    .nav-tabs .nav-link.active, .o_searchview_facet, .badge-primary, .badge-info {
+                        background-color: #c4d6f9 !important; /* Inverts to blue-500 */
+                        color: #111111 !important;
+                    }
+                    
+                    /* Primary active/action buttons in dark mode -> invert to blue-500 */
+                    .o_control_panel .btn-primary,
+                    .o_statusbar_buttons .btn-primary,
+                    .o_statusbar_status .btn-primary,
+                    .o_statusbar_status .btn-primary:disabled,
+                    .o_statusbar_status .btn-primary.disabled,
+                    .o_statusbar_status .o_arrow_button_active,
+                    .o_arrow_button.btn-primary,
+                    .o_arrow_button.active,
+                    .o_form_buttons_edit .btn-primary {
+                        background-color: #c4d6f9 !important;
+                        border-color: #c4d6f9 !important;
+                        color: #111111 !important;
+                    }
+                    
+                    /* Hover styles -> invert to slate-700 (#334155) background */
+                    .o_kanban_record:hover, tr:hover, td:hover, .dropdown-item:hover, .btn-secondary:hover {
+                        background-color: #cbd5e1 !important;
+                    }
+                    
+                    /* Muted texts -> invert to slate-400 (#94a3b8) */
+                    .text-muted, .o_field_translate, .o_form_label_empty, .o_input_placeholder {
+                        color: #555555 !important;
+                    }
+                    
+                    /* Odoo Submenu and brand title text colors in dark mode -> invert to light blue (#93c5fd / #bfdbfe) */
+                    .o_menu_brand,
+                    .o_menu_sections, 
+                    .o_menu_sections a, 
+                    .o_menu_sections button, 
+                    .o_menu_sections .o_nav_entry,
+                    .o_menu_sections .dropdown-toggle {
+                        color: #003a83 !important; /* Inverts to light blue #93c5fd */
+                    }
+                    .o_menu_sections a:hover, 
+                    .o_menu_sections button:hover, 
+                    .o_menu_sections .o_nav_entry:hover,
+                    .o_menu_sections .dropdown-toggle:hover {
+                        background-color: #cbd5e1 !important; /* Inverts to slate-700 background */
+                        color: #001a4e !important; /* Inverts to bright hover blue #bfdbfe */
+                    }
+                    .o_menu_sections a.active, 
+                    .o_menu_sections button.active,
+                    .o_menu_sections .o_nav_entry.active,
+                    .o_menu_sections .show > .dropdown-toggle {
+                        background-color: #dbedff !important; /* Inverts to slate-800 active background */
+                        color: #000000 !important; /* Inverts to clean white #ffffff */
+                        font-weight: 750 !important;
+                    }
+                    
+                    /* 다크모드 아바타 백그라운드 보라색/랜덤색을 정갈한 슬레이트로 변경 */
+                    .o_avatar, .o_user_avatar, .o_image, .o_mimetype_icon {
+                        background-color: #334155 !important;
+                        color: #ffffff !important;
+                    }
+                    
+                    /* Re-invert normal images, avatars, icons and background images */
+                    img, video, .o_avatar, .o_user_avatar, .o_image, .o_mimetype_icon, [style*="background-image"] {
+                        filter: invert(1) hue-rotate(180deg) !important;
+                    }
                 }
             `).catch(() => {});
 

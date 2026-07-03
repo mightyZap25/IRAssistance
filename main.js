@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, shell, session, ipcMain } from 'electron';
+import { app, BrowserWindow, Tray, Menu, shell, session, ipcMain, nativeTheme } from 'electron';
 import path from 'path';
 import pkg from 'electron-updater';
 const { autoUpdater } = pkg;
@@ -16,6 +16,9 @@ console.log('[Electron Main] .env 로드 경로:', envPath);
 
 // Override default User Agent to completely bypass Google's "secure browser" check on login popups and webviews
 app.userAgentFallback = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
+// Force Light Mode as the initial theme for all renderer contents and webviews
+nativeTheme.themeSource = 'light';
 
 let mainWindow = null;
 let tray = null;
@@ -189,6 +192,110 @@ if (!gotTheLock) {
             }
         });
 
+        // Global CSS Injection to force Light Mode for Google previewers and iframes
+        app.on('web-contents-created', (event, contents) => {
+            // If it is a webview guest contents, intercept all popups and open them in-place!
+            if (contents.getType() === 'webview') {
+                contents.setWindowOpenHandler(({ url }) => {
+                    console.log('[Electron Main] Intercepted webview popup window. Loading in-place:', url);
+                    contents.loadURL(url).catch(err => {
+                        console.error('[Electron Main] Failed to load popup URL in webview:', err);
+                    });
+                    return { action: 'deny' };
+                });
+            }
+
+            contents.on('dom-ready', () => {
+                contents.insertCSS(`
+                    /* 1. Google Drive Previewer: Force Light Theme on Backdrop & Dialogs */
+                    div.ndfHFb-c43Cm-z7Ux7b-dL434, 
+                    div.ndfHFb-c43Cm-z7Ux7b-r4nke, 
+                    div.ndfHFb-c43Cm-w7Ozid,
+                    div[role="dialog"],
+                    div[style*="background-color: rgb(17, 17, 17)"],
+                    div[style*="background-color: rgb(30, 30, 30)"] {
+                        background-color: #f1f5f9 !important;
+                    }
+                    
+                    /* 2. Top Header Bar: Force White Background */
+                    .ndfHFb-c43Cm-pyv4t-aufaD-hrZbpb, 
+                    .ndfHFb-c43Cm-pyv4t-aufaD-M743ry-R78rGb,
+                    div[style*="background-color: rgb(32, 33, 36)"] {
+                        background-color: #ffffff !important;
+                        border-bottom: 1px solid #e2e8f0 !important;
+                    }
+                    
+                    /* 3. Top Header Bar: Force Dark Text for Readability */
+                    .ndfHFb-c43Cm-pyv4t-aufaD-hrZbpb *,
+                    .ndfHFb-c43Cm-pyv4t-aufaD-M743ry-R78rGb *,
+                    div[style*="background-color: rgb(32, 33, 36)"] * {
+                        color: #0f172a !important;
+                    }
+                    
+                    /* 4. Top Header Bar: Force Dark Icons for Readability */
+                    .ndfHFb-c43Cm-pyv4t-aufaD-hrZbpb svg,
+                    .ndfHFb-c43Cm-pyv4t-aufaD-M743ry-R78rGb svg,
+                    .ndfHFb-c43Cm-pyv4t-aufaD-hrZbpb svg path,
+                    .ndfHFb-c43Cm-pyv4t-aufaD-M743ry-R78rGb svg path,
+                    div[style*="background-color: rgb(32, 33, 36)"] svg,
+                    div[style*="background-color: rgb(32, 33, 36)"] svg path {
+                        fill: #334155 !important;
+                        color: #334155 !important;
+                    }
+                    
+                    /* 5. Google Drive Spreadsheet Preview: Force Light Column/Row Headers */
+                    .goog-inline-block.grid-header-canvas,
+                    .grid-header-canvas,
+                    .grid-row-header,
+                    .grid-column-header,
+                    td.grid-row-header,
+                    td.grid-column-header,
+                    .grid-row-header-content,
+                    .grid-column-header-content,
+                    .grid-header-canvas-container,
+                    .goog-inline-block.grid-row-header,
+                    .goog-inline-block.grid-column-header {
+                        background-color: #f1f5f9 !important;
+                        color: #334155 !important;
+                        border-color: #cbd5e1 !important;
+                    }
+                    
+                    /* 6. Document Viewer Canvas / Loading background */
+                    .ndfHFb-c43Cm-n7FmZ-w7Ozid {
+                        background-color: #f1f5f9 !important;
+                    }
+                `, { cssOrigin: 'user' }).catch(err => {});
+            });
+        });
+
+        // Persist session cookies for Google domains so users stay logged in across restarts
+        session.defaultSession.cookies.on('changed', (event, cookie, cause, removed) => {
+            if (!removed && cookie.session && (cookie.domain.includes('google.com') || cookie.domain.includes('google.co.kr'))) {
+                const protocol = cookie.secure ? 'https:' : 'http:';
+                const domainClean = cookie.domain.startsWith('.') ? cookie.domain.slice(1) : cookie.domain;
+                const url = `${protocol}//${domainClean}${cookie.path}`;
+                
+                const persistentCookie = {
+                    url: url,
+                    name: cookie.name,
+                    value: cookie.value,
+                    domain: cookie.domain,
+                    path: cookie.path,
+                    secure: cookie.secure,
+                    httpOnly: cookie.httpOnly,
+                    expirationDate: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // Persist for 30 days
+                    sameSite: cookie.sameSite
+                };
+
+                setImmediate(() => {
+                    session.defaultSession.cookies.set(persistentCookie)
+                        .catch(err => {
+                            // Suppress logs for transient failures
+                        });
+                });
+            }
+        });
+
         startBackend();
         createWindow();
         createTray();
@@ -297,10 +404,27 @@ ipcMain.handle('get-app-version', () => {
 });
 
 // ==========================================
-// Google OAuth 2.0 (Electron BrowserWindow 팝업)
+// Google OAuth 2.0 (System Default Browser)
 // ==========================================
 
+let activeOAuthServer = null;
+let activeOAuthReject = null;
+
 ipcMain.handle('google-oauth-signin', async () => {
+    // 이전 로그인 요청이 활성화되어 있다면 정리
+    if (activeOAuthServer) {
+        try {
+            activeOAuthServer.close();
+        } catch (e) {
+            console.error('[OAuth] Failed to close previous server:', e);
+        }
+        activeOAuthServer = null;
+    }
+    if (activeOAuthReject) {
+        activeOAuthReject(new Error('새로운 로그인 요청이 시작되어 이전 요청이 취소되었습니다.'));
+        activeOAuthReject = null;
+    }
+
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
@@ -327,54 +451,80 @@ ipcMain.handle('google-oauth-signin', async () => {
         `&prompt=select_account`;
 
     return new Promise((resolve, reject) => {
-        let authCode = null;
-        let authWin = null;
+        activeOAuthReject = reject;
+        let isResolvedOrRejected = false;
+        let loginWin = null;
+
+        // 5분 타임아웃 설정
+        const timeoutId = setTimeout(() => {
+            if (!isResolvedOrRejected) {
+                isResolvedOrRejected = true;
+                cleanup();
+                reject(new Error('로그인 시간이 초과되었습니다. (5분)'));
+            }
+        }, 5 * 60 * 1000);
+
+        const cleanup = () => {
+            clearTimeout(timeoutId);
+            if (loginWin && !loginWin.isDestroyed()) {
+                try {
+                    loginWin.destroy();
+                } catch (e) {}
+            }
+            loginWin = null;
+            if (activeOAuthServer) {
+                try {
+                    activeOAuthServer.close();
+                } catch (e) {}
+                activeOAuthServer = null;
+            }
+            if (activeOAuthReject === reject) {
+                activeOAuthReject = null;
+            }
+        };
 
         // 로컬 콜백 수신용 HTTP 서버
-        const oauthServer = http.createServer((req, rsp) => {
+        const oauthServer = http.createServer(async (req, rsp) => {
             const reqUrl = new URL(req.url, 'http://localhost:9876');
             if (reqUrl.pathname === '/oauth/callback') {
-                authCode = reqUrl.searchParams.get('code');
+                const authCode = reqUrl.searchParams.get('code');
+                const authError = reqUrl.searchParams.get('error');
+
+                if (authError) {
+                    rsp.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+                    rsp.end(`<html><body style="font-family:sans-serif;text-align:center;padding:50px;background:#fff1f2">
+                        <h2 style="color:#e11d48">❌ Google 로그인 실패</h2>
+                        <p style="color:#4b5563">오류: ${authError}</p>
+                        <p style="color:#6b7280">이 창을 닫고 다시 시도해주세요.</p>
+                    </body></html>`);
+
+                    if (!isResolvedOrRejected) {
+                        isResolvedOrRejected = true;
+                        reject(new Error('Google 로그인 실패: ' + authError));
+                    }
+                    cleanup();
+                    return;
+                }
+
+                if (!authCode) {
+                    rsp.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+                    rsp.end('잘못된 요청입니다. (Authorization code가 없습니다.)');
+                    return;
+                }
+
+                // 성공 응답 전송
                 rsp.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
                 rsp.end(`<html><body style="font-family:sans-serif;text-align:center;padding:50px;background:#f0f4ff">
                     <h2 style="color:#4f46e5">✅ Google 로그인 완료!</h2>
-                    <p style="color:#64748b">이 창을 닫아주세요.</p>
-                    <script>setTimeout(()=>window.close(),1500)</script>
+                    <p style="color:#64748b">로그인이 성공적으로 처리되었습니다. 이 브라우저 창은 자동으로 닫힙니다.</p>
                 </body></html>`);
-                oauthServer.close();
-                // 콜백 받으면 창 자동 닫기
-                if (authWin && !authWin.isDestroyed()) {
+
+                if (loginWin && !loginWin.isDestroyed()) {
                     setTimeout(() => {
-                        if (authWin && !authWin.isDestroyed()) authWin.close();
-                    }, 1500);
-                }
-            }
-        });
-
-        oauthServer.on('error', (err) => {
-            reject(new Error('OAuth 콜백 서버 시작 실패: ' + err.message));
-        });
-
-        oauthServer.listen(9876, () => {
-            console.log('[OAuth] 콜백 서버 시작됨 (포트 9876)');
-
-            // Google 로그인 팝업 창
-            authWin = new BrowserWindow({
-                width: 520,
-                height: 680,
-                title: 'Google 계정으로 로그인',
-                autoHideMenuBar: true,
-                webPreferences: { nodeIntegration: false, contextIsolation: true }
-            });
-
-            authWin.loadURL(authUrl);
-
-            authWin.on('closed', async () => {
-                oauthServer.close();
-
-                if (!authCode) {
-                    reject(new Error('로그인이 취소되었습니다.'));
-                    return;
+                        try {
+                            loginWin.close();
+                        } catch (e) {}
+                    }, 1000);
                 }
 
                 try {
@@ -393,7 +543,11 @@ ipcMain.handle('google-oauth-signin', async () => {
 
                     const tokenData = await tokenRes.json();
                     if (tokenData.error) {
-                        reject(new Error('토큰 교환 실패: ' + (tokenData.error_description || tokenData.error)));
+                        if (!isResolvedOrRejected) {
+                            isResolvedOrRejected = true;
+                            reject(new Error('토큰 교환 실패: ' + (tokenData.error_description || tokenData.error)));
+                        }
+                        cleanup();
                         return;
                     }
 
@@ -405,21 +559,146 @@ ipcMain.handle('google-oauth-signin', async () => {
 
                     console.log('[OAuth] 로그인 성공:', userInfo.email);
 
-                    resolve({
-                        accessToken: tokenData.access_token,
-                        refreshToken: tokenData.refresh_token,
-                        expiresIn: tokenData.expires_in,
-                        user: {
-                            uid: userInfo.id,
-                            email: userInfo.email,
-                            displayName: userInfo.name,
-                            photoURL: userInfo.picture
-                        }
-                    });
+                    if (!isResolvedOrRejected) {
+                        isResolvedOrRejected = true;
+                        resolve({
+                            accessToken: tokenData.access_token,
+                            refreshToken: tokenData.refresh_token,
+                            expiresIn: tokenData.expires_in,
+                            user: {
+                                uid: userInfo.id,
+                                email: userInfo.email,
+                                displayName: userInfo.name,
+                                photoURL: userInfo.picture
+                            }
+                        });
+                    }
+
+                    // 메인 윈도우 포커스
+                    if (mainWindow) {
+                        if (mainWindow.isMinimized()) mainWindow.restore();
+                        mainWindow.show();
+                        mainWindow.focus();
+                    }
                 } catch (err) {
-                    reject(new Error('인증 처리 오류: ' + err.message));
+                    if (!isResolvedOrRejected) {
+                        isResolvedOrRejected = true;
+                        reject(new Error('인증 처리 오류: ' + err.message));
+                    }
+                } finally {
+                    cleanup();
                 }
-            });
+            }
+        });
+
+        oauthServer.on('error', (err) => {
+            if (!isResolvedOrRejected) {
+                isResolvedOrRejected = true;
+                reject(new Error('OAuth 콜백 서버 시작 실패: ' + err.message));
+            }
+            cleanup();
+        });
+
+        activeOAuthServer = oauthServer;
+        oauthServer.listen(9876, async () => {
+            console.log('[OAuth] 콜백 서버 시작됨 (포트 9876)');
+            try {
+                // 시스템 웹 브라우저 대신 작은 Electron 윈도우를 모달 창으로 띄움
+                loginWin = new BrowserWindow({
+                    width: 500,
+                    height: 650,
+                    title: 'Google 계정 로그인',
+                    parent: mainWindow || undefined,
+                    modal: true,
+                    show: false,
+                    resizable: true,
+                    webPreferences: {
+                        nodeIntegration: false,
+                        contextIsolation: true
+                    }
+                });
+
+                loginWin.setMenu(null); // 상단 기본 메뉴바 숨김
+
+                // Google의 Electron 로그인 차단을 피하기 위해 Chrome User-Agent 주입
+                const userAgent = process.platform === 'darwin'
+                    ? 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+                    : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
+                loginWin.loadURL(authUrl, { userAgent });
+
+                // 뒤로가기/앞으로가기 단축키 지원 (Backspace, Cmd+[, Alt+Left 등)
+                loginWin.webContents.on('before-input-event', (event, input) => {
+                    if (input.type === 'keyDown') {
+                        const isBack = 
+                            (process.platform === 'darwin' && input.meta && input.key === '[') || // Cmd + [
+                            (input.alt && input.key === 'ArrowLeft') || // Alt + Left
+                            (input.key === 'BrowserBack') || // Browser Back key
+                            (input.key === 'Backspace' && !input.meta && !input.control && !input.alt); // Backspace (텍스트 필드 외)
+
+                        if (isBack) {
+                            if (loginWin.webContents.canGoBack()) {
+                                loginWin.webContents.goBack();
+                                event.preventDefault();
+                            }
+                        }
+                    }
+                });
+
+                // 마우스 우클릭 시 컨텍스트 메뉴로 뒤로가기/앞으로가기/새로고침 지원
+                loginWin.webContents.on('context-menu', (e, params) => {
+                    const menu = Menu.buildFromTemplate([
+                        {
+                            label: '뒤로 가기',
+                            enabled: loginWin.webContents.canGoBack(),
+                            click: () => loginWin.webContents.goBack()
+                        },
+                        {
+                            label: '앞으로 가기',
+                            enabled: loginWin.webContents.canGoForward(),
+                            click: () => loginWin.webContents.goForward()
+                        },
+                        { type: 'separator' },
+                        {
+                            label: '새로고침',
+                            click: () => loginWin.webContents.reload()
+                        }
+                    ]);
+                    menu.popup({ window: loginWin });
+                });
+
+                loginWin.once('ready-to-show', () => {
+                    loginWin.show();
+                });
+
+                // 로그인 창이 그냥 닫혔을 때 (취소) 처리
+                loginWin.on('close', () => {
+                    if (!isResolvedOrRejected) {
+                        isResolvedOrRejected = true;
+                        reject(new Error('로그인이 취소되었습니다.'));
+                    }
+                    cleanup();
+                });
+            } catch (err) {
+                if (!isResolvedOrRejected) {
+                    isResolvedOrRejected = true;
+                    reject(new Error('로그인 창을 열지 못했습니다: ' + err.message));
+                }
+                cleanup();
+            }
         });
     });
+});
+
+ipcMain.handle('clear-google-cookies', async () => {
+    await session.defaultSession.clearStorageData({
+        storages: ['cookies']
+    });
+    console.log('[Electron Main] Cleared all session cookies.');
+    return true;
+});
+
+ipcMain.on('set-theme', (event, theme) => {
+    console.log('[Electron Main] Setting theme to:', theme);
+    nativeTheme.themeSource = theme;
 });

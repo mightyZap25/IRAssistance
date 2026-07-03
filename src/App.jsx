@@ -14,6 +14,8 @@ import WorkspaceMailPage from './pages/WorkspaceMailPage'
 import WorkspaceMemoPage from './pages/WorkspaceMemoPage'
 import MeetingsPage from './pages/MeetingsPage'
 import SettingsPage from './pages/SettingsPage'
+import NotebookLMPage from './pages/NotebookLMPage'
+import GeminiPage from './pages/GeminiPage'
 
 function PrivateRoute({ children }) {
     const { currentUser } = useAuth();
@@ -52,6 +54,8 @@ function AppContent() {
             <Route path="/workspace/mail" element={<PrivateRoute><Layout><WorkspaceMailPage /></Layout></PrivateRoute>} />
             <Route path="/workspace/memo" element={<PrivateRoute><Layout><WorkspaceMemoPage /></Layout></PrivateRoute>} />
             <Route path="/workspace/chat" element={<PrivateRoute><Layout><GoogleChatPage /></Layout></PrivateRoute>} />
+            <Route path="/workspace/notebooklm" element={<PrivateRoute><Layout><NotebookLMPage /></Layout></PrivateRoute>} />
+            <Route path="/workspace/gemini" element={<PrivateRoute><Layout><GeminiPage /></Layout></PrivateRoute>} />
             <Route path="/workspace/meetings" element={<PrivateRoute><Layout><MeetingsPage /></Layout></PrivateRoute>} />
             <Route path="/settings" element={<PrivateRoute><Layout><SettingsPage /></Layout></PrivateRoute>} />
 

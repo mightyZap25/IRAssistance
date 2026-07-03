@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     restartApp: () => ipcRenderer.send('restart-app'),
     getAppVersion: () => ipcRenderer.invoke('get-app-version'),
     googleOAuthSignIn: () => ipcRenderer.invoke('google-oauth-signin'),
+    clearGoogleCookies: () => ipcRenderer.invoke('clear-google-cookies'),
+    setTheme: (theme) => ipcRenderer.send('set-theme', theme),
     onUpdateMessage: (callback) => {
         const subscription = (event, ...args) => callback(...args);
         ipcRenderer.on('update-message', subscription);

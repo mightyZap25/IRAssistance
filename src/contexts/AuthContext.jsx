@@ -59,10 +59,17 @@ export function AuthProvider({ children }) {
         }
     }
 
-    function logout() {
+    async function logout() {
         setUserProfile(null);
         localStorage.removeItem('google_access_token');
         localStorage.removeItem('google_access_token_expires_at');
+        if (window.electronAPI?.clearGoogleCookies) {
+            try {
+                await window.electronAPI.clearGoogleCookies();
+            } catch (err) {
+                console.error('Failed to clear Google cookies:', err);
+            }
+        }
         return signOut(auth);
     }
 

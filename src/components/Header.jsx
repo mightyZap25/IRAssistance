@@ -34,6 +34,12 @@ export default function Header({ isHelpOpen, onToggleHelp }) {
         return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
     }, []);
 
+    useEffect(() => {
+        const handleToggleMemo = () => setMemoOpen(v => !v);
+        window.addEventListener('toggle-floating-memo', handleToggleMemo);
+        return () => window.removeEventListener('toggle-floating-memo', handleToggleMemo);
+    }, []);
+
     const toggleFullscreen = () => {
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen().catch((err) => {
@@ -397,14 +403,6 @@ export default function Header({ isHelpOpen, onToggleHelp }) {
                     <HelpCircle size={18} />
                 </button>
 
-                {/* Floating Notepad Toggle */}
-                <button
-                    onClick={() => setMemoOpen(v => !v)}
-                    className={`p-1.5 hover:bg-slate-100 rounded-full transition-colors ${memoOpen ? 'text-amber-600 bg-amber-50' : 'text-slate-400 hover:text-amber-600'}`}
-                    title="개인 메모장"
-                >
-                    <StickyNote size={18} />
-                </button>
 
                 {/* Notifications */}
                 <div className="relative">
@@ -462,48 +460,7 @@ export default function Header({ isHelpOpen, onToggleHelp }) {
                     )}
                 </div>
 
-                <div className="h-6 w-[1px] bg-slate-200 mx-1"/>
 
-                {/* Profile */}
-                <div className="flex items-center gap-2">
-                    <div className="text-right hidden sm:block">
-                        <div className="text-xs font-bold text-slate-700 leading-tight">
-                            {userProfile?.displayName || currentUser?.displayName}
-                        </div>
-                        <div className="flex items-center justify-end gap-1">
-                            {devRoleOverride && (
-                                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded text-white ${activeRole?.color || 'bg-slate-400'}`}>
-                                    TEST
-                                </span>
-                            )}
-                            <span className="text-[9px] text-slate-400 font-mono uppercase tracking-wider font-bold">
-                                {devRoleOverride || rawUserProfile?.role || '게스트'}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div className="relative group cursor-pointer">
-                        <div className={`w-8 h-8 rounded-full overflow-hidden border-2 shadow-sm transition-colors ${devRoleOverride ? 'border-amber-400' : 'border-slate-100 group-hover:border-indigo-200'}`}>
-                            {currentUser?.photoURL ? (
-                                <img src={currentUser.photoURL} alt="Profile" className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-slate-200 text-slate-400">
-                                    <User size={20} />
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Dropdown */}
-                        <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right">
-                            <div className="p-2">
-                                <button onClick={logout} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-50 rounded-lg transition-colors font-bold">
-                                    <LogOut size={16} />
-                                    로그아웃
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             {/* Floating Notepad Modal */}
