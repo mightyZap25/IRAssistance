@@ -1,7 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 
-const ODOO_BASE_URL = 'http://192.168.0.7:8069'; // NAS Odoo Server
+// 기본 사내망 Odoo 주소 및 테일스케일 Odoo 주소
+const ODOO_LOCAL_URL = 'http://192.168.0.7:8069'; 
+const ODOO_REMOTE_URL = 'http://100.67.238.32:8069';
 
 let globalOdooMenus = [];
 
@@ -9,6 +11,26 @@ export default function OdooWebView() {
     const location = useLocation();
     const webviewRef = useRef(null);
     const [menusLoaded, setMenusLoaded] = React.useState(globalOdooMenus.length > 0);
+    const [odooBaseUrl, setOdooBaseUrl] = React.useState(ODOO_LOCAL_URL);
+
+    // 활성화된 프로필에 맞는 Odoo URL 가져오기
+    useEffect(() => {
+        fetch('/api/config/db')
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.currentProfile === 'remote') {
+                    setOdooBaseUrl(ODOO_REMOTE_URL);
+                    console.log('[OdooWebView] 외부 원격 프로필(Tailscale) 적용됨:', ODOO_REMOTE_URL);
+                } else {
+                    setOdooBaseUrl(ODOO_LOCAL_URL);
+                    console.log('[OdooWebView] 사내 로컬 프로필 적용됨:', ODOO_LOCAL_URL);
+                }
+            })
+            .catch(err => {
+                console.error('[OdooWebView] DB 설정 로드 실패, 기본 로컬 주소 사용:', err);
+                setOdooBaseUrl(ODOO_LOCAL_URL);
+            });
+    }, []);
 
     const isElectron = window.electronAPI?.isElectron ||
                        (window && window.process && window.process.type === 'renderer') ||
@@ -17,12 +39,12 @@ export default function OdooWebView() {
     // 목표 URL 계산
     const getTargetUrl = () => {
         if (location.pathname === '/odoo/apps') {
-            return `${ODOO_BASE_URL}/odoo/apps`;
+            return `${odooBaseUrl}/odoo/apps`;
         }
         if (location.pathname === '/odoo/view') {
             const searchParams = new URLSearchParams(location.search);
             const menuId = searchParams.get('menu_id');
-            if (menuId) return `${ODOO_BASE_URL}/web#menu_id=${menuId}`;
+            if (menuId) return `${odooBaseUrl}/web#menu_id=${menuId}`;
         }
         
         // 기존 네이티브 메뉴 경로를 Odoo 앱(App) 이름으로 매핑
@@ -44,11 +66,11 @@ export default function OdooWebView() {
         if (targetAppName && globalOdooMenus.length > 0) {
             const matchedMenu = globalOdooMenus.find(m => m.name === targetAppName || m.name === 'Invoicing');
             if (matchedMenu) {
-                return `${ODOO_BASE_URL}/web#menu_id=${matchedMenu.menu_id}`;
+                return `${odooBaseUrl}/web#menu_id=${matchedMenu.menu_id}`;
             }
         }
 
-        return `${ODOO_BASE_URL}/web`;
+        return `${odooBaseUrl}/web`;
     };
 
     // 경로 변경 시 webview URL 이동
