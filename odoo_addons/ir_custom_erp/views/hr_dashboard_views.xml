@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Client Action for the Owl Dashboard -->
+        <record id="action_hr_dashboard" model="ir.actions.client">
+            <field name="name">내 근태 현황 (대시보드)</field>
+            <field name="tag">ir_custom_erp.hr_dashboard_action</field>
+        </record>
+
+        <!-- Menu Item -->
+        <menuitem id="menu_hr_dashboard"
+                  name="근태/휴가 대시보드"
+                  action="action_hr_dashboard"
+                  web_icon="hr_attendance,static/description/icon.png"
+                  sequence="10"/>
+                  
+
+    </data>
+</odoo>

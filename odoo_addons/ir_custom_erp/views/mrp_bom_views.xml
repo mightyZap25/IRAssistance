@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- mrp.bom form view extension -->
+        <record id="view_mrp_bom_form_custom" model="ir.ui.view">
+            <field name="name">mrp.bom.form.custom</field>
+            <field name="model">mrp.bom</field>
+            <field name="inherit_id" ref="mrp.mrp_bom_form_view"/>
+            <field name="arch" type="xml">
+                <!-- Add Custom Fields to the BOM form -->
+                <xpath expr="//sheet/group" position="before">
+                    <div class="oe_title">
+                        <h1>
+                            <field name="x_bom_id" placeholder="BOM ID (자동 생성)"/>
+                        </h1>
+                    </div>
+                </xpath>
+                <xpath expr="//sheet/group/group[1]" position="inside">
+                    <field name="x_bom_rev"/>
+                    <field name="x_owner"/>
+                </xpath>
+                <xpath expr="//notebook" position="inside">
+                    <page string="제조 특이사항 (Custom)" name="custom_bom_notes">
+                        <field name="x_note" placeholder="조립 공정 특이사항이나 기타 내용을 입력하세요."/>
+                    </page>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>

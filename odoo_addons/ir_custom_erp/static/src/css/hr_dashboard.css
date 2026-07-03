@@ -1,0 +1,496 @@
+/* =========================================
+   Modern Premium HR Dashboard Styles
+   ========================================= */
+.hr_dashboard_wrapper {
+    display: flex;
+    height: 100vh;
+    background-color: #f4f7fe;
+    font-family: 'Inter', 'Noto Sans KR', sans-serif;
+    color: #2b3674;
+}
+
+/* ================= Left Navigation Sidebar ================= */
+.hr_nav_sidebar {
+    width: 240px;
+    background: #ffffff;
+    border-right: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    padding: 30px 15px;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.02);
+    z-index: 10;
+}
+
+.hr_nav_sidebar .nav_item {
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: #a3aed1;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.hr_nav_sidebar .nav_item:hover {
+    background-color: #f4f7fe;
+    color: #4318ff;
+}
+
+.hr_nav_sidebar .nav_item.active {
+    background-color: #4318ff;
+    color: #ffffff;
+    box-shadow: 0 10px 20px rgba(67, 24, 255, 0.2);
+}
+
+.hr_nav_sidebar .nav_group_title {
+    margin-top: 24px;
+    margin-bottom: 8px;
+    padding: 0 16px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #a3aed1;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.hr_nav_sidebar .nav_sub_items {
+    padding-left: 12px;
+}
+
+.hr_nav_sidebar .nav_sub_items .nav_item.sub {
+    font-size: 0.85rem;
+    padding: 10px 16px;
+}
+
+/* ================= Dashboard Container ================= */
+.hr_dashboard_container {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* ================= Middle Profile Sidebar ================= */
+.hr_sidebar {
+    width: 340px;
+    background: transparent;
+    display: flex;
+    flex-direction: column;
+    padding: 30px 20px 30px 30px;
+    overflow-y: auto;
+}
+
+.sidebar_header h4 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 24px;
+    color: #2b3674;
+    letter-spacing: -0.5px;
+}
+
+.sidebar_today {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 18px 40px rgba(112, 144, 176, 0.08);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Decorative subtle gradient background for the today card */
+.sidebar_today::before {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 150px; height: 150px;
+    background: radial-gradient(circle, rgba(67,24,255,0.05) 0%, rgba(255,255,255,0) 70%);
+    border-radius: 50%;
+    transform: translate(30%, -30%);
+}
+
+.today_date {
+    font-size: 0.85rem;
+    color: #a3aed1;
+    margin-bottom: 16px;
+    font-weight: 500;
+}
+
+.greeting {
+    font-size: 1.25rem;
+    margin-bottom: 16px;
+    color: #2b3674;
+    line-height: 1.4;
+}
+
+.status_text {
+    font-weight: 700;
+    color: #4318ff;
+    font-size: 1.1rem;
+}
+
+.work_type_badge {
+    display: inline-block;
+    padding: 6px 14px;
+    background: #eef2ff;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #4318ff;
+    margin-bottom: 20px;
+}
+
+.clock_times {
+    font-size: 0.9rem;
+    color: #7090b0;
+    margin-bottom: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-weight: 500;
+}
+
+.progress_circle_wrapper {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 24px;
+}
+
+.progress_circle {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.03);
+}
+
+.inner_circle {
+    width: 136px;
+    height: 136px;
+    background: #ffffff;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.02);
+}
+
+.inner_circle .percent {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #4318ff;
+    letter-spacing: -1px;
+}
+
+.inner_circle .label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #a3aed1;
+    margin-top: 2px;
+}
+
+.inner_circle .time {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #2b3674;
+    margin-top: 4px;
+}
+
+.clock_buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.clock_in_btn {
+    flex: 1;
+    background: linear-gradient(135deg, #868cff 0%, #4318ff 100%);
+    color: white;
+    border: none;
+    border-radius: 14px;
+    padding: 14px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 10px 20px rgba(67, 24, 255, 0.2);
+}
+
+.clock_in_btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 24px rgba(67, 24, 255, 0.3);
+}
+
+/* Weekly Summary */
+.sidebar_weekly {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: 0 18px 40px rgba(112, 144, 176, 0.08);
+}
+
+.weekly_header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    font-weight: 700;
+    color: #2b3674;
+}
+
+.arrows .btn {
+    background: #f4f7fe;
+    border: none;
+    color: #4318ff;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    margin-left: 4px;
+}
+
+.arrows .btn:hover {
+    background: #eef2ff;
+}
+
+.bar_labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #a3aed1;
+    text-align: center;
+    font-weight: 500;
+}
+
+.bar_labels b {
+    color: #2b3674;
+    font-size: 0.9rem;
+    font-weight: 700;
+    margin-top: 4px;
+    display: block;
+}
+
+.progress {
+    height: 10px;
+    background-color: #f4f7fe;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 12px;
+}
+
+.progress-bar {
+    background: linear-gradient(90deg, #4318ff 0%, #868cff 100%);
+    border-radius: 10px;
+}
+
+.bar_ticks {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    color: #a3aed1;
+    margin-top: 8px;
+    font-weight: 500;
+}
+
+/* ================= Main Area ================= */
+.hr_main {
+    flex: 1;
+    padding: 30px 30px 30px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    overflow-y: auto;
+}
+
+.top_cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+
+.metric_card {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 18px 40px rgba(112, 144, 176, 0.08);
+    position: relative;
+    overflow: hidden;
+}
+
+.metric_card::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0;
+    width: 100%; height: 4px;
+    background: transparent;
+    transition: background 0.3s ease;
+}
+
+.metric_card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 22px 45px rgba(112, 144, 176, 0.12);
+}
+
+.metric_card:hover::after {
+    background: linear-gradient(90deg, #4318ff 0%, #868cff 100%);
+}
+
+.card_title {
+    color: #a3aed1;
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 12px;
+}
+
+.card_value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #2b3674;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.card_value i {
+    color: #4318ff;
+    font-size: 1rem;
+    background: #f4f7fe;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ================= Calendar Area ================= */
+.calendar_area {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 24px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 18px 40px rgba(112, 144, 176, 0.08);
+}
+
+.calendar_header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.dropdowns .form-select {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 8px 36px 8px 16px;
+    font-size: 0.9rem;
+    color: #2b3674;
+    font-weight: 500;
+    background-color: #f4f7fe;
+}
+
+.month_title {
+    font-weight: 800;
+    font-size: 1.5rem;
+    color: #2b3674;
+    margin: 0;
+    letter-spacing: -0.5px;
+}
+
+.calendar_legend {
+    display: flex;
+    justify-content: flex-end;
+    gap: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-bottom: 16px;
+}
+
+.leg_item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #7090b0;
+}
+
+.calendar_grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    flex: 1;
+    gap: 1px;
+    background-color: #eef2ff;
+    border: 1px solid #eef2ff;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.cal_head {
+    padding: 12px;
+    text-align: center;
+    font-weight: 700;
+    background-color: #ffffff;
+    color: #a3aed1;
+    font-size: 0.9rem;
+}
+
+.cal_cell {
+    min-height: 110px;
+    padding: 10px;
+    background-color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    transition: background-color 0.2s;
+}
+
+.cal_cell:hover {
+    background-color: #f8fafc;
+}
+
+.cal_cell.text-muted .date_num {
+    color: #cbd5e1;
+}
+
+.date_num {
+    font-weight: 600;
+    color: #2b3674;
+    margin-bottom: 6px;
+    font-size: 0.95rem;
+}
+
+.cal_cell.text-danger .date_num {
+    color: #ef4444;
+}
+
+.events_container {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.event {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Event Colors */
+.event.text-primary { background: #e0e7ff; color: #4318ff !important; }
+.event.text-info { background: #e0f2fe; color: #0284c7 !important; }
+.event.text-purple { background: #f3e8ff; color: #9333ea !important; }
+.event.text-danger { background: #fee2e2; color: #dc2626 !important; }
+.event.text-warning { background: #fef3c7; color: #d97706 !important; }

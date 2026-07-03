@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_ir_eco_wizard_form" model="ir.ui.view">
+            <field name="name">ir.eco.wizard.form</field>
+            <field name="model">ir.eco.wizard</field>
+            <field name="arch" type="xml">
+                <form string="설계 변경(ECO) 기안">
+                    <sheet>
+                        <group>
+                            <group string="리비전 (Revision)">
+                                <field name="x_rev"/>
+                            </group>
+                            <group string="변경 사유">
+                                <field name="reason_for_change" placeholder="어떤 이유로 설계 변경을 진행하시나요?"/>
+                            </group>
+                        </group>
+                        
+                        <notebook>
+                            <page string="새로운 부품 스펙">
+                                <group>
+                                    <group string="기본 분류">
+                                        <field name="x_category"/>
+                                        <field name="x_class"/>
+                                    </group>
+                                    <group string="제조 정보">
+                                        <field name="x_maker"/>
+                                        <field name="x_manufacturer"/>
+                                        <field name="x_mpn"/>
+                                        <field name="x_is_overseas"/>
+                                    </group>
+                                    <group string="관리 정보">
+                                        <field name="x_owner"/>
+                                    </group>
+                                    <group string="공정 및 재질">
+                                        <field name="x_process_type"/>
+                                        <field name="x_material"/>
+                                        <field name="x_grade"/>
+                                        <field name="x_color"/>
+                                    </group>
+                                    <group string="안전 인증" col="10">
+                                        <field name="x_safety_ce"/>
+                                        <field name="x_safety_rohs"/>
+                                        <field name="x_safety_ul"/>
+                                        <field name="x_safety_kc"/>
+                                        <field name="x_safety_reach"/>
+                                    </group>
+                                </group>
+                            </page>
+                            <page string="제조품 스펙 (MFG Parts)">
+                                <group>
+                                    <group string="제조품 구분">
+                                        <field name="x_manufacturing_type"/>
+                                        <field name="x_finished_category" invisible="x_manufacturing_type != 'finished'"/>
+                                    </group>
+                                    <group string="공통 사양" invisible="not x_manufacturing_type">
+                                        <field name="x_series_id"/>
+                                    </group>
+                                    <group string="Actuator 스펙" invisible="x_finished_category != 'actuator'">
+                                        <field name="x_comm_type_id"/>
+                                        <field name="x_stroke_type_id"/>
+                                    </group>
+                                    <group string="추가 정보" invisible="not x_manufacturing_type">
+                                        <field name="x_mfg_extra_notes"/>
+                                    </group>
+                                </group>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <footer>
+                        <button string="설계 변경 제출" name="action_submit_eco" type="object" class="oe_highlight"/>
+                        <button string="취소" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <!-- Action to open wizard -->
+        <record id="action_ir_eco_wizard" model="ir.actions.act_window">
+            <field name="name">설계 변경 시작</field>
+            <field name="res_model">ir.eco.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+    </data>
+</odoo>

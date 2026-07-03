@@ -1,0 +1,173 @@
+/* =========================================
+   Odoo Global Modern Theme Override
+   ========================================= */
+
+:root {
+    --o-font-family-sans-serif: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --o-brand-primary: #4318ff;
+    --o-brand-odoo: #4318ff;
+    --o-primary-color: #4318ff;
+}
+
+/* ================= Global Font ================= */
+body, .o_web_client, .o_content, .o_control_panel, .o_form_view, .o_list_view, .o_kanban_view,
+.dropdown-menu, .btn, input, select, textarea {
+    font-family: var(--o-font-family-sans-serif) !important;
+}
+
+/* ================= Top App Bar ================= */
+.o_main_navbar {
+    background-color: #ffffff !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.02) !important;
+}
+
+.o_main_navbar > a, .o_main_navbar > button, .o_main_navbar .dropdown-toggle, .o_menu_brand {
+    color: #2b3674 !important;
+    font-weight: 600 !important;
+}
+
+.o_main_navbar .dropdown-toggle:hover, .o_main_navbar > a:hover {
+    background-color: #f4f7fe !important;
+    color: #4318ff !important;
+}
+
+/* ================= Form Views ================= */
+.o_form_view {
+    background-color: #f4f7fe !important;
+}
+
+.o_form_view .o_form_sheet_bg {
+    background-color: transparent !important;
+    padding: 20px !important;
+}
+
+.o_form_view .o_form_sheet {
+    border-radius: 20px !important;
+    box-shadow: 0 10px 40px rgba(112, 144, 176, 0.08) !important;
+    border: 1px solid #ffffff !important;
+    padding: 40px !important;
+    margin: 0 auto !important;
+    background: #ffffff !important;
+}
+
+/* ================= Inputs ================= */
+input.o_input, select.o_input, textarea.o_input {
+    border-radius: 10px !important;
+    border: 1px solid #cbd5e1 !important;
+    background-color: #f8fafc !important;
+    padding: 8px 12px !important;
+    transition: all 0.2s ease !important;
+    box-shadow: none !important;
+}
+
+input.o_input:focus, select.o_input:focus, textarea.o_input:focus {
+    border-color: #4318ff !important;
+    background-color: #ffffff !important;
+    box-shadow: 0 0 0 3px rgba(67, 24, 255, 0.1) !important;
+}
+
+/* ================= Buttons ================= */
+.btn {
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+    transition: all 0.2s ease !important;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #868cff 0%, #4318ff 100%) !important;
+    border: none !important;
+    color: white !important;
+    box-shadow: 0 4px 10px rgba(67, 24, 255, 0.2) !important;
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 15px rgba(67, 24, 255, 0.3) !important;
+}
+
+.btn-secondary {
+    background-color: #f1f5f9 !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #475569 !important;
+}
+
+.btn-secondary:hover {
+    background-color: #e2e8f0 !important;
+    color: #1e293b !important;
+}
+
+/* ================= Kanban Cards ================= */
+.o_kanban_record {
+    border-radius: 16px !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 4px 15px rgba(112, 144, 176, 0.05) !important;
+    padding: 16px !important;
+    transition: transform 0.2s, box-shadow 0.2s !important;
+    background: #ffffff !important;
+}
+
+.o_kanban_record:hover {
+    transform: translateY(-3px) !important;
+    box-shadow: 0 10px 25px rgba(112, 144, 176, 0.1) !important;
+}
+
+/* ================= List/Tree View ================= */
+.o_list_view .o_list_table {
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    box-shadow: 0 4px 12px rgba(112, 144, 176, 0.05) !important;
+    border: 1px solid #e2e8f0 !important;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+}
+
+.o_list_view thead th {
+    background-color: #f8fafc !important;
+    color: #64748b !important;
+    font-weight: 700 !important;
+    border-bottom: 2px solid #e2e8f0 !important;
+    padding: 14px 12px !important;
+    text-transform: uppercase !important;
+    font-size: 0.85rem !important;
+    letter-spacing: 0.5px !important;
+}
+
+.o_list_view tbody td {
+    padding: 12px !important;
+    border-top: 1px solid #f1f5f9 !important;
+    color: #334155 !important;
+}
+
+/* ================= Notebooks / Tabs ================= */
+.o_notebook .nav-tabs {
+    border-bottom: 2px solid #e2e8f0 !important;
+    margin-bottom: 20px !important;
+}
+
+.o_notebook .nav-tabs .nav-link {
+    font-weight: 600 !important;
+    color: #94a3b8 !important;
+    border: none !important;
+    padding: 12px 24px !important;
+    font-size: 1rem !important;
+}
+
+.o_notebook .nav-tabs .nav-link:hover {
+    color: #4318ff !important;
+    background: #f4f7fe !important;
+    border-radius: 10px 10px 0 0 !important;
+}
+
+.o_notebook .nav-tabs .nav-link.active {
+    color: #4318ff !important;
+    border-bottom: 3px solid #4318ff !important;
+    background: transparent !important;
+}
+
+/* ================= Control Panel ================= */
+.o_control_panel {
+    background-color: #ffffff !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    padding: 15px 20px !important;
+}

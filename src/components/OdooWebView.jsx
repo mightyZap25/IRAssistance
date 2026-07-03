@@ -3,9 +3,12 @@ import { useLocation } from 'react-router-dom';
 
 const ODOO_BASE_URL = 'http://192.168.0.7:8069'; // NAS Odoo Server
 
+let globalOdooMenus = [];
+
 export default function OdooWebView() {
     const location = useLocation();
     const webviewRef = useRef(null);
+    const [menusLoaded, setMenusLoaded] = React.useState(globalOdooMenus.length > 0);
 
     const isElectron = window.electronAPI?.isElectron ||
                        (window && window.process && window.process.type === 'renderer') ||
@@ -21,6 +24,30 @@ export default function OdooWebView() {
             const menuId = searchParams.get('menu_id');
             if (menuId) return `${ODOO_BASE_URL}/web#menu_id=${menuId}`;
         }
+        
+        // 기존 네이티브 메뉴 경로를 Odoo 앱(App) 이름으로 매핑
+        const appMap = {
+            '/parts': 'Inventory',
+            '/customers': 'Contacts',
+            '/inventory': 'Inventory',
+            '/manufacturers': 'Contacts',
+            '/vendors': 'Contacts',
+            '/prod-execution': 'Manufacturing',
+            '/purchasing': 'Purchase',
+            '/qa/dashboard': 'Quality',
+            '/project/management': 'Project',
+            '/project/tasks': 'Project',
+            '/sales/billing': 'Accounting'
+        };
+
+        const targetAppName = appMap[location.pathname];
+        if (targetAppName && globalOdooMenus.length > 0) {
+            const matchedMenu = globalOdooMenus.find(m => m.name === targetAppName || m.name === 'Invoicing');
+            if (matchedMenu) {
+                return `${ODOO_BASE_URL}/web#menu_id=${matchedMenu.menu_id}`;
+            }
+        }
+
         return `${ODOO_BASE_URL}/web`;
     };
 
@@ -36,7 +63,7 @@ export default function OdooWebView() {
                 webviewRef.current.src = targetUrl;
             }
         }
-    }, [location.pathname, location.search, isElectron]);
+    }, [location.pathname, location.search, isElectron, menusLoaded]);
 
     // webview 내부에서 직접 JSON-RPC 호출 (Odoo 세션 쿠키 사용)
     useEffect(() => {
@@ -44,10 +71,72 @@ export default function OdooWebView() {
         if (!webview || !isElectron) return;
 
         const handleDomReady = async () => {
-            // Odoo 상단 메뉴바 숨기기
+            // Odoo 상단 메뉴바의 홈 버튼(앱 선택기)만 숨기고, 하위 메뉴(품목, 작업 등)는 보이도록 유지
+            // 추가로 Odoo 기본 보라색 테마를 IR Assistant 색상(Slate-800)으로 덮어씌우고 좌측 마진을 줍니다.
             webview.insertCSS(`
-                .o_main_navbar { display: none !important; }
-                .o_action_manager { padding-top: 0 !important; }
+                .o_navbar_apps_menu { display: none !important; }
+                .o_menu_toggle { display: none !important; }
+                .o_menu_apps { display: none !important; }
+                
+                /* 좌측 마진 추가 */
+                .o_menu_brand { margin-left: 24px !important; }
+                
+                /* Odoo 전체 기본 테마(보라색)를 세련된 파란색(Blue 600)으로 강제 덮어쓰기 */
+                :root {
+                    --o-brand-odoo: #2563eb !important;
+                    --o-brand-primary: #2563eb !important;
+                    --primary: #2563eb !important;
+                    --bs-primary: #2563eb !important;
+                    --bs-primary-rgb: 37, 99, 235 !important;
+                }
+                
+                /* 버튼 및 포인트 컬러 강제 오버라이드 */
+                .btn-primary {
+                    background-color: #2563eb !important;
+                    border-color: #2563eb !important;
+                    color: white !important;
+                }
+                .btn-primary:hover {
+                    background-color: #1d4ed8 !important;
+                    border-color: #1d4ed8 !important;
+                }
+                .text-primary {
+                    color: #2563eb !important;
+                }
+                .bg-primary {
+                    background-color: #2563eb !important;
+                }
+                
+                /* 상단바 색상 변경 (연한 회색 배경 + 어두운 글씨) */
+                .o_navbar, .o_main_navbar { 
+                    background-color: #f8fafc !important; 
+                    background-image: none !important;
+                    border-bottom: 1px solid #e2e8f0 !important; 
+                }
+                /* 서브메뉴(버튼) 영역 강제 투명화 및 배경 초기화 (보라색 제거) */
+                .o_menu_sections, .o_menu_sections > *, .o_menu_sections .o_nav_entry, .o_navbar_apps_menu {
+                    background-color: transparent !important;
+                    background-image: none !important;
+                }
+                
+                /* 상단바 글씨 색상 */
+                .o_navbar .o_nav_entry, 
+                .o_navbar .dropdown-toggle,
+                .o_main_navbar > a,
+                .o_main_navbar > button,
+                .o_menu_brand {
+                    color: #475569 !important;
+                }
+                /* 상단바 마우스 오버(Hover) 시 효과 */
+                .o_navbar .o_nav_entry:hover, 
+                .o_navbar .dropdown-toggle:hover, 
+                .o_navbar .o_nav_entry.show, 
+                .o_navbar .dropdown-toggle.show,
+                .o_main_navbar > a:hover,
+                .o_main_navbar > button:hover {
+                    background-color: #e2e8f0 !important;
+                    color: #0f172a !important;
+                }
             `).catch(() => {});
 
             // webview 내부(= Odoo 서버와 같은 origin)에서 JSON-RPC 호출
@@ -83,6 +172,8 @@ export default function OdooWebView() {
                         name: m.name,
                         menu_id: String(m.id),
                     }));
+                    globalOdooMenus = apps;
+                    setMenusLoaded(true);
                     window.dispatchEvent(new CustomEvent('odoo-menus-loaded', { detail: apps }));
                 }
             } catch (e) {
@@ -106,7 +197,7 @@ export default function OdooWebView() {
     }
 
     return (
-        <div className="w-full h-full bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col shadow-sm">
+        <div className="w-full h-full bg-white flex flex-col">
             <webview
                 ref={webviewRef}
                 src={getTargetUrl()}

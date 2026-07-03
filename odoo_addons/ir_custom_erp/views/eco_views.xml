@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- ECO Kanban View -->
+        <record id="view_ir_eco_kanban" model="ir.ui.view">
+            <field name="name">ir.eco.kanban</field>
+            <field name="model">ir.eco</field>
+            <field name="arch" type="xml">
+                <kanban default_group_by="state" class="o_kanban_small_column">
+                    <field name="name"/>
+                    <field name="original_product_id"/>
+                    <field name="new_product_id"/>
+                    <field name="eco_type"/>
+                    <field name="state"/>
+                    <field name="approver_ids"/>
+                    <templates>
+                        <t t-name="card">
+                            <div class="oe_kanban_global_click border-0 shadow-sm rounded-3 p-3 bg-white" style="transition: transform 0.2s, box-shadow 0.2s;">
+                                <div class="o_kanban_record_top mb-2">
+                                    <div class="o_kanban_record_headings">
+                                        <strong class="o_kanban_record_title fs-5 fw-bolder text-dark"><field name="name"/></strong>
+                                    </div>
+                                    <div>
+                                        <field name="eco_type" widget="badge" decoration-info="eco_type == 'part'" decoration-warning="eco_type == 'assembly'"/>
+                                    </div>
+                                </div>
+                                
+                                <div class="o_kanban_record_body mb-2">
+                                    <t t-if="record.eco_type.raw_value == 'part'">
+                                        <div class="d-flex align-items-center text-muted small mb-1">
+                                            <i class="fa fa-cube me-2 opacity-75"></i>
+                                            <span class="me-1">원본:</span>
+                                            <field name="original_product_id"/>
+                                        </div>
+                                        <div class="d-flex align-items-center text-primary small">
+                                            <i class="fa fa-arrow-right me-2 opacity-75"></i>
+                                            <span class="me-1">신규:</span>
+                                            <field name="new_product_id" class="fw-bold"/>
+                                        </div>
+                                    </t>
+                                    <t t-if="record.eco_type.raw_value == 'assembly'">
+                                        <div class="d-flex align-items-center text-muted small">
+                                            <i class="fa fa-sitemap me-2 opacity-75"></i>
+                                            <span>일괄 BOM 변경 (완제품 대상)</span>
+                                        </div>
+                                    </t>
+                                </div>
+                                
+                                <hr class="my-2 border-secondary opacity-25"/>
+                                
+                                <div class="o_kanban_record_bottom mt-2">
+                                    <div class="oe_kanban_bottom_left">
+                                        <field name="state" widget="badge" decoration-success="state == 'approved'" decoration-warning="state == 'review'" decoration-muted="state == 'draft'"/>
+                                    </div>
+                                    <div class="oe_kanban_bottom_right">
+                                        <field name="approver_ids" widget="many2many_avatar_user"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <!-- ECO Form View -->
+        <record id="view_ir_eco_form" model="ir.ui.view">
+            <field name="name">ir.eco.form</field>
+            <field name="model">ir.eco</field>
+            <field name="arch" type="xml">
+                <form>
+                    <header>
+                        <button name="action_submit_for_review" string="결재 상신" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_open_review_wizard_approve" string="승인" type="object" class="oe_highlight" invisible="state != 'review'"/>
+                        <button name="action_open_review_wizard_reject" string="반려" type="object" invisible="state != 'review'"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,review,approved"/>
+                    </header>
+                    <sheet>
+                        <widget name="web_ribbon" title="승인 완료" bg_color="text-bg-success" invisible="state != 'approved'"/>
+                        <widget name="web_ribbon" title="결재 중" bg_color="text-bg-warning" invisible="state != 'review'"/>
+                        
+                        <div class="oe_title mb-4">
+                            <h1 class="d-flex flex-row align-items-center">
+                                <field name="name" readonly="1" class="me-3"/>
+                                <field name="eco_type" widget="badge" decoration-info="eco_type == 'part'" decoration-warning="eco_type == 'assembly'"/>
+                            </h1>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="reason_for_change" readonly="state != 'draft'" placeholder="설계 변경 상세 사유를 입력하세요..."/>
+                            </group>
+                            <group>
+                                <field name="approver_ids" widget="many2many_avatar_user" readonly="state != 'draft'"/>
+                            </group>
+                        </group>
+                        
+                        <!-- 단일 부품 변경용 UI -->
+                        <group string="부품 변경 상세" invisible="eco_type != 'part'" class="mt-4">
+                            <group>
+                                <field name="original_product_id" readonly="1"/>
+                            </group>
+                            <group>
+                                <field name="new_product_id" readonly="1"/>
+                            </group>
+                        </group>
+                        
+                        <!-- 일괄(Assembly) 변경용 UI -->
+                        <group string="완제품 대상 필터 (일괄 변경)" invisible="eco_type != 'assembly'" class="mt-4">
+                            <group>
+                                <field name="filter_category" readonly="state != 'draft'"/>
+                            </group>
+                            <group>
+                                <field name="filter_series_id" readonly="state != 'draft'"/>
+                            </group>
+                        </group>
+                        <group invisible="eco_type != 'assembly'">
+                            <field name="target_product_ids" widget="many2many_tags" options="{'no_create': True}" readonly="state != 'draft'"/>
+                        </group>
+
+                        <notebook class="mt-4">
+                            <page string="BOM Tree (변경 영향도 시각화)">
+                                <field name="bom_line_ids" readonly="1">
+                                    <list decoration-danger="is_changed == True" default_order="level, id">
+                                        <field name="display_name_tree" string="품목 계층"/>
+                                        <field name="old_rev"/>
+                                        <field name="new_rev"/>
+                                        <field name="is_changed" column_invisible="True"/>
+                                        <field name="change_summary"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="결재 히스토리">
+                                <field name="review_history"/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Product Template Form Extension for ECO Action -->
+        <record id="view_product_template_form_eco_action" model="ir.ui.view">
+            <field name="name">product.template.eco.action</field>
+            <field name="model">product.template</field>
+            <field name="inherit_id" ref="product.product_template_form_view"/>
+            <field name="arch" type="xml">
+                <xpath expr="//sheet" position="before">
+                    <header>
+                        <button name="%(ir_custom_erp.action_ir_eco_wizard)d" string="설계 변경(ECO) 시작" type="action" class="oe_highlight"/>
+                    </header>
+                </xpath>
+            </field>
+        </record>
+
+        <!-- Action & Menu -->
+        <record id="action_ir_eco" model="ir.actions.act_window">
+            <field name="name">설계 변경 (ECO)</field>
+            <field name="res_model">ir.eco</field>
+            <field name="view_mode">kanban,form</field>
+        </record>
+
+        <menuitem id="menu_ir_eco_root" name="PLM (Custom)" sequence="50"/>
+        <menuitem id="menu_ir_eco" name="설계 변경 (ECO)" parent="menu_ir_eco_root" action="action_ir_eco" sequence="10"/>
+
+    </data>
+</odoo>

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_product_template_form_custom_parts" model="ir.ui.view">
+            <field name="name">product.template.common.form.custom.parts</field>
+            <field name="model">product.template</field>
+            <field name="inherit_id" ref="product.product_template_form_view"/>
+            <field name="arch" type="xml">
+                <xpath expr="//page[@name='general_information']" position="after">
+                    <page string="IR 부품 스펙 (Custom Parts)" name="ir_custom_parts">
+                        <group>
+                            <group string="기본 분류">
+                                <field name="x_category" readonly="id and active"/>
+                                <field name="x_class" readonly="id and active"/>
+                                <field name="x_part_type_code" readonly="id and active"/>
+                                <field name="x_rev" readonly="1"/>
+                            </group>
+                            <group string="제조 정보">
+                                <field name="x_maker" readonly="id and active"/>
+                                <field name="x_manufacturer" readonly="id and active"/>
+                                <field name="x_mpn" readonly="id and active"/>
+                                <field name="x_is_overseas" readonly="id and active"/>
+                            </group>
+                            <group string="관리 정보">
+                                <field name="x_owner" readonly="id and active"/>
+                                <field name="x_master_part_id" readonly="1"/>
+                                <field name="x_datasheet" widget="url" readonly="id and active"/>
+                            </group>
+                            <group string="공정 및 재질">
+                                <field name="x_process_type" readonly="id and active"/>
+                                <field name="x_material" readonly="id and active"/>
+                                <field name="x_grade" readonly="id and active"/>
+                                <field name="x_color" readonly="id and active"/>
+                            </group>
+                            <group string="안전 인증" col="10">
+                                <field name="x_safety_ce" readonly="id and active"/>
+                                <field name="x_safety_rohs" readonly="id and active"/>
+                                <field name="x_safety_ul" readonly="id and active"/>
+                                <field name="x_safety_kc" readonly="id and active"/>
+                                <field name="x_safety_reach" readonly="id and active"/>
+                            </group>
+                        </group>
+                    </page>
+                    <page string="제조품 스펙 (MFG Parts)" name="ir_mfg_parts">
+                        <group>
+                            <group string="제조품 구분">
+                                <field name="x_manufacturing_type" readonly="id and active"/>
+                                <field name="x_finished_category" 
+                                       invisible="x_manufacturing_type != 'finished'"
+                                       readonly="id and active"/>
+                            </group>
+                            <group string="공통 사양" invisible="not x_manufacturing_type">
+                                <field name="x_series_id" readonly="id and active"/>
+                            </group>
+                            <group string="Actuator 스펙" invisible="x_finished_category != 'actuator'">
+                                <field name="x_comm_type_id" readonly="id and active"/>
+                                <field name="x_stroke_type_id" readonly="id and active"/>
+                            </group>
+                            <group string="추가 정보" invisible="not x_manufacturing_type">
+                                <field name="x_mfg_extra_notes" readonly="id and active"/>
+                            </group>
+                        </group>
+                    </page>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>

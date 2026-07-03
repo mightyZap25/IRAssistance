@@ -22,8 +22,8 @@ export default function Layout({ children }) {
     const [showScreenHints, setShowScreenHints] = useState(false);
     const [hintNumbers, setHintNumbers] = useState({});
     
-    // Determine if we should use full width (e.g., for dashboard, google chat)
-    const isFullPage = location.pathname.includes('/dashboard') || location.pathname.includes('/workspace/chat') || location.pathname.includes('/hr/attendance') || location.pathname.includes('/project/management');
+    // Determine if we should use full width (e.g., for dashboard, google chat, and all Odoo views)
+    const isFullPage = !location.pathname.startsWith('/workspace/memo') && !location.pathname.startsWith('/workspace/mail') && !location.pathname.startsWith('/workspace/calendar') && !location.pathname.startsWith('/workspace/drive') && !location.pathname.startsWith('/settings') && !location.pathname.startsWith('/workspace/meetings');
     const isGoogleChat = location.pathname.includes('/workspace/chat');
 
     const isElectron = window.electronAPI?.isElectron || 

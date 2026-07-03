@@ -1,0 +1,8 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ir_eco_user,ir.eco.user,model_ir_eco,base.group_user,1,1,1,1
+access_ir_eco_wizard_user,ir.eco.wizard.user,model_ir_eco_wizard,base.group_user,1,1,1,1
+access_ir_custom_series_user,ir.custom.series.user,model_ir_custom_series,base.group_user,1,1,1,1
+access_ir_custom_comm_type_user,ir.custom.comm.type.user,model_ir_custom_comm_type,base.group_user,1,1,1,1
+access_ir_custom_stroke_type_user,ir.custom.stroke.type.user,model_ir_custom_stroke_type,base.group_user,1,1,1,1
+access_ir_eco_bom_line_user,ir.eco.bom.line.user,model_ir_eco_bom_line,base.group_user,1,1,1,1
+access_ir_eco_review_wizard_user,ir.eco.review.wizard.user,model_ir_eco_review_wizard,base.group_user,1,1,1,1

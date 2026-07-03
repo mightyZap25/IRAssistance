@@ -312,7 +312,8 @@ ipcMain.handle('google-oauth-signin', async () => {
         'openid', 'email', 'profile',
         'https://www.googleapis.com/auth/drive',
         'https://www.googleapis.com/auth/drive.file',
-        'https://www.googleapis.com/auth/calendar'
+        'https://www.googleapis.com/auth/calendar',
+        'https://www.googleapis.com/auth/gmail.readonly'
     ].join(' ');
 
     const REDIRECT_URI = 'http://localhost:9876/oauth/callback';
