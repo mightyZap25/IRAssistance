@@ -15,7 +15,7 @@ function normalizePartId(id) {
     return normalized;
 }
 
-export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allParts: existingPartsList }) {
+export default function OdooBOMImportModal({ isOpen, onClose, onImportSuccess, allParts: existingPartsList }) {
     const [sheetUrl, setSheetUrl] = useState('');
     const [sheetName, setSheetName] = useState('');
     const [availableSheets, setAvailableSheets] = useState([]);
@@ -331,104 +331,31 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
 
     const handleConfirmImport = async () => {
         setLoading(true);
-        setLoadingStatus('기존 데이터 정합성을 검토하는 중입니다...');
+        setLoadingStatus('Odoo 서버에 품목과 BOM을 전송하는 중입니다...');
         setError('');
         try {
-            const bomColl = collection(db, 'bom');
-            const qSnap = await getDocs(bomColl);
-            const existingBomMap = new Map();
-            qSnap.docs.forEach(docSnap => {
-                const data = docSnap.data();
-                if (data.ParentID && data.ChildID) {
-                    const pId = normalizePartId(data.ParentID);
-                    const cId = normalizePartId(data.ChildID);
-                    existingBomMap.set(`${pId}_${cId}`, docSnap.ref || doc(db, 'bom', docSnap.id));
-                }
-            });
-
-            const operations = [];
-
-            // 1. Create new parts
-            const newPartsToCreate = parsedItems.filter(item => partStatusMap[item.PartID]?.isNew);
-            newPartsToCreate.forEach(item => {
-                const finalPartId = normalizePartId(item.PartID);
-                // parts 문서 ID를 실제 품번(finalPartId)으로 지정하여 저장
-                const partRef = doc(db, 'parts', finalPartId);
-                operations.push((batch) => batch.set(partRef, {
-                    PartID: finalPartId,
-                    MasterPartID: finalPartId,
-                    Name: item.Name,
-                    Class: item.Class,
-                    Category: item.Category,
-                    Rev: item.Rev || '1.0',
-                    Spec: item.Spec || '',
-                    UnitPrice: item.UnitPrice || 0,
-                    Manufacturer: item.Manufacturer || '',
-                    Supplier: item.Supplier || '',
-                    DefaultLocation: item.Location || '',
-                    Lifecycle: 'Active',
-                    Status: 'Active',
-                    IsLatestRevision: true,
-                    CreatedAt: serverTimestamp()
-                }));
-            });
-
-            // 2. Create or Update BOM relations
-            let addedRelationsCount = 0;
-            let updatedRelationsCount = 0;
+            const payload = {
+                items: parsedItems,
+                relations: bomRelations
+            };
             
-            bomRelations.forEach(link => {
-                const pId = normalizePartId(link.parentId);
-                const cId = normalizePartId(link.childId);
-                const relationKey = `${pId}_${cId}`;
-                
-                if (existingBomMap.has(relationKey)) {
-                    const existingRef = existingBomMap.get(relationKey);
-                    operations.push((batch) => batch.update(existingRef, {
-                        Quantity: link.qty,
-                        Location: link.location || '',
-                        Note: link.note || ''
-                    }));
-                    updatedRelationsCount++;
-                } else {
-                    const customBomId = `${pId}_${cId}`;
-                    const newLinkRef = doc(db, 'bom', customBomId);
-                    operations.push((batch) => batch.set(newLinkRef, {
-                        ParentID: pId,
-                        ChildID: cId,
-                        Quantity: link.qty,
-                        Location: link.location || '',
-                        Note: link.note || '',
-                        Status: 'Active'
-                    }));
-                    addedRelationsCount++;
-                    existingBomMap.set(relationKey, newLinkRef);
-                }
+            const response = await fetch('/api/odoo/import-bom', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
             });
-
-            if (operations.length > 0) {
-                let currentBatch = writeBatch(db);
-                let count = 0;
-                for (const op of operations) {
-                    if (count >= 400) {
-                        await currentBatch.commit();
-                        currentBatch = writeBatch(db);
-                        count = 0;
-                    }
-                    op(currentBatch);
-                    count++;
-                }
-                if (count > 0) await currentBatch.commit();
+            
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'Odoo 전송에 실패했습니다.');
             }
 
-            alert(`BOM 가져오기가 성공적으로 완료되었습니다!\n\n- 등록된 신규 품목: ${newPartsToCreate.length}개\n- 생성된 신규 BOM 관계: ${addedRelationsCount}개\n- 갱신된 기존 BOM 관계: ${updatedRelationsCount}개`);
-            // 공급사/제조사 자동 등록 (BOM 가져오기 후, 오류 시 무시)
-            try { await autoRegisterFromParts(parsedItems); } catch (e) { console.warn('[AutoReg] BOM 가져오기 후 공급사/제조사 자동 등록 오류(무시):', e); }
-            onImportSuccess();
+            alert(`Odoo BOM 전송 완료!\n\n${data.message}`);
+            onImportSuccess && onImportSuccess();
             onClose();
         } catch (err) {
             console.error(err);
-            setError("데이터베이스 저장 중 오류가 발생했습니다: " + err.message);
+            setError("Odoo 전송 중 오류가 발생했습니다: " + err.message);
         } finally {
             setLoading(false);
         }
@@ -481,7 +408,7 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
                 <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                     <div className="flex items-center gap-2">
                         <FileSpreadsheet className="text-blue-600" size={20} />
-                        <h2 className="text-lg font-black text-slate-800">구글 시트 BOM 가져오기 (단일 시트)</h2>
+                        <h2 className="text-lg font-black text-slate-800">Odoo 다이렉트 BOM 가져오기</h2>
                     </div>
                     <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
                         <X size={18} />
@@ -673,7 +600,7 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
                                     className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-bold text-sm shadow-md"
                                 >
                                     <Check size={16} />
-                                    <span>BOM 데이터 저장하기</span>
+                                    <span>Odoo 데이터 전송하기</span>
                                 </button>
                             </div>
                         </div>

@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import odooRoutes from './odoo_routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -610,8 +611,27 @@ app.delete('/api/collections/:collection/docs/:id', async (req, res) => {
     }
 });
 
+// Proxy for Google Sheets to bypass CORS
+app.get('/api/proxy-sheet/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const exportUrl = `https://docs.google.com/spreadsheets/d/${id}/export?format=xlsx`;
+        const response = await fetch(exportUrl);
+        if (!response.ok) {
+            throw new Error(`Google Sheets responded with status: ${response.status}`);
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.send(Buffer.from(arrayBuffer));
+    } catch (err) {
+        console.error('[Proxy] Failed to fetch sheet:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Serve built frontend assets in production/Electron mode
 const distPath = path.join(__dirname, 'dist');
+app.use('/api/odoo', odooRoutes);
 app.use(express.static(distPath));
 // SPA fallback: Serve index.html for all non-API GET requests without path-to-regexp v5 issues
 app.use((req, res, next) => {
