@@ -152,6 +152,7 @@ export default function OdooBOMImportModal({ isOpen, onClose, onImportSuccess, a
             const seenPartIds = new Set();
             const seenRelations = new Set();
             const parentStack = [];
+            let absoluteRootParentId = null;
             let parsedCountInTab = 0;
 
             for (let i = headerRowIdx + 1; i < rows.length; i++) {
@@ -184,7 +185,8 @@ export default function OdooBOMImportModal({ isOpen, onClose, onImportSuccess, a
                     }
                 }
 
-                if (isNaN(level) || level === -1) {
+                // 명시적 레벨 열이 없는(들여쓰기 방식) 시트에서만 열 위치로 레벨 추론
+                if (colMap.levelCol === -1 && (isNaN(level) || level === -1)) {
                     for (let col = 0; col < 9; col++) {
                         if (row[col] !== undefined && String(row[col]).trim() !== '') {
                             level = col + 1;
@@ -202,6 +204,15 @@ export default function OdooBOMImportModal({ isOpen, onClose, onImportSuccess, a
                 const assyPartText = String(row[colMap.assyPart] || '').trim().toUpperCase();
                 const isAssembly = assyPartText.startsWith('A') || assyPartText.includes('ASSY') || partId.startsWith('IRA') || partId.startsWith('IRP');
                 
+                let isAccessory = false;
+                if (assyPartText === 'MECH-A' || assyPartText.includes('MECH-A')) {
+                    isAccessory = true;
+                }
+
+                if (!isAccessory && !absoluteRootParentId) {
+                    absoluteRootParentId = partId;
+                }
+
                 let partClass = 'Part (I)';
                 if (isAssembly) {
                     if (parsedCountInTab === 0) {
@@ -241,6 +252,23 @@ export default function OdooBOMImportModal({ isOpen, onClose, onImportSuccess, a
                     parsedAccumulated.push(itemData);
                 }
                 parsedCountInTab++;
+
+                if (isAccessory) {
+                    if (absoluteRootParentId) {
+                        const relKey = `${absoluteRootParentId}_${partId}`;
+                        if (!seenRelations.has(relKey)) {
+                            seenRelations.add(relKey);
+                            relationsAccumulated.push({
+                                parentId: absoluteRootParentId,
+                                childId: partId,
+                                qty: qty,
+                                location: itemData.Location,
+                                note: `Lv Accessory`
+                            });
+                        }
+                    }
+                    continue;
+                }
 
                 while (parentStack.length > 0 && parentStack[parentStack.length - 1].level >= level) {
                     parentStack.pop();

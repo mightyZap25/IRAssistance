@@ -88,6 +88,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
     const role = userProfile?.role || 'viewer';
     const allowedPaths = ROLE_MENU_MAP[role] || ROLE_MENU_MAP.viewer;
     const isAllowed = (path) => {
+        if (path === '/settings') return true;
         if (path.startsWith('/odoo/view')) {
             return allowedPaths.includes('/odoo/view');
         }

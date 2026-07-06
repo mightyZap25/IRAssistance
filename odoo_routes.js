@@ -15,8 +15,8 @@ router.post('/import-bom', async (req, res) => {
     try {
         const ODOO_URL = process.env.ODOO_URL || 'http://100.67.238.32:8069';
         const ODOO_DB = process.env.ODOO_DB || 'odoo';
-        const ODOO_USER = process.env.ODOO_USER || 'admin';
-        const ODOO_PASS = process.env.ODOO_PASS || 'admin';
+        const ODOO_USER = process.env.ODOO_USER || 'jogak@mightyzap.com';
+        const ODOO_PASS = process.env.ODOO_PASS || 'jogak0622#';
 
         const odoo = new OdooClient(ODOO_URL, ODOO_DB, ODOO_USER, ODOO_PASS);
         console.log('[Odoo] Authenticating...');

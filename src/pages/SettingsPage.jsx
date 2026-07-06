@@ -326,7 +326,7 @@ export default function SettingsPage() {
     };
 
     return (
-        <RoleGuard requiredRole="admin">
+        <>
             <div className="flex flex-col h-[calc(100vh-7.5rem)] overflow-hidden gap-4 animate-fade-in text-slate-800 p-4">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-6 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 flex-none shadow-lg">
@@ -953,6 +953,6 @@ export default function SettingsPage() {
                     </div>
                 </div>
             </div>
-        </RoleGuard>
+        </>
     );
 }
