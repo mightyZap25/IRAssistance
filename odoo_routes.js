@@ -25,99 +25,143 @@ router.post('/import-bom', async (req, res) => {
 
         const odooProductIdMap = {}; // PartID -> Odoo Product ID
 
-        // 1. Create or Find Products
-        for (const item of items) {
-            console.log(`[Odoo] Processing Product: ${item.PartID}`);
-            // Check if product exists (by default_code / Part Number)
-            const searchResult = await odoo.execute_kw('product.template', 'search', [[['default_code', '=', item.PartID]]]);
-            
-            let productId;
-            if (searchResult && searchResult.length > 0) {
-                productId = searchResult[0];
-                console.log(`[Odoo] Product ${item.PartID} already exists (ID: ${productId})`);
-            } else {
-                // Create new product
-                const productData = {
-                    name: item.Name,
-                    default_code: item.PartID,
-                    type: 'consu', // Goods/Consumable (since 'product' is missing without stock module)
-                    categ_id: 1, // Default category, ideally mapped from item.Category
-                    list_price: item.UnitPrice || 0,
-                    standard_price: item.UnitPrice || 0,
-                };
-                
-                productId = await odoo.execute_kw('product.template', 'create', [productData]);
-                console.log(`[Odoo] Created Product ${item.PartID} (ID: ${productId})`);
-            }
-            odooProductIdMap[item.PartID] = productId;
+        // ==========================================
+        // 1. Bulk Search for Existing Products
+        // ==========================================
+        const partIds = items.map(item => item.PartID).filter(Boolean);
+        const uniquePartIds = [...new Set(partIds)];
+        
+        console.log(`[Odoo] Bulk searching ${uniquePartIds.length} products...`);
+        const existingProducts = await odoo.execute_kw('product.template', 'search_read', [
+            [['default_code', 'in', uniquePartIds]]
+        ], { fields: ['id', 'default_code'] });
+        
+        for (const p of existingProducts) {
+            odooProductIdMap[p.default_code] = p.id;
         }
 
-        // 2. Create BOMs
-        // Group relations by parentId
+        // ==========================================
+        // 2. Parallel Creation of Missing Products
+        // ==========================================
+        const missingItems = items.filter(item => !odooProductIdMap[item.PartID]);
+        console.log(`[Odoo] Found ${existingProducts.length} existing, creating ${missingItems.length} missing products...`);
+        
+        // Helper to run promises in chunks (concurrency limit) for safety
+        const chunkedPromiseAll = async (items, concurrency, fn) => {
+            const results = [];
+            for (let i = 0; i < items.length; i += concurrency) {
+                const chunk = items.slice(i, i + concurrency);
+                const chunkResults = await Promise.all(chunk.map(fn));
+                results.push(...chunkResults);
+            }
+            return results;
+        };
+
+        await chunkedPromiseAll(missingItems, 10, async (item) => {
+            const productData = {
+                name: item.Name,
+                default_code: item.PartID,
+                type: 'consu',
+                categ_id: 1,
+                list_price: item.UnitPrice || 0,
+                standard_price: item.UnitPrice || 0,
+            };
+            const productId = await odoo.execute_kw('product.template', 'create', [productData]);
+            odooProductIdMap[item.PartID] = productId;
+            console.log(`[Odoo] Created Product ${item.PartID} (ID: ${productId})`);
+        });
+
+        // ==========================================
+        // 3. Group BOM Relations
+        // ==========================================
         const bomGroups = {};
         for (const rel of relations) {
             if (!bomGroups[rel.parentId]) bomGroups[rel.parentId] = [];
             bomGroups[rel.parentId].push(rel);
         }
+        const parentPartIds = Object.keys(bomGroups);
+        const parentOdooIds = parentPartIds.map(pid => odooProductIdMap[pid]).filter(Boolean);
 
-        for (const parentId of Object.keys(bomGroups)) {
-            const odooParentId = odooProductIdMap[parentId];
-            if (!odooParentId) {
-                console.warn(`[Odoo] Skip BOM creation: Parent ${parentId} not found in Odoo.`);
-                continue;
-            }
+        if (parentOdooIds.length > 0) {
+            // ==========================================
+            // 4. Bulk Search for Existing BOMs
+            // ==========================================
+            console.log(`[Odoo] Bulk searching BOMs for ${parentOdooIds.length} parents...`);
+            const existingBoms = await odoo.execute_kw('mrp.bom', 'search_read', [
+                [['product_tmpl_id', 'in', parentOdooIds]]
+            ], { fields: ['id', 'product_tmpl_id'] });
             
-            // Check if product variant exists (BOM needs product.product, but product_tmpl_id is used for template BOM)
-            // Odoo mrp.bom uses product_tmpl_id
-            
-            // First check if BOM already exists for this template
-            const existingBom = await odoo.execute_kw('mrp.bom', 'search', [[['product_tmpl_id', '=', odooParentId]]]);
-            let bomId;
-            
-            if (existingBom && existingBom.length > 0) {
-                bomId = existingBom[0];
-                console.log(`[Odoo] BOM for ${parentId} already exists (ID: ${bomId})`);
-                // Optional: Delete existing lines or update them
-            } else {
-                // Create BOM Header
-                const bomData = {
-                    product_tmpl_id: odooParentId,
-                    product_qty: 1.0,
-                    type: 'normal', // Manufacture
-                };
-                bomId = await odoo.execute_kw('mrp.bom', 'create', [bomData]);
-                console.log(`[Odoo] Created BOM for ${parentId} (ID: ${bomId})`);
+            const bomMap = {}; // product_tmpl_id[0] -> bom_id
+            for (const b of existingBoms) {
+                bomMap[b.product_tmpl_id[0]] = b.id;
             }
 
-            // Create BOM Lines
-            const children = bomGroups[parentId];
-            for (const child of children) {
-                const odooChildId = odooProductIdMap[child.childId];
-                if (!odooChildId) continue;
+            // ==========================================
+            // 5. Bulk Search for Product Variants
+            // ==========================================
+            // We need variant IDs (product.product) for all children to create BOM lines.
+            const allChildPartIds = relations.map(r => r.childId);
+            const childOdooTmplIds = [...new Set(allChildPartIds.map(cid => odooProductIdMap[cid]).filter(Boolean))];
+            
+            console.log(`[Odoo] Bulk searching variants for ${childOdooTmplIds.length} components...`);
+            const variants = await odoo.execute_kw('product.product', 'search_read', [
+                [['product_tmpl_id', 'in', childOdooTmplIds]]
+            ], { fields: ['id', 'product_tmpl_id'] });
+            
+            const variantMap = {}; // product_tmpl_id[0] -> product_id
+            for (const v of variants) {
+                // Take the first variant if multiple exist
+                if (!variantMap[v.product_tmpl_id[0]]) variantMap[v.product_tmpl_id[0]] = v.id;
+            }
+
+            // ==========================================
+            // 6. Process BOMs and Lines (Safe Parallel Execution)
+            // ==========================================
+            await chunkedPromiseAll(parentPartIds, 5, async (parentId) => {
+                const odooParentId = odooProductIdMap[parentId];
+                if (!odooParentId) return;
                 
-                // Need to find the product.product ID for the child, not just template
-                const productVariant = await odoo.execute_kw('product.product', 'search', [[['product_tmpl_id', '=', odooChildId]]]);
-                if (!productVariant || productVariant.length === 0) continue;
-                
-                const bomLineData = {
-                    bom_id: bomId,
-                    product_id: productVariant[0], // mrp.bom.line needs product.product
-                    product_qty: child.qty || 1.0,
-                };
-                
-                // Check if line exists
-                const existingLine = await odoo.execute_kw('mrp.bom.line', 'search', [[
-                    ['bom_id', '=', bomId],
-                    ['product_id', '=', productVariant[0]]
-                ]]);
-                
-                if (existingLine && existingLine.length > 0) {
-                    // Update qty
-                    await odoo.execute_kw('mrp.bom.line', 'write', [[existingLine[0]], { product_qty: child.qty || 1.0 }]);
-                } else {
-                    await odoo.execute_kw('mrp.bom.line', 'create', [bomLineData]);
+                let bomId = bomMap[odooParentId];
+                if (!bomId) {
+                    const bomData = {
+                        product_tmpl_id: odooParentId,
+                        product_qty: 1.0,
+                        type: 'normal',
+                    };
+                    bomId = await odoo.execute_kw('mrp.bom', 'create', [bomData]);
                 }
-            }
+
+                // Get existing BOM lines for this BOM
+                const existingLines = await odoo.execute_kw('mrp.bom.line', 'search_read', [
+                    [['bom_id', '=', bomId]]
+                ], { fields: ['id', 'product_id'] });
+                
+                const existingLineMap = {}; // product_id[0] -> line_id
+                for (const l of existingLines) {
+                    existingLineMap[l.product_id[0]] = l.id;
+                }
+
+                const children = bomGroups[parentId];
+                for (const child of children) {
+                    const odooChildId = odooProductIdMap[child.childId];
+                    if (!odooChildId) continue;
+                    
+                    const variantId = variantMap[odooChildId];
+                    if (!variantId) continue;
+                    
+                    if (existingLineMap[variantId]) {
+                        // Safe to skip write if we assume qty hasn't changed, 
+                        // but to be safe we update qty
+                        await odoo.execute_kw('mrp.bom.line', 'write', [[existingLineMap[variantId]], { product_qty: child.qty || 1.0 }]);
+                    } else {
+                        await odoo.execute_kw('mrp.bom.line', 'create', [{
+                            bom_id: bomId,
+                            product_id: variantId,
+                            product_qty: child.qty || 1.0,
+                        }]);
+                    }
+                }
+            });
         }
 
         res.json({ success: true, message: 'Odoo DB import completed successfully' });

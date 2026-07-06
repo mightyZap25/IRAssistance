@@ -111,7 +111,7 @@ export default function OdooBulkBOMSync() {
             let partId = String(partIdRaw).trim();
             if (!partId || partId.toLowerCase() === 'n/a') continue;
 
-            if (colMap.levelCol !== -1 && row[colMap.levelCol] !== undefined && String(row[colMap.levelCol]).trim() !== '') {
+            if (colMap.levelCol !== -1 && row[colMap.levelCol] !== undefined && row[colMap.levelCol] !== null && String(row[colMap.levelCol]).trim() !== '') {
                 const levelStr = String(row[colMap.levelCol]).trim();
                 if (levelStr.includes('.')) {
                     level = levelStr.split('.').length;
@@ -120,10 +120,10 @@ export default function OdooBulkBOMSync() {
                 }
             }
 
-            // 명시적 레벨 열이 없는(들여쓰기 방식) 시트에서만 열 위치로 레벨 추론
-            if (colMap.levelCol === -1 && (isNaN(level) || level === -1)) {
+            // 들여쓰기 방식(계단식) 시트인 경우 열 위치로 레벨 추론
+            if (isNaN(level) || level === -1) {
                 for (let col = 0; col < 9; col++) {
-                    if (row[col] !== undefined && String(row[col]).trim() !== '') {
+                    if (row[col] !== undefined && row[col] !== null && String(row[col]).trim() !== '') {
                         level = col + 1;
                         break;
                     }
@@ -233,7 +233,13 @@ export default function OdooBulkBOMSync() {
         addLog('info', '구글 시트 메타데이터를 다운로드하는 중입니다...');
 
         try {
-            const exportUrl = `/api/proxy-sheet/${spreadsheetId}`;
+            let finalId = spreadsheetId.trim();
+            const match = finalId.match(/[-\w]{25,}/);
+            if (match) {
+                finalId = match[0];
+            }
+
+            const exportUrl = `/api/proxy-sheet/${finalId}`;
             const res = await fetch(exportUrl);
             if (!res.ok) throw new Error(`HTTP Error: ${res.status} - 시트 권한을 확인하세요.`);
             

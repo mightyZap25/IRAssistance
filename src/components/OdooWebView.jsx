@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 
-// 기본 사내망 Odoo 주소 및 테일스케일 Odoo 주소
-const ODOO_LOCAL_URL = 'http://192.168.0.7:8069'; 
+// 기본 사내망 Odoo 주소 및 테일스케일 Odoo 주소 (현재 외부 접속 테스트를 위해 통일)
+const ODOO_LOCAL_URL = 'http://100.67.238.32:8069'; 
 const ODOO_REMOTE_URL = 'http://100.67.238.32:8069';
 
 let globalOdooMenus = [];
@@ -78,8 +78,18 @@ export default function OdooWebView() {
         const targetUrl = getTargetUrl();
         if (webviewRef.current && isElectron) {
             try {
-                if (webviewRef.current.getURL() !== targetUrl) {
-                    webviewRef.current.loadURL(targetUrl);
+                const currentUrl = webviewRef.current.getURL();
+                // 만약 Base URL은 같은데 hash만 다르다면, loadURL 대신 JS로 hash만 변경 (ERR_ABORTED 방지)
+                const targetBase = targetUrl.split('#')[0];
+                const currentBase = currentUrl.split('#')[0];
+                
+                if (currentUrl !== targetUrl) {
+                    if (currentBase === targetBase && targetUrl.includes('#')) {
+                        const hashPart = targetUrl.split('#')[1];
+                        webviewRef.current.executeJavaScript(`window.location.hash = '${hashPart}';`).catch(() => {});
+                    } else {
+                        webviewRef.current.loadURL(targetUrl);
+                    }
                 }
             } catch (e) {
                 webviewRef.current.src = targetUrl;
