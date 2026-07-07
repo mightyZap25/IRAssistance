@@ -59,7 +59,7 @@ export default function LeaveManagementPage() {
         type: 'Annual',
         startDate: new Date().toISOString().split('T')[0],
         endDate: new Date().toISOString().split('T')[0],
-        startTime: '09:00', endTime: '18:00', reason: ''
+        startTime: '09:00', endTime: '18:00', reason: '', destination: ''
     });
 
     // 근무시간 조정 빌더 state (Standard)
@@ -220,7 +220,7 @@ export default function LeaveManagementPage() {
                 body: JSON.stringify({
                     email: currentUser.email,
                     title: `${formData.category === 'Leave' ? '휴가' : formData.category === 'Flex' ? '유연근로' : formData.category === 'Standard' ? '기본근무' : '근태'} (${formData.type})`,
-                    reason: formData.reason,
+                    reason: formData.category === 'Outside' && formData.destination ? `[장소] ${formData.destination}\n[사유] ${formData.reason}` : formData.reason,
                     startDate: finalStart,
                     endDate: finalEnd,
                     startTime: formData.startTime,
@@ -789,8 +789,8 @@ export default function LeaveManagementPage() {
                                     </div>
                                 )}
 
-                                {/* 시간 설정 - Flex / Hourly */}
-                                {(formData.category === 'Flex' || formData.type === 'Hourly') && (
+                                {/* 시간 설정 - Flex / Hourly / Outside */}
+                                {(formData.category === 'Flex' || formData.category === 'Outside' || formData.type === 'Hourly') && (
                                     <div className="grid grid-cols-2 gap-4 bg-blue-50 p-4 rounded-xl border border-blue-100">
                                         <div>
                                             <label className="block text-[10px] font-black text-blue-600 mb-2">출근(시작) 시간</label>
@@ -873,6 +873,12 @@ export default function LeaveManagementPage() {
                                     );
                                 })()}
 
+                                {formData.category === 'Outside' && (
+                                    <div>
+                                        <label className="block text-[10px] font-black text-amber-600 mb-2 uppercase tracking-wider">목적지 / 장소</label>
+                                        <input type="text" className="w-full bg-amber-50 p-3 rounded-xl text-sm border border-amber-200 outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent mb-4 font-bold" placeholder="예: 거래처 A사 회의실" value={formData.destination || ''} onChange={e => setFormData({...formData, destination: e.target.value})} />
+                                    </div>
+                                )}
                                 <div>
                                     <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-wider">사유</label>
                                     <textarea className="w-full bg-slate-50 p-4 rounded-xl text-sm h-24 border border-slate-200 outline-none resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="상세 사유 입력" value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})}/>
