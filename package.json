@@ -30,6 +30,7 @@
         "electron-updater": "^6.8.9",
         "express": "^5.2.1",
         "firebase": "^10.8.0",
+        "jodit": "^4.12.39",
         "jodit-react": "^5.3.21",
         "jspdf": "^4.1.0",
         "jspdf-autotable": "^5.0.7",

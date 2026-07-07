@@ -6,11 +6,6 @@ import {
     UserPlus, Trash2, Settings, AlertCircle,
     TrendingUp, Activity, Edit3, Bell
 } from 'lucide-react';
-import { db } from '../firebase';
-import { 
-    collection, query, where, onSnapshot, addDoc, 
-    serverTimestamp, doc, getDoc, updateDoc, setDoc, getDocs, arrayUnion
-} from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import clsx from 'clsx';
 import { syncTaskToGoogleCalendar, deleteTaskFromGoogleCalendar } from '../services/calendarService';
@@ -42,7 +37,6 @@ export default function LeaveManagementPage() {
     // 결재 상태
     const [myRequests, setMyRequests] = useState([]);
     const [myPendingApprovals, setMyPendingApprovals] = useState([]);
-    const [allUsers, setAllUsers] = useState([]);
     
     // 근태 상태
     const [attendanceLog, setAttendanceLog] = useState(null);
@@ -54,10 +48,10 @@ export default function LeaveManagementPage() {
     const [detailItem, setDetailItem] = useState(null);
 
     // 잔여 휴가 상태
-    const [balance] = useState({ total: 15, used: 3.5, remaining: 11.5, remainingHours: 92 });
+    const [balance, setBalance] = useState({ total: 0, used: 0, remaining: 0, remainingHours: 0 });
     
     // 근로 시간 통계
-    const [workStats] = useState({ weekly: 34, limit: 40, accumulated: 120, remaining: 6, overtime: 2 });
+    const [workStats, setWorkStats] = useState({ weekly: 0, limit: 40, accumulated: 0, remaining: 0, overtime: 0 });
 
     // 신청 폼 상태
     const [formData, setFormData] = useState({
@@ -67,7 +61,6 @@ export default function LeaveManagementPage() {
         endDate: new Date().toISOString().split('T')[0],
         startTime: '09:00', endTime: '18:00', reason: ''
     });
-    const [manualSteps, setManualSteps] = useState([{ id: Date.now(), label: '팀장 승인', approverUid: '' }]);
 
     // 근무시간 조정 빌더 state (Standard)
     const ALL_DAYS = [
@@ -123,25 +116,40 @@ export default function LeaveManagementPage() {
         }
     };
 
+    const fetchOdooData = async () => {
+        if (!currentUser?.email) return;
+        try {
+            const email = encodeURIComponent(currentUser.email);
+            
+            // 1. Balance
+            const balRes = await fetch(`http://localhost:5050/api/odoo/leave/balance?email=${email}`);
+            if (balRes.ok) setBalance(await balRes.json());
+
+            // 2. Work Stats
+            const statRes = await fetch(`http://localhost:5050/api/odoo/attendance/stats?email=${email}`);
+            if (statRes.ok) setWorkStats(await statRes.json());
+
+            // 3. My Requests
+            const myRes = await fetch(`http://localhost:5050/api/odoo/leave/my-requests?email=${email}`);
+            if (myRes.ok) setMyRequests(await myRes.json());
+
+            // 4. Pending Approvals
+            const pendRes = await fetch(`http://localhost:5050/api/odoo/leave/pending-approvals?email=${email}`);
+            if (pendRes.ok) setMyPendingApprovals(await pendRes.json());
+
+            // 5. All Events
+            const evtRes = await fetch(`http://localhost:5050/api/odoo/leave/all-events`);
+            if (evtRes.ok) setAllEvents(await evtRes.json());
+
+        } catch (err) {
+            console.error("Failed to fetch Odoo data:", err);
+        }
+    };
+
     useEffect(() => {
         if (!currentUser) return;
-        
-        getDocs(collection(db, 'users')).then(snap => setAllUsers(snap.docs.map(d => ({ uid: d.id, ...d.data() }))));
-
-        const unsubEvents = onSnapshot(query(collection(db, 'attendance_requests'), where('Status', '==', 'Approved')), 
-            (snap) => setAllEvents(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-
-        const unsubMine = onSnapshot(query(collection(db, 'attendance_requests'), where('userId', '==', currentUser.uid)), 
-            (snap) => setMyRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => b.createdAt - a.createdAt)));
-
-        const unsubPending = onSnapshot(query(collection(db, 'attendance_requests'), where('Status', '==', 'Pending')), (snap) => {
-            setMyPendingApprovals(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => d.ApprovalSteps?.[d.CurrentStep || 0]?.approverUid === currentUser.uid));
-        });
-
-        // Fetch Odoo attendance on load
         fetchOdooAttendance();
-
-        return () => { unsubEvents(); unsubMine(); unsubPending(); };
+        fetchOdooData();
     }, [currentUser]);
 
     // 실시간 근무 타이머
@@ -194,7 +202,6 @@ export default function LeaveManagementPage() {
     // 통합 신청 처리
     const handleApplySubmit = async (e) => {
         e.preventDefault();
-        if (manualSteps.some(s => !s.approverUid)) return alert('결재자를 모두 지정하세요.');
         
         let finalStart = formData.startDate;
         let finalEnd = formData.endDate;
@@ -207,94 +214,59 @@ export default function LeaveManagementPage() {
             finalEnd = lastDay.toISOString().split('T')[0];
         }
 
-        const sDate = new Date(finalStart);
-        const eDate = new Date(finalEnd);
-        const diffDays = Math.ceil((eDate - sDate) / (1000 * 60 * 60 * 24)) + 1;
-
-        const data = { 
-            category: formData.category,
-            type: formData.type,
-            title: `${formData.category === 'Leave' ? '휴가' : formData.category === 'Flex' ? '유연근로' : formData.category === 'Standard' ? '기본근무' : '근태'} (${formData.type})`, 
-            userId: currentUser.uid, 
-            userName: userProfile?.displayName,
-            department: userProfile?.department || '일반',
-            startDate: finalStart,
-            endDate: finalEnd,
-            startTime: formData.startTime,
-            endTime: formData.endTime,
-            totalDays: diffDays > 0 ? diffDays : 0,
-            reason: formData.reason,
-            Status: 'Pending', 
-            CurrentStep: 0, 
-            ApprovalSteps: manualSteps.map((s, i) => ({ label: s.label, approverUid: s.approverUid, order: i })), 
-            createdAt: serverTimestamp() 
-        };
-
-        await addDoc(collection(db, 'attendance_requests'), data);
-        if (data.ApprovalSteps?.[0]) {
-            await createNotification(data.ApprovalSteps[0].approverUid, '신규 결재', `'${data.title}' 건 결재가 요청되었습니다.`);
+        try {
+            const res = await fetch('http://localhost:5050/api/odoo/leave/request', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: currentUser.email,
+                    title: `${formData.category === 'Leave' ? '휴가' : formData.category === 'Flex' ? '유연근로' : formData.category === 'Standard' ? '기본근무' : '근태'} (${formData.type})`,
+                    reason: formData.reason,
+                    startDate: finalStart,
+                    endDate: finalEnd,
+                    startTime: formData.startTime,
+                    endTime: formData.endTime,
+                    category: formData.category,
+                    type: formData.type
+                })
+            });
+            if (!res.ok) throw new Error(await res.text());
+            
+            setActiveModal(null);
+            alert('신청이 완료되었습니다. (Odoo에 전송됨)');
+            fetchOdooData(); // Refresh UI
+        } catch(err) {
+            alert('신청 실패: ' + err.message);
         }
-        setActiveModal(null);
-        alert('신청이 완료되었습니다.');
     };
 
     // 결재 승인/반려 처리
     const processApproval = async (req, action, comment = '') => {
         if (action === 'Reject' && !comment) return alert('반려 사유를 입력하세요.');
-        const curIdx = req.CurrentStep || 0;
-        const isLast = curIdx + 1 >= req.ApprovalSteps.length;
-        const newStatus = action === 'Approve' ? (isLast ? 'Approved' : 'Pending') : 'Rejected';
         
-        await updateDoc(doc(db, 'attendance_requests', req.id), { 
-            Status: newStatus, 
-            CurrentStep: action === 'Approve' ? curIdx + 1 : curIdx, 
-            ApprovalHistory: arrayUnion({ step: curIdx, approverName: userProfile?.displayName, action, comment, timestamp: new Date().toISOString() }) 
-        });
+        try {
+            const endpoint = action === 'Approve' ? '/api/odoo/leave/approve' : '/api/odoo/leave/refuse';
+            const res = await fetch(`http://localhost:5050${endpoint}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ leaveId: req.id })
+            });
+            if (!res.ok) throw new Error(await res.text());
 
-        if (action === 'Approve') {
-            if (!isLast) {
-                await createNotification(req.ApprovalSteps[curIdx + 1].approverUid, '결재 대기', `'${req.title}' 결재 차례입니다.`);
-            } else {
-                await createNotification(req.userId, '최종 승인', `'${req.title}' 건이 승인되었습니다.`);
-                
-                // Odoo 휴가 연동
-                try {
-                    // getUserEmailById to fetch requester email from 'users' collection
-                    const userSnap = await getDoc(doc(db, 'users', req.userId));
-                    const requesterEmail = userSnap.exists() ? userSnap.data().email : null;
-
-                    if (requesterEmail) {
-                        await fetch('http://localhost:5050/api/odoo/leave/request', {
-                            method: 'POST', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                email: requesterEmail,
-                                title: req.title,
-                                reason: req.reason,
-                                startDate: req.startDate,
-                                endDate: req.endDate,
-                                category: req.category,
-                                type: req.type
-                            })
-                        });
-                    }
-                } catch(err) {
-                    console.error("Odoo leave sync failed:", err);
-                }
-                
-                // 구글 캘린더 연동 (백그라운드 비동기)
+            if (action === 'Approve') {
                 syncTaskToGoogleCalendar(req.id, {
                     title: `[${req.category}] ${req.title} (${req.userName})`,
                     description: `사유: ${req.reason}\n부서: ${req.department}`,
                     startDate: req.startDate,
                     endDate: req.endDate,
                     status: 'confirmed',
-                    priority: 'high' // 색상을 위해 임의 지정
+                    priority: 'high' 
                 }).catch(err => console.error("Calendar sync error:", err));
+            } else {
+                deleteTaskFromGoogleCalendar(req.id).catch(err => console.error("Calendar delete error:", err));
             }
-        } else {
-            await createNotification(req.userId, '반려 알림', `'${req.title}' 건이 반려되었습니다. 사유: ${comment}`);
-            // 반려(취소) 시 캘린더에서도 삭제
-            deleteTaskFromGoogleCalendar(req.id).catch(err => console.error("Calendar delete error:", err));
+            alert('처리되었습니다.');
+            fetchOdooData();
+        } catch(err) {
+            alert('결재 처리 실패: ' + err.message);
         }
         setDetailItem(null);
     };
@@ -639,7 +611,7 @@ export default function LeaveManagementPage() {
                 <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[90vh] border border-slate-200">
                         {/* 왼쪽: 폼 */}
-                        <div className="flex-1 p-7 overflow-y-auto border-r border-slate-100">
+                        <div className="flex-1 p-7 overflow-y-auto">
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-lg font-black text-slate-800">
                                     {formData.category === 'Standard' ? '⏰ 근무시간 조정 신청' : 
@@ -822,11 +794,33 @@ export default function LeaveManagementPage() {
                                     <div className="grid grid-cols-2 gap-4 bg-blue-50 p-4 rounded-xl border border-blue-100">
                                         <div>
                                             <label className="block text-[10px] font-black text-blue-600 mb-2">출근(시작) 시간</label>
-                                            <input type="time" step={1800} className="w-full bg-white border border-blue-200 rounded-lg text-sm font-bold outline-none p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" value={formData.startTime} onChange={e => setFormData({...formData, startTime: e.target.value})}/>
+                                            <div className="flex gap-2">
+                                                <select className="w-1/2 bg-white border border-blue-200 rounded-lg text-sm font-bold outline-none p-2 focus:ring-2 focus:ring-blue-500" value={formData.startTime.split(':')[0]} onChange={e => setFormData({...formData, startTime: `${e.target.value}:${formData.startTime.split(':')[1] || '00'}`})}>
+                                                    {Array.from({length: 24}).map((_, i) => {
+                                                        const h = String(i).padStart(2, '0');
+                                                        return <option key={h} value={h}>{h}시</option>;
+                                                    })}
+                                                </select>
+                                                <select className="w-1/2 bg-white border border-blue-200 rounded-lg text-sm font-bold outline-none p-2 focus:ring-2 focus:ring-blue-500" value={formData.startTime.split(':')[1] || '00'} onChange={e => setFormData({...formData, startTime: `${formData.startTime.split(':')[0] || '09'}:${e.target.value}`})}>
+                                                    <option value="00">00분</option>
+                                                    <option value="30">30분</option>
+                                                </select>
+                                            </div>
                                         </div>
                                         <div>
                                             <label className="block text-[10px] font-black text-blue-600 mb-2">퇴근(종료) 시간</label>
-                                            <input type="time" step={1800} className="w-full bg-white border border-blue-200 rounded-lg text-sm font-bold outline-none p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" value={formData.endTime} onChange={e => setFormData({...formData, endTime: e.target.value})}/>
+                                            <div className="flex gap-2">
+                                                <select className="w-1/2 bg-white border border-blue-200 rounded-lg text-sm font-bold outline-none p-2 focus:ring-2 focus:ring-blue-500" value={formData.endTime.split(':')[0]} onChange={e => setFormData({...formData, endTime: `${e.target.value}:${formData.endTime.split(':')[1] || '00'}`})}>
+                                                    {Array.from({length: 24}).map((_, i) => {
+                                                        const h = String(i).padStart(2, '0');
+                                                        return <option key={h} value={h}>{h}시</option>;
+                                                    })}
+                                                </select>
+                                                <select className="w-1/2 bg-white border border-blue-200 rounded-lg text-sm font-bold outline-none p-2 focus:ring-2 focus:ring-blue-500" value={formData.endTime.split(':')[1] || '00'} onChange={e => setFormData({...formData, endTime: `${formData.endTime.split(':')[0] || '18'}:${e.target.value}`})}>
+                                                    <option value="00">00분</option>
+                                                    <option value="30">30분</option>
+                                                </select>
+                                            </div>
                                         </div>
                                         <div className="col-span-2 text-[10px] font-bold text-blue-500">※ 휴게시간 1시간이 포함된 총 체류 시간을 설정하세요.</div>
                                     </div>
@@ -834,21 +828,29 @@ export default function LeaveManagementPage() {
 
                                 {formData.category === 'Leave' && (() => {
                                     const reqDays = Math.max(0, Math.ceil((new Date(formData.endDate) - new Date(formData.startDate)) / (1000 * 60 * 60 * 24)) + 1);
-                                    // 날짜 범위 내 각 날짜의 daySchedule 기반 시간 합산
                                     let totalReqHours = 0;
-                                    for (let i = 0; i < reqDays; i++) {
-                                        const d = new Date(formData.startDate);
-                                        d.setDate(d.getDate() + i);
-                                        totalReqHours += getDayWorkHours(d.getDay());
+                                    if (formData.type === 'Hourly') {
+                                        const sH = parseInt(formData.startTime.split(':')[0], 10);
+                                        const sM = parseInt(formData.startTime.split(':')[1], 10);
+                                        const eH = parseInt(formData.endTime.split(':')[0], 10);
+                                        const eM = parseInt(formData.endTime.split(':')[1], 10);
+                                        totalReqHours = Math.max(0, (eH + eM / 60) - (sH + sM / 60));
+                                    } else {
+                                        for (let i = 0; i < reqDays; i++) {
+                                            const d = new Date(formData.startDate);
+                                            d.setDate(d.getDate() + i);
+                                            totalReqHours += getDayWorkHours(d.getDay());
+                                        }
                                     }
-                                    const afterDays = Math.max(0, balance.remaining - reqDays);
+                                    const effectiveReqDays = formData.type === 'Hourly' ? (totalReqHours / 8) : reqDays;
+                                    const afterDays = Math.max(0, balance.remaining - effectiveReqDays);
                                     const afterHours = Math.max(0, balance.remainingHours - totalReqHours);
                                     return (
                                         <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-2">
                                             {/* 신청 일수 */}
                                             <div className="text-center">
                                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-0.5">신청 일수</p>
-                                                <p className="text-lg font-black text-blue-600">{reqDays}<span className="text-xs font-bold ml-0.5 text-blue-400">일</span></p>
+                                                <p className="text-lg font-black text-blue-600">{formData.type === 'Hourly' ? effectiveReqDays.toFixed(3).replace(/\.?0+$/, '') : reqDays}<span className="text-xs font-bold ml-0.5 text-blue-400">일</span></p>
                                                 <p className="text-[9px] text-slate-400 mt-0.5">{totalReqHours.toFixed(1)}h 차감</p>
                                             </div>
                                             <div className="text-slate-300 font-black text-lg">→</div>
@@ -857,7 +859,7 @@ export default function LeaveManagementPage() {
                                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-0.5">신청 후 잔여</p>
                                                 <div className="flex items-end gap-0">
                                                     <div className="flex items-end gap-0.5 pr-2">
-                                                        <span className={`text-lg font-black ${afterDays < 0 ? 'text-rose-500' : 'text-blue-600'}`}>{afterDays}</span>
+                                                        <span className={`text-lg font-black ${afterDays < 0 ? 'text-rose-500' : 'text-blue-600'}`}>{afterDays.toFixed(2).replace(/\.?0+$/, '')}</span>
                                                         <span className={`text-[10px] font-bold mb-0.5 ${afterDays < 0 ? 'text-rose-400' : 'text-blue-400'}`}>일</span>
                                                     </div>
                                                     <span className="text-slate-300 font-black text-base mb-0.5">/</span>
@@ -875,70 +877,8 @@ export default function LeaveManagementPage() {
                                     <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-wider">사유</label>
                                     <textarea className="w-full bg-slate-50 p-4 rounded-xl text-sm h-24 border border-slate-200 outline-none resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="상세 사유 입력" value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})}/>
                                 </div>
+                                <button onClick={handleApplySubmit} className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black mt-4 shadow-sm shadow-blue-200 active:scale-95 transition-all text-sm">기안 상신하기</button>
                             </form>
-                        </div>
-
-                        {/* 오른쪽: 결재선 */}
-                        <div className="w-full md:w-[300px] bg-slate-50 p-6 overflow-y-auto flex flex-col border-t md:border-t-0 border-slate-100">
-                            <div className="flex justify-between items-center mb-3">
-                                <h4 className="text-sm font-black text-slate-700 flex items-center gap-1.5">
-                                    <ShieldCheck size={15} className="text-blue-600"/> 결재선 구성
-                                </h4>
-                                <span className="text-[10px] font-bold text-slate-400">{manualSteps.length}단계</span>
-                            </div>
-
-                            {/* 하나의 통합 박스 */}
-                            <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                                {/* 결재자 목록 */}
-                                <div className="divide-y divide-slate-100">
-                                    {manualSteps.map((s, idx) => (
-                                        <div key={s.id} className="flex items-center gap-2 px-3 py-2.5 group hover:bg-slate-50 transition-colors">
-                                            {/* 순번 뱃지 */}
-                                            <span className="w-5 h-5 rounded-full bg-blue-50 border border-blue-100 text-blue-600 text-[10px] font-black flex items-center justify-center flex-shrink-0">
-                                                {idx + 1}
-                                            </span>
-                                            {/* 직책 입력 */}
-                                            <input
-                                                type="text"
-                                                value={s.label}
-                                                onChange={e => setManualSteps(manualSteps.map(x => x.id === s.id ? {...x, label: e.target.value} : x))}
-                                                className="w-16 text-[11px] font-bold text-slate-500 border-none p-0 bg-transparent outline-none focus:text-slate-800 placeholder:text-slate-300"
-                                                placeholder="직책"
-                                            />
-                                            {/* 결재자 선택 */}
-                                            <select
-                                                value={s.approverUid}
-                                                onChange={e => setManualSteps(manualSteps.map(x => x.id === s.id ? {...x, approverUid: e.target.value} : x))}
-                                                className="flex-1 min-w-0 text-[11px] font-bold text-slate-700 border-none bg-transparent outline-none cursor-pointer focus:text-blue-600"
-                                            >
-                                                <option value="">결재자 선택...</option>
-                                                {allUsers.map(u => (
-                                                    <option key={u.uid} value={u.uid}>{u.displayName} ({u.department})</option>
-                                                ))}
-                                            </select>
-                                            {/* 삭제 버튼 (hover 시 표시) */}
-                                            {manualSteps.length > 1 && (
-                                                <button
-                                                    onClick={() => setManualSteps(manualSteps.filter(x => x.id !== s.id))}
-                                                    className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-all flex-shrink-0"
-                                                >
-                                                    <Trash2 size={12}/>
-                                                </button>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                                {/* + 결재자 추가 버튼 */}
-                                <button
-                                    onClick={() => setManualSteps([...manualSteps, { id: Date.now(), label: '승인', approverUid: '' }])}
-                                    className="w-full flex items-center justify-center gap-1.5 py-2.5 text-[11px] font-black text-blue-500 hover:text-blue-700 hover:bg-blue-50 border-t border-slate-100 transition-colors"
-                                >
-                                    <UserPlus size={13}/>
-                                    결재자 추가
-                                </button>
-                            </div>
-
-                            <button onClick={handleApplySubmit} className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black mt-4 shadow-sm shadow-blue-200 active:scale-95 transition-all text-sm">기안 상신하기</button>
                         </div>
                     </div>
                 </div>
@@ -1023,7 +963,7 @@ export default function LeaveManagementPage() {
                                                                     req.category==='Leave'?"bg-blue-50 text-blue-700 border-blue-100":
                                                                     req.category==='Flex'?"bg-teal-50 text-teal-700 border-teal-100":"bg-amber-50 text-amber-700 border-amber-100"
                                                                 )}>{req.title}</span>
-                                                                <span className="text-[9px] text-slate-400 font-mono">#{req.id.slice(0,6)}</span>
+                                                                <span className="text-[9px] text-slate-400 font-mono">#{String(req.id).slice(0,6)}</span>
                                                             </div>
                                                             <p className="text-sm font-bold text-slate-700 truncate">
                                                                 <span className="font-black text-slate-900">[{req.department}] {req.userName}</span> 님

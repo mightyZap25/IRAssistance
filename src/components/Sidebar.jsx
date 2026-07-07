@@ -87,16 +87,25 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
 
     const role = userProfile?.role || 'viewer';
     const allowedPaths = ROLE_MENU_MAP[role] || ROLE_MENU_MAP.viewer;
-    const isAllowed = (path) => {
-        if (path === '/settings') return true;
+    const isAllowed = (item) => {
+        const path = item.path;
+        if (path === '/settings' || path === '/odoo/login' || path === '/odoo/logout') return true;
+        
         if (path.startsWith('/odoo/view')) {
+            // 특정 Odoo 메뉴들은 React 앱의 네이티브 권한 경로와 매핑하여 표시 여부 결정
+            if (item.name === '판매' || item.name === 'Sales') return allowedPaths.includes('/sales/dashboard');
+            if (item.name === '청구서' || item.name === 'Invoicing') return allowedPaths.includes('/sales/billing');
+            if (item.name === '구매 & 외주' || item.name === 'Purchase') return allowedPaths.includes('/purchasing');
+            if (item.name === '제조관리' || item.name === 'Manufacturing') return allowedPaths.includes('/prod-execution');
+            if (item.name === '도면 & BOM & ECO' || item.name === 'PLM') return allowedPaths.includes('/plm');
+            
             return allowedPaths.includes('/odoo/view');
         }
         return allowedPaths.includes(path);
     };
 
     const filterGroups = (groups) => groups
-        .map(group => ({ ...group, items: group.items.filter(item => isAllowed(item.path)) }))
+        .map(group => ({ ...group, items: group.items.filter(item => isAllowed(item)) }))
         .filter(group => group.items.length > 0);
 
     const checkActive = (path) => {
@@ -220,7 +229,9 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         const CUSTOM_APPS = [
             { cat: '근태관리', name: '근태 휴가 관리 (커스텀)', path: '/hr/attendance', icon: CalendarDays },
             { cat: '제조 품질', name: 'PLM (설계 변경)', path: '/plm', icon: Layers },
-            { cat: '협업 & 기타', name: '전자결재', path: '/approval', icon: FileCheck }
+            { cat: '협업 & 기타', name: '전자결재', path: '/approval', icon: FileCheck },
+            { cat: '시스템 제어', name: 'Odoo 로그인', path: '/odoo/login', icon: UserCheck },
+            { cat: '시스템 제어', name: 'Odoo 로그아웃', path: '/odoo/logout', icon: LogOut }
         ];
 
         CUSTOM_APPS.forEach(app => {

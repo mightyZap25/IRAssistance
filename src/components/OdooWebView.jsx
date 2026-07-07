@@ -41,6 +41,12 @@ export default function OdooWebView() {
         if (location.pathname === '/odoo/apps') {
             return `${odooBaseUrl}/odoo/apps`;
         }
+        if (location.pathname === '/odoo/login') {
+            return `${odooBaseUrl}/web/login`;
+        }
+        if (location.pathname === '/odoo/logout') {
+            return `${odooBaseUrl}/web/session/logout`;
+        }
         if (location.pathname === '/odoo/view') {
             const searchParams = new URLSearchParams(location.search);
             const menuId = searchParams.get('menu_id');
@@ -96,6 +102,22 @@ export default function OdooWebView() {
             }
         }
     }, [location.pathname, location.search, isElectron, menusLoaded]);
+
+    useEffect(() => {
+        const handleClearSession = async () => {
+            if (isElectron && window.electronAPI?.clearOdooCookies) {
+                await window.electronAPI.clearOdooCookies();
+                globalOdooMenus = [];
+                setMenusLoaded(false);
+                window.dispatchEvent(new CustomEvent('odoo-menus-loaded', { detail: [] }));
+                if (webviewRef.current) {
+                    webviewRef.current.loadURL(`${odooBaseUrl}/web/login`);
+                }
+            }
+        };
+        window.addEventListener('clear-odoo-session', handleClearSession);
+        return () => window.removeEventListener('clear-odoo-session', handleClearSession);
+    }, [isElectron, odooBaseUrl]);
 
     // webview 내부에서 직접 JSON-RPC 호출 (Odoo 세션 쿠키 사용)
     useEffect(() => {
@@ -545,7 +567,7 @@ export default function OdooWebView() {
             // webview 내부(= Odoo 서버와 같은 origin)에서 JSON-RPC 호출
             // → CORS 없음, Odoo 세션 쿠키 자동 포함
             try {
-                const menus = await webview.executeJavaScript(`
+                const menusData = await webview.executeJavaScript(`
                     fetch('/web/dataset/call_kw', {
                         method: 'POST',
                         credentials: 'include',
@@ -556,31 +578,36 @@ export default function OdooWebView() {
                             id: 1,
                             params: {
                                 model: 'ir.ui.menu',
-                                method: 'search_read',
-                                args: [[['parent_id', '=', false]]],
-                                kwargs: {
-                                    fields: ['id', 'name', 'sequence'],
-                                    order: 'sequence asc'
-                                }
+                                method: 'load_menus',
+                                args: [false],
+                                kwargs: {}
                             }
                         })
                     })
                     .then(r => r.json())
-                    .then(d => (d && d.result) ? d.result : [])
-                    .catch(() => []);
+                    .then(d => (d && d.result) ? d.result : null)
+                    .catch(() => null);
                 `);
 
-                if (Array.isArray(menus) && menus.length > 0) {
-                    const apps = menus.map(m => ({
-                        name: m.name,
-                        menu_id: String(m.id),
-                    }));
+                if (menusData && menusData.root && menusData.root.children) {
+                    const childrenIds = menusData.root.children;
+                    const apps = childrenIds.map(id => {
+                        const m = menusData[id];
+                        return {
+                            name: m.name,
+                            menu_id: String(m.id),
+                        };
+                    });
                     globalOdooMenus = apps;
                     setMenusLoaded(true);
                     window.dispatchEvent(new CustomEvent('odoo-menus-loaded', { detail: apps }));
+                } else {
+                    throw new Error('Invalid load_menus response');
                 }
             } catch (e) {
                 console.warn('[OdooWebView] executeJavaScript menu fetch failed:', e.message);
+                globalOdooMenus = [];
+                window.dispatchEvent(new CustomEvent('odoo-menus-loaded', { detail: [] }));
             }
         };
 

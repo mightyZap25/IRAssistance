@@ -511,29 +511,239 @@ router.post('/leave/request', async (req, res) => {
         }
 
         // Create hr.leave
-        const newId = await odoo.execute_kw('hr.leave', 'create', [{
+        const payload = {
             employee_id: employee.id,
             holiday_status_id: leaveTypeId,
             request_date_from: startDate,
             request_date_to: endDate,
             name: `[${category}] ${title} - ${reason || '사유 없음'}`,
-            // Odoo expects date_from and date_to (datetime) if it's hours, but request_date_from is for UI.
-            // Using request_date_from and request_date_to triggers onchange in Odoo to compute date_from/date_to.
-        }]);
+        };
 
-        // Attempt to confirm the leave so it moves out of draft (Optional)
+        if (type === 'Hourly' && req.body.startTime && req.body.endTime) {
+            payload.request_unit_hours = true;
+            const sH = parseInt(req.body.startTime.split(':')[0], 10);
+            const sM = parseInt(req.body.startTime.split(':')[1], 10);
+            const eH = parseInt(req.body.endTime.split(':')[0], 10);
+            const eM = parseInt(req.body.endTime.split(':')[1], 10);
+            payload.request_hour_from = (sH + sM / 60).toString();
+            payload.request_hour_to = (eH + eM / 60).toString();
+        }
+
+        const newId = await odoo.execute_kw('hr.leave', 'create', [payload]);
+
+        // Attempt to confirm the leave so it moves out of draft to "To Approve" state
         try {
             await odoo.execute_kw('hr.leave', 'action_confirm', [[newId]]);
-            // If we want it fully validated: await odoo.execute_kw('hr.leave', 'action_validate', [[newId]]);
-            // Since it's already approved in Firebase, let's try to validate it.
-            await odoo.execute_kw('hr.leave', 'action_validate', [[newId]]);
         } catch (statusErr) {
-            console.log("Could not auto-validate leave:", statusErr.message);
+            console.log("Could not auto-confirm leave:", statusErr.message);
         }
 
         res.json({ success: true, id: newId });
     } catch (err) {
         console.error('[Odoo] /leave/request Error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- New endpoints added for Leave Management ---
+
+router.get('/leave/balance', async (req, res) => {
+    try {
+        const { email } = req.query;
+        if (!email) return res.status(400).json({ error: 'Email query parameter is required' });
+
+        const odoo = await getOdooClient();
+        const employee = await getEmployeeByEmail(odoo, email);
+
+        const allocations = await odoo.execute_kw('hr.leave.allocation', 'search_read', [
+            [['employee_id', '=', employee.id], ['state', '=', 'validate']]
+        ], { fields: ['number_of_days'] });
+        const total = allocations.reduce((sum, a) => sum + (a.number_of_days || 0), 0);
+
+        const leaves = await odoo.execute_kw('hr.leave', 'search_read', [
+            [['employee_id', '=', employee.id], ['state', '=', 'validate']]
+        ], { fields: ['number_of_days'] });
+        const used = leaves.reduce((sum, l) => sum + (l.number_of_days || 0), 0);
+
+        const remaining = total - used;
+        const remainingHours = remaining * 8; 
+
+        res.json({ total, used, remaining, remainingHours });
+    } catch (err) {
+        console.error('[Odoo] /leave/balance Error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/attendance/stats', async (req, res) => {
+    try {
+        const { email } = req.query;
+        if (!email) return res.status(400).json({ error: 'Email query parameter is required' });
+
+        const odoo = await getOdooClient();
+        const employee = await getEmployeeByEmail(odoo, email);
+
+        const now = new Date();
+        const dayOfWeek = now.getDay() || 7; 
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - dayOfWeek + 1);
+        startOfWeek.setHours(0, 0, 0, 0);
+
+        const attendances = await odoo.execute_kw('hr.attendance', 'search_read', [
+            [
+                ['employee_id', '=', employee.id],
+                ['check_in', '>=', startOfWeek.toISOString().split('T')[0] + ' 00:00:00']
+            ]
+        ], { fields: ['worked_hours'] });
+
+        const weeklyWorked = attendances.reduce((sum, att) => sum + (att.worked_hours || 0), 0);
+        
+        const limit = 40;
+        const overtime = Math.max(0, weeklyWorked - limit);
+        const remaining = Math.max(0, limit - weeklyWorked);
+
+        res.json({
+            weekly: Math.round(weeklyWorked * 10) / 10,
+            limit,
+            accumulated: Math.round(weeklyWorked * 10) / 10, 
+            remaining: Math.round(remaining * 10) / 10,
+            overtime: Math.round(overtime * 10) / 10
+        });
+    } catch (err) {
+        console.error('[Odoo] /attendance/stats Error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/leave/my-requests', async (req, res) => {
+    try {
+        const { email } = req.query;
+        if (!email) return res.status(400).json({ error: 'Email query parameter is required' });
+
+        const odoo = await getOdooClient();
+        const employee = await getEmployeeByEmail(odoo, email);
+
+        const leaves = await odoo.execute_kw('hr.leave', 'search_read', [
+            [['employee_id', '=', employee.id]]
+        ], { 
+            fields: ['id', 'name', 'state', 'request_date_from', 'request_date_to', 'number_of_days', 'holiday_status_id'],
+            order: 'create_date desc'
+        });
+
+        const formatted = leaves.map(l => ({
+            id: l.id,
+            title: l.name || (l.holiday_status_id ? l.holiday_status_id[1] : 'Leave'),
+            startDate: l.request_date_from,
+            endDate: l.request_date_to,
+            totalDays: l.number_of_days,
+            Status: l.state === 'validate' ? 'Approved' : l.state === 'refuse' ? 'Rejected' : 'Pending',
+            OdooState: l.state,
+            category: 'Leave',
+            userName: employee.name,
+            createdAt: l.request_date_from 
+        }));
+
+        res.json(formatted);
+    } catch (err) {
+        console.error('[Odoo] /leave/my-requests Error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/leave/pending-approvals', async (req, res) => {
+    try {
+        const { email } = req.query;
+        if (!email) return res.status(400).json({ error: 'Email is required' });
+
+        const odoo = await getOdooClient();
+        
+        const users = await odoo.execute_kw('res.users', 'search_read', [
+            [['login', '=', email]]
+        ], { fields: ['id'] });
+
+        if (users.length === 0) return res.json([]);
+
+        // Simplistic approach: Just fetch leaves in "confirm" state (To Approve)
+        const leaves = await odoo.execute_kw('hr.leave', 'search_read', [
+            [['state', 'in', ['confirm', 'validate1']]]
+        ], { 
+            fields: ['id', 'name', 'state', 'request_date_from', 'request_date_to', 'number_of_days', 'employee_id']
+        });
+
+        const formatted = leaves.map(l => ({
+            id: l.id,
+            title: l.name || 'Leave Request',
+            startDate: l.request_date_from,
+            endDate: l.request_date_to,
+            totalDays: l.number_of_days,
+            userName: l.employee_id ? l.employee_id[1] : 'Unknown',
+            Status: 'Pending',
+            OdooState: l.state,
+            category: 'Leave',
+            userId: l.employee_id ? l.employee_id[0] : null,
+            approverUid: users[0].id // to mock the frontend condition
+        }));
+
+        res.json(formatted);
+    } catch (err) {
+        console.error('[Odoo] /leave/pending-approvals Error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/leave/all-events', async (req, res) => {
+    try {
+        const odoo = await getOdooClient();
+        const leaves = await odoo.execute_kw('hr.leave', 'search_read', [
+            [['state', '=', 'validate']]
+        ], { 
+            fields: ['id', 'name', 'request_date_from', 'request_date_to', 'employee_id']
+        });
+
+        const formatted = leaves.map(l => ({
+            id: l.id,
+            title: l.name || 'Leave',
+            startDate: l.request_date_from,
+            endDate: l.request_date_to,
+            userName: l.employee_id ? l.employee_id[1] : 'Unknown',
+            department: '', 
+            category: 'Leave'
+        }));
+
+        res.json(formatted);
+    } catch (err) {
+        console.error('[Odoo] /leave/all-events Error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/leave/approve', async (req, res) => {
+    try {
+        const { leaveId } = req.body;
+        const odoo = await getOdooClient();
+        
+        await odoo.execute_kw('hr.leave', 'action_approve', [[parseInt(leaveId)]]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[Odoo] /leave/approve Error:', err);
+        try {
+            const odoo = await getOdooClient();
+            await odoo.execute_kw('hr.leave', 'action_validate', [[parseInt(req.body.leaveId)]]);
+            res.json({ success: true });
+        } catch (e2) {
+            res.status(500).json({ error: err.message });
+        }
+    }
+});
+
+router.post('/leave/refuse', async (req, res) => {
+    try {
+        const { leaveId } = req.body;
+        const odoo = await getOdooClient();
+        await odoo.execute_kw('hr.leave', 'action_refuse', [[parseInt(leaveId)]]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[Odoo] /leave/refuse Error:', err);
         res.status(500).json({ error: err.message });
     }
 });

@@ -700,6 +700,23 @@ ipcMain.handle('clear-google-cookies', async () => {
     return true;
 });
 
+ipcMain.handle('clear-odoo-cookies', async () => {
+    try {
+        const cookies = await session.defaultSession.cookies.get({});
+        for (const cookie of cookies) {
+            if (cookie.domain.includes('100.67.238.32')) {
+                let url = 'http' + (cookie.secure ? 's' : '') + '://' + cookie.domain + cookie.path;
+                await session.defaultSession.cookies.remove(url, cookie.name);
+            }
+        }
+        console.log('[Electron Main] Cleared Odoo session cookies.');
+        return true;
+    } catch (error) {
+        console.error('Failed to clear Odoo cookies:', error);
+        return false;
+    }
+});
+
 ipcMain.on('set-theme', (event, theme) => {
     console.log('[Electron Main] Setting theme to:', theme);
     nativeTheme.themeSource = theme;
