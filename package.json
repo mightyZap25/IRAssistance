@@ -1,7 +1,7 @@
 {
     "name": "ir-assistant",
     "private": true,
-    "version": "0.9.2",
+    "version": "0.9.3",
     "description": "IR Assistant - 스마트 ERP 데스크톱 어플리케이션",
     "author": "Antigravity",
     "type": "module",
@@ -30,6 +30,7 @@
         "electron-updater": "^6.8.9",
         "express": "^5.2.1",
         "firebase": "^10.8.0",
+        "jodit-react": "^5.3.21",
         "jspdf": "^4.1.0",
         "jspdf-autotable": "^5.0.7",
         "lucide-react": "^0.344.0",

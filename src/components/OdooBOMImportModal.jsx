@@ -5,7 +5,6 @@ import { collection, doc, writeBatch, getDocs, serverTimestamp } from '../fireba
 import { db } from '../firebase';
 import BOMTree from './BOMTree';
 import { autoRegisterFromParts } from '../services/supplierAutoRegister';
-
 // Helper to normalize Part IDs for robust comparison (strips out revision suffixes like -1.0, _v1.1)
 function normalizePartId(id) {
     if (!id) return '';
@@ -15,7 +14,7 @@ function normalizePartId(id) {
     return normalized;
 }
 
-export default function OdooBOMImportModal({ isOpen, onClose, onImportSuccess, allParts: existingPartsList }) {
+export default function OdooBOMImportModal({ isOpen, onClose, onImportSuccess, allParts: existingPartsList, isInline = false }) {
     const [sheetUrl, setSheetUrl] = useState('');
     const [sheetName, setSheetName] = useState('');
     const [availableSheets, setAvailableSheets] = useState([]);
@@ -428,20 +427,21 @@ export default function OdooBOMImportModal({ isOpen, onClose, onImportSuccess, a
 
     const previewTree = buildPreviewTree();
 
-    if (!isOpen) return null;
+    if (!isOpen && !isInline) return null;
 
-    return (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                    <div className="flex items-center gap-2">
-                        <FileSpreadsheet className="text-blue-600" size={20} />
-                        <h2 className="text-lg font-black text-slate-800">Odoo 다이렉트 BOM 가져오기</h2>
-                    </div>
+    const content = (
+        <div className={`bg-white border border-slate-200 shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden ${isInline ? 'rounded-2xl mx-auto h-[800px]' : 'rounded-2xl'}`}>
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div className="flex items-center gap-2">
+                    <FileSpreadsheet className="text-blue-600" size={20} />
+                    <h2 className="text-lg font-black text-slate-800">Odoo 다이렉트 단일 완제품 설계 변경 (ECO)</h2>
+                </div>
+                {!isInline && (
                     <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
                         <X size={18} />
                     </button>
-                </div>
+                )}
+            </div>
 
                 <div className="flex-1 overflow-y-auto p-6 space-y-4 relative">
                     {loading && (
@@ -635,6 +635,13 @@ export default function OdooBOMImportModal({ isOpen, onClose, onImportSuccess, a
                     )}
                 </div>
             </div>
+    );
+
+    if (isInline) return content;
+
+    return (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            {content}
         </div>
     );
 }

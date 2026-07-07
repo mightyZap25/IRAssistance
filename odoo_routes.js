@@ -363,4 +363,179 @@ router.post('/import-bom', async (req, res) => {
     }
 });
 
+
+// ============================================================================
+// HR Attendance & Leave API endpoints
+// ============================================================================
+
+// Helper to get authenticated Odoo Client
+const getOdooClient = async () => {
+    const ODOO_URL = process.env.ODOO_URL || 'http://100.67.238.32:8069';
+    const ODOO_DB = process.env.ODOO_DB || 'odoo';
+    const ODOO_USER = process.env.ODOO_USER || 'jogak@mightyzap.com';
+    const ODOO_PASS = process.env.ODOO_PASS || 'jogak0622#';
+    const odoo = new OdooClient(ODOO_URL, ODOO_DB, ODOO_USER, ODOO_PASS);
+    await odoo.authenticate();
+    return odoo;
+};
+
+// Helper to fetch employee by email
+const getEmployeeByEmail = async (odoo, email) => {
+    if (!email) throw new Error("Email is required");
+    const employees = await odoo.execute_kw('hr.employee', 'search_read', [
+        [['work_email', '=', email]]
+    ], { fields: ['id', 'name'] });
+    if (employees.length === 0) {
+        throw new Error(`Employee with email ${email} not found in Odoo`);
+    }
+    return employees[0];
+};
+
+router.get('/attendance/today', async (req, res) => {
+    try {
+        const { email } = req.query;
+        if (!email) return res.status(400).json({ error: 'Email query parameter is required' });
+
+        const odoo = await getOdooClient();
+        const employee = await getEmployeeByEmail(odoo, email);
+
+        // Find today's attendance for this employee
+        // We look for any record where check_in is today (UTC)
+        const todayStr = new Date().toISOString().split('T')[0];
+        const attendances = await odoo.execute_kw('hr.attendance', 'search_read', [
+            [
+                ['employee_id', '=', employee.id],
+                ['check_in', '>=', `${todayStr} 00:00:00`]
+            ]
+        ], { fields: ['id', 'check_in', 'check_out'], order: 'check_in desc', limit: 1 });
+
+        if (attendances.length > 0) {
+            res.json(attendances[0]);
+        } else {
+            res.json(null);
+        }
+    } catch (err) {
+        console.error('[Odoo] /attendance/today Error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/attendance/check-in', async (req, res) => {
+    try {
+        const { email } = req.body;
+        const odoo = await getOdooClient();
+        const employee = await getEmployeeByEmail(odoo, email);
+
+        // check if already checked in (no checkout)
+        const openAtt = await odoo.execute_kw('hr.attendance', 'search_read', [
+            [['employee_id', '=', employee.id], ['check_out', '=', false]]
+        ], { limit: 1 });
+
+        if (openAtt.length > 0) {
+            return res.status(400).json({ error: 'Already checked in' });
+        }
+
+        // Create hr.attendance
+        // Note: Odoo hr.attendance automatically uses the current UTC time for check_in if not provided,
+        // but we can pass it explicitly. For now, we'll let Odoo set the time if possible, or pass it.
+        const checkInTimeStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+        const newId = await odoo.execute_kw('hr.attendance', 'create', [{
+            employee_id: employee.id,
+            check_in: checkInTimeStr
+        }]);
+
+        res.json({ success: true, id: newId, check_in: checkInTimeStr });
+    } catch (err) {
+        console.error('[Odoo] /attendance/check-in Error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/attendance/check-out', async (req, res) => {
+    try {
+        const { email } = req.body;
+        const odoo = await getOdooClient();
+        const employee = await getEmployeeByEmail(odoo, email);
+
+        // Find open attendance
+        const openAtt = await odoo.execute_kw('hr.attendance', 'search_read', [
+            [['employee_id', '=', employee.id], ['check_out', '=', false]]
+        ], { fields: ['id'] });
+
+        if (openAtt.length === 0) {
+            return res.status(400).json({ error: 'No active check-in found' });
+        }
+
+        const attId = openAtt[0].id;
+        const checkOutTimeStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+        await odoo.execute_kw('hr.attendance', 'write', [
+            [attId],
+            { check_out: checkOutTimeStr }
+        ]);
+
+        res.json({ success: true, id: attId, check_out: checkOutTimeStr });
+    } catch (err) {
+        console.error('[Odoo] /attendance/check-out Error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/leave/request', async (req, res) => {
+    try {
+        const { email, title, reason, startDate, endDate, category, type } = req.body;
+        const odoo = await getOdooClient();
+        const employee = await getEmployeeByEmail(odoo, email);
+
+        // Map Category/Type to Odoo Time Off Type (hr.leave.type)
+        // We will try to find a type matching the requested 'type' or just use the first available type.
+        let leaveTypeId = null;
+        
+        // Search by name
+        const leaveTypes = await odoo.execute_kw('hr.leave.type', 'search_read', [
+            [['name', 'ilike', type]]
+        ], { fields: ['id', 'name'], limit: 1 });
+
+        if (leaveTypes.length > 0) {
+            leaveTypeId = leaveTypes[0].id;
+        } else {
+            // Fallback to any active leave type
+            const anyLeaveType = await odoo.execute_kw('hr.leave.type', 'search_read', [
+                [['active', '=', true]]
+            ], { fields: ['id', 'name'], limit: 1 });
+            
+            if (anyLeaveType.length > 0) {
+                leaveTypeId = anyLeaveType[0].id;
+            } else {
+                throw new Error("No active Leave Types (hr.leave.type) found in Odoo.");
+            }
+        }
+
+        // Create hr.leave
+        const newId = await odoo.execute_kw('hr.leave', 'create', [{
+            employee_id: employee.id,
+            holiday_status_id: leaveTypeId,
+            request_date_from: startDate,
+            request_date_to: endDate,
+            name: `[${category}] ${title} - ${reason || '사유 없음'}`,
+            // Odoo expects date_from and date_to (datetime) if it's hours, but request_date_from is for UI.
+            // Using request_date_from and request_date_to triggers onchange in Odoo to compute date_from/date_to.
+        }]);
+
+        // Attempt to confirm the leave so it moves out of draft (Optional)
+        try {
+            await odoo.execute_kw('hr.leave', 'action_confirm', [[newId]]);
+            // If we want it fully validated: await odoo.execute_kw('hr.leave', 'action_validate', [[newId]]);
+            // Since it's already approved in Firebase, let's try to validate it.
+            await odoo.execute_kw('hr.leave', 'action_validate', [[newId]]);
+        } catch (statusErr) {
+            console.log("Could not auto-validate leave:", statusErr.message);
+        }
+
+        res.json({ success: true, id: newId });
+    } catch (err) {
+        console.error('[Odoo] /leave/request Error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 export default router;

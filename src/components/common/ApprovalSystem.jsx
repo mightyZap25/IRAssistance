@@ -15,12 +15,16 @@ async function createNotification(targetUid, title, message, link = '') {
     } catch (err) { console.error("Notification failed:", err); }
 }
 
-export function ApprovalLineEditor({ onSelectTemplate }) {
+export function ApprovalLineEditor({ onSelectTemplate, initialSteps = [], onStepsChange }) {
     const { currentUser } = useAuth();
-    const [steps, setSteps] = useState([]);
+    const [steps, setSteps] = useState(initialSteps);
     const [alias, setAlias] = useState('');
     const [savedTemplates, setSavedTemplates] = useState([]);
     const [allUsers, setAllUsers] = useState([]);
+
+    useEffect(() => {
+        if (onStepsChange) onStepsChange(steps);
+    }, [steps]);
 
     useEffect(() => {
         const fetchUsers = async () => {
@@ -39,45 +43,41 @@ export function ApprovalLineEditor({ onSelectTemplate }) {
         await addDoc(collection(db, 'users', currentUser.uid, 'approval_templates'), {
             name: alias, steps: steps.map((s, i) => ({ label: s.label, approverUid: s.approverUid, order: i })), createdAt: serverTimestamp()
         });
-        setAlias(''); setSteps([]);
+        setAlias(''); // Keep steps so they can still submit
+        alert('템플릿이 저장되었습니다.');
     };
 
     return (
-        <div className="bg-white rounded-2xl border p-6 space-y-6 shadow-sm">
-            <div className="flex justify-between items-center">
-                <h3 className="text-lg font-black flex items-center gap-2"><ShieldCheck className="text-blue-600"/> 결재선 설정</h3>
-                <div className="flex gap-2">
-                    <input value={alias} onChange={e => setAlias(e.target.value)} placeholder="템플릿 별칭" className="border px-3 py-1 rounded-lg text-xs" />
-                    <button onClick={handleSave} className="bg-blue-600 text-white p-2 rounded-lg"><Save size={16}/></button>
-                </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white rounded-2xl border p-6 shadow-sm">
+            <h3 className="text-lg font-black flex items-center gap-2 mb-6"><ShieldCheck className="text-blue-600"/> 결재선 설정</h3>
+            <div className="flex flex-col gap-6">
                 <div className="space-y-3">
                     <div className="flex justify-between">
-                         <button onClick={() => setSteps([...steps, { id: Date.now(), label: '', approverUid: '' }])} className="text-xs font-bold text-blue-600">+ 단계 추가</button>
-                         <p className="text-[10px] text-slate-400">신청 시 첫 결재자에게 알림 발송</p>
+                         <button type="button" onClick={() => setSteps([...steps, { id: Date.now(), label: '', approverUid: '' }])} className="text-xs font-bold text-blue-600">+ 단계 추가</button>
+                         <p className="text-[10px] text-slate-400">신청 시 첫 결재자에게 알림</p>
                     </div>
                     {steps.map((s, i) => (
-                        <div key={s.id} className="flex gap-2 items-center bg-slate-50 p-2 rounded-xl">
-                            <span className="text-[10px] font-black w-4">{i+1}</span>
-                            <input value={s.label} onChange={e => setSteps(steps.map(x => x.id === s.id ? {...x, label: e.target.value} : x))} placeholder="직책" className="flex-1 border px-2 py-1 rounded text-[10px]" />
-                            <select value={s.approverUid} onChange={e => setSteps(steps.map(x => x.id === s.id ? {...x, approverUid: e.target.value} : x))} className="flex-1 border px-2 py-1 rounded text-[10px]">
-                                <option value="">선택</option>
+                        <div key={s.id || i} className="flex gap-2 items-center bg-slate-50 p-2 rounded-xl border border-slate-100">
+                            <span className="text-[10px] font-black w-4 text-center">{i+1}</span>
+                            <select value={s.approverUid} onChange={e => setSteps(steps.map(x => (x.id === s.id || x === s) ? {...x, approverUid: e.target.value} : x))} className="flex-1 border px-2 py-1.5 rounded-lg text-[10px] font-bold">
+                                <option value="">결재자 선택</option>
                                 {allUsers.map(u => <option key={u.uid} value={u.uid}>{u.displayName}</option>)}
                             </select>
-                            <button onClick={() => setSteps(steps.filter(x => x.id !== s.id))}><Trash2 size={14} className="text-slate-300" /></button>
+                            <button type="button" onClick={() => setSteps(steps.filter(x => x !== s))}><Trash2 size={14} className="text-slate-300 hover:text-rose-500" /></button>
                         </div>
                     ))}
                 </div>
-                <div className="border-l pl-6 space-y-2">
-                    <p className="text-xs font-black text-slate-400">저장된 템플릿</p>
-                    {savedTemplates.map(t => (
-                        <button key={t.id} onClick={() => onSelectTemplate(t)} className="w-full text-left p-3 rounded-xl border hover:border-blue-500 flex items-center gap-2">
-                            <Star size={14} className="text-amber-400"/>
-                            <div className="flex-1"><p className="text-xs font-bold">{t.name}</p><p className="text-[9px] text-slate-400">{t.steps.length}단계</p></div>
-                        </button>
-                    ))}
-                </div>
+                {savedTemplates.length > 0 && (
+                    <div className="border-t pt-4 space-y-2">
+                        <p className="text-xs font-black text-slate-400">저장된 템플릿</p>
+                        {savedTemplates.map(t => (
+                            <button type="button" key={t.id} onClick={() => { setSteps(t.steps); if(onSelectTemplate) onSelectTemplate(t); }} className="w-full text-left p-3 rounded-xl border hover:border-blue-500 flex items-center gap-2">
+                                <Star size={14} className="text-amber-400"/>
+                                <div className="flex-1"><p className="text-xs font-bold">{t.name}</p><p className="text-[9px] text-slate-400">{(t.steps || []).length}단계</p></div>
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );

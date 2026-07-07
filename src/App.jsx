@@ -18,6 +18,8 @@ import NotebookLMPage from './pages/NotebookLMPage'
 import GeminiPage from './pages/GeminiPage'
 import NotesPage from './pages/NotesPage'
 import PLMPage from './pages/PLMPage'
+import ApprovalPage from './pages/ApprovalPage'
+import LeaveManagementPage from './pages/LeaveManagementPage'
 
 function PrivateRoute({ children }) {
     const { currentUser } = useAuth();
@@ -36,7 +38,7 @@ function AppContent() {
                 '/manufacturers', '/vendors', '/prod-requests', '/prod-execution', 
                 '/purchasing', '/qa/config', '/qa/process', '/qa/dashboard', 
                 '/qa/dev-testing', '/receiving/placement', '/receiving/returns', 
-                '/transactions', '/outsourcing', '/hr/attendance', 
+                '/transactions', '/outsourcing', 
                 '/project/dashboard', '/project/issues', '/project/tasks', 
                 '/project/task-calendar', '/project/management', 
                 '/sales/dashboard', '/sales/billing', '/odoo/apps', '/odoo/view'
@@ -57,11 +59,13 @@ function AppContent() {
             <Route path="/workspace/memo" element={<PrivateRoute><Layout><WorkspaceMemoPage /></Layout></PrivateRoute>} />
             <Route path="/workspace/chat" element={<PrivateRoute><Layout><GoogleChatPage /></Layout></PrivateRoute>} />
             <Route path="/workspace/notebooklm" element={<PrivateRoute><Layout><NotebookLMPage /></Layout></PrivateRoute>} />
+            <Route path="/hr/attendance" element={<PrivateRoute><Layout><LeaveManagementPage /></Layout></PrivateRoute>} />
             <Route path="/workspace/gemini" element={<PrivateRoute><Layout><GeminiPage /></Layout></PrivateRoute>} />
             <Route path="/workspace/notes" element={<PrivateRoute><Layout><NotesPage /></Layout></PrivateRoute>} />
             <Route path="/workspace/meetings" element={<PrivateRoute><Layout><MeetingsPage /></Layout></PrivateRoute>} />
             <Route path="/settings" element={<PrivateRoute><Layout><SettingsPage /></Layout></PrivateRoute>} />
             <Route path="/plm" element={<PrivateRoute><Layout><PLMPage /></Layout></PrivateRoute>} />
+            <Route path="/approval" element={<PrivateRoute><Layout><ApprovalPage /></Layout></PrivateRoute>} />
 
             {/* Catch all */}
             <Route path="*" element={<Navigate to="/" />} />

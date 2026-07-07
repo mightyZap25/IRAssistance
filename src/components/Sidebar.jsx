@@ -16,12 +16,12 @@ import {
 } from 'lucide-react';
 
 const ROLE_MENU_MAP = {
-    admin: ['/', '/settings', '/parts', '/bom', '/customers', '/prod-requests', '/prod-execution', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/eco', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/workspace/notes', '/odoo/apps', '/odoo/view'],
-    engineer: ['/', '/parts', '/bom', '/eco', '/inventory', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/workspace/notes', '/odoo/view'],
+    admin: ['/', '/settings', '/parts', '/bom', '/customers', '/prod-requests', '/prod-execution', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/eco', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/workspace/notes', '/odoo/apps', '/odoo/view', '/plm', '/approval'],
+    engineer: ['/', '/parts', '/bom', '/eco', '/inventory', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/workspace/notes', '/odoo/view', '/plm', '/approval'],
     sales: ['/', '/customers', '/prod-requests', '/inventory', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/workspace/notes', '/odoo/view'],
     qa: ['/', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/inventory', '/transactions', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/workspace/notes', '/odoo/view'],
     production: ['/', '/prod-execution', '/prod-requests', '/inventory', '/purchasing', '/outsourcing', '/transactions', '/vendors', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/workspace/notes', '/odoo/view'],
-    manager: ['/', '/customers', '/prod-requests', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/eco', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/workspace/notes', '/odoo/view'],
+    manager: ['/', '/customers', '/prod-requests', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/eco', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/workspace/notes', '/odoo/view', '/plm', '/approval'],
     viewer: ['/', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/workspace/notes', '/odoo/view'],
 };
 
@@ -215,23 +215,38 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
     ]);
 
     const getOdooDynamicGroups = () => {
-        if (odooMenus.length === 0) return [];
-
         const groupsMap = {};
 
-        odooMenus
-            .filter(app => !ODOO_HIDDEN_MENUS.has(app.name))
-            .forEach(app => {
-                const cat = ODOO_CATEGORY_MAP[app.name] || 'Project 관리';
-                if (!groupsMap[cat]) {
-                    groupsMap[cat] = [];
-                }
-                groupsMap[cat].push({
-                    name: ODOO_NAME_MAP[app.name] || app.name,
-                    path: `/odoo/view?menu_id=${app.menu_id}`,
-                    icon: ODOO_ICON_MAP[app.name] || Package
-                });
+        const CUSTOM_APPS = [
+            { cat: '근태관리', name: '근태 휴가 관리 (커스텀)', path: '/hr/attendance', icon: CalendarDays },
+            { cat: '제조 품질', name: 'PLM (설계 변경)', path: '/plm', icon: Layers },
+            { cat: '협업 & 기타', name: '전자결재', path: '/approval', icon: FileCheck }
+        ];
+
+        CUSTOM_APPS.forEach(app => {
+            if (!groupsMap[app.cat]) groupsMap[app.cat] = [];
+            groupsMap[app.cat].push({
+                name: app.name,
+                path: app.path,
+                icon: app.icon
             });
+        });
+
+        if (odooMenus && odooMenus.length > 0) {
+            odooMenus
+                .filter(app => !ODOO_HIDDEN_MENUS.has(app.name))
+                .forEach(app => {
+                    const cat = ODOO_CATEGORY_MAP[app.name] || 'Project 관리';
+                    if (!groupsMap[cat]) {
+                        groupsMap[cat] = [];
+                    }
+                    groupsMap[cat].push({
+                        name: ODOO_NAME_MAP[app.name] || app.name,
+                        path: `/odoo/view?menu_id=${app.menu_id}`,
+                        icon: ODOO_ICON_MAP[app.name] || Package
+                    });
+                });
+        }
 
         return ODOO_CATEGORY_ORDER
             .filter(cat => groupsMap[cat] && groupsMap[cat].length > 0)
