@@ -85,8 +85,14 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
         Material: '',
         Grade: '',
         Color: '',
+        Color: '',
         Safety: { CE: false, ROHS: false, UL: false, KC: false, REACH: false },
         SafetyLinks: { CE: '', ROHS: '', UL: '', KC: '', REACH: '' },
+        ProductFamily: 'Actuator', // Actuator, Board
+        Series: '',
+        CommType: '',
+        RatedLoad: '',
+        Stroke: '',
         CustomData: {}
     });
 
@@ -283,7 +289,43 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
             const key = name.split('_')[1];
             setFormData(prev => ({ ...prev, Safety: { ...prev.Safety, [key]: checked } }));
         } else {
-            setFormData(prev => ({ ...prev, [name]: value }));
+            setFormData(prev => {
+                const next = { ...prev, [name]: value };
+                
+                // Smart Parsing for Actuator Model Name
+                if (name === 'Name' && next.Class && next.Class.includes('Product')) {
+                    const match = value.match(/^([A-Za-z0-9]+)-([0-9]+)([A-Za-z]*)-([0-9]+)$/);
+                    if (match) {
+                        next.ProductFamily = 'Actuator';
+                        next.Series = match[1];
+                        next.RatedLoad = match[2];
+                        const commRaw = match[3] || '';
+                        if (commRaw.toLowerCase() === 'f') next.CommType = 'RS485';
+                        else if (commRaw.toLowerCase() === 'pt') next.CommType = 'PWM/TTL';
+                        else if (commRaw.toLowerCase() === 's') next.CommType = 'Switch';
+                        else next.CommType = 'Feedback';
+                        next.Stroke = match[4];
+                    }
+                }
+                
+                // Smart Parsing for Spec field as well (fallback)
+                if (name === 'Spec' && next.Class && next.Class.includes('Product')) {
+                    const match = value.match(/^([A-Za-z0-9]+)-([0-9]+)([A-Za-z]*)-([0-9]+)$/);
+                    if (match) {
+                        next.ProductFamily = 'Actuator';
+                        next.Series = match[1];
+                        next.RatedLoad = match[2];
+                        const commRaw = match[3] || '';
+                        if (commRaw.toLowerCase() === 'f') next.CommType = 'RS485';
+                        else if (commRaw.toLowerCase() === 'pt') next.CommType = 'PWM/TTL';
+                        else if (commRaw.toLowerCase() === 's') next.CommType = 'Switch';
+                        else next.CommType = 'Feedback';
+                        next.Stroke = match[4];
+                    }
+                }
+
+                return next;
+            });
         }
     };
 
@@ -757,9 +799,10 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <label className={labelClass}>Classification</label>
-                                    <select name="Class" value={formData.Class} onChange={handleChange} disabled className={`${inputClass} bg-slate-50 text-slate-500 cursor-not-allowed`}>
+                                    <select name="Class" value={formData.Class} onChange={handleChange} className={inputClass}>
                                         <option value="Part (I)">Part (I)</option>
                                         <option value="Assembly (A)">Assembly (A)</option>
+                                        <option value="Product (P)">Product (P)</option>
                                     </select>
                                 </div>
                                 <div className="flex items-center gap-1">
@@ -794,6 +837,50 @@ export default function PartFormModal({ mode = 'create', initialData = null, onC
                                 </div>
                             </div>
                         </div>
+
+                        {formData.Class && formData.Class.includes('Product') && (
+                            <div className="bg-blue-50/30 p-3 rounded-3xl border border-blue-100 shadow-sm flex flex-col gap-1 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full -mr-10 -mt-10 blur-2xl"></div>
+                                <h3 className={`${sectionTitleClass} text-blue-800`}><Settings2 size={14} className="text-blue-500" /> 완제품 스펙 (Product Spec)</h3>
+                                <p className="text-[10px] text-blue-600/70 ml-5 -mt-1 mb-1 font-bold">모델명 입력 시 시리즈, 통신타입 등이 자동 파싱됩니다.</p>
+                                <div className="flex flex-col gap-1 relative z-10">
+                                    <div className="flex items-center gap-1">
+                                        <label className={labelClass}>제품군 (Family)</label>
+                                        <select name="ProductFamily" value={formData.ProductFamily || 'Actuator'} onChange={handleChange} className={`${inputClass} bg-white border-blue-200 text-blue-900 font-bold`}>
+                                            <option value="Actuator">Actuator</option>
+                                            <option value="Board">Board</option>
+                                        </select>
+                                    </div>
+                                    
+                                    {(!formData.ProductFamily || formData.ProductFamily === 'Actuator') && (
+                                        <>
+                                            <div className="flex items-center gap-1">
+                                                <label className={labelClass}>시리즈 (Series)</label>
+                                                <input name="Series" value={formData.Series || ''} onChange={handleChange} className={`${inputClass} bg-white border-blue-100`} placeholder="예: 12Lf" />
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                <label className={labelClass}>통신 타입</label>
+                                                <select name="CommType" value={formData.CommType || ''} onChange={handleChange} className={`${inputClass} bg-white border-blue-100`}>
+                                                    <option value="">선택</option>
+                                                    <option value="RS485">RS485 (f)</option>
+                                                    <option value="PWM/TTL">PWM/TTL (PT)</option>
+                                                    <option value="Switch">Switch (s)</option>
+                                                    <option value="Feedback">Feedback (없음)</option>
+                                                </select>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                <label className={labelClass}>정격 하중 (Load)</label>
+                                                <input name="RatedLoad" value={formData.RatedLoad || ''} onChange={handleChange} className={`${inputClass} bg-white border-blue-100`} placeholder="예: 20" />
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                <label className={labelClass}>Stroke</label>
+                                                <input name="Stroke" value={formData.Stroke || ''} onChange={handleChange} className={`${inputClass} bg-white border-blue-100`} placeholder="예: 27" />
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                         <div className="bg-slate-50/50 p-3 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-1">
                             <h3 className={sectionTitleClass}><Truck size={14} className="text-amber-500" /> Manufacturing & Sourcing</h3>

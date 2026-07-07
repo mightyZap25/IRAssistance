@@ -135,37 +135,38 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
 
     // Odoo 영문 메뉴명 → 한글 변환 맵
     const ODOO_NAME_MAP = {
-        'Sales': '영업',
+        'Sales': '판매',
         'Purchase': '구매 & 외주',
         'Inventory': '재고',
-        'Manufacturing': '생산',
+        'Manufacturing': '제조관리',
         'Quality': '품질',
         'PLM': '도면 & BOM & ECO',
-        'Invoicing': '회계 & 재무',
+        'Invoicing': '청구서',
         'Attendances': '근태',
         'Time Off': '휴가',
         'Employees': '인사',
         'Projects': '프로젝트',
         'Maintenance': '설비 보전',
         'IoT': 'IoT 기기',
-        'Helpdesk': '고객 서비스'
+        'Helpdesk': '고객 서비스',
+        'Repairs': '수리'
     };
 
-    // Odoo 메뉴명 → 카테고리 맵
     const ODOO_CATEGORY_MAP = {
-        'Sales': '영업 & 마케팅',
-        'Purchase': '재고 & 구매 & 서비스',
-        'Inventory': '재고 & 구매 & 서비스',
-        'Helpdesk': '재고 & 구매 & 서비스',
-        'Maintenance': '재고 & 구매 & 서비스',
-        'Manufacturing': '제조 & 품질 & 기기',
-        'Quality': '제조 & 품질 & 기기',
-        'PLM': '제조 & 품질 & 기기',
-        'IoT': '제조 & 품질 & 기기',
-        'Invoicing': '회계 & 재무',
-        'Attendances': '인사 & 근태 & 급여',
-        'Time Off': '인사 & 근태 & 급여',
-        'Employees': '인사 & 근태 & 급여',
+        'Sales': '영업',
+        'Purchase': '생산 관리',
+        'Inventory': '생산 관리',
+        'Helpdesk': '생산 관리',
+        'Maintenance': '생산 관리',
+        'Manufacturing': '생산 관리',
+        'Quality': '제조 품질',
+        'PLM': '제조 품질',
+        'IoT': '제조 품질',
+        'Repairs': '제조 품질',
+        'Invoicing': '영업',
+        'Attendances': '근태관리',
+        'Time Off': '근태관리',
+        'Employees': '근태관리',
         'Projects': '협업 & 기타'
     };
 
@@ -184,44 +185,44 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         'Projects': ClipboardList,
         'Maintenance': Wrench,
         'IoT': Cpu,
-        'Helpdesk': HeadphonesIcon
+        'Helpdesk': HeadphonesIcon,
+        'Repairs': Wrench
     };
 
     // UI에 보여줄 카테고리 순서 정의
     const ODOO_CATEGORY_ORDER = [
-        '영업 & 마케팅',
-        '재고 & 구매 & 서비스',
-        '제조 & 품질 & 기기',
-        '회계 & 재무',
-        '인사 & 근태 & 급여',
+        '영업',
+        '생산 관리',
+        '제조 품질',
+        '근태관리',
         '협업 & 기타',
-        '기타 서비스'
+        'Project 관리'
     ];
 
     const GROUP_COLOR_MAP = {
-        '영업 & 마케팅': 'text-indigo-500',
-        '재고 & 구매 & 서비스': 'text-emerald-600',
-        '제조 & 품질 & 기기': 'text-amber-600',
-        '회계 & 재무': 'text-rose-500',
-        '인사 & 근태 & 급여': 'text-sky-600',
+        '영업': 'text-indigo-500',
+        '생산 관리': 'text-emerald-600',
+        '제조 품질': 'text-amber-600',
+        '근태관리': 'text-sky-600',
         '협업 & 기타': 'text-purple-500',
-        '기타 서비스': 'text-slate-500',
+        'Project 관리': 'text-slate-500',
         '구글 워크스페이스': 'text-blue-500',
         '시스템 제어': 'text-slate-500'
     };
 
     const ODOO_HIDDEN_MENUS = new Set([
-        'Discuss', 'Calendar', 'Contacts', 'To-Do', 'Dashboards', 'App Store', 'Settings', 'Apps'
+        'Discuss', 'Calendar', 'Contacts', 'To-Do', 'Dashboards', 'App Store', 'Settings', 'Apps', 'Tests', 'Link Tracker'
     ]);
 
     const getOdooDynamicGroups = () => {
         if (odooMenus.length === 0) return [];
 
         const groupsMap = {};
+
         odooMenus
             .filter(app => !ODOO_HIDDEN_MENUS.has(app.name))
             .forEach(app => {
-                const cat = ODOO_CATEGORY_MAP[app.name] || '기타 서비스';
+                const cat = ODOO_CATEGORY_MAP[app.name] || 'Project 관리';
                 if (!groupsMap[cat]) {
                     groupsMap[cat] = [];
                 }

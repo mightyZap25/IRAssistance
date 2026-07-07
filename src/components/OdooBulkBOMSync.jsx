@@ -14,6 +14,7 @@ export default function OdooBulkBOMSync() {
     const [spreadsheetId, setSpreadsheetId] = useState('');
     const [status, setStatus] = useState('idle'); // idle, fetching_sheets, syncing, complete, error
     const [errorMsg, setErrorMsg] = useState('');
+    const [overwriteExisting, setOverwriteExisting] = useState(false);
     
     // Progress state
     const [totalSheets, setTotalSheets] = useState(0);
@@ -160,11 +161,33 @@ export default function OdooBulkBOMSync() {
             const qtyRaw = String(row[colMap.qty] || '1').replace(/,/g, '');
             const qty = parseFloat(qtyRaw) || 1;
 
+
+            let finalCategory = categoryRaw;
+            let finalClass = partClass;
+            let finalTypeCode = 'A';
+
+            if (partId && partId.startsWith('IR') && partId.length >= 5) {
+                const catChar = partId.charAt(2).toUpperCase();
+                const clsChar = partId.charAt(3).toUpperCase();
+                const typeChar = partId.charAt(4).toUpperCase();
+                
+                if (catChar === 'E') finalCategory = '전자부품 (E)';
+                else if (catChar === 'O') finalCategory = '구매품 (O)';
+                else finalCategory = '기구부품 (M)';
+                
+                if (clsChar === 'A') finalClass = 'Assembly (A)';
+                else if (clsChar === 'P') finalClass = 'Product (P)';
+                else finalClass = 'Part (I)';
+                
+                finalTypeCode = typeChar;
+            }
+
             const itemData = {
                 PartID: partId,
                 Name: name || 'Unnamed Item',
-                Category: categoryRaw,
-                Class: partClass,
+                Category: finalCategory,
+                Class: finalClass,
+                PartTypeCode: finalTypeCode,
                 Rev: rev,
                 Spec: String(row[colMap.spec] || '').trim(),
                 UnitPrice: parseFloat(String(row[colMap.unitPrice] || '0').replace(/[^0-9.]/g, '')) || 0,
@@ -277,7 +300,7 @@ export default function OdooBulkBOMSync() {
                     const response = await fetch('/api/odoo/import-bom', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ items, relations })
+                        body: JSON.stringify({ items, relations, overwriteExisting })
                     });
                     
                     const data = await response.json();
@@ -342,6 +365,22 @@ export default function OdooBulkBOMSync() {
                             )}
                             일괄 동기화 시작
                         </button>
+                    </div>
+                </div>
+
+                <div className="flex items-center bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 shadow-sm transition-all hover:bg-indigo-50 cursor-pointer" onClick={() => setOverwriteExisting(!overwriteExisting)}>
+                    <div className="flex-shrink-0">
+                        <input 
+                            type="checkbox" 
+                            id="odooOverwrite"
+                            checked={overwriteExisting}
+                            onChange={(e) => { e.stopPropagation(); setOverwriteExisting(e.target.checked); }}
+                            className="w-5 h-5 text-indigo-600 rounded border-indigo-300 focus:ring-indigo-500 cursor-pointer"
+                        />
+                    </div>
+                    <div className="ml-3">
+                        <label htmlFor="odooOverwrite" className="text-sm font-black text-indigo-900 cursor-pointer pointer-events-none">기존 항목 덮어쓰기 (강제 업데이트)</label>
+                        <p className="text-xs text-indigo-700 mt-0.5">체크 시, Odoo에 이미 존재하는 품목도 시트의 최신 정보로 덮어씁니다.</p>
                     </div>
                 </div>
 

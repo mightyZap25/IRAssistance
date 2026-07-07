@@ -30,6 +30,9 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
     const [bomRelations, setBomRelations] = useState([]); // Array of { parentId, childId, qty, location, note }
     const [partStatusMap, setPartStatusMap] = useState({}); // partId -> { exists: bool, data: obj, isNew: bool }
     
+    // Toggle for overwriting existing parts
+    const [overwriteExistingParts, setOverwriteExistingParts] = useState(false);
+    
     const [spreadsheetId, setSpreadsheetId] = useState('');
     const [workbookObj, setWorkbookObj] = useState(null);
 
@@ -46,6 +49,7 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
             setParsedItems([]);
             setBomRelations([]);
             setPartStatusMap({});
+            setOverwriteExistingParts(false);
             setSpreadsheetId('');
             setWorkbookObj(null);
         }
@@ -139,8 +143,11 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
                 location: headers.findIndex(h => { const l = h.toLowerCase(); return l.includes('location') || l.includes('e-comp') || l.includes('위치') || l.includes('로케이션'); }),
                 manufacturer: headers.findIndex(h => { const l = h.toLowerCase(); return l.includes('manufacturer') || l.includes('maker') || l.includes('제조사') || l.includes('메이커'); }),
                 supplier: headers.findIndex(h => { const l = h.toLowerCase(); return l.includes('supplier') || l.includes('vendor') || l.includes('공급사') || l.includes('구매처'); }),
+                owner: headers.findIndex(h => { const l = h.toLowerCase(); return l.includes('pic') || l.includes('owner') || l.includes('담당자'); }),
                 unitPrice: headers.findIndex(h => { const l = h.toLowerCase(); return l.includes('unit price') || l.includes('price') || l.includes('단가') || l.includes('가격'); }),
-                spec: headers.findIndex(h => { const l = h.toLowerCase(); return l.includes('manufacturer no') || l.includes('mfn') || l.includes('spec') || l.includes('규격') || l.includes('스펙'); }),
+                modelCode: headers.findIndex(h => { const l = h.toLowerCase(); return l.includes('model') || l.includes('code') || l.includes('모델'); }),
+                mfnRef: headers.findIndex(h => { const l = h.toLowerCase(); return l.includes('manufacturer no') || l.includes('mfn') || l.includes('ref'); }),
+                spec: headers.findIndex(h => { const l = h.toLowerCase(); return l === 'spec' || l === '규격' || l === '스펙'; }),
             };
 
             // Defaults if not found
@@ -197,6 +204,11 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
 
                 const name = String(row[colMap.name] || '').trim();
                 const categoryRaw = String(row[colMap.category] || '').trim();
+                
+                let parsedCategory = categoryRaw || '기구부품 (M)';
+                if (parsedCategory.toLowerCase().includes('mech')) parsedCategory = '기구부품 (M)';
+                else if (parsedCategory.toLowerCase().includes('elec')) parsedCategory = '전자부품 (E)';
+
                 const rev = String(row[colMap.rev] || '1.0').trim();
                 
                 const assyPartText = String(row[colMap.assyPart] || '').trim().toUpperCase();
@@ -217,22 +229,37 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
                 const location = String(row[colMap.location] || '').trim();
                 const manufacturer = String(row[colMap.manufacturer] || '').trim();
                 const supplier = String(row[colMap.supplier] || '').trim();
+                const owner = String(row[colMap.owner] || '').trim();
                 
                 const priceRaw = String(row[colMap.unitPrice] || '0').replace(/[^0-9.]/g, '');
                 const unitPrice = parseFloat(priceRaw) || 0;
-                const spec = String(row[colMap.spec] || '').trim();
+                
+                const modelCode = String(row[colMap.modelCode] || '').trim();
+                const mfnRef = String(row[colMap.mfnRef] || '').trim();
+                let spec = String(row[colMap.spec] || '').trim();
+                
+                // 스펙이 비어있고 Model/MFN이 있다면 스펙 필드에도 요약해서 넣어줌
+                if (!spec) {
+                    const specs = [];
+                    if (modelCode) specs.push(modelCode);
+                    if (mfnRef) specs.push(mfnRef);
+                    spec = specs.join(' / ');
+                }
 
                 const itemData = {
                     PartID: partId,
                     Name: name || 'Unnamed Item',
-                    Category: categoryRaw,
+                    Category: parsedCategory,
                     Class: partClass,
                     Rev: rev,
                     Spec: spec,
+                    MFN: modelCode,
+                    MPN: mfnRef,
                     UnitPrice: unitPrice,
                     Manufacturer: manufacturer,
                     Supplier: supplier,
                     Location: location,
+                    Owner: owner,
                     Level: level
                 };
 
@@ -249,15 +276,21 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
                 if (parentStack.length > 0) {
                     const parent = parentStack[parentStack.length - 1];
                     const relKey = `${parent.partId}_${partId}`;
-                    if (!seenRelations.has(relKey)) {
-                        seenRelations.add(relKey);
-                        relationsAccumulated.push({
-                            parentId: parent.partId,
-                            childId: partId,
-                            qty: qty,
-                            location: location,
-                            note: `Lv ${level}`
-                        });
+                    
+                    // Prevent self-referencing (recursive) BOMs caused by data errors
+                    if (parent.partId !== partId) {
+                        if (!seenRelations.has(relKey)) {
+                            seenRelations.add(relKey);
+                            relationsAccumulated.push({
+                                parentId: parent.partId,
+                                childId: partId,
+                                qty: qty,
+                                location: location,
+                                note: `Lv ${level}`
+                            });
+                        }
+                    } else {
+                        console.warn(`[BOM Import] Ignored self-referencing BOM line: ${partId} is its own child.`);
                     }
                 }
 
@@ -348,29 +381,51 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
 
             const operations = [];
 
-            // 1. Create new parts
-            const newPartsToCreate = parsedItems.filter(item => partStatusMap[item.PartID]?.isNew);
-            newPartsToCreate.forEach(item => {
-                const finalPartId = normalizePartId(item.PartID);
-                // parts 문서 ID를 실제 품번(finalPartId)으로 지정하여 저장
-                const partRef = doc(db, 'parts', finalPartId);
-                operations.push((batch) => batch.set(partRef, {
-                    PartID: finalPartId,
-                    MasterPartID: finalPartId,
+            // 1. Create or update parts
+            const partsToProcess = parsedItems.filter(item => 
+                partStatusMap[item.PartID]?.isNew || overwriteExistingParts
+            );
+            partsToProcess.forEach(item => {
+                const partRef = doc(db, 'parts', item.PartID);
+                const partData = {
+                    PartID: item.PartID,
+                    MasterPartID: item.PartID,
                     Name: item.Name,
                     Class: item.Class,
                     Category: item.Category,
                     Rev: item.Rev || '1.0',
                     Spec: item.Spec || '',
+                    MFN: item.MFN || '',
+                    MPN: item.MPN || '',
                     UnitPrice: item.UnitPrice || 0,
                     Manufacturer: item.Manufacturer || '',
                     Supplier: item.Supplier || '',
+                    Owner: item.Owner || '',
                     DefaultLocation: item.Location || '',
                     Lifecycle: 'Active',
                     Status: 'Active',
-                    IsLatestRevision: true,
-                    CreatedAt: serverTimestamp()
-                }));
+                    IsLatestRevision: true
+                };
+
+                if (partStatusMap[item.PartID]?.isNew) {
+                    partData.CreatedAt = serverTimestamp();
+                    operations.push((batch) => batch.set(partRef, partData));
+                } else {
+                    // Overwrite existing parts
+                    operations.push((batch) => batch.update(partRef, {
+                        Name: item.Name,
+                        Class: item.Class,
+                        Category: item.Category,
+                        Spec: item.Spec || '',
+                        MFN: item.MFN || '',
+                        MPN: item.MPN || '',
+                        UnitPrice: item.UnitPrice || 0,
+                        Manufacturer: item.Manufacturer || '',
+                        Supplier: item.Supplier || '',
+                        Owner: item.Owner || '',
+                        DefaultLocation: item.Location || ''
+                    }));
+                }
             });
 
             // 2. Create or Update BOM relations
@@ -657,6 +712,22 @@ export default function BOMImportModal({ isOpen, onClose, onImportSuccess, allPa
                                                 );
                                             })}
                                     </div>
+                                </div>
+                            </div>
+
+                            <div className="mt-4 flex items-center bg-blue-50/50 p-4 rounded-xl border border-blue-100 shadow-sm transition-all hover:bg-blue-50 cursor-pointer" onClick={() => setOverwriteExistingParts(!overwriteExistingParts)}>
+                                <div className="flex-shrink-0">
+                                    <input 
+                                        type="checkbox" 
+                                        id="overwriteParts"
+                                        checked={overwriteExistingParts}
+                                        onChange={(e) => { e.stopPropagation(); setOverwriteExistingParts(e.target.checked); }}
+                                        className="w-5 h-5 text-blue-600 rounded border-blue-300 focus:ring-blue-500 cursor-pointer"
+                                    />
+                                </div>
+                                <div className="ml-3">
+                                    <label htmlFor="overwriteParts" className="text-sm font-black text-blue-900 cursor-pointer pointer-events-none">기존 부품 정보 덮어쓰기 (강제 업데이트)</label>
+                                    <p className="text-xs text-blue-700 mt-0.5">체크 시, 이미 등록된 부품이더라도 엑셀 시트의 정보(이름, 단가, 담당자 등)로 기존 데이터를 덮어씁니다. 미체크 시 기존 부품은 건너뛰고 신규 부품만 추가합니다.</p>
                                 </div>
                             </div>
 

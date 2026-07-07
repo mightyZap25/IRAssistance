@@ -6,7 +6,7 @@ const router = express.Router();
 
 
 router.post('/import-bom', async (req, res) => {
-    const { items, relations } = req.body;
+    const { items, relations, overwriteExisting } = req.body;
     
     if (!items || !relations) {
         return res.status(400).json({ error: 'items and relations are required' });
@@ -41,7 +41,97 @@ router.post('/import-bom', async (req, res) => {
         }
 
         // ==========================================
-        // 2. Parallel Creation of Missing Products
+        // 1.5 Handle Suppliers/Manufacturers (res.partner)
+        // ==========================================
+        const partnerNames = new Set();
+        items.forEach(item => {
+            if (item.Supplier) partnerNames.add(item.Supplier.trim());
+            if (item.Manufacturer) partnerNames.add(item.Manufacturer.trim());
+        });
+        const uniquePartnerNames = [...partnerNames].filter(Boolean);
+        const partnerMap = {}; // Name -> res.partner ID
+        
+        if (uniquePartnerNames.length > 0) {
+            console.log(`[Odoo] Resolving ${uniquePartnerNames.length} partners...`);
+            const existingPartners = await odoo.execute_kw('res.partner', 'search_read', [
+                [['name', 'in', uniquePartnerNames]]
+            ], { fields: ['id', 'name'] });
+            
+            for (const p of existingPartners) {
+                partnerMap[p.name] = p.id;
+            }
+            
+            const missingPartners = uniquePartnerNames.filter(name => !partnerMap[name]);
+            if (missingPartners.length > 0) {
+                console.log(`[Odoo] Creating ${missingPartners.length} missing partners...`);
+                for (const name of missingPartners) {
+                    const pid = await odoo.execute_kw('res.partner', 'create', [{ name, is_company: true }]);
+                    partnerMap[name] = pid;
+                }
+            }
+        }
+
+        // ==========================================
+        // 1.6 Parse Product Specs and Resolve Relational Models
+        // ==========================================
+        const seriesSet = new Set();
+        const commTypeSet = new Set();
+        const strokeSet = new Set();
+
+        items.forEach(item => {
+            if (item.Class && item.Class.includes('Product')) {
+                // Try parsing Name or Spec
+                let targetStr = item.Name || '';
+                let match = targetStr.match(/^([A-Za-z0-9]+)-([0-9]+)([A-Za-z]*)-([0-9]+)$/);
+                if (!match) {
+                    targetStr = item.Spec || '';
+                    match = targetStr.match(/^([A-Za-z0-9]+)-([0-9]+)([A-Za-z]*)-([0-9]+)$/);
+                }
+
+                if (match) {
+                    item._isActuator = true;
+                    item._series = match[1];
+                    item._ratedLoad = match[2]; // we don't have x_rated_load yet, so we ignore it or append to note
+                    const commRaw = match[3] || '';
+                    if (commRaw.toLowerCase() === 'f') item._commType = 'RS485';
+                    else if (commRaw.toLowerCase() === 'pt') item._commType = 'PWM/TTL';
+                    else if (commRaw.toLowerCase() === 's') item._commType = 'Switch';
+                    else item._commType = 'Feedback';
+                    item._stroke = match[4];
+
+                    seriesSet.add(item._series);
+                    commTypeSet.add(item._commType);
+                    strokeSet.add(item._stroke);
+                }
+            }
+        });
+
+        // Helper to resolve custom dictionaries in Odoo
+        const resolveCustomDict = async (modelName, stringSet) => {
+            const arr = [...stringSet].filter(Boolean);
+            const map = {};
+            if (arr.length === 0) return map;
+            
+            const existing = await odoo.execute_kw(modelName, 'search_read', [
+                [['name', 'in', arr]]
+            ], { fields: ['id', 'name'] });
+            
+            for (const r of existing) map[r.name] = r.id;
+            
+            const missing = arr.filter(n => !map[n]);
+            for (const name of missing) {
+                const newId = await odoo.execute_kw(modelName, 'create', [{ name }]);
+                map[name] = newId;
+            }
+            return map;
+        };
+
+        const seriesMap = await resolveCustomDict('ir.custom.series', seriesSet);
+        const commTypeMap = await resolveCustomDict('ir.custom.comm.type', commTypeSet);
+        const strokeMap = await resolveCustomDict('ir.custom.stroke.type', strokeSet);
+
+        // ==========================================
+        // 2. Bulk Creation of Missing Products
         // ==========================================
         const missingItems = items.filter(item => !odooProductIdMap[item.PartID]);
         console.log(`[Odoo] Found ${existingProducts.length} existing, creating ${missingItems.length} missing products...`);
@@ -57,19 +147,85 @@ router.post('/import-bom', async (req, res) => {
             return results;
         };
 
-        await chunkedPromiseAll(missingItems, 10, async (item) => {
-            const productData = {
-                name: item.Name,
-                default_code: item.PartID,
-                type: 'consu',
-                categ_id: 1,
-                list_price: item.UnitPrice || 0,
-                standard_price: item.UnitPrice || 0,
-            };
-            const productId = await odoo.execute_kw('product.template', 'create', [productData]);
-            odooProductIdMap[item.PartID] = productId;
-            console.log(`[Odoo] Created Product ${item.PartID} (ID: ${productId})`);
-        });
+        if (missingItems.length > 0) {
+            const productsToCreate = missingItems.map(item => {
+                const isProductOrAssembly = item.Class && (item.Class.includes('Product') || item.Class.includes('Assembly'));
+                const productData = {
+                    name: item.Name,
+                    default_code: item.PartID,
+                    type: 'consu',
+                    is_storable: true,
+                    sale_ok: isProductOrAssembly,
+                    purchase_ok: !isProductOrAssembly,
+                    categ_id: 1,
+                    list_price: item.UnitPrice || 0,
+                    standard_price: item.UnitPrice || 0,
+                    x_maker: (item.Supplier && partnerMap[item.Supplier.trim()]) ? partnerMap[item.Supplier.trim()] : false,
+                    x_manufacturer: (item.Manufacturer && partnerMap[item.Manufacturer.trim()]) ? partnerMap[item.Manufacturer.trim()] : false,
+                    x_owner: item.Owner || '',
+                    x_category: (item.Category || '').replace(/\s+\(/g, '('),
+                    x_class: item.Class || '',
+                    x_part_type_code: item.PartTypeCode || '',
+                };
+                
+                if (item._isActuator) {
+                    productData.x_finished_category = 'actuator';
+                    productData.x_series_id = seriesMap[item._series] || false;
+                    productData.x_comm_type_id = commTypeMap[item._commType] || false;
+                    productData.x_stroke_type_id = strokeMap[item._stroke] || false;
+                    if (item._ratedLoad) {
+                        productData.x_mfg_extra_notes = `Rated Load: ${item._ratedLoad}`;
+                    }
+                }
+                return productData;
+            });
+            
+            console.log(`[Odoo] Bulk creating ${productsToCreate.length} products in one API call...`);
+            const createdIds = await odoo.execute_kw('product.template', 'create', [productsToCreate]);
+            
+            missingItems.forEach((item, idx) => {
+                odooProductIdMap[item.PartID] = createdIds[idx];
+                console.log(`[Odoo] Created Product ${item.PartID} (ID: ${createdIds[idx]})`);
+            });
+        }
+
+        // ==========================================
+        // 2.5 Parallel Update of Existing Products
+        // ==========================================
+        if (overwriteExisting) {
+            const existingItemsToUpdate = items.filter(item => odooProductIdMap[item.PartID] && missingItems.findIndex(m => m.PartID === item.PartID) === -1);
+            console.log(`[Odoo] Overwriting ${existingItemsToUpdate.length} existing products...`);
+            await chunkedPromiseAll(existingItemsToUpdate, 20, async (item) => {
+                const productId = odooProductIdMap[item.PartID];
+                const isProductOrAssembly = item.Class && (item.Class.includes('Product') || item.Class.includes('Assembly'));
+
+                const updateData = {
+                    name: item.Name,
+                    sale_ok: isProductOrAssembly,
+                    purchase_ok: !isProductOrAssembly,
+                    list_price: item.UnitPrice || 0,
+                    standard_price: item.UnitPrice || 0,
+                    x_maker: (item.Supplier && partnerMap[item.Supplier.trim()]) ? partnerMap[item.Supplier.trim()] : false,
+                    x_manufacturer: (item.Manufacturer && partnerMap[item.Manufacturer.trim()]) ? partnerMap[item.Manufacturer.trim()] : false,
+                    x_owner: item.Owner || '',
+                    x_category: (item.Category || '').replace(/\s+\(/g, '('),
+                    x_class: item.Class || '',
+                    x_part_type_code: item.PartTypeCode || '',
+                };
+
+                if (item._isActuator) {
+                    updateData.x_finished_category = 'actuator';
+                    updateData.x_series_id = seriesMap[item._series] || false;
+                    updateData.x_comm_type_id = commTypeMap[item._commType] || false;
+                    updateData.x_stroke_type_id = strokeMap[item._stroke] || false;
+                    if (item._ratedLoad) {
+                        updateData.x_mfg_extra_notes = `Rated Load: ${item._ratedLoad}`;
+                    }
+                }
+                await odoo.execute_kw('product.template', 'write', [[productId], updateData]);
+                console.log(`[Odoo] Updated Product ${item.PartID} (ID: ${productId})`);
+            });
+        }
 
         // ==========================================
         // 3. Group BOM Relations
@@ -115,31 +271,52 @@ router.post('/import-bom', async (req, res) => {
             }
 
             // ==========================================
-            // 6. Process BOMs and Lines (Safe Parallel Execution)
+            // 6. Bulk Create Missing BOMs
             // ==========================================
-            await chunkedPromiseAll(parentPartIds, 5, async (parentId) => {
-                const odooParentId = odooProductIdMap[parentId];
-                if (!odooParentId) return;
-                
-                let bomId = bomMap[odooParentId];
-                if (!bomId) {
-                    const bomData = {
-                        product_tmpl_id: odooParentId,
+            const bomsToCreate = [];
+            const pidsWithoutBom = [];
+            for (const pid of parentPartIds) {
+                const odooId = odooProductIdMap[pid];
+                if (odooId && !bomMap[odooId]) {
+                    bomsToCreate.push({
+                        product_tmpl_id: odooId,
                         product_qty: 1.0,
                         type: 'normal',
-                    };
-                    bomId = await odoo.execute_kw('mrp.bom', 'create', [bomData]);
+                    });
+                    pidsWithoutBom.push(pid);
                 }
+            }
+            if (bomsToCreate.length > 0) {
+                console.log(`[Odoo] Bulk creating ${bomsToCreate.length} BOMs...`);
+                const createdBomIds = await odoo.execute_kw('mrp.bom', 'create', [bomsToCreate]);
+                for (let i = 0; i < pidsWithoutBom.length; i++) {
+                    bomMap[odooProductIdMap[pidsWithoutBom[i]]] = createdBomIds[i];
+                }
+            }
 
-                // Get existing BOM lines for this BOM
-                const existingLines = await odoo.execute_kw('mrp.bom.line', 'search_read', [
-                    [['bom_id', '=', bomId]]
-                ], { fields: ['id', 'product_id'] });
+            // ==========================================
+            // 7. Bulk Process BOM Lines
+            // ==========================================
+            const allBomIds = Object.values(bomMap);
+            console.log(`[Odoo] Fetching existing lines for ${allBomIds.length} BOMs...`);
+            const allExistingLines = await odoo.execute_kw('mrp.bom.line', 'search_read', [
+                [['bom_id', 'in', allBomIds]]
+            ], { fields: ['id', 'bom_id', 'product_id'] });
+            
+            const existingLineMap = {}; // "bomId_productId" -> line_id
+            for (const l of allExistingLines) {
+                existingLineMap[`${l.bom_id[0]}_${l.product_id[0]}`] = l.id;
+            }
+
+            const linesToCreate = [];
+            const linesToUpdate = [];
+
+            for (const parentId of parentPartIds) {
+                const odooParentId = odooProductIdMap[parentId];
+                if (!odooParentId) continue;
                 
-                const existingLineMap = {}; // product_id[0] -> line_id
-                for (const l of existingLines) {
-                    existingLineMap[l.product_id[0]] = l.id;
-                }
+                const bomId = bomMap[odooParentId];
+                if (!bomId) continue;
 
                 const children = bomGroups[parentId];
                 for (const child of children) {
@@ -149,19 +326,33 @@ router.post('/import-bom', async (req, res) => {
                     const variantId = variantMap[odooChildId];
                     if (!variantId) continue;
                     
-                    if (existingLineMap[variantId]) {
-                        // Safe to skip write if we assume qty hasn't changed, 
-                        // but to be safe we update qty
-                        await odoo.execute_kw('mrp.bom.line', 'write', [[existingLineMap[variantId]], { product_qty: child.qty || 1.0 }]);
+                    const safeQty = parseFloat(child.qty) > 0 ? parseFloat(child.qty) : 0.001;
+                    const lineKey = `${bomId}_${variantId}`;
+                    const existingLineId = existingLineMap[lineKey];
+                    
+                    if (existingLineId) {
+                        linesToUpdate.push({ id: existingLineId, product_qty: safeQty });
                     } else {
-                        await odoo.execute_kw('mrp.bom.line', 'create', [{
+                        linesToCreate.push({
                             bom_id: bomId,
                             product_id: variantId,
-                            product_qty: child.qty || 1.0,
-                        }]);
+                            product_qty: safeQty,
+                        });
                     }
                 }
-            });
+            }
+
+            if (linesToCreate.length > 0) {
+                console.log(`[Odoo] Bulk creating ${linesToCreate.length} BOM lines...`);
+                await odoo.execute_kw('mrp.bom.line', 'create', [linesToCreate]);
+            }
+
+            if (linesToUpdate.length > 0) {
+                console.log(`[Odoo] Overwriting ${linesToUpdate.length} BOM lines...`);
+                await chunkedPromiseAll(linesToUpdate, 20, async (line) => {
+                    await odoo.execute_kw('mrp.bom.line', 'write', [[line.id], { product_qty: line.product_qty }]);
+                });
+            }
         }
 
         res.json({ success: true, message: 'Odoo DB import completed successfully' });

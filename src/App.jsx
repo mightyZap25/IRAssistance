@@ -17,6 +17,7 @@ import SettingsPage from './pages/SettingsPage'
 import NotebookLMPage from './pages/NotebookLMPage'
 import GeminiPage from './pages/GeminiPage'
 import NotesPage from './pages/NotesPage'
+import PLMPage from './pages/PLMPage'
 
 function PrivateRoute({ children }) {
     const { currentUser } = useAuth();
@@ -60,6 +61,7 @@ function AppContent() {
             <Route path="/workspace/notes" element={<PrivateRoute><Layout><NotesPage /></Layout></PrivateRoute>} />
             <Route path="/workspace/meetings" element={<PrivateRoute><Layout><MeetingsPage /></Layout></PrivateRoute>} />
             <Route path="/settings" element={<PrivateRoute><Layout><SettingsPage /></Layout></PrivateRoute>} />
+            <Route path="/plm" element={<PrivateRoute><Layout><PLMPage /></Layout></PrivateRoute>} />
 
             {/* Catch all */}
             <Route path="*" element={<Navigate to="/" />} />
