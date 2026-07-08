@@ -136,6 +136,19 @@ router.post('/import-bom', async (req, res) => {
         const missingItems = items.filter(item => !odooProductIdMap[item.PartID]);
         console.log(`[Odoo] Found ${existingProducts.length} existing, creating ${missingItems.length} missing products...`);
         
+        // Fetch a valid product.category to use as default instead of hardcoding 1
+        let defaultCategId = 1;
+        try {
+            const categories = await odoo.execute_kw('product.category', 'search_read', [[]], { fields: ['id'], limit: 1 });
+            if (categories && categories.length > 0) {
+                defaultCategId = categories[0].id;
+            } else {
+                defaultCategId = await odoo.execute_kw('product.category', 'create', [{ name: 'All' }]);
+            }
+        } catch (catErr) {
+            console.log('[Odoo] Warning: Failed to fetch default product category, falling back to 1');
+        }
+        
         // Helper to run promises in chunks (concurrency limit) for safety
         const chunkedPromiseAll = async (items, concurrency, fn) => {
             const results = [];
@@ -157,7 +170,7 @@ router.post('/import-bom', async (req, res) => {
                     is_storable: true,
                     sale_ok: isProductOrAssembly,
                     purchase_ok: !isProductOrAssembly,
-                    categ_id: 1,
+                    categ_id: defaultCategId,
                     list_price: item.UnitPrice || 0,
                     standard_price: item.UnitPrice || 0,
                     x_maker: (item.Supplier && partnerMap[item.Supplier.trim()]) ? partnerMap[item.Supplier.trim()] : false,

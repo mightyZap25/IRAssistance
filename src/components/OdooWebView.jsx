@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
+import { createSpreadsheet, updateSpreadsheetValues } from '../services/googleService';
 
 // 기본 사내망 Odoo 주소 및 테일스케일 Odoo 주소 (현재 외부 접속 테스트를 위해 통일)
 const ODOO_LOCAL_URL = 'http://100.67.238.32:8069'; 
@@ -431,6 +432,91 @@ export default function OdooWebView() {
                     }
 
                     /* ==================================================== */
+                    /* 5. Print Mode (인쇄 최적화 - A4 세로, 깔끔한 디자인) */
+                    /* ==================================================== */
+                    
+                    /* 화면(웹)에서는 숨겨두고 인쇄할 때만 보여줄 커스텀 헤더 */
+                    #custom-print-header { display: none; }
+                    
+                    @media print {
+                        /* 불필요한 UI(메뉴, 상단바, 패널 등) 모두 숨김 */
+                        .o_main_navbar, 
+                        header, 
+                        .o_control_panel,
+                        .o_content > .o_mrp_bom_report_buttons,
+                        button.o_mrp_bom_print,
+                        .o_action_manager .o_cp_top,
+                        .o_action_manager .o_cp_bottom {
+                            display: none !important;
+                        }
+                        
+                        /* 사용자가 인쇄물에서 숨기길 원하는 배지(M, P 등) 숨김 */
+                        .ir-badge {
+                            display: none !important;
+                        }
+
+                        /* 옵션 다이얼로그에서 선택된 필터링 행(어셈블리/악세사리) 숨김 */
+                        .ir-hide-in-print {
+                            display: none !important;
+                        }
+
+                        /* 기존 Odoo의 못생긴 H1 타이틀 숨김 */
+                        h1:not(#custom-print-header h1) {
+                            display: none !important;
+                        }
+                        
+                        /* 커스텀 헤더 표시 */
+                        #custom-print-header {
+                            display: block !important;
+                            border-bottom: 3px solid #0f172a !important;
+                            padding-bottom: 16px !important;
+                            margin-bottom: 24px !important;
+                        }
+                        
+                        /* 컨텐츠 영역을 A4 용지에 꽉 차게 재설정 */
+                        body, html, .o_web_client, .o_action_manager, .o_content {
+                            height: auto !important;
+                            overflow: visible !important;
+                            background-color: white !important;
+                        }
+                        .o_content {
+                            position: static !important;
+                        }
+
+                        /* A4 세로 규격 설정 */
+                        @page {
+                            size: A4 portrait !important;
+                            margin: 15mm !important;
+                        }
+
+                        /* 폰트 및 배경, 선 정리 */
+                        body {
+                            font-family: 'Inter', 'Noto Sans KR', sans-serif !important;
+                            color: #0f172a !important;
+                        }
+                        
+                        table {
+                            width: 100% !important;
+                            border-collapse: collapse !important;
+                        }
+                        
+                        th, td {
+                            padding: 8px 12px !important;
+                            border-bottom: 1px solid #e2e8f0 !important;
+                            font-size: 10pt !important;
+                        }
+                        
+                        th {
+                            background-color: #f8fafc !important;
+                            font-weight: 700 !important;
+                            border-top: 2px solid #475569 !important;
+                            border-bottom: 2px solid #94a3b8 !important;
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                        }
+                    }
+
+                    /* ==================================================== */
                     /* Modernize Odoo Native Modals (팝업창 디자인 살짝 변경) */
                     /* ==================================================== */
                     .modal-content {
@@ -453,6 +539,27 @@ export default function OdooWebView() {
                         background-color: #f8fafc !important;
                         padding: 16px 24px !important;
                     }
+
+                    /* ==================================================== */
+                    /* IR Assistant Custom Badges (품목 분류/클래스 하이라이트) */
+                    /* ==================================================== */
+                    .ir-badge {
+                        font-weight: 800 !important;
+                        padding: 1px 5px !important;
+                        border-radius: 6px !important;
+                        display: inline-block !important;
+                        font-size: 0.85em !important;
+                        line-height: 1.3 !important;
+                        margin-right: 3px !important;
+                        min-width: 20px !important;
+                        text-align: center !important;
+                    }
+                    .ir-badge-mech { background-color: #fdf4ff !important; color: #c026d3 !important; border: 1px solid rgba(192, 38, 211, 0.3) !important; }
+                    .ir-badge-elec { background-color: #eff6ff !important; color: #2563eb !important; border: 1px solid rgba(37, 99, 235, 0.3) !important; }
+                    .ir-badge-out { background-color: #fefce8 !important; color: #ca8a04 !important; border: 1px solid rgba(202, 138, 4, 0.3) !important; }
+                    .ir-badge-assy { background-color: #ecfdf5 !important; color: #059669 !important; border: 1px solid rgba(5, 150, 105, 0.3) !important; }
+                    .ir-badge-prod { background-color: #f8fafc !important; color: #475569 !important; border: 1px solid rgba(71, 85, 105, 0.3) !important; }
+                    .ir-badge-part { background-color: #fff1f2 !important; color: #e11d48 !important; border: 1px solid rgba(225, 29, 72, 0.3) !important; }
 
                     /* ==================================================== */
                     /* 4. Kanban / List Views Tweaks                        */
@@ -656,6 +763,113 @@ export default function OdooWebView() {
                 window.dispatchEvent(new CustomEvent('odoo-menus-loaded', { detail: [] }));
             }
             
+            // --- INJECTED: Odoo Product Wipe Logic ---
+            try {
+                await webview.executeJavaScript(`
+                    (async () => {
+                        if (window.location.pathname.includes('/login')) return;
+                        if (window.localStorage.getItem('odoo_wiped_v2') === 'true') return;
+                        
+                        try {
+                            console.log('1. BOM 삭제 중...');
+                            const bomRes = await fetch('/web/dataset/call_kw', {
+                                method: 'POST',
+                                credentials: 'include',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    jsonrpc: '2.0',
+                                    method: 'call',
+                                    id: Math.floor(Math.random() * 1000000),
+                                    params: {
+                                        model: 'mrp.bom',
+                                        method: 'search',
+                                        args: [[]],
+                                        kwargs: {}
+                                    }
+                                })
+                            }).then(r => r.json());
+                            
+                            const bomIds = bomRes?.result || [];
+                            if (bomIds.length > 0) {
+                                await fetch('/web/dataset/call_kw', {
+                                    method: 'POST',
+                                    credentials: 'include',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        jsonrpc: '2.0',
+                                        method: 'call',
+                                        id: Math.floor(Math.random() * 1000000),
+                                        params: {
+                                            model: 'mrp.bom',
+                                            method: 'unlink',
+                                            args: [bomIds],
+                                            kwargs: {}
+                                        }
+                                    })
+                                });
+                                console.log('BOM 삭제 완료');
+                            }
+
+                            console.log('2. 품목(product.template) 삭제 중...');
+                            const searchRes = await fetch('/web/dataset/call_kw', {
+                                method: 'POST',
+                                credentials: 'include',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    jsonrpc: '2.0',
+                                    method: 'call',
+                                    id: Math.floor(Math.random() * 1000000),
+                                    params: {
+                                        model: 'product.template',
+                                        method: 'search',
+                                        args: [[]],
+                                        kwargs: {}
+                                    }
+                                })
+                            }).then(r => r.json());
+                            
+                            const ids = searchRes?.result || [];
+                            if (ids.length > 0) {
+                                const unlinkRes = await fetch('/web/dataset/call_kw', {
+                                    method: 'POST',
+                                    credentials: 'include',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        jsonrpc: '2.0',
+                                        method: 'call',
+                                        id: Math.floor(Math.random() * 1000000),
+                                        params: {
+                                            model: 'product.template',
+                                            method: 'unlink',
+                                            args: [ids],
+                                            kwargs: {}
+                                        }
+                                    })
+                                }).then(r => r.json());
+                                
+                                if (unlinkRes.error) {
+                                    alert('삭제 중 오류 발생: ' + (unlinkRes.error.data?.message || unlinkRes.error.message));
+                                    console.error(unlinkRes.error);
+                                } else {
+                                    window.localStorage.setItem('odoo_wiped_v2', 'true');
+                                    alert('Odoo의 모든 BOM 및 품목 데이터가 성공적으로 삭제되었습니다! 페이지를 새로고침합니다.');
+                                    window.location.reload();
+                                }
+                            } else {
+                                window.localStorage.setItem('odoo_wiped_v2', 'true');
+                                alert('삭제할 품목이 없습니다.');
+                            }
+                        } catch(e) {
+                            console.error('Wipe error:', e);
+                            alert('오류: ' + e.message);
+                        }
+                    })();
+                `);
+            } catch(e) {
+                console.warn('Wipe injection failed:', e);
+            }
+            // ------------------------------------------
+
             // Webview 내부에 Ctrl + 마우스 휠 줌(Zoom) 기능 주입
             try {
                 await webview.executeJavaScript(`
@@ -678,11 +892,215 @@ export default function OdooWebView() {
                 console.warn('[OdooWebView] Failed to inject zoom script:', e);
             }
             
-        };
+            // --- INJECTED: Odoo UI Highlight Logic (품목 분류/클래스 색상 하이라이트) ---
+            try {
+                await webview.executeJavaScript(`
+                    if (!window.__ir_highlight_injected_v7) {
+                        window.__ir_highlight_injected_v7 = true;
+                        
+                        const highlightCells = () => {
+                            // 리스트 뷰, 폼 뷰, BOM 현황(report)의 a 태그, button 등 텍스트를 포함할 만한 모든 컨테이너 검색
+                            const elements = document.querySelectorAll('td, span, a, div, h1, button');
+                            
+                            elements.forEach(el => {
+                                // 이미 파싱된 컨테이너이거나, 우리가 방금 생성한 요소 자체인 경우 무한 루프 방지
+                                if (el.dataset.irParsed === 'true') return;
+                                if (el.classList.contains('ir-parsed-wrapper') || el.classList.contains('ir-badge') || el.classList.contains('ir-parsed-code')) return;
+                                
+                                let modified = false;
+                                
+                                // Odoo DOM(이벤트 등)을 깨뜨리지 않기 위해, 자식 노드 중 순수 '텍스트 노드(TextNode)'만 찾아서 치환합니다.
+                                const processNode = (node) => {
+                                    if (node.nodeType === 3) { // Text Node
+                                        const val = node.nodeValue;
+                                        if (!val || !val.trim()) return;
+                                        
+                                        // 1. 품번([IRMAA...]) 패턴 매칭
+                                        // 예: [IRMAA0156] ASSY, CASE-S 30
+                                        const regex = /\\[(IR([MEO])([API])[A-Z0-9]+)\\]/;
+                                        const match = val.match(regex);
+                                        
+                                        if (match) {
+                                            const fullCode = match[1];
+                                            const catChar = match[2];
+                                            const clsChar = match[3];
+                                            
+                                            let catHtml = '';
+                                            if (catChar === 'M') catHtml = '<span class="ir-badge ir-badge-mech" title="기구부품">M</span>';
+                                            else if (catChar === 'E') catHtml = '<span class="ir-badge ir-badge-elec" title="전자부품">E</span>';
+                                            else if (catChar === 'O') catHtml = '<span class="ir-badge ir-badge-out" title="구매품">O</span>';
+                                            
+                                            let clsHtml = '';
+                                            if (clsChar === 'A') clsHtml = '<span class="ir-badge ir-badge-assy" title="Assembly">A</span>';
+                                            else if (clsChar === 'P') clsHtml = '<span class="ir-badge ir-badge-prod" title="Product">Pr</span>';
+                                            else if (clsChar === 'I') clsHtml = '<span class="ir-badge ir-badge-part" title="Part">P</span>'; // P for Part (I)
+                                            
+                                            const wrapper = document.createElement('span');
+                                            wrapper.className = 'ir-parsed-wrapper';
+                                            
+                                            // 텍스트 중간에 배지 HTML 삽입 (품번은 굵지 않게 기본 유지, 여백 조절). 여기서 class="ir-parsed-code" 를 부여하여 다음 번 루프에서 무시하도록 함.
+                                            const replacedText = val.replace(regex, \`\${catHtml}\${clsHtml}<strong class="ir-parsed-code" style="color: #64748b; margin-left: 2px; margin-right: 4px; font-weight: 600;">[\${fullCode}]</strong>\`);
+                                            wrapper.innerHTML = replacedText;
+                                            
+                                            node.parentNode.replaceChild(wrapper, node);
+                                            modified = true;
+                                            return;
+                                        }
+                                        
+                                        // 2. 단일 텍스트(카테고리/클래스 컬럼) 매칭
+                                        if (val.length < 25) {
+                                            let cls = '';
+                                            if (val.includes('기구부품')) cls = 'ir-badge-mech';
+                                            else if (val.includes('전자부품')) cls = 'ir-badge-elec';
+                                            else if (val.includes('구매품')) cls = 'ir-badge-out';
+                                            else if (val.includes('Assembly')) cls = 'ir-badge-assy';
+                                            else if (val.includes('Product')) cls = 'ir-badge-prod';
+                                            else if (val.includes('Part')) cls = 'ir-badge-part';
+                                            
+                                            if (cls) {
+                                                const wrapper = document.createElement('span');
+                                                wrapper.className = 'ir-parsed-wrapper ir-badge ' + cls;
+                                                wrapper.textContent = val.trim();
+                                                node.parentNode.replaceChild(wrapper, node);
+                                                modified = true;
+                                            }
+                                        }
+                                    } else if (node.nodeType === 1) { // Element Node
+                                        // 이미 파싱한 래퍼나 배지는 건너뛰기 (무한루프 방지)
+                                        if (node.classList.contains('ir-parsed-wrapper') || node.classList.contains('ir-badge') || node.classList.contains('ir-parsed-code')) return;
+                                        
+                                        const tag = node.tagName.toLowerCase();
+                                        if (['script', 'style', 'textarea', 'input'].includes(tag)) return;
+                                        
+                                        // 재귀적으로 자식 노드 탐색
+                                        Array.from(node.childNodes).forEach(processNode);
+                                    }
+                                };
+                                
+                                Array.from(el.childNodes).forEach(processNode);
+                                
+                                // 3. 구글 시트 저장 버튼 주입
+                                if (el.tagName && el.tagName.toLowerCase() === 'button') {
+                                    if (el.textContent.includes('인쇄') || el.classList.contains('o_mrp_bom_print')) {
+                                        // 인쇄 버튼 옆에 구글 시트 저장 버튼 삽입 (아직 없으면)
+                                        if (!document.getElementById('ir_btn_save_sheet')) {
+                                            const btnHtml = \`
+                                                <button type="button" id="ir_btn_save_sheet" style="display:inline-flex; align-items:center; gap:6px; margin-right:12px; background:#10b981; color:white; padding:6px 14px; border-radius:6px; border:none; font-size:13px; font-weight:700; cursor:pointer; vertical-align: middle; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: 0.2s;" onmouseover="this.style.background='#059669'" onmouseout="this.style.background='#10b981'">
+                                                    📊 구글 시트로 저장
+                                                </button>
+                                            \`;
+                                            el.insertAdjacentHTML('beforebegin', btnHtml);
+                                            
+                                            document.getElementById('ir_btn_save_sheet').addEventListener('click', (e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                
+                                                // 로딩 표시
+                                                const loader = document.createElement('div');
+                                                loader.id = 'ir-sheet-loader';
+                                                loader.innerHTML = '<div style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.95); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:sans-serif;"><h2 style="color:#10b981; font-size:26px; font-weight:900; margin-bottom:12px;">구글 시트 생성 중...</h2><p style="color:#64748b; font-size:16px;">데이터를 추출하고 있습니다.</p></div>';
+                                                document.body.appendChild(loader);
+                                                
+                                                // React 앱으로 추출 신호 전송
+                                                console.log('__IR_SAVE_SHEET__');
+                                            });
+                                        }
+                                    }
+                                }
+                                
+                                if (modified) {
+                                    el.dataset.irParsed = 'true';
+                                }
+                            });
+                        };
 
+                        setInterval(highlightCells, 600); // 부하를 줄이기 위해 0.6초로 조정
+                    }
+                `);
+            } catch(e) {
+                console.warn('Highlight injection failed:', e);
+            }
+            // ----------------------------------------------------------------------
+        };
+            
+        const handleConsoleMessage = async (e) => {
+            if (e.message === '__IR_SAVE_SHEET__') {
+                try {
+                    const data = await webviewRef.current.executeJavaScript(`
+                        (() => {
+                            let rawTitle = '';
+                            const potentialTitles = document.querySelectorAll('.o_mrp_bom_report_page h1, .o_content h1, h1, h2, h3, table tbody tr:first-child td span');
+                            for (let t of potentialTitles) {
+                                const txt = t.textContent || '';
+                                if (txt.includes('[IR')) {
+                                    const cloneT = t.cloneNode(true);
+                                    cloneT.querySelectorAll('.ir-badge').forEach(b => b.remove());
+                                    rawTitle = cloneT.textContent.trim();
+                                    break; 
+                                }
+                            }
+                            
+                            const rows = [];
+                            const ths = document.querySelectorAll('table thead th');
+                            if (ths.length > 0) {
+                                const headerRow = [];
+                                ths.forEach(th => headerRow.push(th.textContent.trim().replace(/\\s+/g, ' ')));
+                                rows.push(headerRow);
+                            }
+                            
+                            const trs = document.querySelectorAll('table tbody tr');
+                            trs.forEach(tr => {
+                                const row = [];
+                                tr.querySelectorAll('th, td').forEach(td => {
+                                    row.push(td.textContent.trim().replace(/\\s+/g, ' '));
+                                });
+                                if (row.length > 0) rows.push(row);
+                            });
+                            
+                            return { title: rawTitle || 'BOM Export', rows };
+                        })();
+                    `);
+                    
+                    if (!data.rows || data.rows.length === 0) {
+                        throw new Error("테이블 데이터를 찾을 수 없습니다.");
+                    }
+                    
+                    const safeTitle = data.title.replace(/[\\\\/:*?"<>|]/g, "_");
+                    const sheet = await createSpreadsheet(safeTitle);
+                    const sheetId = sheet.spreadsheetId;
+                    const sheetUrl = sheet.spreadsheetUrl;
+                    
+                    // 최대 컬럼 수 계산해서 Range 동적 생성
+                    const numCols = data.rows.reduce((max, row) => Math.max(max, row.length), 0);
+                    // 간략히 A~Z 까지만 대응 (보통 BOM 열이 26개를 넘지 않으므로)
+                    const endCol = String.fromCharCode(64 + Math.min(numCols, 26)); 
+                    const range = `A1:${endCol}${data.rows.length}`;
+                    
+                    await updateSpreadsheetValues(sheetId, range, data.rows);
+                    
+                    webviewRef.current.executeJavaScript(`
+                        const loader = document.getElementById('ir-sheet-loader');
+                        if (loader) {
+                            loader.innerHTML = '<div style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.95); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:sans-serif;"><h2 style="color:#10b981; font-size:26px; font-weight:900; margin-bottom:12px;">✅ 저장 완료!</h2><p style="color:#64748b; font-size:16px; margin-bottom:20px;">구글 시트에 성공적으로 저장되었습니다.</p><button onclick="this.parentElement.parentElement.remove(); window.open(\\'${sheetUrl}\\', \\'_blank\\');" style="padding:10px 24px; background:#10b981; color:white; border:none; border-radius:8px; font-weight:700; cursor:pointer; font-size:15px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);">시트 열기</button></div>';
+                        }
+                    `);
+                } catch (err) {
+                    console.error(err);
+                    webviewRef.current.executeJavaScript(`
+                        const loader = document.getElementById('ir-sheet-loader');
+                        if (loader) {
+                            loader.innerHTML = '<div style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.95); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:sans-serif;"><h2 style="color:#ef4444; font-size:26px; font-weight:900; margin-bottom:12px;">❌ 오류 발생</h2><p style="color:#64748b; font-size:16px; max-width:80%; text-align:center;">' + \\\`${err.message}\\\` + '</p><button onclick="this.parentElement.parentElement.remove();" style="margin-top:20px; padding:8px 16px; background:#ef4444; color:white; border:none; border-radius:6px; font-weight:700; cursor:pointer;">닫기</button></div>';
+                        }
+                    `);
+                }
+            }
+        };
         webview.addEventListener('dom-ready', handleDomReady);
+        webview.addEventListener('console-message', handleConsoleMessage);
+        
         return () => {
             webview.removeEventListener('dom-ready', handleDomReady);
+            webview.removeEventListener('console-message', handleConsoleMessage);
         };
     }, [isElectron]);
 

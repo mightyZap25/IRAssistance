@@ -629,6 +629,90 @@ app.get('/api/proxy-sheet/:id', async (req, res) => {
     }
 });
 
+// ==========================================
+// AI Agent (RAG) SQL 실행 API (보안 적용)
+// ==========================================
+
+// 주요 ERP 테이블 목록 (AI에게 제공할 스키마 범위 제한)
+const ALLOWED_TABLES = [
+    'product_product', 'product_template', 'sale_order', 'sale_order_line',
+    'stock_move', 'stock_quant', 'mrp_bom', 'mrp_bom_line', 'res_partner',
+    'purchase_order', 'purchase_order_line', 'account_move', 'account_move_line'
+];
+
+app.get('/api/sql/schema', async (req, res) => {
+    try {
+        const query = `
+            SELECT table_name, column_name, data_type 
+            FROM information_schema.columns 
+            WHERE table_schema = 'public' 
+            AND table_name = ANY($1)
+            ORDER BY table_name, ordinal_position;
+        `;
+        const result = await pool.query(query, [ALLOWED_TABLES]);
+        
+        // 테이블별로 그룹화
+        const schema = {};
+        result.rows.forEach(row => {
+            if (!schema[row.table_name]) schema[row.table_name] = [];
+            schema[row.table_name].push({
+                column: row.column_name,
+                type: row.data_type
+            });
+        });
+        
+        res.json({ success: true, schema });
+    } catch (err) {
+        console.error('[SQL Schema] Error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.post('/api/sql/execute', async (req, res) => {
+    const { sql } = req.body;
+    
+    if (!sql || typeof sql !== 'string') {
+        return res.status(400).json({ success: false, error: 'SQL query is required' });
+    }
+
+    const upperSql = sql.trim().toUpperCase();
+    
+    // 1. 보안 필터링: SELECT 문만 허용
+    if (!upperSql.startsWith('SELECT')) {
+        return res.status(403).json({ success: false, error: 'Only SELECT queries are allowed for security reasons.' });
+    }
+    
+    // 2. 파괴적 명령어 차단 (이중 필터)
+    const forbiddenKeywords = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'TRUNCATE', 'GRANT', 'REVOKE', 'REPLACE'];
+    const hasForbidden = forbiddenKeywords.some(keyword => {
+        // 단어 경계(\b)를 사용하여 부분 매칭 방지 (예: SELECT 컬럼명 FROM 테이블)
+        const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+        return regex.test(sql);
+    });
+    
+    if (hasForbidden) {
+        return res.status(403).json({ success: false, error: 'Query contains forbidden keywords.' });
+    }
+
+    // 3. 과부하 방지: LIMIT 강제 적용 (없으면 추가, 있으면 냅두되 너무 크면 제한하는 로직이지만 여기서는 간단히 LIMIT 100을 무조건 덧붙이거나 감싸는 방식을 쓸 수 있음)
+    // 간단하게 정규식으로 LIMIT이 없으면 끝에 LIMIT 100 추가
+    let safeSql = sql;
+    if (!/\\bLIMIT\\b\\s+\\d+/i.test(safeSql)) {
+        // 세미콜론 제거 후 LIMIT 100 추가
+        safeSql = safeSql.replace(/;\\s*$/, '') + ' LIMIT 100';
+    }
+
+    console.log(`[AI SQL Execution] Safe SQL: ${safeSql}`);
+
+    try {
+        const result = await pool.query(safeSql);
+        res.json({ success: true, rows: result.rows, rowCount: result.rowCount });
+    } catch (err) {
+        console.error('[AI SQL Execution] Error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // Serve built frontend assets in production/Electron mode
 const distPath = path.join(__dirname, 'dist');
 app.use('/api/odoo', odooRoutes);

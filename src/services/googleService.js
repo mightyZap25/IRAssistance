@@ -155,3 +155,27 @@ export const getDriveMeetings = async () => {
     const data = await fetchDrive(searchUrl);
     return data.files || [];
 };
+
+/**
+ * Google Sheets API: 새로운 스프레드시트 생성
+ */
+export const createSpreadsheet = async (title) => {
+    const url = 'https://sheets.googleapis.com/v4/spreadsheets';
+    return fetchDrive(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ properties: { title } })
+    });
+};
+
+/**
+ * Google Sheets API: 스프레드시트 특정 범위 값 업데이트
+ */
+export const updateSpreadsheetValues = async (spreadsheetId, range, values) => {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
+    return fetchDrive(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values })
+    });
+};
