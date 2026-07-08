@@ -1,8 +1,54 @@
 from odoo import http
-from odoo.http import request
+from odoo.http import request, logging
 import datetime
+import json
+import werkzeug
+
+_logger = logging.getLogger(__name__)
 
 class HrDashboardAPI(http.Controller):
+
+    @http.route('/api/fix_bom_loop', type='http', auth='user')
+    def fix_bom_loop(self):
+        """
+        자재명세서(BOM) 무한 루프(순환 참조) 감지 및 삭제 스크립트
+        """
+        boms = request.env['mrp.bom'].sudo().search([])
+        
+        cycles_found = []
+        
+        def check_cycle(bom, visited):
+            if bom.id in visited:
+                return True
+            visited.add(bom.id)
+            for line in bom.bom_line_ids:
+                # 라인의 제품(product_id)이나 템플릿(product_tmpl_id)에 연결된 자식 BOM 찾기
+                child_boms = request.env['mrp.bom'].sudo().search([
+                    '|',
+                    ('product_id', '=', line.product_id.id),
+                    ('product_tmpl_id', '=', line.product_tmpl_id.id)
+                ])
+                for cb in child_boms:
+                    if check_cycle(cb, visited.copy()):
+                        return True
+            return False
+
+        for bom in boms:
+            if check_cycle(bom, set()):
+                cycles_found.append(bom)
+                
+        if not cycles_found:
+            return request.make_response("무한 루프(순환 참조)를 일으키는 BOM이 없습니다.", headers=[('Content-Type', 'text/html; charset=utf-8')])
+            
+        result_html = "<h3>무한 루프(순환 참조)가 감지된 BOM 목록:</h3><ul>"
+        for cb in cycles_found:
+            result_html += f"<li>[BOM ID: {cb.id}] {cb.product_tmpl_id.name}</li>"
+            # 무한루프를 끊기 위해 해당 BOM 비활성화(삭제)
+            cb.active = False
+            
+        result_html += "</ul><br/><b>위 BOM들을 자동으로 비활성화(보관 처리)하여 무한 루프를 끊었습니다. 이제 Odoo 자재명세서 화면이 정상 접속될 것입니다.</b>"
+        
+        return request.make_response(result_html, headers=[('Content-Type', 'text/html; charset=utf-8')])
 
     @http.route('/api/hr_dashboard/data', type='json', auth='user')
     def get_dashboard_data(self):
@@ -33,8 +79,15 @@ class HrDashboardAPI(http.Controller):
             ('check_in', '<=', datetime.datetime.combine(today, datetime.time.max))
         ], limit=1)
 
-        check_in_str = attendance.check_in.strftime('%H:%M') if attendance and attendance.check_in else '--:--'
-        check_out_str = attendance.check_out.strftime('%H:%M') if attendance and attendance.check_out else '--:--'
+        import pytz
+        user_tz = pytz.timezone(user.tz or 'Asia/Seoul')
+        
+        def format_tz(dt):
+            if not dt: return '--:--'
+            return pytz.utc.localize(dt).astimezone(user_tz).strftime('%H:%M')
+
+        check_in_str = format_tz(attendance.check_in) if attendance and attendance.check_in else '--:--'
+        check_out_str = format_tz(attendance.check_out) if attendance and attendance.check_out else '--:--'
         
         status = '출근 전입니다.'
         if attendance:
@@ -48,31 +101,45 @@ class HrDashboardAPI(http.Controller):
         worked_hours_week = 32.6  # 예시: 32시간 40분
         
         # 3. 휴가 잔여일 계산 (일수 + 시간)
-        # Odoo 19 hr_holidays 로직 연동
+        # Odoo 19 hr_holidays 로직 연동 (현재 유효한 할당만 합산)
         leave_allocations = request.env['hr.leave.allocation'].search([
             ('employee_id', '=', employee.id),
-            ('state', '=', 'validate')
+            ('state', '=', 'validate'),
+            '|', ('date_to', '=', False), ('date_to', '>=', today)
         ])
-        total_allocated = sum(leave_allocations.mapped('number_of_days'))
+        # number_of_days_display 가 없는 버전을 대비해 number_of_days 도 고려
+        total_allocated = sum(leave_allocations.mapped(lambda a: a.number_of_days_display if hasattr(a, 'number_of_days_display') else a.number_of_days))
         
         leaves = request.env['hr.leave'].search([
             ('employee_id', '=', employee.id),
-            ('state', '=', 'validate')
+            ('state', '=', 'validate'),
+            ('date_from', '>=', f'{today.year}-01-01')
         ])
         total_taken = sum(leaves.mapped('number_of_days'))
         
         remaining_days = total_allocated - total_taken
         remaining_hours = remaining_days * 8 # 1일 8시간 기준
 
-        # 4. 결재 대기 건수 (기본 휴가 신청서)
+        # 4. 결재 대기 건수 (기본 휴가 신청서 + 근무일정 변경)
         pending_approvals = 0
         if 'hr.leave' in request.env:
             pending_approvals += request.env['hr.leave'].search_count([
-                ('state', '=', 'confirm')
+                ('state', '=', 'confirm'),
+                ('employee_id', '=', employee.id)
+            ])
+        if 'hr.schedule.change' in request.env:
+            pending_approvals += request.env['hr.schedule.change'].search_count([
+                ('state', '=', 'confirm'),
+                ('employee_id', '=', employee.id)
             ])
         # TODO: ECO나 다른 모델의 결재도 합산 가능
 
+        # 5. 신청 가능한 휴가/근태 분류 (hr.leave.type) 가져오기
+        leave_types_records = request.env['hr.leave.type'].search([('active', '=', True)])
+        leave_types = [{'id': lt.id, 'name': lt.name} for lt in leave_types_records]
+
         return {
+            'employee_id': employee.id,
             'user_name': employee.name,
             'today_date': today.strftime('%y-%m-%d (%a)'),
             'status_text': status,
@@ -84,6 +151,7 @@ class HrDashboardAPI(http.Controller):
             'leave_total_days': total_allocated,
             'leave_remaining_hours': remaining_hours,
             'pending_approvals': pending_approvals,
+            'leave_types': leave_types,
         }
 
     @http.route('/api/hr_dashboard/clock', type='json', auth='user')
@@ -92,7 +160,6 @@ class HrDashboardAPI(http.Controller):
         if not employee:
             return {'error': '직원 정보 없음'}
             
-        # Odoo 17/18 기본 출퇴근 로직 대신 직접 attendance 레코드 생성/수정
         attendance = request.env['hr.attendance'].search([
             ('employee_id', '=', employee.id),
             ('check_out', '=', False)
@@ -100,13 +167,13 @@ class HrDashboardAPI(http.Controller):
         
         try:
             if attendance:
-                # 퇴근
-                attendance.sudo().write({'check_out': datetime.datetime.now()})
+                # 퇴근 (현재 시간을 UTC로 저장)
+                attendance.sudo().write({'check_out': datetime.datetime.utcnow()})
             else:
                 # 출근
                 request.env['hr.attendance'].sudo().create({
                     'employee_id': employee.id,
-                    'check_in': datetime.datetime.now()
+                    'check_in': datetime.datetime.utcnow()
                 })
                 
             return {'success': True}
@@ -127,14 +194,24 @@ class HrDashboardAPI(http.Controller):
         end_date = datetime.date(next_year, next_month, 1) - datetime.timedelta(days=1)
         
         events = []
+        employee = request.env.user.employee_id
+        if not employee:
+            return {'events': events}
         
-        # 1. 일반 휴가 (hr.leave)
+        # 1. 일반 휴가 (hr.leave) - 모든 직원 표시
         leaves = request.env['hr.leave'].search([
             ('state', '=', 'validate'),
             ('date_from', '<=', end_date),
             ('date_to', '>=', start_date)
         ])
+        
+        seen_events = set()
         for leave in leaves:
+            event_key = f"{leave.employee_id.id}_{leave.date_from.strftime('%Y-%m-%d')}"
+            if event_key in seen_events:
+                continue
+            seen_events.add(event_key)
+            
             events.append({
                 'id': f'leave_{leave.id}',
                 'type': 'leave',
@@ -148,3 +225,31 @@ class HrDashboardAPI(http.Controller):
         # 2. 추가 근태 신청 내역 등은 제거됨 (Odoo 기본 hr.leave만 달력에 표시)
             
         return {'events': events}
+
+    @http.route('/api/hr_dashboard/submit_request', type='json', auth='user')
+    def submit_leave_request(self, type, formData):
+        employee = request.env.user.employee_id
+        if not employee:
+            return {'error': '직원 정보 없음'}
+            
+        # Odoo hr.leave 에 레코드 생성
+        try:
+            # formData에서 전달받은 type(실제로는 hr.leave.type의 ID)을 사용
+            leave_type_id = int(formData.get('type')) if formData.get('type') else False
+            if not leave_type_id:
+                leave_type_id = request.env['hr.leave.type'].search([], limit=1).id
+            
+            # startDate와 endDate 파싱
+            start_dt = datetime.datetime.strptime(formData.get('startDate'), '%Y-%m-%d') if formData.get('startDate') else datetime.datetime.now()
+            end_dt = datetime.datetime.strptime(formData.get('endDate'), '%Y-%m-%d') if formData.get('endDate') else datetime.datetime.now()
+            
+            request.env['hr.leave'].sudo().create({
+                'employee_id': employee.id,
+                'holiday_status_id': leave_type_id,
+                'request_date_from': start_dt.date(),
+                'request_date_to': end_dt.date(),
+                'name': formData.get('reason', ''),
+            })
+            return {'success': True}
+        except Exception as e:
+            return {'error': str(e)}

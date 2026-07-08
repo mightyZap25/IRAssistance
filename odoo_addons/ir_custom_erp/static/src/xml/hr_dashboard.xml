@@ -2,21 +2,7 @@
 <templates xml:space="preserve">
     <t t-name="ir_custom_erp.HrDashboard" owl="1">
         <div class="hr_dashboard_wrapper">
-            <!-- Global Left Navigation -->
-            <div class="hr_nav_sidebar">
-                <div class="nav_item active">내 근태 현황</div>
-                <div class="nav_item">내 출퇴근 내역</div>
-                
-                <div class="nav_group_title">
-                    <i class="fa fa-chevron-down"/> 근태 문서
-                </div>
-                <div class="nav_sub_items">
-                    <div class="nav_item sub">내 신청 문서</div>
-                    <div class="nav_item sub">내 결재 문서</div>
-                    <div class="nav_item sub">내 참조 문서</div>
-                </div>
-            </div>
-
+            <!-- Global Left Navigation Removed per user request -->
             <div class="hr_dashboard_container">
                 <!-- Middle Sidebar -->
                 <div class="hr_sidebar">
@@ -38,7 +24,7 @@
                     
                     <div class="progress_circle_wrapper">
                         <!-- CSS Donut Chart for work hours -->
-                        <div class="progress_circle" t-attf-style="background: conic-gradient(#4d72fa {{state.data.worked_hours_percent}}%, #f0f2f5 0);">
+                        <div class="progress_circle" t-attf-style="background: conic-gradient(#4318ff {{state.data.worked_hours_percent}}%, #eef2ff 0);">
                             <div class="inner_circle">
                                 <div class="percent"><t t-esc="Math.round(state.data.worked_hours_percent)"/>%</div>
                                 <div class="label">근무시간</div>
@@ -47,37 +33,13 @@
                         </div>
                     </div>
                     
-                    <div class="clock_buttons">
+                    <div class="clock_buttons" style="display: flex; flex-direction: column; gap: 10px;">
                         <button class="btn btn-primary clock_in_btn" t-on-click="_onClickClock">출근 / 퇴근</button>
+                        <button class="btn btn-outline-primary schedule_change_btn" t-on-click="_onClickScheduleChange" style="border-radius: 14px; padding: 10px; font-weight: 600; width: 100%;">근무일정 변경 신청</button>
                     </div>
                 </div>
                 
-                <!-- Weekly summary -->
-                <div class="sidebar_weekly">
-                    <div class="weekly_header">
-                        <span>이번 주</span>
-                        <div class="arrows">
-                            <button class="btn btn-sm"><i class="fa fa-chevron-left"/></button>
-                            <button class="btn btn-sm">오늘</button>
-                            <button class="btn btn-sm"><i class="fa fa-chevron-right"/></button>
-                        </div>
-                    </div>
-                    <div class="weekly_bar_container">
-                        <div class="bar_labels">
-                            <div class="label_item">주 근로시간<br/><b>40h 00m</b></div>
-                            <div class="label_item">누적근로시간<br/><b t-esc="state.data.worked_hours_week + 'h'"/></div>
-                            <div class="label_item">잔여근로시간<br/><b><t t-esc="(40 - state.data.worked_hours_week).toFixed(1)"/>h</b></div>
-                        </div>
-                        <div class="progress mt-2">
-                            <div class="progress-bar bg-primary" role="progressbar" t-attf-style="width: {{state.data.worked_hours_percent}}%;"/>
-                        </div>
-                        <div class="bar_ticks">
-                            <span>0</span>
-                            <span>40</span>
-                            <span>52</span>
-                        </div>
-                    </div>
-                </div>
+
             </div>
             
             <!-- Main Content -->
@@ -96,8 +58,8 @@
                         <span class="card_title">근태 신청 (출퇴근 변경/유연근무)</span>
                         <span class="card_value"><i class="fa fa-chevron-right"/></span>
                     </div>
-                    <div class="metric_card">
-                        <span class="card_title">결재 대기</span>
+                    <div class="metric_card" t-on-click="_onClickPendingApprovals" style="cursor: pointer;">
+                        <span class="card_title">내 결재 대기</span>
                         <span class="card_value"><t t-esc="state.data.pending_approvals"/> 건 <i class="fa fa-chevron-right"/></span>
                     </div>
                 </div>
@@ -105,10 +67,6 @@
                 <!-- Calendar Area (Placeholder for actual fullcalendar integration or custom grid) -->
                 <div class="calendar_area">
                     <div class="calendar_header">
-                        <div class="dropdowns">
-                            <select class="form-select"><option>연구소</option></select>
-                            <select class="form-select ml-2"><option>연차, 기타 휴가, 외근</option></select>
-                        </div>
                         <h3 class="month_title"><t t-esc="state.calendar.currentMonthStr"/></h3>
                         <div class="arrows">
                             <button class="btn btn-sm" t-on-click="prevMonth"><i class="fa fa-chevron-left"/></button>

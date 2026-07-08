@@ -6,3 +6,5 @@ access_ir_custom_comm_type_user,ir.custom.comm.type.user,model_ir_custom_comm_ty
 access_ir_custom_stroke_type_user,ir.custom.stroke.type.user,model_ir_custom_stroke_type,base.group_user,1,1,1,1
 access_ir_eco_bom_line_user,ir.eco.bom.line.user,model_ir_eco_bom_line,base.group_user,1,1,1,1
 access_ir_eco_review_wizard_user,ir.eco.review.wizard.user,model_ir_eco_review_wizard,base.group_user,1,1,1,1
+access_hr_schedule_change_user,hr.schedule.change.user,model_hr_schedule_change,base.group_user,1,1,1,1
+access_hr_pending_approvals_wizard,hr.pending.approvals.wizard,model_hr_pending_approvals_wizard,base.group_user,1,1,1,1

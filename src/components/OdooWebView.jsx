@@ -56,6 +56,8 @@ export default function OdooWebView() {
         // 기존 네이티브 메뉴 경로를 Odoo 앱(App) 이름으로 매핑
         const appMap = {
             '/parts': 'Inventory',
+            '/bom': 'Manufacturing',
+            '/eco': 'PLM',
             '/customers': 'Contacts',
             '/inventory': 'Inventory',
             '/manufacturers': 'Contacts',
@@ -73,6 +75,13 @@ export default function OdooWebView() {
             const matchedMenu = globalOdooMenus.find(m => m.name === targetAppName || m.name === 'Invoicing');
             if (matchedMenu) {
                 return `${odooBaseUrl}/web#menu_id=${matchedMenu.menu_id}`;
+            }
+        }
+
+        if (location.pathname === '/' && globalOdooMenus.length > 0) {
+            const hrMenu = globalOdooMenus.find(m => m.name === '근태/휴가 대시보드');
+            if (hrMenu) {
+                return `${odooBaseUrl}/web#menu_id=${hrMenu.menu_id}`;
             }
         }
 
@@ -94,7 +103,14 @@ export default function OdooWebView() {
                         const hashPart = targetUrl.split('#')[1];
                         webviewRef.current.executeJavaScript(`window.location.hash = '${hashPart}';`).catch(() => {});
                     } else {
-                        webviewRef.current.loadURL(targetUrl);
+                        const loadPromise = webviewRef.current.loadURL(targetUrl);
+                        if (loadPromise && loadPromise.catch) {
+                            loadPromise.catch(err => {
+                                if (err.code !== 'ERR_ABORTED') {
+                                    console.warn('[OdooWebView] loadURL warning:', err);
+                                }
+                            });
+                        }
                     }
                 }
             } catch (e) {
@@ -401,7 +417,6 @@ export default function OdooWebView() {
                         border-bottom: 1px solid #e2e8f0 !important; 
                     }
                     
-                    /* 상단바 일반 메뉴 글씨 색상 */
                     .o_navbar .o_nav_entry, 
                     .o_navbar .dropdown-toggle,
                     .o_main_navbar > a,
@@ -410,7 +425,38 @@ export default function OdooWebView() {
                         color: #475569 !important; /* Slate-600 */
                     }
                     
-                    /* 상단바 마우스 오버(Hover) 시 효과 - 슬레이트 연한 회색 라운드 필(Pill) */
+                    /* Hide HR Sidebar */
+                    .hr_nav_sidebar {
+                        display: none !important;
+                    }
+
+                    /* ==================================================== */
+                    /* Modernize Odoo Native Modals (팝업창 디자인 살짝 변경) */
+                    /* ==================================================== */
+                    .modal-content {
+                        border-radius: 16px !important;
+                        border: none !important;
+                        box-shadow: 0 20px 40px rgba(0,0,0,0.12) !important;
+                        overflow: hidden !important;
+                    }
+                    .modal-header {
+                        background-color: #f8fafc !important;
+                        border-bottom: 1px solid #e2e8f0 !important;
+                        padding: 16px 24px !important;
+                    }
+                    .modal-title {
+                        font-weight: 700 !important;
+                        color: #1e293b !important;
+                    }
+                    .modal-footer {
+                        border-top: 1px solid #e2e8f0 !important;
+                        background-color: #f8fafc !important;
+                        padding: 16px 24px !important;
+                    }
+
+                    /* ==================================================== */
+                    /* 4. Kanban / List Views Tweaks                        */
+                    /* ==================================================== */
                     .o_menu_sections a:hover, 
                     .o_menu_sections button:hover, 
                     .o_menu_sections .o_nav_entry:hover,
@@ -609,6 +655,29 @@ export default function OdooWebView() {
                 globalOdooMenus = [];
                 window.dispatchEvent(new CustomEvent('odoo-menus-loaded', { detail: [] }));
             }
+            
+            // Webview 내부에 Ctrl + 마우스 휠 줌(Zoom) 기능 주입
+            try {
+                await webview.executeJavaScript(`
+                    window.addEventListener('wheel', (e) => {
+                        if (e.ctrlKey) {
+                            e.preventDefault();
+                            const currentZoom = parseFloat(document.body.style.zoom || '1');
+                            let newZoom = currentZoom;
+                            if (e.deltaY > 0) newZoom -= 0.1;
+                            else newZoom += 0.1;
+                            
+                            if (newZoom < 0.5) newZoom = 0.5;
+                            if (newZoom > 3.0) newZoom = 3.0;
+                            
+                            document.body.style.zoom = newZoom;
+                        }
+                    }, { passive: false });
+                `);
+            } catch(e) {
+                console.warn('[OdooWebView] Failed to inject zoom script:', e);
+            }
+            
         };
 
         webview.addEventListener('dom-ready', handleDomReady);

@@ -149,7 +149,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         'Inventory': '재고',
         'Manufacturing': '제조관리',
         'Quality': '품질',
-        'PLM': '도면 & BOM & ECO',
+        'PLM': 'ECO',
         'Invoicing': '청구서',
         'Attendances': '근태',
         'Time Off': '휴가',
@@ -158,11 +158,13 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         'Maintenance': '설비 보전',
         'IoT': 'IoT 기기',
         'Helpdesk': '고객 서비스',
-        'Repairs': '수리'
+        'Repairs': '수리',
+        'CRM': 'CRM'
     };
 
     const ODOO_CATEGORY_MAP = {
         'Sales': '영업',
+        'CRM': '영업',
         'Purchase': '생산 관리',
         'Inventory': '생산 관리',
         'Helpdesk': '생산 관리',
@@ -176,12 +178,14 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         'Attendances': '근태관리',
         'Time Off': '근태관리',
         'Employees': '근태관리',
+        '근태/휴가 대시보드': '근태관리',
         'Projects': '협업 & 기타'
     };
 
     // Odoo 메뉴별 어울리는 Lucide 아이콘 매핑
     const ODOO_ICON_MAP = {
         'Sales': TrendingUp,
+        'CRM': Briefcase,
         'Purchase': ShoppingCart,
         'Inventory': Package,
         'Manufacturing': Factory,
@@ -191,6 +195,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         'Attendances': UserCheck,
         'Time Off': CalendarDays,
         'Employees': Users,
+        '근태/휴가 대시보드': LayoutDashboard,
         'Projects': ClipboardList,
         'Maintenance': Wrench,
         'IoT': Cpu,
@@ -227,8 +232,6 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         const groupsMap = {};
 
         const CUSTOM_APPS = [
-            { cat: '근태관리', name: '근태 휴가 관리 (커스텀)', path: '/hr/attendance', icon: CalendarDays },
-            { cat: '제조 품질', name: 'PLM (설계 변경)', path: '/plm', icon: Layers },
             { cat: '협업 & 기타', name: '전자결재', path: '/approval', icon: FileCheck },
             { cat: '시스템 제어', name: 'Odoo 로그인', path: '/odoo/login', icon: UserCheck },
             { cat: '시스템 제어', name: 'Odoo 로그아웃', path: '/odoo/logout', icon: LogOut }
@@ -245,19 +248,36 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
 
         if (odooMenus && odooMenus.length > 0) {
             odooMenus
-                .filter(app => !ODOO_HIDDEN_MENUS.has(app.name))
                 .forEach(app => {
-                    const cat = ODOO_CATEGORY_MAP[app.name] || 'Project 관리';
+                    const cleanName = app.name.replace(/\s*\(custom\)\s*/i, '').trim();
+                    if (ODOO_HIDDEN_MENUS.has(cleanName) || ODOO_HIDDEN_MENUS.has(app.name)) return;
+                    
+                    const cat = ODOO_CATEGORY_MAP[cleanName] || ODOO_CATEGORY_MAP[app.name] || 'Project 관리';
                     if (!groupsMap[cat]) {
                         groupsMap[cat] = [];
                     }
                     groupsMap[cat].push({
-                        name: ODOO_NAME_MAP[app.name] || app.name,
+                        name: ODOO_NAME_MAP[cleanName] || ODOO_NAME_MAP[app.name] || cleanName,
                         path: `/odoo/view?menu_id=${app.menu_id}`,
-                        icon: ODOO_ICON_MAP[app.name] || Package
+                        icon: ODOO_ICON_MAP[cleanName] || ODOO_ICON_MAP[app.name] || Package
                     });
                 });
         }
+        
+        // 정렬: 근태관리 내의 순서를 고정
+        const SORT_ORDER = {
+            '근태/휴가 대시보드': 1,
+            '근태': 2,
+            '휴가': 3,
+            '인사': 4,
+        };
+        Object.keys(groupsMap).forEach(cat => {
+            groupsMap[cat].sort((a, b) => {
+                const orderA = SORT_ORDER[a.name] || 99;
+                const orderB = SORT_ORDER[b.name] || 99;
+                return orderA - orderB;
+            });
+        });
 
         return ODOO_CATEGORY_ORDER
             .filter(cat => groupsMap[cat] && groupsMap[cat].length > 0)

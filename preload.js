@@ -1,7 +1,9 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webFrame } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
     isElectron: true,
+    setZoomFactor: (factor) => webFrame.setZoomFactor(factor),
+    getZoomFactor: () => webFrame.getZoomFactor(),
     checkForUpdates: (options) => ipcRenderer.send('check-for-updates', options),
     startDownload: () => ipcRenderer.send('start-download'),
     restartApp: () => ipcRenderer.send('restart-app'),

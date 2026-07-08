@@ -7,6 +7,7 @@ import Layout from './components/Layout'
 import OdooWebView from './components/OdooWebView'
 
 // 커스텀 Google Workspace 화면들 및 기타 유지 화면들
+import MainDashboard from './pages/MainDashboard'
 import GoogleChatPage from './pages/GoogleChatPage'
 import GoogleDrivePage from './pages/GoogleDrivePage'
 import WorkspaceCalendarPage from './pages/WorkspaceCalendarPage'
@@ -17,9 +18,7 @@ import SettingsPage from './pages/SettingsPage'
 import NotebookLMPage from './pages/NotebookLMPage'
 import GeminiPage from './pages/GeminiPage'
 import NotesPage from './pages/NotesPage'
-import PLMPage from './pages/PLMPage'
 import ApprovalPage from './pages/ApprovalPage'
-import LeaveManagementPage from './pages/LeaveManagementPage'
 
 function PrivateRoute({ children }) {
     const { currentUser } = useAuth();
@@ -60,12 +59,10 @@ function AppContent() {
             <Route path="/workspace/memo" element={<PrivateRoute><Layout><WorkspaceMemoPage /></Layout></PrivateRoute>} />
             <Route path="/workspace/chat" element={<PrivateRoute><Layout><GoogleChatPage /></Layout></PrivateRoute>} />
             <Route path="/workspace/notebooklm" element={<PrivateRoute><Layout><NotebookLMPage /></Layout></PrivateRoute>} />
-            <Route path="/hr/attendance" element={<PrivateRoute><Layout><LeaveManagementPage /></Layout></PrivateRoute>} />
             <Route path="/workspace/gemini" element={<PrivateRoute><Layout><GeminiPage /></Layout></PrivateRoute>} />
             <Route path="/workspace/notes" element={<PrivateRoute><Layout><NotesPage /></Layout></PrivateRoute>} />
             <Route path="/workspace/meetings" element={<PrivateRoute><Layout><MeetingsPage /></Layout></PrivateRoute>} />
             <Route path="/settings" element={<PrivateRoute><Layout><SettingsPage /></Layout></PrivateRoute>} />
-            <Route path="/plm" element={<PrivateRoute><Layout><PLMPage /></Layout></PrivateRoute>} />
             <Route path="/approval" element={<PrivateRoute><Layout><ApprovalPage /></Layout></PrivateRoute>} />
 
             {/* Catch all */}
@@ -75,6 +72,26 @@ function AppContent() {
 }
 
 function App() {
+    React.useEffect(() => {
+        const handleWheel = (e) => {
+            if (e.ctrlKey) {
+                if (window.electronAPI && window.electronAPI.getZoomFactor) {
+                    const currentZoom = window.electronAPI.getZoomFactor();
+                    let newZoom = currentZoom;
+                    if (e.deltaY > 0) newZoom -= 0.1; // scroll down -> zoom out
+                    else newZoom += 0.1; // scroll up -> zoom in
+                    
+                    if (newZoom < 0.3) newZoom = 0.3;
+                    if (newZoom > 3.0) newZoom = 3.0;
+                    
+                    window.electronAPI.setZoomFactor(newZoom);
+                }
+            }
+        };
+        window.addEventListener('wheel', handleWheel, { passive: false });
+        return () => window.removeEventListener('wheel', handleWheel);
+    }, []);
+
     return (
         <AuthProvider>
             <Router>

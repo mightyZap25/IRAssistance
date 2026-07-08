@@ -27,6 +27,16 @@ export class HrDashboard extends Component {
                 currentDate: new Date(),
                 currentMonthStr: '',
                 weeks: []
+            },
+            modal: {
+                active: false,
+                type: 'leave', // 'leave' or 'attendance'
+                formData: {
+                    type: '',
+                    startDate: '',
+                    endDate: '',
+                    reason: ''
+                }
             }
         });
 
@@ -147,13 +157,27 @@ export class HrDashboard extends Component {
     }
 
     async _onClickClock() {
+        if (this.state.data.check_in_time !== '--:--' && this.state.data.check_out_time === '--:--') {
+            if (!window.confirm('정말 퇴근하시겠습니까? 퇴근 처리 후에는 취소할 수 없습니다.')) {
+                return;
+            }
+        }
+        
         try {
             const result = await rpc("/api/hr_dashboard/clock", {});
             if (result.success) {
+                if (this.state.data.check_in_time !== '--:--' && this.state.data.check_out_time === '--:--') {
+                    alert('퇴근 처리되었습니다 (Odoo 연동됨). 수고하셨습니다!');
+                } else {
+                    alert('출근 등록되었습니다 (Odoo 연동됨).');
+                }
                 await this.loadData();
+            } else {
+                alert('처리 실패: ' + (result.error || '알 수 없는 오류'));
             }
         } catch (e) {
             console.error("RPC Error:", e);
+            alert('처리 실패: ' + e.message);
         }
     }
 
@@ -162,11 +186,11 @@ export class HrDashboard extends Component {
             type: 'ir.actions.act_window',
             name: '휴가 신청',
             res_model: 'hr.leave',
-            view_mode: 'form',
             views: [[false, 'form']],
+            view_mode: 'form',
             target: 'new',
             context: {
-                default_request_unit_hours: true, // Allow hours precision
+                default_employee_id: this.state.data.employee_id,
             }
         });
     }
@@ -176,10 +200,48 @@ export class HrDashboard extends Component {
             type: 'ir.actions.act_window',
             name: '근태 신청',
             res_model: 'hr.leave',
-            view_mode: 'form',
             views: [[false, 'form']],
-            target: 'new'
+            view_mode: 'form',
+            target: 'new',
+            context: {
+                default_employee_id: this.state.data.employee_id,
+            }
         });
+    }
+
+    _onClickScheduleChange() {
+        this.action.doAction('ir_custom_erp.action_hr_schedule_change_modal', {
+            additionalContext: {
+                default_employee_id: this.state.data.employee_id,
+            }
+        });
+    }
+
+    _onClickPendingApprovals() {
+        this.action.doAction('ir_custom_erp.action_hr_pending_approvals_wizard');
+    }
+
+    closeModal() {
+        this.state.modal.active = false;
+    }
+
+    async submitModal() {
+        try {
+            const result = await rpc("/api/hr_dashboard/submit_request", {
+                type: this.state.modal.type,
+                formData: this.state.modal.formData
+            });
+            if (result.success) {
+                alert('신청이 성공적으로 완료되었습니다.');
+                this.closeModal();
+                await this.loadData();
+            } else {
+                alert('신청 실패: ' + (result.error || '알 수 없는 오류'));
+            }
+        } catch (e) {
+            console.error("RPC Error:", e);
+            alert('오류 발생: ' + e.message);
+        }
     }
 }
 

@@ -64,6 +64,7 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
+            webSecurity: false, // Bypass CORS for direct Odoo API fetches
             webviewTag: true, // Crucial for Google Chat iframe/webview embedding
             preload: path.join(app.getAppPath(), 'preload.js') // app.getAppPath()는 패키징 환경(asar)에서도 올바른 경로 반환
         }
