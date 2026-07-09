@@ -933,76 +933,6 @@ export default function OdooWebView() {
                                 
                                 let modified = false;
                                 
-                                // Odoo DOM(이벤트 등)을 깨뜨리지 않기 위해, 자식 노드 중 순수 '텍스트 노드(TextNode)'만 찾아서 치환합니다.
-                                const processNode = (node) => {
-                                    if (node.nodeType === 3) { // Text Node
-                                        const val = node.nodeValue;
-                                        if (!val || !val.trim()) return;
-                                        
-                                        // 1. 품번([IRMAA...]) 패턴 매칭
-                                        // 예: [IRMAA0156] ASSY, CASE-S 30
-                                        const regex = /\\[(IR([MEO])([API])[A-Z0-9]+)\\]/;
-                                        const match = val.match(regex);
-                                        
-                                        if (match) {
-                                            const fullCode = match[1];
-                                            const catChar = match[2];
-                                            const clsChar = match[3];
-                                            
-                                            let catHtml = '';
-                                            if (catChar === 'M') catHtml = '<span class="ir-badge ir-badge-mech" title="기구부품">M</span>';
-                                            else if (catChar === 'E') catHtml = '<span class="ir-badge ir-badge-elec" title="전자부품">E</span>';
-                                            else if (catChar === 'O') catHtml = '<span class="ir-badge ir-badge-out" title="구매품">O</span>';
-                                            
-                                            let clsHtml = '';
-                                            if (clsChar === 'A') clsHtml = '<span class="ir-badge ir-badge-assy" title="Assembly">A</span>';
-                                            else if (clsChar === 'P') clsHtml = '<span class="ir-badge ir-badge-prod" title="Product">Pr</span>';
-                                            else if (clsChar === 'I') clsHtml = '<span class="ir-badge ir-badge-part" title="Part">P</span>'; // P for Part (I)
-                                            
-                                            const wrapper = document.createElement('span');
-                                            wrapper.className = 'ir-parsed-wrapper';
-                                            
-                                            // 텍스트 중간에 배지 HTML 삽입 (품번은 굵지 않게 기본 유지, 여백 조절). 여기서 class="ir-parsed-code" 를 부여하여 다음 번 루프에서 무시하도록 함.
-                                            const replacedText = val.replace(regex, \`\${catHtml}\${clsHtml}<strong class="ir-parsed-code" style="color: #64748b; margin-left: 2px; margin-right: 4px; font-weight: 600;">[\${fullCode}]</strong>\`);
-                                            wrapper.innerHTML = replacedText;
-                                            
-                                            node.parentNode.replaceChild(wrapper, node);
-                                            modified = true;
-                                            return;
-                                        }
-                                        
-                                        // 2. 단일 텍스트(카테고리/클래스 컬럼) 매칭
-                                        if (val.length < 25) {
-                                            let cls = '';
-                                            if (val.includes('기구부품')) cls = 'ir-badge-mech';
-                                            else if (val.includes('전자부품')) cls = 'ir-badge-elec';
-                                            else if (val.includes('구매품')) cls = 'ir-badge-out';
-                                            else if (val.includes('Assembly')) cls = 'ir-badge-assy';
-                                            else if (val.includes('Product')) cls = 'ir-badge-prod';
-                                            else if (val.includes('Part')) cls = 'ir-badge-part';
-                                            
-                                            if (cls) {
-                                                const wrapper = document.createElement('span');
-                                                wrapper.className = 'ir-parsed-wrapper ir-badge ' + cls;
-                                                wrapper.textContent = val.trim();
-                                                node.parentNode.replaceChild(wrapper, node);
-                                                modified = true;
-                                            }
-                                        }
-                                    } else if (node.nodeType === 1) { // Element Node
-                                        // 이미 파싱한 래퍼나 배지는 건너뛰기 (무한루프 방지)
-                                        if (node.classList.contains('ir-parsed-wrapper') || node.classList.contains('ir-badge') || node.classList.contains('ir-parsed-code')) return;
-                                        
-                                        const tag = node.tagName.toLowerCase();
-                                        if (['script', 'style', 'textarea', 'input'].includes(tag)) return;
-                                        
-                                        // 재귀적으로 자식 노드 탐색
-                                        Array.from(node.childNodes).forEach(processNode);
-                                    }
-                                };
-                                
-                                Array.from(el.childNodes).forEach(processNode);
-                                
                                 // 3. 구글 시트 저장 버튼 주입
                                 if (el.tagName && el.tagName.toLowerCase() === 'button') {
                                     if (el.textContent.includes('인쇄') || el.classList.contains('o_mrp_bom_print')) {
@@ -1028,6 +958,7 @@ export default function OdooWebView() {
                                                 // React 앱으로 추출 신호 전송
                                                 console.log('__IR_SAVE_SHEET__');
                                             });
+                                            modified = true;
                                         }
                                     }
                                 }

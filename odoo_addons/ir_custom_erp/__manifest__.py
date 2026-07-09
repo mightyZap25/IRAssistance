@@ -19,6 +19,7 @@
     ],
     'assets': {
         'web.assets_backend': [
+            'ir_custom_erp/static/src/css/global_theme.css',
             'ir_custom_erp/static/src/css/hr_dashboard.css',
             'ir_custom_erp/static/src/js/hr_dashboard.js',
             'ir_custom_erp/static/src/xml/hr_dashboard.xml',
