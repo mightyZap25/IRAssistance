@@ -763,112 +763,6 @@ export default function OdooWebView() {
                 window.dispatchEvent(new CustomEvent('odoo-menus-loaded', { detail: [] }));
             }
             
-            // --- INJECTED: Odoo Product Wipe Logic ---
-            try {
-                await webview.executeJavaScript(`
-                    (async () => {
-                        if (window.location.pathname.includes('/login')) return;
-                        if (window.localStorage.getItem('odoo_wiped_v2') === 'true') return;
-                        
-                        try {
-                            console.log('1. BOM 삭제 중...');
-                            const bomRes = await fetch('/web/dataset/call_kw', {
-                                method: 'POST',
-                                credentials: 'include',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    jsonrpc: '2.0',
-                                    method: 'call',
-                                    id: Math.floor(Math.random() * 1000000),
-                                    params: {
-                                        model: 'mrp.bom',
-                                        method: 'search',
-                                        args: [[]],
-                                        kwargs: {}
-                                    }
-                                })
-                            }).then(r => r.json());
-                            
-                            const bomIds = bomRes?.result || [];
-                            if (bomIds.length > 0) {
-                                await fetch('/web/dataset/call_kw', {
-                                    method: 'POST',
-                                    credentials: 'include',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        jsonrpc: '2.0',
-                                        method: 'call',
-                                        id: Math.floor(Math.random() * 1000000),
-                                        params: {
-                                            model: 'mrp.bom',
-                                            method: 'unlink',
-                                            args: [bomIds],
-                                            kwargs: {}
-                                        }
-                                    })
-                                });
-                                console.log('BOM 삭제 완료');
-                            }
-
-                            console.log('2. 품목(product.template) 삭제 중...');
-                            const searchRes = await fetch('/web/dataset/call_kw', {
-                                method: 'POST',
-                                credentials: 'include',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    jsonrpc: '2.0',
-                                    method: 'call',
-                                    id: Math.floor(Math.random() * 1000000),
-                                    params: {
-                                        model: 'product.template',
-                                        method: 'search',
-                                        args: [[]],
-                                        kwargs: {}
-                                    }
-                                })
-                            }).then(r => r.json());
-                            
-                            const ids = searchRes?.result || [];
-                            if (ids.length > 0) {
-                                const unlinkRes = await fetch('/web/dataset/call_kw', {
-                                    method: 'POST',
-                                    credentials: 'include',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        jsonrpc: '2.0',
-                                        method: 'call',
-                                        id: Math.floor(Math.random() * 1000000),
-                                        params: {
-                                            model: 'product.template',
-                                            method: 'unlink',
-                                            args: [ids],
-                                            kwargs: {}
-                                        }
-                                    })
-                                }).then(r => r.json());
-                                
-                                if (unlinkRes.error) {
-                                    alert('삭제 중 오류 발생: ' + (unlinkRes.error.data?.message || unlinkRes.error.message));
-                                    console.error(unlinkRes.error);
-                                } else {
-                                    window.localStorage.setItem('odoo_wiped_v2', 'true');
-                                    alert('Odoo의 모든 BOM 및 품목 데이터가 성공적으로 삭제되었습니다! 페이지를 새로고침합니다.');
-                                    window.location.reload();
-                                }
-                            } else {
-                                window.localStorage.setItem('odoo_wiped_v2', 'true');
-                                alert('삭제할 품목이 없습니다.');
-                            }
-                        } catch(e) {
-                            console.error('Wipe error:', e);
-                            alert('오류: ' + e.message);
-                        }
-                    })();
-                `);
-            } catch(e) {
-                console.warn('Wipe injection failed:', e);
-            }
-            // ------------------------------------------
 
             // Webview 내부에 Ctrl + 마우스 휠 줌(Zoom) 기능 주입
             try {
@@ -891,6 +785,136 @@ export default function OdooWebView() {
             } catch(e) {
                 console.warn('[OdooWebView] Failed to inject zoom script:', e);
             }
+
+            // Webview 내부에 Clipboard API 폴리필 주입 (HTTP 환경에서 navigator.clipboard.writeText 오류 방지)
+            try {
+                await webview.executeJavaScript(`
+                    if (!navigator.clipboard) {
+                        navigator.clipboard = {};
+                    }
+                    if (!navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText = function(text) {
+                            return new Promise((resolve, reject) => {
+                                try {
+                                    const textArea = document.createElement('textarea');
+                                    textArea.value = text;
+                                    textArea.style.position = 'fixed';
+                                    textArea.style.left = '-999999px';
+                                    textArea.style.top = '-999999px';
+                                    document.body.appendChild(textArea);
+                                    textArea.focus();
+                                    textArea.select();
+                                    const successful = document.execCommand('copy');
+                                    textArea.remove();
+                                    if (successful) resolve();
+                                    else reject(new Error('copy command failed'));
+                                } catch (err) {
+                                    reject(err);
+                                }
+                            });
+                        };
+                    }
+                `);
+            } catch(e) {
+                console.warn('[OdooWebView] Failed to inject clipboard polyfill:', e);
+            }
+
+            // --- INJECTED: Odoo BOM Circular Dependency Detector (임시 진단용) ---
+            try {
+                await webview.executeJavaScript(`
+                    window.analyzeCircularBOM = async function() {
+                        try {
+                            const boms = await fetch('/web/dataset/call_kw', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    jsonrpc: '2.0', method: 'call', id: 1,
+                                    params: { model: 'mrp.bom', method: 'search_read', args: [[]], kwargs: { fields: ['product_tmpl_id', 'product_id'] } }
+                                })
+                            }).then(r => r.json()).then(r => r.result);
+
+                            const lines = await fetch('/web/dataset/call_kw', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    jsonrpc: '2.0', method: 'call', id: 2,
+                                    params: { model: 'mrp.bom.line', method: 'search_read', args: [[]], kwargs: { fields: ['bom_id', 'product_id', 'product_tmpl_id'] } }
+                                })
+                            }).then(r => r.json()).then(r => r.result);
+
+                            if (!boms || !lines) return;
+
+                            const bomMap = {};
+                            boms.forEach(b => { if (b.product_tmpl_id) bomMap[b.id] = { tmpl_id: b.product_tmpl_id[0], name: b.product_tmpl_id[1] }; });
+                            
+                            const adjList = {};
+                            const nameMap = {};
+
+                            lines.forEach(line => {
+                                const parentBom = bomMap[line.bom_id[0]];
+                                if (!parentBom) return;
+                                const parentTmplId = parentBom.tmpl_id;
+                                nameMap[parentTmplId] = parentBom.name;
+
+                                let childTmplId = null;
+                                let childName = null;
+                                if (line.product_tmpl_id) {
+                                    childTmplId = line.product_tmpl_id[0];
+                                    childName = line.product_tmpl_id[1];
+                                } else if (line.product_id) {
+                                    childTmplId = 'prod_' + line.product_id[0];
+                                    childName = line.product_id[1];
+                                }
+                                if (!childTmplId) return;
+                                nameMap[childTmplId] = childName;
+
+                                if (!adjList[parentTmplId]) adjList[parentTmplId] = new Set();
+                                adjList[parentTmplId].add(childTmplId);
+                            });
+
+                            const visited = new Set();
+                            const stack = new Set();
+                            let cycleFound = false;
+
+                            function dfs(node, path) {
+                                visited.add(node);
+                                stack.add(node);
+                                path.push(node);
+                                if (adjList[node]) {
+                                    for (const child of adjList[node]) {
+                                        if (!visited.has(child)) {
+                                            if (dfs(child, path)) return true;
+                                        } else if (stack.has(child)) {
+                                            const start = path.indexOf(child);
+                                            const cycle = path.slice(start);
+                                            cycle.push(child);
+                                            const names = cycle.map(n => nameMap[n] || n).join('\\n  ⬇\\n');
+                                            alert('🚨 Odoo BOM 순환 참조 (무한 루프) 발견!\\n\\n이 부품들이 꼬리를 물고 있습니다:\\n\\n' + names + '\\n\\n위 품목 중 하나의 BOM에 들어가서 잘못 들어간 자식 부품을 삭제하세요.');
+                                            cycleFound = true;
+                                            return true;
+                                        }
+                                    }
+                                }
+                                stack.delete(node);
+                                path.pop();
+                                return false;
+                            }
+
+                            for (const node of Object.keys(adjList)) {
+                                if (!visited.has(node)) {
+                                    if (dfs(node, [])) break;
+                                }
+                            }
+                            if (!cycleFound) console.log('✅ BOM 무한 루프 없음');
+                        } catch (e) {
+                            console.error('BOM 분석 실패:', e);
+                        }
+                    };
+                    
+                    // 실행
+                    window.analyzeCircularBOM();
+                `);
+            } catch(e) {}
             
             // --- INJECTED: Odoo UI Highlight Logic (품목 분류/클래스 색상 하이라이트) ---
             try {

@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     googleOAuthSignIn: () => ipcRenderer.invoke('google-oauth-signin'),
     clearGoogleCookies: () => ipcRenderer.invoke('clear-google-cookies'),
     clearOdooCookies: () => ipcRenderer.invoke('clear-odoo-cookies'),
+    getOdooSessionId: () => ipcRenderer.invoke('get-odoo-session-id'),
     setTheme: (theme) => ipcRenderer.send('set-theme', theme),
     // Notes (Obsidian-like) file system API
     notes: {

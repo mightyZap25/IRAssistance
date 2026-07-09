@@ -109,7 +109,7 @@ export default function OdooBulkBOMSync() {
             }
 
             if (!partIdRaw) continue;
-            let partId = String(partIdRaw).trim();
+            let partId = normalizePartId(String(partIdRaw).trim());
             if (!partId || partId.toLowerCase() === 'n/a') continue;
 
             if (colMap.levelCol !== -1 && row[colMap.levelCol] !== undefined && row[colMap.levelCol] !== null && String(row[colMap.levelCol]).trim() !== '') {
@@ -200,8 +200,8 @@ export default function OdooBulkBOMSync() {
             if (!seenPartIds.has(partId)) {
                 seenPartIds.add(partId);
                 parsedAccumulated.push(itemData);
+                parsedCountInTab++; // 실제로 추가된 고유 품목만 카운트
             }
-            parsedCountInTab++;
 
             if (isAccessory) {
                 if (absoluteRootParentId) {
@@ -297,10 +297,18 @@ export default function OdooBulkBOMSync() {
                     
                     addLog('info', `[${sheetName}] 품목 ${items.length}개, 관계 ${relations.length}개 발견. Odoo 전송 시작...`);
                     
+                    let sessionId = null;
+                    if (window.electronAPI && window.electronAPI.getOdooSessionId) {
+                        sessionId = await window.electronAPI.getOdooSessionId();
+                    }
+                    if (!sessionId) {
+                        throw new Error('Odoo 세션이 없습니다. Odoo 메뉴에서 먼저 로그인해주세요.');
+                    }
+
                     const response = await fetch('/api/odoo/import-bom', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ items, relations, overwriteExisting })
+                        body: JSON.stringify({ items, relations, overwriteExisting, sessionId })
                     });
                     
                     const data = await response.json();

@@ -718,6 +718,21 @@ ipcMain.handle('clear-odoo-cookies', async () => {
     }
 });
 
+ipcMain.handle('get-odoo-session-id', async () => {
+    try {
+        const cookies = await session.defaultSession.cookies.get({ name: 'session_id' });
+        for (const cookie of cookies) {
+            if (cookie.domain.includes('100.67.238.32')) {
+                return cookie.value;
+            }
+        }
+        return null;
+    } catch (error) {
+        console.error('Failed to get Odoo session cookie:', error);
+        return null;
+    }
+});
+
 ipcMain.on('set-theme', (event, theme) => {
     console.log('[Electron Main] Setting theme to:', theme);
     nativeTheme.themeSource = theme;

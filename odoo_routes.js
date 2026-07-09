@@ -6,20 +6,28 @@ const router = express.Router();
 
 
 router.post('/import-bom', async (req, res) => {
-    const { items, relations, overwriteExisting } = req.body;
+    const { items, relations, overwriteExisting, sessionId } = req.body;
     
     if (!items || !relations) {
         return res.status(400).json({ error: 'items and relations are required' });
     }
 
     try {
-        const ODOO_URL = process.env.ODOO_URL || 'http://100.67.238.32:8069';
-        const ODOO_DB = process.env.ODOO_DB || 'odoo';
-        const ODOO_USER = process.env.ODOO_USER || 'jogak@mightyzap.com';
-        const ODOO_PASS = process.env.ODOO_PASS || 'jogak0622#';
+        const ODOO_URL  = process.env.ODOO_URL  || 'http://100.67.238.32:8069';
+        const ODOO_DB   = process.env.ODOO_DB   || 'odoo';
+        const ODOO_USER = process.env.ODOO_USER;
+        const ODOO_PASS = process.env.ODOO_API_KEY;
 
-        const odoo = new OdooClient(ODOO_URL, ODOO_DB, ODOO_USER, ODOO_PASS);
-        console.log('[Odoo] Authenticating...');
+        if (!sessionId && (!ODOO_USER || !ODOO_PASS)) {
+            return res.status(500).json({ error: '세션 정보가 없으며, .env에 ODOO_USER와 ODOO_API_KEY도 설정되어 있지 않습니다.' });
+        }
+
+        const odoo = new OdooClient(ODOO_URL, ODOO_DB, ODOO_USER, ODOO_PASS, sessionId);
+        if (sessionId) {
+            console.log('[Odoo] Authenticating with WebView session...');
+        } else {
+            console.log('[Odoo] Authenticating with API key for user:', ODOO_USER);
+        }
         await odoo.authenticate();
         console.log('[Odoo] Authenticated successfully. UID:', odoo.uid);
 
@@ -208,7 +216,7 @@ router.post('/import-bom', async (req, res) => {
         if (overwriteExisting) {
             const existingItemsToUpdate = items.filter(item => odooProductIdMap[item.PartID] && missingItems.findIndex(m => m.PartID === item.PartID) === -1);
             console.log(`[Odoo] Overwriting ${existingItemsToUpdate.length} existing products...`);
-            await chunkedPromiseAll(existingItemsToUpdate, 20, async (item) => {
+            await chunkedPromiseAll(existingItemsToUpdate, 5, async (item) => {
                 const productId = odooProductIdMap[item.PartID];
                 const isProductOrAssembly = item.Class && (item.Class.includes('Product') || item.Class.includes('Assembly'));
 
@@ -243,13 +251,32 @@ router.post('/import-bom', async (req, res) => {
         // ==========================================
         // 3. Group BOM Relations
         // ==========================================
+        // ✅ 현재 시트의 items에 포함된 PartID만 부모로 허용
+        const currentSheetPartIds = new Set(items.map(item => item.PartID));
+        
         const bomGroups = {};
         for (const rel of relations) {
+            if (!currentSheetPartIds.has(rel.parentId)) {
+                console.log(`[Odoo] Skipping relation: parent ${rel.parentId} not in current sheet.`);
+                continue;
+            }
             if (!bomGroups[rel.parentId]) bomGroups[rel.parentId] = [];
             bomGroups[rel.parentId].push(rel);
         }
         const parentPartIds = Object.keys(bomGroups);
         const parentOdooIds = parentPartIds.map(pid => odooProductIdMap[pid]).filter(Boolean);
+
+        // ==========================================
+        // ✅ 핵심 수정: 각 시트의 루트(최상위) 아이템 식별
+        // relations에서 childId로 등장하지 않는 parentId = 이 시트의 루트
+        // 루트 아이템: 해당 시트에서 BOM 헤더 + 라인 모두 처리
+        // 서브어셈블리: BOM 헤더가 없을 때만 신규 생성, 이미 있으면 라인 추가 금지
+        // ==========================================
+        const allChildIds = new Set(relations.map(r => r.childId));
+        const sheetRootPartIds = new Set(
+            parentPartIds.filter(pid => !allChildIds.has(pid))
+        );
+        console.log(`[Odoo] Sheet root items: ${[...sheetRootPartIds].join(', ')}`);
 
         if (parentOdooIds.length > 0) {
             // ==========================================
@@ -260,15 +287,27 @@ router.post('/import-bom', async (req, res) => {
                 [['product_tmpl_id', 'in', parentOdooIds]]
             ], { fields: ['id', 'product_tmpl_id'] });
             
-            const bomMap = {}; // product_tmpl_id[0] -> bom_id
+            const bomMap = {}; // product_tmpl_id -> bom_id
             for (const b of existingBoms) {
                 bomMap[b.product_tmpl_id[0]] = b.id;
+            }
+            
+            // 이미 BOM이 존재하는 서브어셈블리 PartID 집합
+            // (루트가 아닌 서브어셈블리 중 기존 BOM 보유한 것 → 현재 시트에서 라인 추가 금지)
+            const subAssemblyWithExistingBom = new Set(
+                parentPartIds.filter(pid => {
+                    if (sheetRootPartIds.has(pid)) return false; // 루트는 제외
+                    const odooId = odooProductIdMap[pid];
+                    return odooId && bomMap[odooId]; // 이미 BOM 존재
+                })
+            );
+            if (subAssemblyWithExistingBom.size > 0) {
+                console.log(`[Odoo] Skipping BOM line update for existing sub-assemblies: ${[...subAssemblyWithExistingBom].join(', ')}`);
             }
 
             // ==========================================
             // 5. Bulk Search for Product Variants
             // ==========================================
-            // We need variant IDs (product.product) for all children to create BOM lines.
             const allChildPartIds = relations.map(r => r.childId);
             const childOdooTmplIds = [...new Set(allChildPartIds.map(cid => odooProductIdMap[cid]).filter(Boolean))];
             
@@ -277,9 +316,8 @@ router.post('/import-bom', async (req, res) => {
                 [['product_tmpl_id', 'in', childOdooTmplIds]]
             ], { fields: ['id', 'product_tmpl_id'] });
             
-            const variantMap = {}; // product_tmpl_id[0] -> product_id
+            const variantMap = {}; // product_tmpl_id -> product_id
             for (const v of variants) {
-                // Take the first variant if multiple exist
                 if (!variantMap[v.product_tmpl_id[0]]) variantMap[v.product_tmpl_id[0]] = v.id;
             }
 
@@ -289,6 +327,8 @@ router.post('/import-bom', async (req, res) => {
             const bomsToCreate = [];
             const pidsWithoutBom = [];
             for (const pid of parentPartIds) {
+                // 이미 BOM 있는 서브어셈블리는 신규 BOM 생성 건너뜀
+                if (subAssemblyWithExistingBom.has(pid)) continue;
                 const odooId = odooProductIdMap[pid];
                 if (odooId && !bomMap[odooId]) {
                     bomsToCreate.push({
@@ -325,6 +365,12 @@ router.post('/import-bom', async (req, res) => {
             const linesToUpdate = [];
 
             for (const parentId of parentPartIds) {
+                // ✅ 이미 BOM 있는 서브어셈블리는 라인 추가/수정 금지
+                if (subAssemblyWithExistingBom.has(parentId)) {
+                    console.log(`[Odoo] Skipping BOM lines for existing sub-assembly: ${parentId}`);
+                    continue;
+                }
+
                 const odooParentId = odooProductIdMap[parentId];
                 if (!odooParentId) continue;
                 
@@ -362,7 +408,7 @@ router.post('/import-bom', async (req, res) => {
 
             if (linesToUpdate.length > 0) {
                 console.log(`[Odoo] Overwriting ${linesToUpdate.length} BOM lines...`);
-                await chunkedPromiseAll(linesToUpdate, 20, async (line) => {
+                await chunkedPromiseAll(linesToUpdate, 5, async (line) => {
                     await odoo.execute_kw('mrp.bom.line', 'write', [[line.id], { product_qty: line.product_qty }]);
                 });
             }
@@ -377,16 +423,22 @@ router.post('/import-bom', async (req, res) => {
 });
 
 
+
 // ============================================================================
 // HR Attendance & Leave API endpoints
 // ============================================================================
 
 // Helper to get authenticated Odoo Client
 const getOdooClient = async () => {
-    const ODOO_URL = process.env.ODOO_URL || 'http://100.67.238.32:8069';
-    const ODOO_DB = process.env.ODOO_DB || 'odoo';
-    const ODOO_USER = process.env.ODOO_USER || 'jogak@mightyzap.com';
-    const ODOO_PASS = process.env.ODOO_PASS || 'jogak0622#';
+    const ODOO_URL  = process.env.ODOO_URL  || 'http://100.67.238.32:8069';
+    const ODOO_DB   = process.env.ODOO_DB   || 'odoo';
+    const ODOO_USER = process.env.ODOO_USER;
+    const ODOO_PASS = process.env.ODOO_API_KEY;
+
+    if (!ODOO_USER || !ODOO_PASS) {
+        throw new Error('.env에 ODOO_USER와 ODOO_API_KEY가 설정되어 있지 않습니다.');
+    }
+
     const odoo = new OdooClient(ODOO_URL, ODOO_DB, ODOO_USER, ODOO_PASS);
     await odoo.authenticate();
     return odoo;

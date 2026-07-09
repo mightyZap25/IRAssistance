@@ -361,9 +361,18 @@ export default function OdooBOMImportModal({ isOpen, onClose, onImportSuccess, a
         setLoadingStatus('Odoo 서버에 품목과 BOM을 전송하는 중입니다...');
         setError('');
         try {
+            let sessionId = null;
+            if (window.electronAPI && window.electronAPI.getOdooSessionId) {
+                sessionId = await window.electronAPI.getOdooSessionId();
+            }
+            if (!sessionId) {
+                throw new Error('Odoo 세션이 없습니다. Odoo 탭에서 먼저 로그인해주세요.');
+            }
+
             const payload = {
                 items: parsedItems,
-                relations: bomRelations
+                relations: bomRelations,
+                sessionId: sessionId
             };
             
             const response = await fetch('/api/odoo/import-bom', {

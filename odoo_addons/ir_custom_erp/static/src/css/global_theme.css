@@ -171,3 +171,109 @@ input.o_input:focus, select.o_input:focus, textarea.o_input:focus {
     border-bottom: 1px solid #e2e8f0 !important;
     padding: 15px 20px !important;
 }
+
+/* ================= 전체 뱃지(Badge) / 태그(Tag) UI 완전 제거 ================= */
+
+/* 1. 모든 o_tag (many2one, many2many 태그 뱃지) */
+.o_tag,
+.o_tag.badge,
+.badge.o_tag,
+span.o_tag,
+.o_field_tags .o_tag,
+.o_field_many2many_tags .o_tag,
+.o_field_many2one_tags .o_tag {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    color: #334155 !important;
+    font-size: inherit !important;
+    font-weight: 500 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: inherit !important;
+}
+
+/* 2. o_tag 안의 삭제 버튼(x) 숨김 처리는 제외 - 편집 가능성 유지 */
+.o_tag .o_delete {
+    color: #94a3b8 !important;
+}
+
+/* 3. Bootstrap badge 클래스 (Odoo 내부에서 사용) */
+.o_form_view .badge,
+.o_list_view .badge,
+.o_kanban_view .badge,
+.o_web_client .badge:not(.btn):not(.nav-link) {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    color: #334155 !important;
+    font-size: inherit !important;
+    font-weight: 500 !important;
+    padding: 0 !important;
+}
+
+/* 4. many2one 단일 값 링크 스타일 제거 (파란 링크 → 일반 텍스트) */
+.o_field_many2one .o_form_uri,
+.o_field_many2one_avatar .o_form_uri,
+.o_form_view .o_form_uri {
+    color: #334155 !important;
+    text-decoration: none !important;
+    font-weight: 500 !important;
+    cursor: default !important;
+    pointer-events: none !important;
+}
+
+/* 5. 상태바(statusbar) 뱃지는 유지 - 기능에 필요 */
+.o_statusbar_status .btn,
+.o_statusbar_status button {
+    /* 상태바 버튼은 건드리지 않음 */
+    all: revert;
+}
+
+/* 6. Kanban 상태 불릿(green/red dot)은 유지 */
+.o_kanban_state_label,
+.o_status {
+    /* 칸반 상태 아이콘 유지 */
+    all: revert;
+}
+
+/* 7. 폼 뷰 내 selection 필드 컬러 뱃지 제거 */
+.o_field_selection .o_status,
+.o_field_selection span.badge {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    color: #334155 !important;
+    font-weight: 500 !important;
+    padding: 0 !important;
+}
+
+/* 8. 리스트 뷰의 many2many 컬럼 뱃지 */
+.o_list_view td .o_tag,
+.o_list_view td .badge {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    color: #334155 !important;
+    font-weight: 500 !important;
+    padding: 0 !important;
+}
+
+/* 9. many2one 드롭다운 외부(읽기 전용) 텍스트 링크 */
+.o_field_widget[name] .o_form_uri,
+.o_readonly .o_form_uri,
+span.o_form_uri {
+    color: #334155 !important;
+    text-decoration: none !important;
+    pointer-events: none !important;
+}
+
