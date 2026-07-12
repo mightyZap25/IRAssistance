@@ -46,7 +46,7 @@ export function AuthProvider({ children }) {
             const domain = userEmail.split('@')[1]?.toLowerCase();
             if (!ALLOWED_DOMAINS.includes(domain)) {
                 await logout();
-                setError(`Unauthorized domain: ${domain}. Only @irrocot.com accounts are allowed.`);
+                setError(`Unauthorized domain: ${domain}. Only @mightyzap.com accounts are allowed.`);
                 return;
             }
 
