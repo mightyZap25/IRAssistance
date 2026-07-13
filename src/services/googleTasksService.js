@@ -2,7 +2,7 @@ import { fetchDrive } from './googleService';
 import { db, collection, query, where, getDocs, getDoc, updateDoc, doc, addDoc, serverTimestamp, deleteDoc } from '../firebase';
 
 const TASKS_API_BASE = 'https://tasks.googleapis.com/tasks/v1';
-const TASKLIST_NAME = 'IR Assistant Tasks';
+const TASKLIST_NAME = 'I-Link Tasks';
 
 /**
  * 전용 할 일 목록(TaskList)을 찾거나 없으면 생성합니다.

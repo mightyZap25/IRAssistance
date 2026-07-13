@@ -23,9 +23,9 @@ export default function RequestQuotationModal({ isOpen, onClose }) {
             fetchVendors();
             setFormData(prev => ({
                 ...prev,
-                Subject: `[견적 요청] 품목 견적 의뢰의 건 - ${userProfile?.displayName || userProfile?.Name || 'IR Assistant'}`,
+                Subject: `[견적 요청] 품목 견적 의뢰의 건 - ${userProfile?.displayName || userProfile?.Name || 'I-Link'}`,
                 Content: `
-안녕하십니까, (주)IR Assistant 입니다.
+안녕하십니까, (주)I-Link 입니다.
 
 아래 품목에 대한 견적을 요청드리오니, 검토 후 회신 부탁드립니다.
 
@@ -38,7 +38,7 @@ export default function RequestQuotationModal({ isOpen, onClose }) {
 --------------------------------------------------
 
 감사합니다.
-(주)IR Assistant
+(주)I-Link
 ${userProfile?.displayName || userProfile?.Name || ''} 드림
                 `.trim()
             }));

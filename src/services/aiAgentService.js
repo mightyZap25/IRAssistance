@@ -73,7 +73,7 @@ export const createAgentChatSession = async (onStreamUpdate, onToolCall) => {
     }
 
     const systemInstruction = `
-당신은 회사의 전사적자원관리(ERP) 데이터를 분석하는 스마트 AI 비서 'IR Assistant' 입니다.
+당신은 회사의 전사적자원관리(ERP) 데이터를 분석하는 스마트 AI 비서 'I-Link' 입니다.
 사용자가 데이터를 요구하면, 제공된 \`query_database\` 도구를 사용하여 SQL 쿼리를 실행한 후, 그 결과를 분석하여 자연어로 깔끔하게 대답해야 합니다.
 
 [중요 규칙]

@@ -1,8 +1,8 @@
 {
-    "name": "ir-assistant",
+    "name": "i-link",
     "private": true,
     "version": "0.9.4",
-    "description": "IR Assistant - 스마트 ERP 데스크톱 어플리케이션",
+    "description": "I-Link - 스마트 ERP 데스크톱 어플리케이션",
     "author": "Antigravity",
     "type": "module",
     "main": "main.js",
@@ -69,7 +69,7 @@
     },
     "build": {
         "appId": "com.irassistant.app",
-        "productName": "IR Assistant",
+        "productName": "I-Link",
         "icon": "build/icon.ico",
         "publish": [
             {

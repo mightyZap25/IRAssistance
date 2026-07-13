@@ -143,7 +143,7 @@ export default function OdooWebView() {
 
         const handleDomReady = async () => {
             // Odoo 상단 메뉴바의 홈 버튼(앱 선택기)만 숨기고, 하위 메뉴(품목, 작업 등)는 보이도록 유지
-            // 추가로 Odoo 기본 보라색 테마를 IR Assistant 색상(Slate-800)으로 덮어씌우고 좌측 마진을 줍니다.
+            // 추가로 Odoo 기본 보라색 테마를 I-Link 색상(Slate-800)으로 덮어씌우고 좌측 마진을 줍니다.
             webview.insertCSS(`
                 .o_navbar_apps_menu { display: none !important; }
                 .o_menu_toggle { display: none !important; }
@@ -541,7 +541,7 @@ export default function OdooWebView() {
                     }
 
                     /* ==================================================== */
-                    /* IR Assistant Custom Badges (품목 분류/클래스 하이라이트) */
+                    /* I-Link Custom Badges (품목 분류/클래스 하이라이트) */
                     /* ==================================================== */
                     .ir-badge {
                         font-weight: 800 !important;

@@ -1,4 +1,4 @@
-const CALENDAR_SUMMARY = 'IR Assistant ERP';
+const CALENDAR_SUMMARY = 'I-Link ERP';
 const API_BASE = 'https://www.googleapis.com/calendar/v3';
 import { db, collection, query, where, getDocs, updateDoc, doc, addDoc, serverTimestamp } from '../firebase';
 
@@ -100,7 +100,7 @@ export async function syncTaskToGoogleCalendar(taskId, taskData) {
 
         const eventBody = {
             summary: `[Task] ${taskData.title}`,
-            description: taskData.description || 'IR Assistant ERP에서 연동된 태스크입니다.',
+            description: taskData.description || 'I-Link ERP에서 연동된 태스크입니다.',
             start,
             end,
             // 완료된 태스크는 투명도(transparency)를 'transparent'로 하거나, 취소선 표시를 원하면 상태를 변경

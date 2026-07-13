@@ -124,7 +124,7 @@ export default function UpdateNotificationModal() {
                     </div>
                     
                     <h2 className="text-lg font-black tracking-tight">시스템 업데이트 안내</h2>
-                    <p className="text-[11px] text-indigo-200 font-bold mt-1">IR Assistant ERP의 새로운 빌드가 감지되었습니다.</p>
+                    <p className="text-[11px] text-indigo-200 font-bold mt-1">I-Link ERP의 새로운 빌드가 감지되었습니다.</p>
                 </div>
 
                 {/* Content */}

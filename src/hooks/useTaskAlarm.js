@@ -73,7 +73,7 @@ export function useTaskAlarm(currentUser) {
         if (!("Notification" in window)) return;
 
         const trigger = () => {
-            new Notification("IR Assistant: Task 알람", {
+            new Notification("I-Link: Task 알람", {
                 body: `[${title}] 마감: ${dueDate.toLocaleTimeString()}`,
                 icon: '/favicon.ico'
             });

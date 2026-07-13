@@ -156,10 +156,10 @@ export default function SettingsPage() {
     });
 
     const [templateSettings, setTemplateSettings] = useState({
-        poEmailSubject: '[발주서] {PONumber} - IR Assistant (주)',
-        poEmailBody: '안녕하십니까, IR Assistant (주)입니다.\n아래와 같이 발주서를 송부드리오니 확인 후 납기 내 납품을 부탁드립니다.',
-        quotationEmailSubject: '[견적요청] {PartName} 외 - IR Assistant (주)',
-        quotationEmailBody: '안녕하십니까, IR Assistant (주)입니다.\n첨부된 항목에 대한 견적(단가 및 리드타임)을 회신 부탁드립니다.'
+        poEmailSubject: '[발주서] {PONumber} - I-Link (주)',
+        poEmailBody: '안녕하십니까, I-Link (주)입니다.\n아래와 같이 발주서를 송부드리오니 확인 후 납기 내 납품을 부탁드립니다.',
+        quotationEmailSubject: '[견적요청] {PartName} 외 - I-Link (주)',
+        quotationEmailBody: '안녕하십니까, I-Link (주)입니다.\n첨부된 항목에 대한 견적(단가 및 리드타임)을 회신 부탁드립니다.'
     });
 
     const [approvalSettings, setApprovalSettings] = useState({
@@ -834,7 +834,7 @@ export default function SettingsPage() {
                             <div className="max-w-2xl animate-fade-in text-slate-800">
                                 <h2 className="text-lg font-black text-slate-900 mb-2">시스템 자동 업데이트 (GitHub Releases)</h2>
                                 <p className="text-sm text-slate-500 font-medium mb-6">
-                                    GitHub Releases를 연동하여 IR Assistant ERP 프로그램의 최신 버전을 검사하고 자동으로 설치합니다.
+                                    GitHub Releases를 연동하여 I-Link ERP 프로그램의 최신 버전을 검사하고 자동으로 설치합니다.
                                 </p>
 
                                 <div className="border border-slate-200 rounded-2xl p-6 bg-slate-50 space-y-6 shadow-sm">

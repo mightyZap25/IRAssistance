@@ -59,7 +59,7 @@ function createWindow() {
         height: 850,
         minWidth: 1024,
         minHeight: 720,
-        title: 'IR Assistant',
+        title: 'I-Link',
         icon: path.join(app.getAppPath(), 'app_tray_icon.png'),
         webPreferences: {
             nodeIntegration: false,
@@ -106,7 +106,7 @@ function createWindow() {
             
             if (tray && !hasShownTrayBalloon) {
                 tray.displayBalloon({
-                    title: 'IR Assistant',
+                    title: 'I-Link',
                     content: '프로그램이 백그라운드에서 계속 실행 중입니다. 우측 하단 트레이 아이콘을 더블클릭하여 다시 열 수 있습니다.',
                     iconType: 'info'
                 });
@@ -145,7 +145,7 @@ function createTray() {
         }
     ]);
 
-    tray.setToolTip('IR Assistant ERP');
+    tray.setToolTip('I-Link ERP');
     tray.setContextMenu(contextMenu);
 
     // Toggle show/hide on double click

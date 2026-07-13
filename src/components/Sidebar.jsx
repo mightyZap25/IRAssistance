@@ -340,7 +340,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                     <>
                         <div className="font-black text-xl text-slate-800 dark:text-slate-100 tracking-tight flex items-center gap-2 animate-fade-in">
                             <span className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold">IR</span>
-                            <span>IR Assistant</span>
+                            <span>I-Link</span>
                         </div>
                         <button 
                             onClick={toggleSidebar} 

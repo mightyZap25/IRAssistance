@@ -10,7 +10,7 @@ export default function Login() {
     return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50">
             <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
-                <h2 className="text-2xl font-bold text-slate-800 mb-2">IR Assistant Access</h2>
+                <h2 className="text-2xl font-bold text-slate-800 mb-2">I-Link Access</h2>
                 
                 <>
                     <p className="text-slate-500 mb-8">Sign in with your Google account</p>
