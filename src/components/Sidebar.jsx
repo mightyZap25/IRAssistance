@@ -12,7 +12,7 @@ import {
     TrendingUp, FileText, CreditCard, StickyNote, MessageSquare, Microscope,
     DollarSign, BarChart2, Wrench, HeadphonesIcon, Globe, Cpu,
     ClipboardCheck, Clock, Receipt, Contact, Boxes, FlaskConical,
-    LogOut, User, ChevronLeft, ChevronRight, Sparkles, Sun, Moon, NotebookPen, Bot
+    LogOut, User, ChevronLeft, ChevronRight, Sparkles, Sun, Moon, NotebookPen, Bot, RefreshCw
 } from 'lucide-react';
 
 const ROLE_MENU_MAP = {
