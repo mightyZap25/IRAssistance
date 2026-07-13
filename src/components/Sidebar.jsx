@@ -40,6 +40,18 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
     const [darkMode, setDarkMode] = useState(() => {
         return localStorage.getItem('theme') === 'dark';
     });
+    const [showAiMenu, setShowAiMenu] = useState(() => {
+        return localStorage.getItem('sidebar_show_ai_menu') !== 'false';
+    });
+
+    // 설정 페이지에서 localStorage 변경 시 즉시 반영
+    useEffect(() => {
+        const handleStorageChange = () => {
+            setShowAiMenu(localStorage.getItem('sidebar_show_ai_menu') !== 'false');
+        };
+        window.addEventListener('storage', handleStorageChange);
+        return () => window.removeEventListener('storage', handleStorageChange);
+    }, []);
 
     useEffect(() => {
         const theme = darkMode ? 'dark' : 'light';
@@ -126,8 +138,10 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                 { name: 'Gmail', path: '/workspace/mail', icon: Mail },
                 { name: 'Google Drive', path: '/workspace/drive', icon: Cloud },
                 { name: 'Google Chat', path: '/workspace/chat', icon: MessageSquare },
-                { name: 'Gemini', path: '/workspace/gemini', icon: Sparkles },
-                { name: 'AI 비서', path: '/workspace/agent', icon: Bot, badge: 'N' },
+                ...(showAiMenu ? [
+                    { name: 'Gemini', path: '/workspace/gemini', icon: Sparkles },
+                    { name: 'AI 비서', path: '/workspace/agent', icon: Bot, badge: 'N' },
+                ] : []),
                 { name: 'NotebookLM', path: '/workspace/notebooklm', icon: BookOpen },
                 { name: '노트', path: '/workspace/notes', icon: NotebookPen }
             ]

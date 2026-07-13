@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Save, ShieldAlert, Mail, Database, Server, FileText, GitMerge, RefreshCw, Building2, Briefcase } from 'lucide-react';
+import { Save, ShieldAlert, Mail, Database, Server, FileText, GitMerge, RefreshCw, Building2, Briefcase, Bot, Monitor } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import RoleGuard from '../components/common/RoleGuard';
 import { getAllUsers, updateUserRoleAndDepartment, USER_ROLES, ROLE_LABELS } from '../services/userService';
@@ -7,6 +7,19 @@ import OdooBulkBOMSync from '../components/OdooBulkBOMSync';
 
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState('database');
+
+    // UI 표시 설정
+    const [showAiMenu, setShowAiMenu] = useState(() => {
+        return localStorage.getItem('sidebar_show_ai_menu') !== 'false';
+    });
+
+    const handleToggleAiMenu = () => {
+        const newVal = !showAiMenu;
+        setShowAiMenu(newVal);
+        localStorage.setItem('sidebar_show_ai_menu', String(newVal));
+        // 사이드바에 변경 즉시 반영을 위해 storage 이벤트 dispatch
+        window.dispatchEvent(new Event('storage'));
+    };
     const { userProfile } = useAuth();
     const [loading, setLoading] = useState(false);
 
@@ -365,6 +378,9 @@ export default function SettingsPage() {
                         </button>
                         <button onClick={() => setActiveTab('update')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-bold ${activeTab === 'update' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'text-slate-600 hover:bg-slate-50'}`}>
                             <RefreshCw size={18} /> 시스템 자동 업데이트
+                        </button>
+                        <button onClick={() => setActiveTab('ui')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-bold ${activeTab === 'ui' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'text-slate-600 hover:bg-slate-50'}`}>
+                            <Monitor size={18} /> UI / 화면 설정
                         </button>
                     </div>
 
@@ -947,6 +963,53 @@ export default function SettingsPage() {
                                             업데이트 확인
                                         </button>
                                     )}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'ui' && (
+                            <div className="max-w-2xl animate-fade-in">
+                                <h2 className="text-lg font-black text-slate-900 mb-2">UI / 화면 표시 설정</h2>
+                                <p className="text-sm text-slate-500 font-medium mb-8">사이드바에 표시할 메뉴 항목들을 선택적으로 활성화하거나 비활성화할 수 있습니다. 변경 사항은 즉시 반영됩니다.</p>
+
+                                <div className="space-y-4">
+                                    {/* Section Header */}
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <div className="w-1 h-5 bg-indigo-500 rounded-full"></div>
+                                        <h3 className="text-sm font-black text-slate-700">사이드바 메뉴 표시</h3>
+                                    </div>
+
+                                    {/* AI 메뉴 토글 카드 */}
+                                    <div className="flex items-center justify-between p-5 bg-slate-50 border border-slate-200 rounded-2xl hover:border-indigo-200 transition-all group">
+                                        <div className="flex items-center gap-4">
+                                            <div className={`p-2.5 rounded-xl transition-all ${showAiMenu ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-400'}`}>
+                                                <Bot size={20} />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-black text-slate-800">AI 메뉴 표시</p>
+                                                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                                    사이드바의 <span className="font-bold text-slate-600">Gemini</span> 및 <span className="font-bold text-slate-600">AI 비서</span> 메뉴 항목 표시 여부를 제어합니다.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        {/* 토글 스위치 */}
+                                        <button
+                                            onClick={handleToggleAiMenu}
+                                            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none ${
+                                                showAiMenu ? 'bg-indigo-500' : 'bg-slate-300'
+                                            }`}
+                                        >
+                                            <span
+                                                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform duration-200 ${
+                                                    showAiMenu ? 'translate-x-6' : 'translate-x-1'
+                                                }`}
+                                            />
+                                        </button>
+                                    </div>
+
+                                    <p className="text-xs text-slate-400 font-medium pl-1">
+                                        💡 설정은 즉시 저장되며, 페이지 새로고침 없이 사이드바에 바로 반영됩니다.
+                                    </p>
                                 </div>
                             </div>
                         )}

@@ -33,9 +33,9 @@ const getDbConfigPath = () => {
     if (!fs.existsSync(configFolder)) {
         fs.mkdirSync(configFolder, { recursive: true });
     }
-    
+
     const userConfigFile = path.join(configFolder, 'db_config.json');
-    
+
     // AppData 폴더에 db_config.json이 없는 경우, 템플릿 복사 시도
     if (!fs.existsSync(userConfigFile)) {
         const resourcesPath = process.env.ELECTRON_RESOURCES_PATH || process.cwd();
@@ -45,7 +45,7 @@ const getDbConfigPath = () => {
             path.join(__dirname, '..', '..'),
             process.cwd()
         ];
-        
+
         let templateCopied = false;
         for (const p of possibleResourcesPaths) {
             const templatePath = path.join(p, 'db_config.json');
@@ -60,12 +60,12 @@ const getDbConfigPath = () => {
                 }
             }
         }
-        
+
         if (!templateCopied) {
             console.log('[DB Config] No database configuration template found. Fallback profile will be created.');
         }
     }
-    
+
     return userConfigFile;
 };
 
@@ -127,11 +127,11 @@ const initPgPool = (configObj) => {
         console.log('[PG Pool] Closing old connection pool...');
         pool.end().catch(err => console.error("Error closing PG pool:", err));
     }
-    
+
     const activeProfile = configObj.currentProfile || 'local';
     const activeConfig = configObj[activeProfile];
     const pgPort = isNaN(parseInt(activeConfig.port)) ? 15432 : parseInt(activeConfig.port);
-    
+
     pool = new pg.Pool({
         host: activeConfig.host,
         port: pgPort,
@@ -140,11 +140,11 @@ const initPgPool = (configObj) => {
         database: activeConfig.database,
         connectionTimeoutMillis: 5000,
     });
-    
+
     pool.on('error', (err) => {
         console.error('[PG Pool] Unexpected error on idle client:', err.message);
     });
-    
+
     console.log(`[PG Pool] Initialized PG Pool for [${activeProfile}] ${activeConfig.user}@${activeConfig.host}:${pgPort}/${activeConfig.database}`);
 };
 
@@ -197,7 +197,7 @@ app.get('/api/config/db', (req, res) => {
 // API: Test a DB Config temporarily without saving it
 app.post('/api/config/db/test', async (req, res) => {
     const { host, port, user, password, database, profileType } = req.body;
-    
+
     // Fallback password if not supplied in test
     let effectivePassword = password;
     if (!effectivePassword && profileType && currentConfig[profileType]) {
@@ -226,7 +226,7 @@ app.post('/api/config/db/test', async (req, res) => {
         console.log('[DB Config Test] Connection test successful');
         res.json({ success: true, message: '연결 성공!' });
     } catch (err) {
-        await tempPool.end().catch(() => {});
+        await tempPool.end().catch(() => { });
         console.error('[DB Config Test] Connection test failed:', err);
         res.status(500).json({ success: false, error: err.message });
     }
@@ -235,7 +235,7 @@ app.post('/api/config/db/test', async (req, res) => {
 // API: Save and Apply DB configuration (handles dual profile saving and switching)
 app.post('/api/config/db', async (req, res) => {
     const { currentProfile, local, remote } = req.body;
-    
+
     if (!currentProfile || !local || !remote) {
         return res.status(400).json({ success: false, error: 'Invalid config format' });
     }
@@ -247,8 +247,8 @@ app.post('/api/config/db', async (req, res) => {
             host: local.host,
             port: isNaN(parseInt(local.port)) ? 15432 : parseInt(local.port),
             user: local.user,
-            password: (local.password !== undefined && local.password !== '') 
-                ? local.password 
+            password: (local.password !== undefined && local.password !== '')
+                ? local.password
                 : (currentConfig.local?.password || ''),
             database: local.database
         },
@@ -256,25 +256,25 @@ app.post('/api/config/db', async (req, res) => {
             host: remote.host,
             port: isNaN(parseInt(remote.port)) ? 15432 : parseInt(remote.port),
             user: remote.user,
-            password: (remote.password !== undefined && remote.password !== '') 
-                ? remote.password 
+            password: (remote.password !== undefined && remote.password !== '')
+                ? remote.password
                 : (currentConfig.remote?.password || ''),
             database: remote.database
         }
     };
-    
+
     const activeProfile = newConfig.currentProfile;
-    
+
     console.log(`[DB Config Save] Saving config for active profile: [${activeProfile}]`);
-    
+
     try {
         // Write to local json config file
         fs.writeFileSync(CONFIG_FILE, JSON.stringify(newConfig, null, 4), 'utf8');
-        
+
         // Apply configuration live
         currentConfig = newConfig;
         initPgPool(currentConfig);
-        
+
         res.json({ success: true, message: `설정이 저장되고 [${activeProfile}] 프로필로 연결되었습니다.` });
     } catch (err) {
         console.error('[DB Config Save] Failed to write config file:', err);
@@ -285,27 +285,27 @@ app.post('/api/config/db', async (req, res) => {
 // API: Initialize/seed DB with frontend backup files (called by client on first run)
 app.post('/api/db/init', async (req, res) => {
     const { collection, data } = req.body;
-    
+
     if (!collection || !Array.isArray(data)) {
         return res.status(400).json({ error: 'Invalid payload. Expecting collection and data array.' });
     }
-    
+
     if (!validateCollection(collection)) {
         return res.status(400).json({ error: 'Invalid collection name' });
     }
-    
+
     console.log(`[Backup Init] Starting seeding for collection: "${collection}" with ${data.length} records.`);
-    
+
     try {
         await ensureTableExists(collection);
-        
+
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
             for (const item of data) {
                 const id = item.id || item.PartID || item.uid || 'auto_' + Math.random().toString(36).substr(2, 9);
                 const itemData = { ...item, id };
-                
+
                 await client.query(
                     `INSERT INTO "${collection}" (id, data) VALUES ($1, $2)
                      ON CONFLICT (id) DO UPDATE SET data = $2`,
@@ -329,11 +329,11 @@ app.post('/api/db/init', async (req, res) => {
 // API: Get all documents in a collection
 app.get('/api/db/:collection', async (req, res) => {
     const { collection } = req.params;
-    
+
     if (!validateCollection(collection)) {
         return res.status(400).json({ error: 'Invalid collection name' });
     }
-    
+
     try {
         await ensureTableExists(collection);
         const result = await pool.query(`SELECT id, data FROM "${collection}"`);
@@ -348,11 +348,11 @@ app.get('/api/db/:collection', async (req, res) => {
 // API: Get single document in a collection
 app.get('/api/db/:collection/:id', async (req, res) => {
     const { collection, id } = req.params;
-    
+
     if (!validateCollection(collection)) {
         return res.status(400).json({ error: 'Invalid collection name' });
     }
-    
+
     try {
         await ensureTableExists(collection);
         const result = await pool.query(`SELECT data FROM "${collection}" WHERE id = $1`, [id]);
@@ -370,15 +370,15 @@ app.get('/api/db/:collection/:id', async (req, res) => {
 app.post('/api/db/:collection/:id', async (req, res) => {
     const { collection, id } = req.params;
     const docData = req.body;
-    
+
     if (!validateCollection(collection)) {
         return res.status(400).json({ error: 'Invalid collection name' });
     }
-    
+
     try {
         await ensureTableExists(collection);
         const updatedData = { ...docData, id };
-        
+
         await pool.query(
             `INSERT INTO "${collection}" (id, data) VALUES ($1, $2)
              ON CONFLICT (id) DO UPDATE SET data = $2`,
@@ -395,11 +395,11 @@ app.post('/api/db/:collection/:id', async (req, res) => {
 // API: Delete a document
 app.delete('/api/db/:collection/:id', async (req, res) => {
     const { collection, id } = req.params;
-    
+
     if (!validateCollection(collection)) {
         return res.status(400).json({ error: 'Invalid collection name' });
     }
-    
+
     try {
         await ensureTableExists(collection);
         await pool.query(`DELETE FROM "${collection}" WHERE id = $1`, [id]);
@@ -424,13 +424,13 @@ app.get('/api/collections/:collection/docs', async (req, res) => {
     try {
         await ensureTableExists(collection);
         const result = await pool.query(`SELECT id, data FROM "${collection}"`);
-        
+
         // MockFirebase.js가 기대하는 { id, data } 형식으로 객체 구조화
         let items = result.rows.map(row => ({
             id: row.id,
             data: { ...row.data, id: row.id }
         }));
-        
+
         // where 필터 파싱 및 적용
         let wheres = [];
         if (req.query.where) {
@@ -444,7 +444,7 @@ app.get('/api/collections/:collection/docs', async (req, res) => {
                 console.error("[DB Server] Where clause parse error:", parseErr);
             }
         }
-        
+
         for (const w of wheres) {
             const { field, op, val } = w;
             items = items.filter(item => {
@@ -461,7 +461,7 @@ app.get('/api/collections/:collection/docs', async (req, res) => {
                 return true;
             });
         }
-        
+
         // orderBy 정렬 파싱 및 적용
         let orderBys = [];
         if (req.query.orderBy) {
@@ -488,7 +488,7 @@ app.get('/api/collections/:collection/docs', async (req, res) => {
                 return 0;
             });
         }
-        
+
         // limit 제한 적용
         if (req.query.limit) {
             const lim = parseInt(req.query.limit);
@@ -496,7 +496,7 @@ app.get('/api/collections/:collection/docs', async (req, res) => {
                 items = items.slice(0, lim);
             }
         }
-        
+
         res.json({ docs: items });
     } catch (err) {
         console.error(`Error query docs from ${collection}:`, err);
@@ -650,7 +650,7 @@ app.get('/api/sql/schema', async (req, res) => {
             ORDER BY table_name, ordinal_position;
         `;
         const result = await pool.query(query, [ALLOWED_TABLES]);
-        
+
         // 테이블별로 그룹화
         const schema = {};
         result.rows.forEach(row => {
@@ -660,7 +660,7 @@ app.get('/api/sql/schema', async (req, res) => {
                 type: row.data_type
             });
         });
-        
+
         res.json({ success: true, schema });
     } catch (err) {
         console.error('[SQL Schema] Error:', err);
@@ -670,18 +670,18 @@ app.get('/api/sql/schema', async (req, res) => {
 
 app.post('/api/sql/execute', async (req, res) => {
     const { sql } = req.body;
-    
+
     if (!sql || typeof sql !== 'string') {
         return res.status(400).json({ success: false, error: 'SQL query is required' });
     }
 
     const upperSql = sql.trim().toUpperCase();
-    
+
     // 1. 보안 필터링: SELECT 문만 허용
     if (!upperSql.startsWith('SELECT')) {
         return res.status(403).json({ success: false, error: 'Only SELECT queries are allowed for security reasons.' });
     }
-    
+
     // 2. 파괴적 명령어 차단 (이중 필터)
     const forbiddenKeywords = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'TRUNCATE', 'GRANT', 'REVOKE', 'REPLACE'];
     const hasForbidden = forbiddenKeywords.some(keyword => {
@@ -689,18 +689,24 @@ app.post('/api/sql/execute', async (req, res) => {
         const regex = new RegExp(`\\b${keyword}\\b`, 'i');
         return regex.test(sql);
     });
-    
+
     if (hasForbidden) {
         return res.status(403).json({ success: false, error: 'Query contains forbidden keywords.' });
     }
 
-    // 3. 과부하 방지: LIMIT 강제 적용 (없으면 추가, 있으면 냅두되 너무 크면 제한하는 로직이지만 여기서는 간단히 LIMIT 100을 무조건 덧붙이거나 감싸는 방식을 쓸 수 있음)
-    // 간단하게 정규식으로 LIMIT이 없으면 끝에 LIMIT 100 추가
-    let safeSql = sql;
-    if (!/\\bLIMIT\\b\\s+\\d+/i.test(safeSql)) {
-        // 세미콜론 제거 후 LIMIT 100 추가
-        safeSql = safeSql.replace(/;\\s*$/, '') + ' LIMIT 100';
+    // 3. 과부하 방지: LIMIT 강제 적용
+    // 마크다운 블록(```sql ... ```)으로 감싸진 경우 제거
+    let safeSql = sql.trim();
+    if (safeSql.startsWith('```')) {
+        safeSql = safeSql.replace(/^```(?:sql)?\n?/i, '').replace(/\n?```$/, '').trim();
     }
+    
+    // 끝에 있는 세미콜론 제거
+    safeSql = safeSql.replace(/;+\s*$/, '');
+    
+    // AI가 OFFSET이나 주석을 사용한 경우 단순히 문자열 끝에 ' LIMIT 100'을 붙이면 문법 오류가 발생할 수 있으므로,
+    // 서브쿼리로 감싸서 안전하게 LIMIT 100을 강제 적용합니다.
+    safeSql = `SELECT * FROM (\n  ${safeSql}\n) AS _ai_limit_wrap LIMIT 100`;
 
     console.log(`[AI SQL Execution] Safe SQL: ${safeSql}`);
 
