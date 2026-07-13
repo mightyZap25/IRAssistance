@@ -11,10 +11,18 @@ export default function UpdateNotificationModal() {
     useEffect(() => {
         if (!window.electronAPI) return;
 
+        let isManual = false; // 수동/자동 체크 구분용 플래그
+
         // 리스너 등록
         const unsubscribe = window.electronAPI.onUpdateMessage((data) => {
             console.log('[UpdateModal] Received update message:', data);
             const { status: updateStatus, info, percent: pct, error } = data;
+            
+            // 자동 백그라운드 체크 중 'not-available'(최신버전)인 경우 팝업을 띄우지 않고 조용히 무시함
+            if (!isManual && updateStatus === 'not-available') {
+                setStatus('idle');
+                return;
+            }
             
             setStatus(updateStatus);
 
@@ -26,12 +34,23 @@ export default function UpdateNotificationModal() {
             } else if (updateStatus === 'downloaded') {
                 setPercent(100);
             } else if (updateStatus === 'error') {
-                setErrorMsg(error || '업데이트 확인 중 에러가 발생했습니다.');
+                // 자동 백그라운드 체크 중 에러가 발생한 경우 방해되지 않도록 팝업 미노출
+                if (isManual) {
+                    setErrorMsg(error || '업데이트 확인 중 에러가 발생했습니다.');
+                } else {
+                    setStatus('idle');
+                }
+            }
+
+            // 조회 완료 시 플래그 초기화
+            if (updateStatus === 'not-available' || updateStatus === 'error') {
+                isManual = false;
             }
         });
 
         // 수동 업데이트 체크 리스너
         const handleManualCheck = () => {
+            isManual = true;
             setIsOpen(true);
             setStatus('checking');
             setErrorMsg('');
@@ -42,9 +61,21 @@ export default function UpdateNotificationModal() {
 
         window.addEventListener('manual-update-check', handleManualCheck);
 
+        // 앱 켜지고 10초 후 백그라운드 체크 1회 자동 실행
+        const timer = setTimeout(() => {
+            if (window.electronAPI) window.electronAPI.checkForUpdates();
+        }, 10000);
+
+        // 2시간마다 주기적으로 백그라운드 업데이트 체크 실행
+        const intervalTimer = setInterval(() => {
+            if (window.electronAPI) window.electronAPI.checkForUpdates();
+        }, 2 * 60 * 60 * 1000);
+
         return () => {
             if (unsubscribe) unsubscribe();
             window.removeEventListener('manual-update-check', handleManualCheck);
+            clearTimeout(timer);
+            clearInterval(intervalTimer);
         };
     }, []);
 
