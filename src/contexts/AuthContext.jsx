@@ -23,9 +23,14 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [devRoleOverride, setDevRoleOverride] = useState(null); // 임시 역할 오버라이드
+    const [isOdooOnlyAuth, setIsOdooOnlyAuth] = useState(false);
 
     // Domain restriction configuration
     const ALLOWED_DOMAINS = ['mightyzap.com'];
+    
+    // Odoo API 기본 설정
+    const ODOO_API_URL = 'http://100.67.238.32:8069';
+    const ODOO_DB = 'irrocot';
 
     async function login() {
         try {
@@ -59,10 +64,65 @@ export function AuthProvider({ children }) {
         }
     }
 
+    async function loginWithOdoo(username, password) {
+        try {
+            setError('');
+            const response = await fetch(`${ODOO_API_URL}/web/session/authenticate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    params: {
+                        db: ODOO_DB,
+                        login: username,
+                        password: password
+                    }
+                })
+            });
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.error.data?.message || 'Odoo 로그인 실패');
+            }
+            
+            if (data.result && data.result.uid) {
+                // 성공: Odoo-Only 가상 유저 세팅
+                const odooUser = {
+                    uid: `odoo_${data.result.uid}`,
+                    email: data.result.username || username,
+                    displayName: data.result.name || username,
+                    isOdooOnly: true
+                };
+                const odooProfile = {
+                    role: 'field_viewer',
+                    department: '현장/조회',
+                    displayName: data.result.name || username
+                };
+                
+                localStorage.setItem('odoo_only_user', JSON.stringify(odooUser));
+                setCurrentUser(odooUser);
+                setUserProfile(odooProfile);
+                setIsOdooOnlyAuth(true);
+            } else {
+                throw new Error('아이디 또는 비밀번호가 올바르지 않습니다.');
+            }
+        } catch (e) {
+            setError('Odoo Login Error: ' + e.message);
+            throw e;
+        }
+    }
+
     async function logout() {
         setUserProfile(null);
+        setCurrentUser(null);
+        setIsOdooOnlyAuth(false);
         localStorage.removeItem('google_access_token');
         localStorage.removeItem('google_access_token_expires_at');
+        localStorage.removeItem('odoo_only_user');
+        
+        // I-Link 내 OdooWebView 세션 쿠키도 날려줌
+        window.dispatchEvent(new CustomEvent('clear-odoo-session'));
+        
         if (window.electronAPI?.clearGoogleCookies) {
             try {
                 await window.electronAPI.clearGoogleCookies();
@@ -74,8 +134,27 @@ export function AuthProvider({ children }) {
     }
 
     useEffect(() => {
+        // 앱 초기 구동 시 Odoo 전용 사용자(로컬)인지 확인
+        const storedOdooUser = localStorage.getItem('odoo_only_user');
+        if (storedOdooUser) {
+            try {
+                const odooUser = JSON.parse(storedOdooUser);
+                setCurrentUser(odooUser);
+                setUserProfile({
+                    role: 'field_viewer',
+                    department: '현장/조회',
+                    displayName: odooUser.displayName
+                });
+                setIsOdooOnlyAuth(true);
+                setLoading(false);
+                return; // Odoo 모드면 Firebase onAuthStateChanged 대기 안 함 (Firebase 토큰 없으므로)
+            } catch(e) {
+                localStorage.removeItem('odoo_only_user');
+            }
+        }
+
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            if (user) {
+            if (user && !isOdooOnlyAuth) {
                 const userEmail = user.email || 'temp@irrocot.com';
                 const domain = userEmail.split('@')[1]?.toLowerCase();
                 // Add console log for debugging (remove in prod)
@@ -96,7 +175,7 @@ export function AuthProvider({ children }) {
                         console.error("Profile sync failed", err);
                     }
                 }
-            } else {
+            } else if (!isOdooOnlyAuth) {
                 setCurrentUser(null);
                 setUserProfile(null);
             }
@@ -104,7 +183,7 @@ export function AuthProvider({ children }) {
         });
 
         return unsubscribe;
-    }, []);
+    }, [isOdooOnlyAuth]);
 
     // devRoleOverride 적용된 실효 프로필 (컴포넌트들은 이것을 사용)
     const effectiveUserProfile = userProfile
@@ -118,6 +197,8 @@ export function AuthProvider({ children }) {
         devRoleOverride,
         setDevRoleOverride,
         login,
+        loginWithOdoo,
+        isOdooOnlyAuth,
         logout,
         error
     };

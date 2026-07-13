@@ -23,10 +23,11 @@ const ROLE_MENU_MAP = {
     production: ['/', '/prod-execution', '/prod-requests', '/inventory', '/purchasing', '/outsourcing', '/transactions', '/vendors', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/workspace/agent', '/workspace/notes', '/odoo/view'],
     manager: ['/', '/customers', '/prod-requests', '/purchasing', '/outsourcing', '/inventory', '/qa/config', '/qa/process', '/qa/dashboard', '/qa/dev-testing', '/transactions', '/manufacturers', '/vendors', '/eco', '/hr/attendance', '/project/dashboard', '/project/issues', '/project/management', '/project/tasks', '/project/task-calendar', '/sales/dashboard', '/sales/billing', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/workspace/agent', '/workspace/notes', '/odoo/view', '/plm', '/approval'],
     viewer: ['/', '/hr/attendance', '/project/management', '/project/tasks', '/project/task-calendar', '/workspace/calendar', '/workspace/meetings', '/workspace/drive', '/workspace/mail', '/workspace/memo', '/workspace/chat', '/workspace/notebooklm', '/workspace/gemini', '/workspace/agent', '/workspace/notes', '/odoo/view'],
+    field_viewer: ['/', '/odoo/view'],
 };
 
 export default function Sidebar({ isCollapsed, toggleSidebar }) {
-    const { currentUser, userProfile, logout } = useAuth();
+    const { currentUser, userProfile, logout, isOdooOnlyAuth } = useAuth();
     const location = useLocation();
     const [pendingEcnCount, setPendingEcnCount] = useState(0);
     const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
@@ -305,8 +306,8 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
     const ODOO_DYNAMIC_GROUPS = getOdooDynamicGroups();
 
     const fOdoo = filterGroups(ODOO_DYNAMIC_GROUPS);
-    const fCollab = filterGroups(COLLAB_MENU_GROUPS);
-    const fAdmin = filterGroups(ADMIN_GROUPS);
+    const fCollab = isOdooOnlyAuth ? [] : filterGroups(COLLAB_MENU_GROUPS);
+    const fAdmin = isOdooOnlyAuth ? [] : filterGroups(ADMIN_GROUPS);
 
     const roleInfo = {
         admin: { label: '최고관리자', color: 'bg-rose-500' },
@@ -315,7 +316,8 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         qa: { label: 'QA', color: 'bg-purple-500' },
         production: { label: '생산', color: 'bg-emerald-500' },
         manager: { label: '관리', color: 'bg-indigo-500' },
-        viewer: { label: '뷰어', color: 'bg-slate-400' }
+        viewer: { label: '뷰어', color: 'bg-slate-400' },
+        field_viewer: { label: '현장직', color: 'bg-emerald-600' }
     }[role] || { label: '뷰어', color: 'bg-slate-400' };
 
     return (
@@ -441,33 +443,33 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                                 <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">연동 계정 관리</p>
                             </div>
                             
-                            {/* Google Account */}
-                            <div className="flex flex-col gap-1.5 p-2 bg-slate-50/70 dark:bg-slate-900/70 border border-slate-100 dark:border-slate-800/60 rounded-xl">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-1.5">
-                                        <span className="w-3.5 h-3.5 rounded-full bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 flex items-center justify-center font-black text-[8px]">G</span>
-                                        <span className="text-slate-800 dark:text-slate-200 font-black text-[9px]">Google Workspace</span>
+                            {!isOdooOnlyAuth && (
+                                <div className="flex flex-col gap-1.5 p-2 bg-slate-50/70 dark:bg-slate-900/70 border border-slate-100 dark:border-slate-800/60 rounded-xl">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="w-3.5 h-3.5 rounded-full bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 flex items-center justify-center font-black text-[8px]">G</span>
+                                            <span className="text-slate-800 dark:text-slate-200 font-black text-[9px]">Google Workspace</span>
+                                        </div>
+                                        <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-400">연동됨</span>
                                     </div>
-                                    <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-400">연동됨</span>
+                                    <div className="flex items-center justify-between gap-1.5">
+                                        <p className="text-[8px] text-slate-500 dark:text-slate-400 font-semibold truncate flex-1" title={currentUser?.email}>
+                                            {currentUser?.email}
+                                        </p>
+                                        <button
+                                            onClick={() => {
+                                                setProfileMenuOpen(false);
+                                                logout();
+                                            }}
+                                            className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/40 text-red-500 transition-colors active:scale-90"
+                                            title="구글 계정 바꾸기"
+                                        >
+                                            <LogOut size={10} />
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="flex items-center justify-between gap-1.5">
-                                    <p className="text-[8px] text-slate-500 dark:text-slate-400 font-semibold truncate flex-1" title={currentUser?.email}>
-                                        {currentUser?.email}
-                                    </p>
-                                    <button
-                                        onClick={() => {
-                                            setProfileMenuOpen(false);
-                                            logout();
-                                        }}
-                                        className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/40 text-red-500 transition-colors active:scale-90"
-                                        title="구글 계정 바꾸기"
-                                    >
-                                        <LogOut size={10} />
-                                    </button>
-                                </div>
-                            </div>
+                            )}
 
-                            {/* Odoo Account */}
                             <div className="flex flex-col gap-1.5 p-2 bg-slate-50/70 dark:bg-slate-900/70 border border-slate-100 dark:border-slate-800/60 rounded-xl">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-1.5">
@@ -483,11 +485,15 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                                     <button
                                         onClick={() => {
                                             setProfileMenuOpen(false);
-                                            window.dispatchEvent(new CustomEvent('clear-odoo-session'));
-                                            alert("Odoo 세션이 초기화되었습니다. Odoo 뷰에서 다시 로그인해 주세요.");
+                                            if (isOdooOnlyAuth) {
+                                                logout();
+                                            } else {
+                                                window.dispatchEvent(new CustomEvent('clear-odoo-session'));
+                                                alert("Odoo 세션이 초기화되었습니다. Odoo 뷰에서 다시 로그인해 주세요.");
+                                            }
                                         }}
                                         className="p-1 rounded hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-500 transition-colors active:scale-90"
-                                        title="Odoo 계정 바꾸기"
+                                        title={isOdooOnlyAuth ? "로그아웃" : "Odoo 계정 바꾸기"}
                                     >
                                         <LogOut size={10} />
                                     </button>

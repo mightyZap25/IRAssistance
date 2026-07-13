@@ -21,9 +21,11 @@ import NotesPage from './pages/NotesPage'
 import ApprovalPage from './pages/ApprovalPage'
 import AgentChatPage from './pages/AgentChatPage'
 
-function PrivateRoute({ children }) {
-    const { currentUser } = useAuth();
-    return currentUser ? children : <Navigate to="/login" />;
+function PrivateRoute({ children, disableForOdoo }) {
+    const { currentUser, isOdooOnlyAuth } = useAuth();
+    if (!currentUser) return <Navigate to="/login" />;
+    if (disableForOdoo && isOdooOnlyAuth) return <Navigate to="/" />;
+    return children;
 }
 
 function AppContent() {
@@ -54,18 +56,18 @@ function AppContent() {
             ))}
 
             {/* 별도 유지하는 커스텀 React 화면들 (Google 통합 및 설정) */}
-            <Route path="/workspace/drive" element={<PrivateRoute><Layout><GoogleDrivePage /></Layout></PrivateRoute>} />
-            <Route path="/workspace/calendar" element={<PrivateRoute><Layout><WorkspaceCalendarPage /></Layout></PrivateRoute>} />
-            <Route path="/workspace/mail" element={<PrivateRoute><Layout><WorkspaceMailPage /></Layout></PrivateRoute>} />
-            <Route path="/workspace/memo" element={<PrivateRoute><Layout><WorkspaceMemoPage /></Layout></PrivateRoute>} />
-            <Route path="/workspace/chat" element={<PrivateRoute><Layout><GoogleChatPage /></Layout></PrivateRoute>} />
-            <Route path="/workspace/notebooklm" element={<PrivateRoute><Layout><NotebookLMPage /></Layout></PrivateRoute>} />
-            <Route path="/workspace/gemini" element={<PrivateRoute><Layout><GeminiPage /></Layout></PrivateRoute>} />
-            <Route path="/workspace/agent" element={<PrivateRoute><Layout><AgentChatPage /></Layout></PrivateRoute>} />
-            <Route path="/workspace/notes" element={<PrivateRoute><Layout><NotesPage /></Layout></PrivateRoute>} />
-            <Route path="/workspace/meetings" element={<PrivateRoute><Layout><MeetingsPage /></Layout></PrivateRoute>} />
+            <Route path="/workspace/drive" element={<PrivateRoute disableForOdoo={true}><Layout><GoogleDrivePage /></Layout></PrivateRoute>} />
+            <Route path="/workspace/calendar" element={<PrivateRoute disableForOdoo={true}><Layout><WorkspaceCalendarPage /></Layout></PrivateRoute>} />
+            <Route path="/workspace/mail" element={<PrivateRoute disableForOdoo={true}><Layout><WorkspaceMailPage /></Layout></PrivateRoute>} />
+            <Route path="/workspace/memo" element={<PrivateRoute disableForOdoo={true}><Layout><WorkspaceMemoPage /></Layout></PrivateRoute>} />
+            <Route path="/workspace/chat" element={<PrivateRoute disableForOdoo={true}><Layout><GoogleChatPage /></Layout></PrivateRoute>} />
+            <Route path="/workspace/notebooklm" element={<PrivateRoute disableForOdoo={true}><Layout><NotebookLMPage /></Layout></PrivateRoute>} />
+            <Route path="/workspace/gemini" element={<PrivateRoute disableForOdoo={true}><Layout><GeminiPage /></Layout></PrivateRoute>} />
+            <Route path="/workspace/agent" element={<PrivateRoute disableForOdoo={true}><Layout><AgentChatPage /></Layout></PrivateRoute>} />
+            <Route path="/workspace/notes" element={<PrivateRoute disableForOdoo={true}><Layout><NotesPage /></Layout></PrivateRoute>} />
+            <Route path="/workspace/meetings" element={<PrivateRoute disableForOdoo={true}><Layout><MeetingsPage /></Layout></PrivateRoute>} />
             <Route path="/settings" element={<PrivateRoute><Layout><SettingsPage /></Layout></PrivateRoute>} />
-            <Route path="/approval" element={<PrivateRoute><Layout><ApprovalPage /></Layout></PrivateRoute>} />
+            <Route path="/approval" element={<PrivateRoute disableForOdoo={true}><Layout><ApprovalPage /></Layout></PrivateRoute>} />
 
             {/* Catch all */}
             <Route path="*" element={<Navigate to="/" />} />
