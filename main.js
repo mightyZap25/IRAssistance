@@ -60,7 +60,7 @@ function createWindow() {
         minWidth: 1024,
         minHeight: 720,
         title: 'I-Link',
-        icon: path.join(app.getAppPath(), 'app_tray_icon.png'),
+        icon: path.join(app.getAppPath(), 'build', 'icon.png'),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -121,7 +121,7 @@ function createWindow() {
 }
 
 function createTray() {
-    const activeIconPath = path.join(app.getAppPath(), 'app_tray_icon.png');
+    const activeIconPath = path.join(app.getAppPath(), 'build', 'icon.png');
     
     tray = new Tray(activeIconPath);
     

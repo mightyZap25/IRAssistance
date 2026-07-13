@@ -1,7 +1,7 @@
 {
     "name": "i-link",
     "private": true,
-    "version": "0.9.5",
+    "version": "0.9.4",
     "description": "I-Link - 스마트 ERP 데스크톱 어플리케이션",
     "author": "Antigravity",
     "type": "module",
@@ -70,6 +70,7 @@
     "build": {
         "appId": "com.irassistant.app",
         "productName": "I-Link",
+        "artifactName": "I-Link-Setup-${version}.${ext}",
         "icon": "build/icon.png",
         "publish": [
             {
