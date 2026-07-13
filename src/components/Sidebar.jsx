@@ -591,6 +591,16 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                     >
                         {darkMode ? <Sun size={15} /> : <Moon size={15} />}
                     </button>
+                    <button
+                        onClick={() => {
+                            window.dispatchEvent(new CustomEvent('manual-update-check'));
+                        }}
+                        className="p-1.5 mt-1 hover:bg-slate-200 dark:hover:bg-slate-850 text-slate-400 dark:text-slate-500 hover:text-indigo-500 dark:hover:text-indigo-400 rounded-lg transition-colors"
+                        title="업데이트 확인"
+                    >
+                        <RefreshCw size={14} />
+                    </button>
+                    <span className="text-[8px] font-bold text-slate-400 dark:text-slate-655 select-none transform scale-90 origin-center mt-1">v{appVersion}</span>
                 </div>
             ) : (
                 <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 shrink-0 flex items-center justify-between">
@@ -605,7 +615,18 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                             {darkMode ? "라이트 모드" : "다크 모드"}
                         </span>
                     </button>
-                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-600">v{appVersion}</span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => {
+                                window.dispatchEvent(new CustomEvent('manual-update-check'));
+                            }}
+                            className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-indigo-650 dark:hover:text-indigo-400 rounded-lg transition-colors flex items-center justify-center"
+                            title="업데이트 확인"
+                        >
+                            <RefreshCw size={13} />
+                        </button>
+                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-600">v{appVersion}</span>
+                    </div>
                 </div>
             )}
         </aside>

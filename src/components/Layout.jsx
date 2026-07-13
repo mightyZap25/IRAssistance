@@ -10,6 +10,14 @@ export default function Layout({ children }) {
     const { currentUser } = useAuth();
     useTaskAlarm(currentUser);
 
+    const [appVersion, setAppVersion] = React.useState('0.9.4');
+
+    React.useEffect(() => {
+        if (window.electronAPI?.getAppVersion) {
+            window.electronAPI.getAppVersion().then(setAppVersion).catch(() => {});
+        }
+    }, []);
+
     const location = useLocation();
     
     const isGoogleApp = location.pathname.startsWith('/workspace/chat') || 
@@ -72,6 +80,13 @@ export default function Layout({ children }) {
 
                     {/* 플로팅 개인 메모장 */}
                     <FloatingNotepad />
+
+                    {/* 우측 하단 고정 버전 배지 */}
+                    {!isFullPage && (
+                        <div className="fixed bottom-4 right-5 z-40 bg-white/60 dark:bg-slate-900/60 border border-slate-200/40 dark:border-slate-800/40 backdrop-blur-md px-2 py-0.5 rounded-md shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-[9px] font-black text-slate-400 dark:text-slate-500 select-none tracking-wider pointer-events-none transition-all">
+                            VER v{appVersion}
+                        </div>
+                    )}
                 </main>
             </div>
         </div>

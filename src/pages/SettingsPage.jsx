@@ -125,11 +125,7 @@ export default function SettingsPage() {
     }, []);
 
     const handleCheckForUpdates = () => {
-        if (!window.electronAPI) return; // Electron 환경에서만 동작
-        setUpdateStatus('checking');
-        setUpdateError(null);
-        setDownloadPercent(0);
-        window.electronAPI.checkForUpdates();
+        window.dispatchEvent(new CustomEvent('manual-update-check'));
     };
 
     const handleStartDownload = () => {

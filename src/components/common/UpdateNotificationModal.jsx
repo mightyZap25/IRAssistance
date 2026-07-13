@@ -27,19 +27,24 @@ export default function UpdateNotificationModal() {
                 setPercent(100);
             } else if (updateStatus === 'error') {
                 setErrorMsg(error || '업데이트 확인 중 에러가 발생했습니다.');
-                // 자동 감지 도중 에러가 나면 팝업을 바로 띄우지 않고 콘솔에만 출력하거나, 
-                // 만약 이미 열려있던 상태라면 에러를 보여준다.
             }
         });
 
-        // 앱 켜지고 3초 후 백그라운드 체크 시작
-        const timer = setTimeout(() => {
-            window.electronAPI.checkForUpdates({ isAuto: true });
-        }, 3000);
+        // 수동 업데이트 체크 리스너
+        const handleManualCheck = () => {
+            setIsOpen(true);
+            setStatus('checking');
+            setErrorMsg('');
+            if (window.electronAPI) {
+                window.electronAPI.checkForUpdates();
+            }
+        };
+
+        window.addEventListener('manual-update-check', handleManualCheck);
 
         return () => {
             if (unsubscribe) unsubscribe();
-            clearTimeout(timer);
+            window.removeEventListener('manual-update-check', handleManualCheck);
         };
     }, []);
 
@@ -57,12 +62,8 @@ export default function UpdateNotificationModal() {
         }
     };
 
-    // 팝업을 띄워야 하는 상태인지 판별
-    // available, downloading, downloaded, error 상태 중 사용자가 닫지 않은 경우에만 표시
-    if (!isOpen) return null;
-    
-    // not-available 상태로 전환되면 자동으로 닫힘
-    if (status === 'not-available' || status === 'idle') return null;
+    // 사용자가 팝업을 닫았거나 idle 상태일 때만 렌더링 안 함
+    if (!isOpen || status === 'idle') return null;
 
     return (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -97,8 +98,28 @@ export default function UpdateNotificationModal() {
 
                 {/* Content */}
                 <div className="p-6 flex-1 flex flex-col gap-5 bg-white">
+                    {/* Checking Stage */}
+                    {status === 'checking' && (
+                        <div className="flex flex-col items-center justify-center py-6 gap-3">
+                            <RefreshCw size={24} className="animate-spin text-indigo-600" />
+                            <span className="text-xs font-bold text-slate-500">최신 업데이트 정보를 조회하는 중...</span>
+                        </div>
+                    )}
+
+                    {/* Not Available (Up to date) Stage */}
+                    {status === 'not-available' && (
+                        <div className="p-4 bg-sky-50 border border-sky-100 rounded-2xl text-center flex flex-col gap-1">
+                            <span className="text-xs font-extrabold text-sky-850">
+                                ✨ 최신 버전을 사용하고 있습니다.
+                            </span>
+                            <p className="text-[10px] text-sky-600 font-bold leading-normal">
+                                현재 프로그램 버전은 최신 상태입니다.
+                            </p>
+                        </div>
+                    )}
+
                     {/* Version Display */}
-                    {updateInfo && (
+                    {updateInfo && (status !== 'checking' && status !== 'not-available') && (
                         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                             <div className="flex flex-col">
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">신규 버전</span>
@@ -126,7 +147,7 @@ export default function UpdateNotificationModal() {
                     {/* Downloading Status */}
                     {status === 'downloading' && (
                         <div className="flex flex-col gap-2.5">
-                            <div className="flex justify-between items-center text-xs font-black text-indigo-650">
+                            <div className="flex justify-between items-center text-xs font-black text-indigo-655">
                                 <span className="flex items-center gap-1.5">
                                     <RefreshCw size={12} className="animate-spin text-indigo-500" />
                                     최신 버전 다운로드 중...
@@ -167,6 +188,22 @@ export default function UpdateNotificationModal() {
 
                     {/* Action Buttons */}
                     <div className="pt-2">
+                        {status === 'checking' && (
+                            <button 
+                                disabled
+                                className="w-full bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed font-black py-3 px-4 rounded-xl text-sm flex items-center justify-center gap-2"
+                            >
+                                <RefreshCw size={16} className="animate-spin text-slate-400" /> 최신 버전 확인 중...
+                            </button>
+                        )}
+                        {status === 'not-available' && (
+                            <button 
+                                onClick={() => setIsOpen(false)}
+                                className="w-full bg-slate-800 hover:bg-slate-700 text-white font-black py-3 px-4 rounded-xl text-sm transition-all flex items-center justify-center gap-2"
+                            >
+                                확인
+                            </button>
+                        )}
                         {status === 'available' && (
                             <button 
                                 onClick={handleDownload}
@@ -194,7 +231,7 @@ export default function UpdateNotificationModal() {
                         {status === 'error' && (
                             <button 
                                 onClick={() => {
-                                    setStatus('idle');
+                                    setStatus('checking');
                                     if (window.electronAPI) window.electronAPI.checkForUpdates();
                                 }}
                                 className="w-full bg-rose-600 hover:bg-rose-700 text-white font-black py-3 px-4 rounded-xl text-sm transition-all shadow-md shadow-rose-100 flex items-center justify-center gap-2"
