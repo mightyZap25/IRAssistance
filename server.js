@@ -719,6 +719,116 @@ app.post('/api/sql/execute', async (req, res) => {
     }
 });
 
+import crypto from 'crypto';
+
+// Google Chat DM Send Helper (using Service Account JWT)
+async function getGoogleChatAccessToken(serviceAccount) {
+    const iat = Math.floor(Date.now() / 1000);
+    const exp = iat + 3600;
+    
+    const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
+    const claim = Buffer.from(JSON.stringify({
+        iss: serviceAccount.client_email,
+        sub: serviceAccount.client_email,
+        scope: 'https://www.googleapis.com/auth/chat.spaces https://www.googleapis.com/auth/chat.messages https://www.googleapis.com/auth/chat.bot',
+        aud: 'https://oauth2.googleapis.com/token',
+        exp: exp,
+        iat: iat
+    })).toString('base64url');
+    
+    const signatureInput = `${header}.${claim}`;
+    const sign = crypto.createSign('RSA-SHA256');
+    sign.update(signatureInput);
+    const signature = sign.sign(serviceAccount.private_key, 'base64url');
+    const jwt = `${signatureInput}.${signature}`;
+    
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+            assertion: jwt
+        })
+    });
+    
+    const data = await response.json();
+    if (data.error) {
+        throw new Error(`Google Chat Auth Token exchange failed: ${data.error_description || data.error}`);
+    }
+    return data.access_token;
+}
+
+async function sendGoogleChatDM(userEmail, text) {
+    const configPath = path.join(process.cwd(), 'service_account.json');
+    if (!fs.existsSync(configPath)) {
+        throw new Error('프로젝트 루트 폴더에 service_account.json 파일이 설정되어 있지 않습니다.');
+    }
+    
+    const serviceAccount = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    const accessToken = await getGoogleChatAccessToken(serviceAccount);
+    
+    // 1. Setup space (look up direct message space with email)
+    const setupResponse = await fetch('https://chat.googleapis.com/v1/spaces:setup', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json; charset=UTF-8'
+        },
+        body: JSON.stringify({
+            space: {
+                spaceType: 'DIRECT_MESSAGE',
+                singleUserLookupRequest: {
+                    userName: `users/${userEmail}`
+                }
+            }
+        })
+    });
+    
+    const setupData = await setupResponse.json();
+    if (setupData.error) {
+        throw new Error(`Google Chat Space setup failed: ${setupData.error.message}`);
+    }
+    
+    const spaceName = setupData.name;
+    
+    // 2. Post DM Message
+    const msgResponse = await fetch(`https://chat.googleapis.com/v1/${spaceName}/messages`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json; charset=UTF-8'
+        },
+        body: JSON.stringify({
+            text: text
+        })
+    });
+    
+    const msgData = await msgResponse.json();
+    if (msgData.error) {
+        throw new Error(`Google Chat message send failed: ${msgData.error.message}`);
+    }
+    return msgData;
+}
+
+// Odoo event receiver and forwarder route
+app.post('/api/odoo-notification', async (req, res) => {
+    const { recipient_email, message } = req.body;
+    
+    if (!recipient_email || !message) {
+        return res.status(400).json({ error: 'recipient_email and message are required' });
+    }
+    
+    console.log(`[Google Chat Notification] Forwarding Odoo event to: ${recipient_email}`);
+    
+    try {
+        await sendGoogleChatDM(recipient_email, message);
+        res.json({ success: true, message: 'Google Chat notification sent successfully.' });
+    } catch (err) {
+        console.error('[Google Chat Notification] Error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // Serve built frontend assets in production/Electron mode
 const distPath = path.join(__dirname, 'dist');
 app.use('/api/odoo', odooRoutes);

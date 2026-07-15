@@ -24,69 +24,122 @@ export function AuthProvider({ children }) {
     const [error, setError] = useState('');
     const [devRoleOverride, setDevRoleOverride] = useState(null); // 임시 역할 오버라이드
     const [isOdooOnlyAuth, setIsOdooOnlyAuth] = useState(false);
+    const [odooLinked, setOdooLinked] = useState(!!localStorage.getItem('odoo_password'));
 
     // Domain restriction configuration
-    const ALLOWED_DOMAINS = ['mightyzap.com'];
+    const ALLOWED_DOMAINS = ['mightyzap.com', 'irrobot.com'];
     
     // Odoo API 기본 설정
     const ODOO_API_URL = 'http://100.67.238.32:8069';
-    const ODOO_DB = 'irrocot';
+    const ODOO_DB = 'odoo';
 
     async function login() {
         try {
             setError('');
+            // firebase.js의 signInWithPopup이 Electron 환경에서는
+            // 자동으로 electronAPI.googleOAuthSignIn() (별도 창 방식)을 호출합니다.
             const result = await signInWithPopup(auth, googleProvider);
             const user = result.user;
 
-            // Google OAuth Access Token 획득 및 저장
+            // Access Token 저장
             const credential = GoogleAuthProvider.credentialFromResult(result);
-            if (credential && credential.accessToken) {
+            if (credential?.accessToken) {
                 localStorage.setItem('google_access_token', credential.accessToken);
                 const expiresIn = credential.expiresIn || 3500;
                 localStorage.setItem('google_access_token_expires_at', Date.now() + (expiresIn - 60) * 1000);
             }
 
-            // Domain Check
-            const userEmail = user?.email || 'temp@irrocot.com';
+            // 도메인 제한 체크
+            const userEmail = user?.email || '';
             const domain = userEmail.split('@')[1]?.toLowerCase();
             if (!ALLOWED_DOMAINS.includes(domain)) {
                 await logout();
-                setError(`Unauthorized domain: ${domain}. Only @mightyzap.com accounts are allowed.`);
+                setError(`접속이 허용되지 않은 도메인입니다: ${domain} (허용: @mightyzap.com, @irrobot.com)`);
                 return;
             }
 
-            // Sync Profile
+            // 프로필 동기화
             const profile = await syncUserProfile(user);
             setUserProfile(profile);
 
+            // Google 로그인 완료 → Odoo 웹뷰도 /web으로 이동 (기존 Odoo 세션 활용)
+            window.dispatchEvent(new CustomEvent('odoo-google-login', { detail: { email: userEmail } }));
+
         } catch (e) {
-            setError('Failed to log in: ' + e.message);
+            if (e.message !== '로그인이 취소되었습니다.') {
+                setError('Google 로그인 실패: ' + e.message);
+            }
         }
     }
 
-    async function loginWithOdoo(username, password) {
+    async function linkOdoo(password) {
         try {
             setError('');
+            const username = currentUser?.email;
+            if (!username) throw new Error("Google 로그인이 필요합니다.");
+
+            // 메인 렌더러에서도 인증 확인 (uid 체크용)
             const response = await fetch(`${ODOO_API_URL}/web/session/authenticate`, {
                 method: 'POST',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     jsonrpc: '2.0',
-                    params: {
-                        db: ODOO_DB,
-                        login: username,
-                        password: password
-                    }
+                    params: { db: ODOO_DB, login: username, password }
                 })
             });
             const data = await response.json();
             
             if (data.error) {
+                throw new Error(data.error.data?.message || 'Odoo 인증 실패');
+            }
+            
+            if (data.result && data.result.uid) {
+                localStorage.setItem('odoo_password', password);
+                setOdooLinked(true);
+                
+                // 인증 성공시 웹뷰 자동 로그인 트리거
+                window._odooPendingCreds = { login: username, password, db: ODOO_DB, url: ODOO_API_URL };
+                window.dispatchEvent(new CustomEvent('odoo-auto-login', {
+                    detail: { login: username, password, db: ODOO_DB, url: ODOO_API_URL }
+                }));
+            } else {
+                throw new Error('비밀번호가 올바르지 않습니다.');
+            }
+        } catch (e) {
+            setError('Odoo Link Error: ' + e.message);
+            throw e;
+        }
+    }
+
+
+    async function loginWithOdoo(username, password) {
+        try {
+            setError('');
+            // 웹뷰가 직접 Odoo 로그인을 처리할 수 있도록 자격증명을 메모리에 임시 저장
+            window._odooPendingCreds = { login: username, password, db: ODOO_DB, url: ODOO_API_URL };
+            window.dispatchEvent(new CustomEvent('odoo-auto-login', {
+                detail: { login: username, password, db: ODOO_DB, url: ODOO_API_URL }
+            }));
+
+            // 메인 렌더러에서도 인증 확인 (uid 체크용)
+            const response = await fetch(`${ODOO_API_URL}/web/session/authenticate`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    params: { db: ODOO_DB, login: username, password }
+                })
+            });
+            const data = await response.json();
+            
+            if (data.error) {
+                window._odooPendingCreds = null;
                 throw new Error(data.error.data?.message || 'Odoo 로그인 실패');
             }
             
             if (data.result && data.result.uid) {
-                // 성공: Odoo-Only 가상 유저 세팅
                 const odooUser = {
                     uid: `odoo_${data.result.uid}`,
                     email: data.result.username || username,
@@ -98,12 +151,12 @@ export function AuthProvider({ children }) {
                     department: '현장/조회',
                     displayName: data.result.name || username
                 };
-                
                 localStorage.setItem('odoo_only_user', JSON.stringify(odooUser));
                 setCurrentUser(odooUser);
                 setUserProfile(odooProfile);
                 setIsOdooOnlyAuth(true);
             } else {
+                window._odooPendingCreds = null;
                 throw new Error('아이디 또는 비밀번호가 올바르지 않습니다.');
             }
         } catch (e) {
@@ -119,6 +172,9 @@ export function AuthProvider({ children }) {
         localStorage.removeItem('google_access_token');
         localStorage.removeItem('google_access_token_expires_at');
         localStorage.removeItem('odoo_only_user');
+        
+        // 메모리 자격증명 초기화 (다음 사람 로그인 시 이전 사람 세션 방지)
+        window._odooPendingCreds = null;
         
         // I-Link 내 OdooWebView 세션 쿠키도 날려줌
         window.dispatchEvent(new CustomEvent('clear-odoo-session'));
@@ -155,7 +211,7 @@ export function AuthProvider({ children }) {
 
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (user && !isOdooOnlyAuth) {
-                const userEmail = user.email || 'temp@irrocot.com';
+                const userEmail = user.email || 'temp@irrobot.com';
                 const domain = userEmail.split('@')[1]?.toLowerCase();
                 // Add console log for debugging (remove in prod)
                 console.log("Auth State Changed: ", userEmail);
@@ -173,6 +229,15 @@ export function AuthProvider({ children }) {
                         setUserProfile(profile);
                     } catch (err) {
                         console.error("Profile sync failed", err);
+                    }
+                    
+                    // Odoo 비밀번호가 저장되어 있다면 자동으로 웹뷰 로그인 진행
+                    const savedOdooPwd = localStorage.getItem('odoo_password');
+                    if (savedOdooPwd) {
+                        window._odooPendingCreds = { login: user.email, password: savedOdooPwd, db: ODOO_DB, url: ODOO_API_URL };
+                        window.dispatchEvent(new CustomEvent('odoo-auto-login', {
+                            detail: { login: user.email, password: savedOdooPwd, db: ODOO_DB, url: ODOO_API_URL }
+                        }));
                     }
                 }
             } else if (!isOdooOnlyAuth) {
@@ -198,7 +263,9 @@ export function AuthProvider({ children }) {
         setDevRoleOverride,
         login,
         loginWithOdoo,
+        linkOdoo,
         isOdooOnlyAuth,
+        odooLinked,
         logout,
         error
     };

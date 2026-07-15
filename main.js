@@ -115,6 +115,17 @@ function createWindow() {
         }
     });
 
+    // Intercept mouse back/forward button clicks to handle inside webviews
+    mainWindow.on('app-command', (e, cmd) => {
+        if (cmd === 'browser-backward') {
+            e.preventDefault();
+            mainWindow.webContents.send('app-go-back');
+        } else if (cmd === 'browser-forward') {
+            e.preventDefault();
+            mainWindow.webContents.send('app-go-forward');
+        }
+    });
+
     mainWindow.on('closed', () => {
         mainWindow = null;
     });
@@ -566,6 +577,7 @@ ipcMain.handle('google-oauth-signin', async () => {
                         isResolvedOrRejected = true;
                         resolve({
                             accessToken: tokenData.access_token,
+                            idToken: tokenData.id_token,       // Firebase signInWithCredential용
                             refreshToken: tokenData.refresh_token,
                             expiresIn: tokenData.expires_in,
                             user: {
@@ -703,14 +715,18 @@ ipcMain.handle('clear-google-cookies', async () => {
 
 ipcMain.handle('clear-odoo-cookies', async () => {
     try {
-        const cookies = await session.defaultSession.cookies.get({});
+        // persist:odoo 파티션의 세션 사용
+        const odooSession = session.fromPartition('persist:odoo');
+        const cookies = await odooSession.cookies.get({});
         for (const cookie of cookies) {
-            if (cookie.domain.includes('100.67.238.32')) {
-                let url = 'http' + (cookie.secure ? 's' : '') + '://' + cookie.domain + cookie.path;
-                await session.defaultSession.cookies.remove(url, cookie.name);
-            }
+            const protocol = cookie.secure ? 'https' : 'http';
+            const domain = cookie.domain.startsWith('.') ? cookie.domain.slice(1) : cookie.domain;
+            const url = `${protocol}://${domain}${cookie.path}`;
+            await odooSession.cookies.remove(url, cookie.name);
         }
-        console.log('[Electron Main] Cleared Odoo session cookies.');
+        // session_id 쿠키만 명확히 삭제
+        await odooSession.clearStorageData({ storages: ['cookies'] });
+        console.log('[Electron Main] Cleared Odoo session cookies (persist:odoo partition).');
         return true;
     } catch (error) {
         console.error('Failed to clear Odoo cookies:', error);
@@ -718,14 +734,22 @@ ipcMain.handle('clear-odoo-cookies', async () => {
     }
 });
 
+ipcMain.handle('set-odoo-cookie', async (event, cookieData) => {
+    try {
+        await session.defaultSession.cookies.set(cookieData);
+        console.log('[Electron Main] Set Odoo session cookie successfully.');
+        return true;
+    } catch (error) {
+        console.error('Failed to set Odoo cookie:', error);
+        return false;
+    }
+});
+
 ipcMain.handle('get-odoo-session-id', async () => {
     try {
-        const cookies = await session.defaultSession.cookies.get({ name: 'session_id' });
-        for (const cookie of cookies) {
-            if (cookie.domain.includes('100.67.238.32')) {
-                return cookie.value;
-            }
-        }
+        const odooSession = session.fromPartition('persist:odoo');
+        const cookies = await odooSession.cookies.get({ name: 'session_id' });
+        if (cookies.length > 0) return cookies[0].value;
         return null;
     } catch (error) {
         console.error('Failed to get Odoo session cookie:', error);

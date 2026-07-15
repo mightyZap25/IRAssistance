@@ -6,7 +6,16 @@ import { createSpreadsheet, updateSpreadsheetValues } from '../services/googleSe
 const ODOO_LOCAL_URL = 'http://100.67.238.32:8069'; 
 const ODOO_REMOTE_URL = 'http://100.67.238.32:8069';
 
-let globalOdooMenus = [];
+let globalOdooMenus = (() => {
+    try {
+        const cached = localStorage.getItem('odoo_cached_menus');
+        return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+        return [];
+    }
+})();
+
+let lastAuthenticatedUser = null;
 
 export default function OdooWebView() {
     const location = useLocation();
@@ -122,18 +131,137 @@ export default function OdooWebView() {
 
     useEffect(() => {
         const handleClearSession = async () => {
+            globalOdooMenus = [];
+            lastAuthenticatedUser = null;
+            try {
+                localStorage.removeItem('odoo_cached_menus');
+            } catch (e) {}
+            setMenusLoaded(false);
+            window.dispatchEvent(new CustomEvent('odoo-menus-loaded', { detail: [] }));
+            
+            if (webviewRef.current) {
+                // 웹뷰 내부에서 Odoo 세션 파기
+                try {
+                    await webviewRef.current.executeJavaScript(`
+                        (async () => {
+                            try {
+                                await fetch('/web/session/destroy', {
+                                    method: 'POST', credentials: 'include',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ jsonrpc: '2.0', id: 0, params: {} })
+                                });
+                            } catch(e) {}
+                        })()
+                    `).catch(() => {});
+                } catch(e) {}
+                
+                webviewRef.current.loadURL(`${odooBaseUrl}/web/login`);
+            }
+            
             if (isElectron && window.electronAPI?.clearOdooCookies) {
                 await window.electronAPI.clearOdooCookies();
-                globalOdooMenus = [];
-                setMenusLoaded(false);
-                window.dispatchEvent(new CustomEvent('odoo-menus-loaded', { detail: [] }));
-                if (webviewRef.current) {
-                    webviewRef.current.loadURL(`${odooBaseUrl}/web/login`);
-                }
             }
         };
         window.addEventListener('clear-odoo-session', handleClearSession);
         return () => window.removeEventListener('clear-odoo-session', handleClearSession);
+    }, [isElectron, odooBaseUrl]);
+
+    // odoo-auto-login 이벤트 수신: 웹뷰가 직접 Odoo 로그인 처리
+    useEffect(() => {
+        const handleAutoLogin = (e) => {
+            const { login, password, db, url } = e.detail;
+            
+            // 이미 동일한 유저로 자동 로그인이 처리되어 있다면 중복 로그인 및 세션 끊김을 방지합니다.
+            if (lastAuthenticatedUser === login) {
+                console.log('[OdooWebView] 이미 동일한 사용자로 인증되어 중복 로그인을 스킵합니다:', login);
+                return;
+            }
+
+            // 웹뷰가 준비되면 내부에서 인증 수행 (딜레이 단축)
+            setTimeout(async () => {
+                const webview = webviewRef.current;
+                if (!webview) return;
+                try {
+                    // ① 먼저 기존 Odoo 세션을 완전히 파기 (다른 사람 세션 방지)
+                    await webview.executeJavaScript(`
+                        (async () => {
+                            try {
+                                await fetch('/web/session/destroy', {
+                                    method: 'POST',
+                                    credentials: 'include',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ jsonrpc: '2.0', id: 0, params: {} })
+                                });
+                            } catch(e) {}
+                        })()
+                    `).catch(() => {});
+
+                    // ② 새 자격증명으로 로그인
+                    const uid = await webview.executeJavaScript(`
+                        (async () => {
+                            try {
+                                const r = await fetch('/web/session/authenticate', {
+                                    method: 'POST',
+                                    credentials: 'include',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ jsonrpc: '2.0', id: 1, params: { db: '${db}', login: '${login.replace(/'/g, "\\'")}', password: '${password.replace(/'/g, "\\'")}' } })
+                                });
+                                const d = await r.json();
+                                return d.result?.uid || null;
+                            } catch(err) { return null; }
+                        })()
+                    `);
+                    if (uid) {
+                        console.log('[OdooWebView] 웹뷰 내 자동 로그인 성공, 이동 시도');
+                        lastAuthenticatedUser = login; // 인증 완료된 유저 기록
+                        let targetUrl = `${url}/web`;
+                        if (globalOdooMenus && globalOdooMenus.length > 0) {
+                            const hrMenu = globalOdooMenus.find(m => m.name === '근태/휴가 대시보드');
+                            if (hrMenu) {
+                                targetUrl = `${url}/web#menu_id=${hrMenu.menu_id}`;
+                            }
+                        }
+                        webview.loadURL(targetUrl).catch(() => {});
+                    } else {
+                        console.warn('[OdooWebView] 웹뷰 자동 로그인: uid 없음 (잘못된 자격증명?)');
+                    }
+                } catch(e) {
+                    console.warn('[OdooWebView] 웹뷰 자동 로그인 실패:', e.message);
+                }
+            }, 200);
+        };
+
+        window.addEventListener('odoo-auto-login', handleAutoLogin);
+
+        // 앱 재시작 후에도 로그인 유지: 저장된 자격증명이 있으면 즉시 실행
+        if (window._odooPendingCreds) {
+            handleAutoLogin({ detail: window._odooPendingCreds });
+        }
+
+        return () => window.removeEventListener('odoo-auto-login', handleAutoLogin);
+    }, [isElectron]);
+
+    // Google 로그인 이벤트: 웹뷰를 /web 으로 이동 (기존 Odoo 세션 쿠키 활용)
+    useEffect(() => {
+        const handleGoogleLogin = (e) => {
+            setTimeout(() => {
+                const webview = webviewRef.current;
+                if (!webview) return;
+                
+                let targetUrl = odooBaseUrl + '/web';
+                if (globalOdooMenus && globalOdooMenus.length > 0) {
+                    const hrMenu = globalOdooMenus.find(m => m.name === '근태/휴가 대시보드');
+                    if (hrMenu) {
+                        targetUrl = `${odooBaseUrl}/web#menu_id=${hrMenu.menu_id}`;
+                    }
+                }
+                
+                console.log('[OdooWebView] Google 로그인 감지 → Odoo 이동:', targetUrl);
+                webview.loadURL(targetUrl).catch(() => {});
+            }, 200);
+        };
+        window.addEventListener('odoo-google-login', handleGoogleLogin);
+        return () => window.removeEventListener('odoo-google-login', handleGoogleLogin);
     }, [isElectron, odooBaseUrl]);
 
     // webview 내부에서 직접 JSON-RPC 호출 (Odoo 세션 쿠키 사용)
@@ -142,15 +270,69 @@ export default function OdooWebView() {
         if (!webview || !isElectron) return;
 
         const handleDomReady = async () => {
+            // 로그인 페이지인 경우 자동 로그인 시도
+            try {
+                const currentPath = await webview.executeJavaScript(`window.location.pathname + window.location.search`);
+                if (currentPath && (currentPath.includes('/web/login') || currentPath.includes('action=login'))) {
+                    const creds = window._odooPendingCreds;
+                    if (creds) {
+                        console.log('[OdooWebView] 로그인 페이지 감지 → 웹뷰 내부 자동 인증 시작');
+                        const uid = await webview.executeJavaScript(`
+                            (async () => {
+                                try {
+                                    const r = await fetch('/web/session/authenticate', {
+                                        method: 'POST',
+                                        credentials: 'include',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ jsonrpc: '2.0', id: 1, params: { db: '${creds.db}', login: '${creds.login.replace(/'/g, "\\'")}', password: '${creds.password.replace(/'/g, "\\'")}' } })
+                                    });
+                                    const d = await r.json();
+                                    return d.result?.uid || null;
+                                } catch(e) { return null; }
+                            })()
+                        `);
+                        if (uid) {
+                            console.log('[OdooWebView] 자동 로그인 성공! /web으로 이동');
+                            webview.loadURL(`${creds.url}/web`).catch(() => {});
+                            return; // CSS 주입 등 나머지는 다음 dom-ready에서 처리
+                        }
+                    }
+                }
+            } catch(e) {
+                // 로그인 페이지 체크 실패 무시
+            }
             // Odoo 상단 메뉴바의 홈 버튼(앱 선택기)만 숨기고, 하위 메뉴(품목, 작업 등)는 보이도록 유지
             // 추가로 Odoo 기본 보라색 테마를 I-Link 색상(Slate-800)으로 덮어씌우고 좌측 마진을 줍니다.
             webview.insertCSS(`
+                /* ===== Odoo 로그인 페이지: Google 로그인 버튼 숨기기 =====
+                   임베디드 브라우저(Electron webview)에서는 Google OAuth가
+                   Google 정책에 의해 차단됩니다. I-Link 앱의 로그인 화면에서
+                   Google 로그인 버튼을 사용해주세요.
+                */
+                .o_auth_oauth_login,
+                .o_login_oauth,
+                a[href*="oauth"],
+                .btn-oauth,
+                [data-provider="google"],
+                .o_oauth_provider,
+                .o_sign_up_form .o_oauth_provider {
+                    display: none !important;
+                }
+                
                 .o_navbar_apps_menu { display: none !important; }
                 .o_menu_toggle { display: none !important; }
                 .o_menu_apps { display: none !important; }
                 
                 /* Odoo 우측 상단 사용자 프로필 메뉴 숨기기 */
                 .o_user_menu, .o_user_menu_wrapper, .o_menu_systray .o_user_menu, [data-menu-xmlid="base.menu_user"] {
+                    display: none !important;
+                }
+
+                /* 링크 추적기(Link Tracker) 메뉴 강제 숨김 */
+                a[data-menu-xmlid="utm.menu_link_tracker_root"],
+                a[data-menu-xmlid="link_tracker.link_tracker_menu_main"],
+                a.o_nav_entry:has(:contains("링크 추적기")),
+                a.o_nav_entry:has(:contains("Link Tracker")) {
                     display: none !important;
                 }
 
@@ -752,6 +934,9 @@ export default function OdooWebView() {
                         };
                     });
                     globalOdooMenus = apps;
+                    try {
+                        localStorage.setItem('odoo_cached_menus', JSON.stringify(apps));
+                    } catch (e) {}
                     setMenusLoaded(true);
                     window.dispatchEvent(new CustomEvent('odoo-menus-loaded', { detail: apps }));
                 } else {
@@ -814,6 +999,7 @@ export default function OdooWebView() {
                             });
                         };
                     }
+                    true;
                 `);
             } catch(e) {
                 console.warn('[OdooWebView] Failed to inject clipboard polyfill:', e);
@@ -980,6 +1166,7 @@ export default function OdooWebView() {
                 src={getTargetUrl()}
                 style={{ width: '100%', height: '100%', border: 'none' }}
                 allowpopups="true"
+                partition="persist:odoo"
                 useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             />
         </div>

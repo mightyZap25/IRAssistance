@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     googleOAuthSignIn: () => ipcRenderer.invoke('google-oauth-signin'),
     clearGoogleCookies: () => ipcRenderer.invoke('clear-google-cookies'),
     clearOdooCookies: () => ipcRenderer.invoke('clear-odoo-cookies'),
+    setOdooCookie: (cookieData) => ipcRenderer.invoke('set-odoo-cookie', cookieData),
     getOdooSessionId: () => ipcRenderer.invoke('get-odoo-session-id'),
     setTheme: (theme) => ipcRenderer.send('set-theme', theme),
     // Notes (Obsidian-like) file system API
@@ -29,6 +30,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.on('update-message', subscription);
         return () => {
             ipcRenderer.removeListener('update-message', subscription);
+        };
+    },
+    onAppGoBack: (callback) => {
+        const subscription = (event, ...args) => callback(...args);
+        ipcRenderer.on('app-go-back', subscription);
+        return () => {
+            ipcRenderer.removeListener('app-go-back', subscription);
+        };
+    },
+    onAppGoForward: (callback) => {
+        const subscription = (event, ...args) => callback(...args);
+        ipcRenderer.on('app-go-forward', subscription);
+        return () => {
+            ipcRenderer.removeListener('app-go-forward', subscription);
         };
     }
 });

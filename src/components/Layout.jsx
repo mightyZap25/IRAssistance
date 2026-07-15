@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { useAuth } from '../contexts/AuthContext';
 import { useTaskAlarm } from '../hooks/useTaskAlarm';
@@ -7,16 +7,72 @@ import UpdateNotificationModal from './common/UpdateNotificationModal';
 import FloatingNotepad from './common/FloatingNotepad';
 
 export default function Layout({ children }) {
-    const { currentUser } = useAuth();
+    const { currentUser, isOdooOnlyAuth } = useAuth();
     useTaskAlarm(currentUser);
 
     const [appVersion, setAppVersion] = React.useState('0.9.4');
+    const navigate = useNavigate();
 
     React.useEffect(() => {
         if (window.electronAPI?.getAppVersion) {
             window.electronAPI.getAppVersion().then(setAppVersion).catch(() => {});
         }
     }, []);
+
+    React.useEffect(() => {
+        if (!window.electronAPI) return;
+
+        const unsubscribeBack = window.electronAPI.onAppGoBack(() => {
+            const webviews = document.querySelectorAll('webview');
+            let handled = false;
+
+            for (const webview of webviews) {
+                if (webview.getBoundingClientRect().height > 0) {
+                    try {
+                        if (webview.canGoBack()) {
+                            webview.goBack();
+                            handled = true;
+                            break;
+                        }
+                    } catch (e) {
+                        console.error('Failed to call goBack on webview:', e);
+                    }
+                }
+            }
+
+            if (!handled) {
+                navigate(-1);
+            }
+        });
+
+        const unsubscribeForward = window.electronAPI.onAppGoForward(() => {
+            const webviews = document.querySelectorAll('webview');
+            let handled = false;
+
+            for (const webview of webviews) {
+                if (webview.getBoundingClientRect().height > 0) {
+                    try {
+                        if (webview.canGoForward()) {
+                            webview.goForward();
+                            handled = true;
+                            break;
+                        }
+                    } catch (e) {
+                        console.error('Failed to call goForward on webview:', e);
+                    }
+                }
+            }
+
+            if (!handled) {
+                navigate(1);
+            }
+        });
+
+        return () => {
+            unsubscribeBack();
+            unsubscribeForward();
+        };
+    }, [navigate]);
 
     const location = useLocation();
     
@@ -51,8 +107,8 @@ export default function Layout({ children }) {
             <Sidebar isCollapsed={isSidebarCollapsed} toggleSidebar={toggleSidebar} />
             <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
                 <main className={`flex-1 overflow-x-hidden ${isFullPage ? 'p-0' : 'p-6'} ${isGoogleApp ? (isSidebarCollapsed ? 'pl-1 bg-slate-100' : 'pl-2.5 bg-slate-100') : ''} relative`}>
-                    {/* Persistent Google Chat Webview (Always in DOM for background notifications) */}
-                    {isElectron && (
+                    {/* Persistent Google Chat Webview - Google 로그인 시에만 로드 (Odoo 전용 로그인 시 불필요) */}
+                    {isElectron && !isOdooOnlyAuth && (
                         <div style={{ 
                             position: isGoogleChat ? 'relative' : 'absolute',
                             left: isGoogleChat ? 0 : '-9999px',

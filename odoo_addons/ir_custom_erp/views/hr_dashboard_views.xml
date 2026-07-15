@@ -11,9 +11,6 @@
         <menuitem id="menu_hr_dashboard"
                   name="근태/휴가 대시보드"
                   action="action_hr_dashboard"
-                  web_icon="hr_attendance,static/description/icon.png"
-                  sequence="10"/>
-                  
-
+                  web_icon="hr_attendance,static/description/icon.png"/>
     </data>
 </odoo>

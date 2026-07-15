@@ -8,6 +8,7 @@
     """,
     'depends': ['base', 'product', 'mrp', 'purchase', 'stock', 'hr_attendance', 'hr_holidays'],
     'data': [
+        'security/security.xml',
         'security/ir.model.access.csv',
         'wizard/eco_wizard_views.xml',
         'wizard/eco_review_wizard_views.xml',
@@ -26,6 +27,6 @@
         ],
     },
     'installable': True,
-    'application': False,
+    'application': True,
     'auto_install': False,
 }

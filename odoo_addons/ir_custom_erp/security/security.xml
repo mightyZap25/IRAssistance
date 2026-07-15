@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- 제조 모듈 카테고리 하위에 PLM 그룹 생성 -->
+    <record id="group_ir_plm_user" model="res.groups">
+        <field name="name">PLM 사용자 (ECO 읽기/쓰기)</field>
+    </record>
+    
+    <record id="group_ir_plm_manager" model="res.groups">
+        <field name="name">PLM 관리자 (ECO 승인권한)</field>
+        <field name="implied_ids" eval="[(4, ref('group_ir_plm_user'))]"/>
+    </record>
+</odoo>

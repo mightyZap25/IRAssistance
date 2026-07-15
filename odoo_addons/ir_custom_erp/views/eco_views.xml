@@ -159,7 +159,7 @@
             <field name="view_mode">kanban,form</field>
         </record>
 
-        <menuitem id="menu_ir_eco_root" name="PLM (Custom)" sequence="50"/>
+        <menuitem id="menu_ir_eco_root" name="PLM (Custom)" sequence="50" groups="ir_custom_erp.group_ir_plm_user"/>
         <menuitem id="menu_ir_eco" name="설계 변경 (ECO)" parent="menu_ir_eco_root" action="action_ir_eco" sequence="10"/>
 
     </data>

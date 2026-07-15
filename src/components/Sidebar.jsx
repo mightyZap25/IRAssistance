@@ -27,7 +27,7 @@ const ROLE_MENU_MAP = {
 };
 
 export default function Sidebar({ isCollapsed, toggleSidebar }) {
-    const { currentUser, userProfile, logout, isOdooOnlyAuth } = useAuth();
+    const { currentUser, userProfile, logout, isOdooOnlyAuth, odooLinked, linkOdoo } = useAuth();
     const location = useLocation();
     const [pendingEcnCount, setPendingEcnCount] = useState(0);
     const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
@@ -45,6 +45,18 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         return localStorage.getItem('sidebar_show_ai_menu') !== 'false';
     });
 
+    const handleOdooLink = async () => {
+        const password = window.prompt("Odoo 연동을 위해 비밀번호를 입력해주세요:");
+        if (!password) return;
+        try {
+            await linkOdoo(password);
+            alert("Odoo 연동 성공!");
+            window.location.reload();
+        } catch(e) {
+            alert("Odoo 연동 실패: " + e.message);
+        }
+    };
+    
     // 설정 페이지에서 localStorage 변경 시 즉시 반영
     useEffect(() => {
         const handleStorageChange = () => {
@@ -67,7 +79,8 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
     }, [darkMode]);
 
     useEffect(() => {
-        if (!currentUser) return;
+        // Odoo 전용 로그인 시 Firebase 구독 불필요 (Google 인증 없음)
+        if (!currentUser || isOdooOnlyAuth) return;
 
         const qEcn = query(collection(db, 'ecns'), where('Status', '==', 'Pending'));
         const unsubEcn = onSnapshot(qEcn, (snap) => setPendingEcnCount(snap.docs.length));
@@ -83,7 +96,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         });
 
         return () => { unsubEcn(); unsubLeave(); unsubFlex(); };
-    }, [currentUser]);
+    }, [currentUser, isOdooOnlyAuth]);
 
     useEffect(() => {
         const handleOdooMenus = (e) => {
@@ -346,7 +359,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                         </div>
                         <button 
                             onClick={toggleSidebar} 
-                            className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-655 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95 animate-fade-in"
+                            className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-655 dark:hover:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95 animate-fade-in"
                             title="메뉴 접기"
                         >
                             <ChevronLeft size={16} />
@@ -355,7 +368,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                 ) : (
                     <button 
                         onClick={toggleSidebar} 
-                        className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-655 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95 hover:scale-105"
+                        className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-655 dark:hover:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95 hover:scale-105"
                         title="메뉴 펼치기"
                     >
                         <ChevronRight size={18} />
@@ -476,27 +489,42 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                                         <span className="w-3.5 h-3.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-650 dark:text-emerald-400 flex items-center justify-center font-black text-[8px]">O</span>
                                         <span className="text-slate-800 dark:text-slate-200 font-black text-[9px]">Odoo ERP</span>
                                     </div>
-                                    <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-400">연동됨</span>
+                                    <span className={`text-[8px] font-black ${odooLinked ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}`}>
+                                        {odooLinked ? '연동됨' : '미연동'}
+                                    </span>
                                 </div>
                                 <div className="flex items-center justify-between gap-1.5">
                                     <p className="text-[8px] text-slate-500 dark:text-slate-400 font-semibold truncate flex-1" title={currentUser?.email}>
                                         {currentUser?.email}
                                     </p>
-                                    <button
-                                        onClick={() => {
-                                            setProfileMenuOpen(false);
-                                            if (isOdooOnlyAuth) {
-                                                logout();
-                                            } else {
-                                                window.dispatchEvent(new CustomEvent('clear-odoo-session'));
-                                                alert("Odoo 세션이 초기화되었습니다. Odoo 뷰에서 다시 로그인해 주세요.");
-                                            }
-                                        }}
-                                        className="p-1 rounded hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-500 transition-colors active:scale-90"
-                                        title={isOdooOnlyAuth ? "로그아웃" : "Odoo 계정 바꾸기"}
-                                    >
-                                        <LogOut size={10} />
-                                    </button>
+                                    {odooLinked ? (
+                                        <button
+                                            onClick={() => {
+                                                setProfileMenuOpen(false);
+                                                if (isOdooOnlyAuth) {
+                                                    logout();
+                                                } else {
+                                                    localStorage.removeItem('odoo_password');
+                                                    window.dispatchEvent(new CustomEvent('clear-odoo-session'));
+                                                    window.location.reload();
+                                                }
+                                            }}
+                                            className="p-1 rounded hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-500 transition-colors active:scale-90"
+                                            title="Odoo 연동 해제"
+                                        >
+                                            <LogOut size={10} />
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => {
+                                                setProfileMenuOpen(false);
+                                                handleOdooLink();
+                                            }}
+                                            className="px-2 py-1 text-[9px] font-bold text-white bg-blue-655 hover:bg-blue-700 rounded transition-all active:scale-95 shadow-sm"
+                                        >
+                                            연동하기
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>

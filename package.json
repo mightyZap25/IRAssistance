@@ -1,8 +1,8 @@
 {
-    "name": "i-link",
+    "name": "ilink",
     "private": true,
-    "version": "0.9.4",
-    "description": "I-Link - 스마트 ERP 데스크톱 어플리케이션",
+    "version": "0.9.6",
+    "description": "ILink - 스마트 ERP 데스크톱 어플리케이션",
     "author": "Antigravity",
     "type": "module",
     "main": "main.js",
@@ -69,8 +69,8 @@
     },
     "build": {
         "appId": "com.irassistant.app",
-        "productName": "I-Link",
-        "artifactName": "I-Link-Setup-${version}.${ext}",
+        "productName": "ILink",
+        "artifactName": "ILink-Setup-${version}.${ext}",
         "icon": "build/icon.png",
         "publish": [
             {
@@ -102,6 +102,20 @@
             "target": [
                 "nsis"
             ]
+        },
+        "mac": {
+            "icon": "build/icon.png",
+            "target": [
+                "dmg",
+                "zip"
+            ]
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true,
+            "createStartMenuShortcut": true,
+            "createDesktopShortcut": true,
+            "shortcutName": "ILink"
         }
     }
 }
