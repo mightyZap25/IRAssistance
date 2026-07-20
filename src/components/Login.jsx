@@ -62,14 +62,71 @@ export default function Login() {
                     </div>
                 )}
 
-                <button
-                    type="button"
-                    onClick={login}
-                    className="w-full flex items-center justify-center gap-3 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-3 px-4 rounded-lg transition-all shadow-sm"
-                >
-                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
-                    Google Workspace로 로그인 (@mightyzap.com)
-                </button>
+                {showOdooLogin ? (
+                    <form onSubmit={handleOdooSubmit} className="flex flex-col gap-4 animate-fade-in mt-4">
+                        <div className="flex flex-col text-left gap-1">
+                            <label className="text-xs font-bold text-slate-500">Odoo 이메일</label>
+                            <div className="relative">
+                                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                <input
+                                    type="text"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                                    placeholder="email@example.com"
+                                    required
+                                />
+                            </div>
+                        </div>
+                        <div className="flex flex-col text-left gap-1">
+                            <label className="text-xs font-bold text-slate-500">비밀번호</label>
+                            <div className="relative">
+                                <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                                    placeholder="••••••••"
+                                    required
+                                />
+                            </div>
+                        </div>
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg transition-all shadow-sm flex items-center justify-center gap-2 mt-2"
+                        >
+                            {isLoading ? <Loader2 className="animate-spin" size={18} /> : '로그인'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setShowOdooLogin(false)}
+                            className="text-sm text-slate-500 hover:text-slate-700 underline mt-2"
+                        >
+                            Google 계정으로 로그인하기
+                        </button>
+                    </form>
+                ) : (
+                    <div className="flex flex-col gap-3">
+                        <button
+                            type="button"
+                            onClick={login}
+                            className="w-full flex items-center justify-center gap-3 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-3 px-4 rounded-lg transition-all shadow-sm"
+                        >
+                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
+                            Google Workspace로 로그인 (@mightyzap.com)
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setShowOdooLogin(true)}
+                            className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 px-4 rounded-lg transition-all"
+                        >
+                            <User size={18} />
+                            Odoo 직접 로그인 (조회 전용)
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );

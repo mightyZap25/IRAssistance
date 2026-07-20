@@ -238,6 +238,9 @@ export function AuthProvider({ children }) {
                         window.dispatchEvent(new CustomEvent('odoo-auto-login', {
                             detail: { login: user.email, password: savedOdooPwd, db: ODOO_DB, url: ODOO_API_URL }
                         }));
+                    } else {
+                        // 저장된 비밀번호가 없으면 Odoo 로그인(연동) 창 띄우기 요청
+                        window.dispatchEvent(new CustomEvent('require-odoo-login'));
                     }
                 }
             } else if (!isOdooOnlyAuth) {
