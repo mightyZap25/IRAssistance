@@ -235,7 +235,7 @@ export class HrDashboard extends Component {
     _onClickAttendanceRequest() {
         this.action.doAction({
             type: 'ir.actions.act_window',
-            name: '근태 신청',
+            name: '휴가/외근 신청',
             res_model: 'hr.leave',
             views: [[false, 'form']],
             view_mode: 'form',

@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setOdooCookie: (cookieData) => ipcRenderer.invoke('set-odoo-cookie', cookieData),
     getOdooSessionId: () => ipcRenderer.invoke('get-odoo-session-id'),
     setTheme: (theme) => ipcRenderer.send('set-theme', theme),
+    sendToHost: (channel, ...args) => ipcRenderer.sendToHost(channel, ...args),
     // Notes (Obsidian-like) file system API
     notes: {
         openFolder:  ()              => ipcRenderer.invoke('notes:openFolder'),

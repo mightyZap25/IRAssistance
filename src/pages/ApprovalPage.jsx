@@ -6,12 +6,23 @@ import ApprovalForm from '../components/ApprovalForm';
 import { ApprovalProcessor, ApprovalStatusViewer } from '../components/common/ApprovalSystem';
 import { FileCheck, Plus } from 'lucide-react';
 
+import { useLocation } from 'react-router-dom';
+
 export default function ApprovalPage() {
     const { currentUser } = useAuth();
-    const [viewMode, setViewMode] = useState('list'); // list, create, edit, view
+    const location = useLocation();
+    
+    // Parse query params to optionally auto-start creating a specific document type
+    const queryParams = new URLSearchParams(location.search);
+    const initialDocType = queryParams.get('docType');
+    const initialSubType = queryParams.get('subType');
+    
+    const [viewMode, setViewMode] = useState(initialDocType ? 'create' : 'list'); // list, create, edit, view
     const [activeTab, setActiveTab] = useState('pending'); // pending, my, draft, completed
     const [approvalsData, setApprovalsData] = useState([]);
-    const [selectedRequest, setSelectedRequest] = useState(null);
+    const [selectedRequest, setSelectedRequest] = useState(
+        initialDocType ? { docType: initialDocType, subType: initialSubType || '' } : null
+    );
 
     useEffect(() => {
         if (!currentUser) return;
@@ -81,6 +92,15 @@ export default function ApprovalPage() {
                             <div><p className="text-xs font-bold text-slate-500">불출요청일</p><p>{data.requestDate}</p></div>
                             <div><p className="text-xs font-bold text-slate-500">고객사</p><p>{data.customer}</p></div>
                             <div className="col-span-2"><p className="text-xs font-bold text-slate-500">사용목적</p><p>{data.purpose}</p></div>
+                        </>
+                    )}
+                    {data.docType === '근태신청서' && (
+                        <>
+                            <div><p className="text-xs font-bold text-slate-500">근태 종류</p><p>{data.subType}</p></div>
+                            <div><p className="text-xs font-bold text-slate-500">시작일</p><p>{data.startDate}</p></div>
+                            <div><p className="text-xs font-bold text-slate-500">종료일</p><p>{data.endDate}</p></div>
+                            <div><p className="text-xs font-bold text-slate-500">목적지/장소</p><p>{data.location || '-'}</p></div>
+                            <div className="col-span-2"><p className="text-xs font-bold text-slate-500">신청 사유</p><p>{data.reason}</p></div>
                         </>
                     )}
                     

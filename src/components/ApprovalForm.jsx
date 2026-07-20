@@ -26,6 +26,9 @@ export default function ApprovalForm({ existingData = null, onBack, onSaved }) {
         
         // Release Request fields
         requestDate: new Date().toISOString().split('T')[0], customer: '', purpose: '',
+
+        // Attendance Request fields
+        subType: existingData?.subType || '외근', startDate: new Date().toISOString().split('T')[0], endDate: new Date().toISOString().split('T')[0], reason: '', location: '',
     });
 
     const [items, setItems] = useState(existingData?.items || []);
@@ -138,6 +141,24 @@ export default function ApprovalForm({ existingData = null, onBack, onSaved }) {
             <div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1">양산이관 폴더경로</label><input name="folderPath" value={formData.folderPath||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
             <div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1">발행부서 의견</label><textarea name="deptOpinion" value={formData.deptOpinion||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm h-20"/></div>
             <div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1">비고</label><input name="note" value={formData.note||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
+        </>
+    );
+
+    const renderAttendanceFields = () => (
+        <>
+            <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">근태 종류</label>
+                <select name="subType" value={formData.subType || '외근'} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm">
+                    <option value="외근">외근</option>
+                    <option value="외출">외출</option>
+                    <option value="유연근로">유연근로</option>
+                    <option value="출근시간 변경">출근시간 변경</option>
+                </select>
+            </div>
+            <div><label className="block text-xs font-bold text-slate-500 mb-1">시작일</label><input type="date" name="startDate" value={formData.startDate||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
+            <div><label className="block text-xs font-bold text-slate-500 mb-1">종료일</label><input type="date" name="endDate" value={formData.endDate||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
+            <div><label className="block text-xs font-bold text-slate-500 mb-1">목적지/장소 (외근/출장 시)</label><input name="location" value={formData.location||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm" placeholder="예: 서울 본사, 롯데타워 등"/></div>
+            <div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1">신청 사유</label><textarea name="reason" value={formData.reason||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm h-24" placeholder="상세 사유를 입력하세요"/></div>
         </>
     );
 
@@ -273,18 +294,21 @@ export default function ApprovalForm({ existingData = null, onBack, onSaved }) {
                                     <option value="양산이관서">양산이관서</option>
                                     <option value="기안서">기안서</option>
                                     <option value="불출요청서">불출요청서</option>
+                                    <option value="근태신청서">근태신청서</option>
                                 </select>
                             </div>
                             <div className="md:col-span-2">
                                 <label className="block text-xs font-bold text-slate-500 mb-1">결재 제목</label>
                                 <input name="title" value={formData.title} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm font-bold bg-blue-50 text-blue-900" placeholder="결재 제목을 입력하세요."/>
                             </div>
-                            
-                            {formData.docType === '설계변경서' && renderECOFields()}
-                            {formData.docType === '지출결의서' && renderExpenseFields()}
-                            {formData.docType === '양산이관서' && renderTransferFields()}
-                            {formData.docType === '기안서' && renderDraftFields()}
-                            {formData.docType === '불출요청서' && renderReleaseFields()}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-6 rounded-xl border border-slate-200">
+                                {formData.docType === '설계변경서' && renderECOFields()}
+                                {formData.docType === '지출결의서' && renderExpenseFields()}
+                                {formData.docType === '양산이관서' && renderTransferFields()}
+                                {formData.docType === '기안서' && renderDraftFields()}
+                                {formData.docType === '불출요청서' && renderReleaseFields()}
+                                {formData.docType === '근태신청서' && renderAttendanceFields()}
+                            </div>
                         </div>
                     </div>
 

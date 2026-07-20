@@ -42,7 +42,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         return localStorage.getItem('theme') === 'dark';
     });
     const [showAiMenu, setShowAiMenu] = useState(() => {
-        return localStorage.getItem('sidebar_show_ai_menu') !== 'false';
+        return localStorage.getItem('sidebar_show_ai_menu') === 'true'; // 기본값 false로 변경 (사용자 요청에 의해 비활성화)
     });
 
     const handleOdooLink = async () => {
@@ -60,7 +60,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
     // 설정 페이지에서 localStorage 변경 시 즉시 반영
     useEffect(() => {
         const handleStorageChange = () => {
-            setShowAiMenu(localStorage.getItem('sidebar_show_ai_menu') !== 'false');
+            setShowAiMenu(localStorage.getItem('sidebar_show_ai_menu') === 'true');
         };
         window.addEventListener('storage', handleStorageChange);
         return () => {
@@ -117,6 +117,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
     const allowedPaths = ROLE_MENU_MAP[role] || ROLE_MENU_MAP.viewer;
     const isAllowed = (item) => {
         const path = item.path;
+        if (item.isExternal) return true;
         if (path === '/settings' || path === '/odoo/login' || path === '/odoo/logout') return true;
         
         if (path.startsWith('/odoo/view')) {
@@ -155,10 +156,6 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                 { name: 'Google Drive', path: '/workspace/drive', icon: Cloud },
                 { name: 'Google Calendar', path: '/workspace/calendar', icon: CalendarDays },
                 { name: 'Google Chat', path: '/workspace/chat', icon: MessageSquare },
-                ...(showAiMenu ? [
-                    { name: 'Gemini', path: '/workspace/gemini', icon: Sparkles },
-                    { name: 'AI 비서', path: '/workspace/agent', icon: Bot, badge: 'N' },
-                ] : []),
                 { name: 'NotebookLM', path: '/workspace/notebooklm', icon: BookOpen },
                 { name: '노트', path: '/workspace/notes', icon: NotebookPen }
             ]
@@ -251,7 +248,8 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         '제조 품질',
         '근태관리',
         '협업 & 기타',
-        'Project 관리'
+        'Project 관리',
+        '매뉴얼'
     ];
 
     const GROUP_COLOR_MAP = {
@@ -261,6 +259,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         '근태관리': 'text-sky-600',
         '협업 & 기타': 'text-purple-500',
         'Project 관리': 'text-slate-500',
+        '매뉴얼': 'text-blue-500',
         '구글 워크스페이스': 'text-blue-500',
         '시스템 제어': 'text-slate-500'
     };
@@ -275,7 +274,8 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         const CUSTOM_APPS = [
             { cat: '협업 & 기타', name: '전자결재', path: '/approval', icon: FileCheck },
             { cat: '시스템 제어', name: 'Odoo 로그인', path: '/odoo/login', icon: UserCheck },
-            { cat: '시스템 제어', name: 'Odoo 로그아웃', path: '/odoo/logout', icon: LogOut }
+            { cat: '시스템 제어', name: 'Odoo 로그아웃', path: '/odoo/logout', icon: LogOut },
+            { cat: '매뉴얼', name: 'ERP MANUAL', path: 'https://www.odoo.com/documentation/19.0/ko/index.html', icon: BookOpen, isExternal: true }
         ];
 
         CUSTOM_APPS.forEach(app => {
@@ -283,7 +283,8 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
             groupsMap[app.cat].push({
                 name: app.name,
                 path: app.path,
-                icon: app.icon
+                icon: app.icon,
+                isExternal: app.isExternal
             });
         });
 
@@ -311,6 +312,9 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
             '근태': 2,
             '휴가': 3,
             '인사': 4,
+            '전자결재': 10,
+            '프로젝트': 11,
+            'ERP MANUAL': 12,
         };
         Object.keys(groupsMap).forEach(cat => {
             groupsMap[cat].sort((a, b) => {
@@ -597,45 +601,65 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                                                 {group.title}
                                             </div>
                                         )}
-                                        {group.items.map(item => (
-                                            <NavLink 
-                                                key={item.path} 
-                                                to={item.path} 
-                                                replace={true}
-                                                className={({ isActive }) => 
-                                                    isCollapsed
-                                                        ? `flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 relative ${
-                                                            checkActive(item.path) 
-                                                                ? 'bg-sky-50 dark:bg-sky-955/40 text-sky-700 dark:text-sky-400 border border-sky-100 dark:border-sky-900/50' 
-                                                                : 'hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-500 dark:text-slate-400'
-                                                        }`
-                                                        : `flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
-                                                            checkActive(item.path) 
-                                                                ? 'bg-sky-50 dark:bg-sky-955/40 text-sky-700 dark:text-sky-400 border border-sky-100 dark:border-sky-900/50 font-bold' 
-                                                                : 'hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-500 dark:text-slate-400 font-medium'
-                                                        }`
-                                                }
-                                                onMouseEnter={isCollapsed ? (e) => {
-                                                    const rect = e.currentTarget.getBoundingClientRect();
-                                                    setTooltip({ label: item.name, y: rect.top + rect.height / 2 });
-                                                } : undefined}
-                                                onMouseLeave={isCollapsed ? () => setTooltip(null) : undefined}
-                                            >
-                                                <item.icon size={16} /> 
-                                                {!isCollapsed && <span className="text-xs flex-1">{item.name}</span>}
-                                                {item.badge && (
-                                                    isCollapsed ? (
-                                                        <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-pulse">
-                                                            {item.badge}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
-                                                            {item.badge}
-                                                        </span>
-                                                    )
-                                                )}
-                                            </NavLink>
-                                        ))}
+                                        {group.items.map(item => {
+                                            const activeClass = isCollapsed
+                                                ? `flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 relative bg-sky-50 dark:bg-sky-955/40 text-sky-700 dark:text-sky-400 border border-sky-100 dark:border-sky-900/50`
+                                                : `flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group bg-sky-50 dark:bg-sky-955/40 text-sky-700 dark:text-sky-400 border border-sky-100 dark:border-sky-900/50 font-bold`;
+                                            const inactiveClass = isCollapsed
+                                                ? `flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 relative hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-500 dark:text-slate-400`
+                                                : `flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-500 dark:text-slate-400 font-medium`;
+                                            
+                                            const getClassName = (isActive) => isActive ? activeClass : inactiveClass;
+                                            
+                                            const onMouseEnter = isCollapsed ? (e) => {
+                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                setTooltip({ label: item.name, y: rect.top + rect.height / 2 });
+                                            } : undefined;
+                                            const onMouseLeave = isCollapsed ? () => setTooltip(null) : undefined;
+                                            
+                                            const content = (
+                                                <>
+                                                    <item.icon size={16} /> 
+                                                    {!isCollapsed && <span className="text-xs flex-1">{item.name}</span>}
+                                                    {item.badge && (
+                                                        isCollapsed ? (
+                                                            <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-pulse">
+                                                                {item.badge}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
+                                                                {item.badge}
+                                                            </span>
+                                                        )
+                                                    )}
+                                                </>
+                                            );
+
+                                            return item.isExternal ? (
+                                                <a
+                                                    key={item.path}
+                                                    href={item.path}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className={inactiveClass}
+                                                    onMouseEnter={onMouseEnter}
+                                                    onMouseLeave={onMouseLeave}
+                                                >
+                                                    {content}
+                                                </a>
+                                            ) : (
+                                                <NavLink 
+                                                    key={item.path} 
+                                                    to={item.path} 
+                                                    replace={true}
+                                                    className={({ isActive }) => getClassName(checkActive(item.path))}
+                                                    onMouseEnter={onMouseEnter}
+                                                    onMouseLeave={onMouseLeave}
+                                                >
+                                                    {content}
+                                                </NavLink>
+                                            );
+                                        })}
                                     </div>
                                 ))}
                             </div>

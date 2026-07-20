@@ -8,6 +8,7 @@ const fs = _require('fs');
 import { fork } from 'child_process';
 import url from 'url';
 import http from 'http';
+import https from 'https';
 import dotenv from 'dotenv';
 // 개발 환경: __dirname 기준 / 패키징 환경: app.getAppPath() 기준으로 .env 경로 명시
 const envPath = app.isPackaged
@@ -31,7 +32,6 @@ function ensureNotificationIcons() {
     const downloadIcon = (url, filename) => {
         const dest = path.join(iconDir, filename);
         if (!fs.existsSync(dest)) {
-            const https = require('https');
             https.get(url, (res) => {
                 if (res.statusCode === 200) {
                     const file = fs.createWriteStream(dest);
@@ -281,11 +281,6 @@ if (!gotTheLock) {
                 contents.on('ipc-message', (e, channel, ...args) => {
                     if (channel === 'odoo-desktop-notification') {
                         const data = args[0] || {};
-                        console.log('\n======================================');
-                        console.log('[Electron Main] 🔔 앱 푸시 알림 수신!');
-                        console.log('- 제목:', data.title);
-                        console.log('- 내용:', data.options?.body || '');
-                        console.log('======================================\n');
                         if (Notification.isSupported()) {
                             const notif = new Notification({
                                 title: data.title || '새 알림',
@@ -300,9 +295,7 @@ if (!gotTheLock) {
                 // Preload 스크립트의 console.log를 터미널로 중계 및 알림 처리
                 contents.on('console-message', (event, level, message, line, sourceId) => {
                     const msg = message || '';
-                    if (msg.startsWith('[ILink-Preload]')) {
-                        console.log(msg);
-                    } else if (msg.startsWith('ILINK_NOTIF::')) {
+                    if (msg.startsWith('ILINK_NOTIF::')) {
                         try {
                             const data = JSON.parse(msg.slice('ILINK_NOTIF::'.length));
                             
@@ -317,13 +310,6 @@ if (!gotTheLock) {
                             }
                             
                             const finalTitle = prefix + (data.title || '새 알림');
-                            
-                            console.log('\n======================================');
-                            console.log(`[Electron Main] 🔔 앱 푸시 알림 수신 (Console)!`);
-                            console.log('- 출처:', data.source || '알 수 없음');
-                            console.log('- 제목:', finalTitle);
-                            console.log('- 내용:', data.body);
-                            console.log('======================================\n');
                             
                             if (Notification.isSupported()) {
                                 // 다운로드된 아이콘 파일이 존재하는지 확인, 없으면 기본 아이콘 사용

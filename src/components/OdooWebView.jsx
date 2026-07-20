@@ -129,6 +129,11 @@ export default function OdooWebView() {
                 console.log('[OdooWebView] IPC Notification Request Received:', title);
                 // 메인 렌더러(I-Link) 권한으로 진짜 윈도우 알림을 띄웁니다!
                 new window.Notification(title, options);
+            } else if (e.channel === 'odoo-navigate') {
+                const { path } = e.args[0];
+                console.log('[OdooWebView] IPC Navigate Request Received:', path);
+                // React Router를 통해 라우팅 수행
+                window.location.hash = '#' + path; // HashRouter 사용 가정
             }
         };
 
@@ -1240,6 +1245,8 @@ export default function OdooWebView() {
                                     el.dataset.irParsed = 'true';
                                 }
                             });
+
+                            // 4. 앱 별 매뉴얼 버튼 주입 기능 제거됨 (Sidebar 메뉴로 이동)
                         };
 
                         setInterval(highlightCells, 600); // 부하를 줄이기 위해 0.6초로 조정
@@ -1252,6 +1259,13 @@ export default function OdooWebView() {
         };
             
         const handleConsoleMessage = async (e) => {
+            if (typeof e.message === 'string' && e.message.startsWith('__IR_NAVIGATE__:')) {
+                const targetPath = e.message.split('__IR_NAVIGATE__:')[1];
+                console.log('[OdooWebView] Navigation requested from Odoo:', targetPath);
+                window.location.hash = '#' + targetPath;
+                return;
+            }
+
             if (e.message === '__IR_SAVE_SHEET__') {
                 try {
                     const data = await webviewRef.current.executeJavaScript(`

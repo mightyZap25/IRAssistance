@@ -46,16 +46,16 @@
             <div class="hr_main">
                 <!-- Top Metric Cards -->
                 <div class="top_cards">
-                    <div class="metric_card" t-on-click="_onClickLeaveRequest">
-                        <span class="card_title">휴가 신청</span>
+                    <div class="metric_card" t-on-click="_onClickAttendanceRequest">
+                        <span class="card_title">근태 신청 (휴가/외근)</span>
                         <span class="card_value">
                             <t t-esc="(state.data.leave_total_days - state.data.leave_taken_days).toFixed(1)"/> / <t t-esc="state.data.leave_total_days"/>
                             <small class="text-muted ml-2">(잔여: <t t-esc="state.data.leave_remaining_hours"/>시간)</small>
                             <i class="fa fa-chevron-right ml-2"/>
                         </span>
                     </div>
-                    <div class="metric_card" t-on-click="_onClickAttendanceRequest">
-                        <span class="card_title">근태 신청 (출퇴근 변경/유연근무)</span>
+                    <div class="metric_card" t-on-click="_onClickScheduleChange">
+                        <span class="card_title">근무일정 변경 신청</span>
                         <span class="card_value"><i class="fa fa-chevron-right"/></span>
                     </div>
                     <div class="metric_card" t-on-click="_onClickPendingApprovals" style="cursor: pointer;">
@@ -166,7 +166,6 @@
                         </div>
                     </div>
                 </div>
-
 
                 <!-- Calendar Area (Placeholder for actual fullcalendar integration or custom grid) -->
                 <div class="calendar_area">
