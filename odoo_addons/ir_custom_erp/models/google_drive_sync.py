@@ -46,28 +46,28 @@ class GoogleDriveSyncMixin(models.AbstractModel):
 
     def _get_csv_data(self):
         """
-        현재 레코드의 모든 필드를 Flatten하여 단일 행 CSV 문자열로 변환
+        현재 레코드의 안전한 필드(스칼라 및 Many2one)만 Flatten하여 단일 행 CSV 문자열로 변환
         """
         output = StringIO()
         writer = csv.writer(output)
         
+        # 무거운 관계형 필드 및 바이너리 필드 제외 (무한 로딩/성능 저하 방지)
+        safe_fields = []
+        for fname, field in self._fields.items():
+            if field.type not in ('binary', 'one2many', 'many2many'):
+                safe_fields.append(fname)
+        
         # 필드명 헤더 생성
-        field_names = list(self._fields.keys())
-        writer.writerow(field_names)
+        writer.writerow(safe_fields)
         
         for record in self:
             row = []
-            for field in field_names:
+            for field in safe_fields:
                 try:
                     val = getattr(record, field)
                     if isinstance(val, models.Model):
-                        # 관계형 필드일 경우 display_name을 파이프로 이어 붙임
-                        if len(val) > 1:
-                            row.append(" | ".join([str(v.display_name) for v in val]))
-                        elif len(val) == 1:
-                            row.append(str(val.display_name))
-                        else:
-                            row.append('')
+                        # Many2one 필드일 경우
+                        row.append(str(val.display_name) if val else '')
                     else:
                         row.append(str(val) if val is not False else '')
                 except Exception as e:
