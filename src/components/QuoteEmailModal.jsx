@@ -4,7 +4,7 @@ import {
     X, Send, Mail, Check, Plus, FileDown, Building2, User,
     ChevronDown, AlertCircle, Sparkles
 } from 'lucide-react';
-import { db, collection, getDocs, query, where } from '../firebase';
+import { db, collection, getDocs, query, where } from '../database';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 

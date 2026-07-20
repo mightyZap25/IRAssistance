@@ -1,15 +1,19 @@
 const CALENDAR_SUMMARY = 'I-Link ERP';
 const API_BASE = 'https://www.googleapis.com/calendar/v3';
-import { db, collection, query, where, getDocs, updateDoc, doc, addDoc, serverTimestamp } from '../firebase';
+import { db, collection, query, where, getDocs, updateDoc, doc, addDoc, serverTimestamp } from '../database';
 
 function getAccessToken() {
     return localStorage.getItem('google_access_token');
 }
 
+let isCalendarDisabled = false;
+
 /**
  * 전용 캘린더를 찾거나 없으면 생성합니다.
  */
 export async function getOrCreateCalendar() {
+    if (isCalendarDisabled) return null;
+
     const token = getAccessToken();
     if (!token) throw new Error('No Google Access Token');
 
@@ -24,7 +28,10 @@ export async function getOrCreateCalendar() {
     
     if (!listRes.ok) {
         if (listRes.status === 401 || listRes.status === 403) {
-            console.warn("[Calendar] 캘린더 접근 권한이 없거나 토큰이 만료되었습니다. 캘린더 동기화가 비활성화됩니다.");
+            if (!isCalendarDisabled) {
+                console.warn("[Calendar] 캘린더 접근 권한이 없거나 토큰이 만료되었습니다. 캘린더 동기화가 비활성화됩니다.");
+                isCalendarDisabled = true;
+            }
             return null;
         }
         throw new Error('Failed to fetch calendar list');

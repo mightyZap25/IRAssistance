@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { collection, doc, getDocs, query, where, writeBatch, addDoc, updateDoc, runTransaction, serverTimestamp } from '../firebase';
-import { db } from '../firebase';
+import { collection, doc, getDocs, query, where, writeBatch, addDoc, updateDoc, runTransaction, serverTimestamp } from '../database';
+import { db } from '../database';
 import { 
     X, Save, FileText, Plus, CheckCircle2, 
     Settings2, Trash2, Tag, CheckSquare, MessageSquare, RefreshCw, 

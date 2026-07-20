@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, FileText, Upload, CheckCircle2, DollarSign, Info, ShieldCheck, Printer, CreditCard } from 'lucide-react';
-import { db, doc, updateDoc, serverTimestamp, setDoc } from '../firebase';
+import { db, doc, updateDoc, serverTimestamp, setDoc } from '../database';
 
 const ExpenseResolutionModal = ({ isOpen, onClose, poData, onSubmit }) => {
     const [taxInvoiceFile, setTaxInvoiceFile] = useState(null);

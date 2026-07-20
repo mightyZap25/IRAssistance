@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { collection, getDocs, query, where, writeBatch, doc, addDoc, updateDoc, arrayUnion } from '../firebase';
-import { db } from '../firebase';
+import { collection, getDocs, query, where, writeBatch, doc, addDoc, updateDoc, arrayUnion } from '../database';
+import { db } from '../database';
 import { X, Plus, Trash2, Save, AlertCircle, Copy, ChevronDown, ChevronRight, CheckCircle2, LayoutGrid, List, Link, Upload, FileSpreadsheet, ClipboardPaste, AlertTriangle, Check, RotateCcw } from 'lucide-react';
 import * as XLSX from 'xlsx';
 

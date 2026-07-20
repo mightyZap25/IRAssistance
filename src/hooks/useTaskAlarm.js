@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { db, collection, query, where, onSnapshot, addDoc, serverTimestamp, updateDoc, doc } from '../firebase';
+import { db, collection, query, where, onSnapshot, addDoc, serverTimestamp, updateDoc, doc } from '../database';
 import { pollGoogleCalendarToTasks } from '../services/calendarService';
 
 export function useTaskAlarm(currentUser) {

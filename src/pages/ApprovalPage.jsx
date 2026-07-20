@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot } from '../firebase';
-import { db } from '../firebase';
+import { collection, query, orderBy, onSnapshot } from '../database';
+import { db } from '../database';
 import { useAuth } from '../contexts/AuthContext';
 import ApprovalForm from '../components/ApprovalForm';
 import { ApprovalProcessor, ApprovalStatusViewer } from '../components/common/ApprovalSystem';

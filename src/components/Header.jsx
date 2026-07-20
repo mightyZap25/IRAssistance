@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth, DEV_ROLES } from '../contexts/AuthContext';
-import { db, collection, query, where, orderBy, onSnapshot, doc, updateDoc, setDoc, serverTimestamp, getDoc } from '../firebase';
+import { db, collection, query, where, orderBy, onSnapshot, doc, updateDoc, setDoc, serverTimestamp, getDoc } from '../database';
 import { LogOut, User, Bell, FlaskConical, ChevronDown, Check, StickyNote, X, Maximize2, Minimize2, Move, Printer, HelpCircle } from 'lucide-react';
 import RichMemoEditor from './common/RichMemoEditor';
 

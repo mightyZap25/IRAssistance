@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { db, doc, updateDoc, serverTimestamp, getDocs, collection, query, where, addDoc } from '../firebase';
+import { db, doc, updateDoc, serverTimestamp, getDocs, collection, query, where, addDoc } from '../database';
 import { X, ShieldCheck, CheckCircle2, XCircle, Info, User, ClipboardList, Package, Camera, AlertTriangle } from 'lucide-react';
 
 const QualityInspectionModal = ({ isOpen, onClose, inspectionData, onRefresh }) => {

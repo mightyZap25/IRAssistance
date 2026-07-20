@@ -60,10 +60,114 @@
                     </div>
                     <div class="metric_card" t-on-click="_onClickPendingApprovals" style="cursor: pointer;">
                         <span class="card_title">내 결재 대기</span>
-                        <span class="card_value"><t t-esc="state.data.pending_approvals"/> 건 <i class="fa fa-chevron-right"/></span>
+                        <span class="card_value">
+                            <t t-esc="state.data.pending_approvals"/> 건
+                            <i t-att-class="state.pendingPanel.open ? 'fa fa-chevron-up ml-1' : 'fa fa-chevron-down ml-1'"/>
+                        </span>
                     </div>
                 </div>
-                
+
+                <!-- ★ 결재 대기 모달 팝업 -->
+                <div t-if="state.pendingPanel.open" class="pending_modal_backdrop" t-on-click="_onClickClosePendingPanel">
+                    <div class="pending_modal_content" t-on-click.stop="">
+                        <div class="pending_modal_header">
+                            <h3><i class="fa fa-list-alt text-primary"/> 내 결재 대기 목록</h3>
+                            <button class="btn_close" t-on-click="_onClickClosePendingPanel"><i class="fa fa-times"/></button>
+                        </div>
+
+                        <!-- 로딩 표시 -->
+                        <div t-if="state.pendingPanel.loading" class="pending_loading">
+                            <i class="fa fa-spinner fa-spin"/> 목록 로딩 중...
+                        </div>
+
+                        <div t-else="" class="pending_modal_body">
+                            <!-- ① 내가 신청한 휴가 (결재 대기 중) -->
+                            <div class="pending_section">
+                                <div class="pending_section_title">
+                                    <i class="fa fa-paper-plane text-primary"/> 내가 신청한 휴가
+                                    <span class="badge badge-primary ml-1"><t t-esc="state.pendingPanel.my_requests.length"/>건</span>
+                                </div>
+                                <div t-if="state.pendingPanel.my_requests.length === 0" class="pending_empty">
+                                    결재 대기 중인 신청이 없습니다.
+                                </div>
+                                <table t-else="" class="pending_table">
+                                    <thead>
+                                        <tr>
+                                            <th>휴가 종류</th>
+                                            <th>기간</th>
+                                            <th>일수</th>
+                                            <th>상태</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-foreach="state.pendingPanel.my_requests" t-as="req" t-key="req.id">
+                                            <tr>
+                                                <td><t t-esc="req.leave_type"/></td>
+                                                <td><t t-esc="req.date_from"/> ~ <t t-esc="req.date_to"/></td>
+                                                <td><t t-esc="req.number_of_days"/>일</td>
+                                                <td>
+                                                    <span t-attf-class="state_badge state_{{ req.state_raw }}">
+                                                        <t t-esc="req.state"/>
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-secondary" t-on-click="() => this._onClickMyLeave(req.id)">
+                                                        <i class="fa fa-eye"/> 보기
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- ② 내가 결재해야 할 휴가 -->
+                            <div class="pending_section">
+                                <div class="pending_section_title">
+                                    <i class="fa fa-check-circle text-warning"/> 내가 결재해야 할 휴가
+                                    <span class="badge badge-warning ml-1"><t t-esc="state.pendingPanel.to_approve.length"/>건</span>
+                                </div>
+                                <div t-if="state.pendingPanel.to_approve.length === 0" class="pending_empty">
+                                    결재 요청된 항목이 없습니다.
+                                </div>
+                                <table t-else="" class="pending_table">
+                                    <thead>
+                                        <tr>
+                                            <th>신청자</th>
+                                            <th>부서</th>
+                                            <th>휴가 종류</th>
+                                            <th>기간</th>
+                                            <th>일수</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-foreach="state.pendingPanel.to_approve" t-as="req" t-key="req.id">
+                                            <tr>
+                                                <td><strong><t t-esc="req.employee_name"/></strong></td>
+                                                <td><t t-esc="req.department"/></td>
+                                                <td><t t-esc="req.leave_type"/></td>
+                                                <td><t t-esc="req.date_from"/> ~ <t t-esc="req.date_to"/></td>
+                                                <td><t t-esc="req.number_of_days"/>일</td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-primary" t-on-click="() => this._onClickApproveLeave(req.id)">
+                                                    <i class="fa fa-check"/> 승인
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger ml-1" t-on-click="() => this._onClickRefuseLeave(req.id)">
+                                                    <i class="fa fa-times"/> 반려
+                                                </button>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
                 <!-- Calendar Area (Placeholder for actual fullcalendar integration or custom grid) -->
                 <div class="calendar_area">
                     <div class="calendar_header">

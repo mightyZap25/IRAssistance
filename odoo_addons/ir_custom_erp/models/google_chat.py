@@ -1,6 +1,7 @@
 import re
 import logging
 from odoo import models, fields, api, _
+from odoo.exceptions import UserError
 from .google_chat_helper import send_chat_dm
 
 _logger = logging.getLogger(__name__)
@@ -47,59 +48,90 @@ class MailNotification(models.Model):
                             msg += "..."
                             
                     send_chat_dm(self.env, user.email, msg)
+            except UserError as ue:
+                raise ue
             except Exception as e:
-                _logger.error("Failed to process Google Chat notification in mail.notification: %s", str(e))
+                _logger.error("Failed to process Google Chat notification: %s", str(e))
         return records
 
 
 class HrLeave(models.Model):
     _inherit = 'hr.leave'
 
-    def action_confirm(self):
-        res = super(HrLeave, self).action_confirm()
-        for rec in self:
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super(HrLeave, self).create(vals_list)
+        for rec in records:
             try:
-                # 결재 신청 시 승인권자(매니저)에게 알림
-                manager_user = rec.employee_id.parent_id.user_id
-                if manager_user and manager_user.email:
+                if rec.state in ['confirm', 'validate1']:
+                    manager_emp = rec.employee_id.parent_id
+                    if not manager_emp:
+                        raise UserError(f"[{rec.employee_id.name}] 직원의 매니저가 설정되어 있지 않습니다!")
+                    manager_email = manager_emp.work_email or (manager_emp.user_id and manager_emp.user_id.email)
+                    if not manager_email:
+                        raise UserError(f"매니저({manager_emp.name})의 직원 정보에 '업무 이메일'이 등록되어 있지 않습니다!")
+                        
                     msg = f"📋 *[휴가 결재 요청]*\n"
-                    msg += f"👤 *신청자*: {rec.employee_id.name} ({rec.employee_id.department_id.name or '부서 없음'})\n"
+                    msg += f"👤 *신청자*: {rec.employee_id.name}\n"
                     msg += f"📅 *기간*: {rec.date_from} ~ {rec.date_to} ({rec.number_of_days}일)\n"
-                    msg += f"📝 *사유*: {rec.name or '없음'}\n\n"
-                    msg += f"👉 Odoo 결재 대기 함에서 확인 후 승인해 주세요."
-                    send_chat_dm(self.env, manager_user.email, msg)
-            except Exception as e:
-                _logger.error("Failed to send Google Chat DM for hr.leave confirm: %s", str(e))
-        return res
-
-    def action_validate(self):
-        res = super(HrLeave, self).action_validate()
-        for rec in self:
-            try:
-                # 승인 완료 시 신청자에게 알림
-                requester_user = rec.employee_id.user_id
-                if requester_user and requester_user.email:
-                    msg = f"✅ *[휴가 승인 완료]*\n"
+                    msg += f"👉 Odoo에서 승인해 주세요."
+                    send_chat_dm(self.env, manager_email, msg)
+                elif rec.state == 'validate':
+                    emp_email = rec.employee_id.work_email or (rec.employee_id.user_id and rec.employee_id.user_id.email)
+                    if not emp_email:
+                        raise UserError(f"신청자({rec.employee_id.name})의 직원 정보에 '업무 이메일'이 등록되어 있지 않습니다!")
+                        
+                    msg = f"✅ *[휴가 자동 승인]*\n"
                     msg += f"📅 *기간*: {rec.date_from} ~ {rec.date_to} ({rec.number_of_days}일)\n"
-                    msg += f"🎉 요청하신 휴가가 승인 완료되었습니다."
-                    send_chat_dm(self.env, requester_user.email, msg)
+                    send_chat_dm(self.env, emp_email, msg)
+            except UserError as ue:
+                raise ue
             except Exception as e:
-                _logger.error("Failed to send Google Chat DM for hr.leave validate: %s", str(e))
-        return res
+                _logger.error("Failed to send Google Chat DM for hr.leave create: %s", str(e))
+        return records
 
-    def action_refuse(self):
-        res = super(HrLeave, self).action_refuse()
-        for rec in self:
-            try:
-                # 반려 시 신청자에게 알림
-                requester_user = rec.employee_id.user_id
-                if requester_user and requester_user.email:
-                    msg = f"❌ *[휴가 반려 안내]*\n"
-                    msg += f"📅 *기간*: {rec.date_from} ~ {rec.date_to}\n"
-                    msg += f"⚠️ 요청하신 휴가가 반려되었습니다. 세부 사유는 결재 라인을 확인해 주세요."
-                    send_chat_dm(self.env, requester_user.email, msg)
-            except Exception as e:
-                _logger.error("Failed to send Google Chat DM for hr.leave refuse: %s", str(e))
+    def write(self, vals):
+        old_states = {rec.id: rec.state for rec in self}
+        res = super(HrLeave, self).write(vals)
+        if 'state' in vals:
+            for rec in self:
+                try:
+                    old_state = old_states.get(rec.id)
+                    new_state = rec.state
+                    if old_state != new_state:
+                        if new_state in ['confirm', 'validate1']:
+                            manager_emp = rec.employee_id.parent_id
+                            if not manager_emp:
+                                raise UserError(f"[{rec.employee_id.name}] 직원의 매니저가 설정되어 있지 않습니다!")
+                            manager_email = manager_emp.work_email or (manager_emp.user_id and manager_emp.user_id.email)
+                            if not manager_email:
+                                raise UserError(f"매니저({manager_emp.name})의 직원 정보에 '업무 이메일'이 등록되어 있지 않습니다!")
+                                
+                            msg = f"📋 *[휴가 결재 요청]*\n"
+                            msg += f"👤 *신청자*: {rec.employee_id.name}\n"
+                            msg += f"📅 *기간*: {rec.date_from} ~ {rec.date_to} ({rec.number_of_days}일)\n"
+                            msg += f"👉 Odoo에서 승인해 주세요."
+                            send_chat_dm(self.env, manager_email, msg)
+                        elif new_state == 'validate':
+                            emp_email = rec.employee_id.work_email or (rec.employee_id.user_id and rec.employee_id.user_id.email)
+                            if not emp_email:
+                                raise UserError(f"신청자({rec.employee_id.name})의 직원 정보에 '업무 이메일'이 등록되어 있지 않습니다!")
+                                
+                            msg = f"✅ *[휴가 승인 완료]*\n"
+                            msg += f"📅 *기간*: {rec.date_from} ~ {rec.date_to} ({rec.number_of_days}일)\n"
+                            send_chat_dm(self.env, emp_email, msg)
+                        elif new_state == 'refuse':
+                            emp_email = rec.employee_id.work_email or (rec.employee_id.user_id and rec.employee_id.user_id.email)
+                            if not emp_email:
+                                raise UserError(f"신청자({rec.employee_id.name})의 직원 정보에 '업무 이메일'이 등록되어 있지 않습니다!")
+                                
+                            msg = f"❌ *[휴가 반려 안내]*\n"
+                            msg += f"📅 *기간*: {rec.date_from} ~ {rec.date_to}\n"
+                            send_chat_dm(self.env, emp_email, msg)
+                except UserError as ue:
+                    raise ue
+                except Exception as e:
+                    _logger.error("Failed to send Google Chat DM for hr.leave write: %s", str(e))
         return res
 
 
@@ -152,3 +184,131 @@ class HrScheduleChange(models.Model):
             except Exception as e:
                 _logger.error("Failed to send Google Chat DM for hr.schedule.change reject: %s", str(e))
         return res
+
+
+class ProjectTask(models.Model):
+    _inherit = 'project.task'
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super(ProjectTask, self).create(vals_list)
+        for rec in records:
+            try:
+                if rec.user_ids:
+                    for user in rec.user_ids:
+                        # 본인이 본인에게 할당한 경우는 제외
+                        if user != self.env.user:
+                            if not user.email:
+                                raise UserError(f"할당된 담당자({user.name})의 계정에 이메일 주소가 없어 구글 챗을 발송할 수 없습니다.")
+                            msg = f"📝 *[새로운 할 일 할당]*\n"
+                            msg += f"👤 *할당자*: {self.env.user.name}\n"
+                            msg += f"🎯 *작업명*: {rec.name}\n"
+                            msg += f"📅 *마감일*: {rec.date_deadline or '미지정'}\n"
+                            msg += f"👉 Odoo 프로젝트(할 일) 메뉴에서 상세 내용을 확인해 주세요."
+                            send_chat_dm(self.env, user.email, msg)
+            except UserError as ue:
+                raise ue
+            except Exception as e:
+                _logger.error("Failed to send Google Chat DM for project.task create: %s", str(e))
+        return records
+
+    def write(self, vals):
+        old_users_dict = {rec.id: set(rec.user_ids.ids) for rec in self}
+        res = super(ProjectTask, self).write(vals)
+        
+        if 'user_ids' in vals:
+            for rec in self:
+                try:
+                    new_users = set(rec.user_ids.ids)
+                    old_users = old_users_dict[rec.id]
+                    added_user_ids = new_users - old_users
+                    if added_user_ids:
+                        added_users = self.env['res.users'].browse(list(added_user_ids))
+                        for user in added_users:
+                            if user != self.env.user:
+                                if not user.email:
+                                    raise UserError(f"할당된 담당자({user.name})의 계정에 이메일 주소가 없어 구글 챗을 발송할 수 없습니다.")
+                                msg = f"📝 *[할 일 추가 할당]*\n"
+                                msg += f"👤 *할당자*: {self.env.user.name}\n"
+                                msg += f"🎯 *작업명*: {rec.name}\n"
+                                msg += f"📅 *마감일*: {rec.date_deadline or '미지정'}\n"
+                                msg += f"👉 Odoo 프로젝트(할 일) 메뉴에서 상세 내용을 확인해 주세요."
+                                send_chat_dm(self.env, user.email, msg)
+                except UserError as ue:
+                    raise ue
+                except Exception as e:
+                    _logger.error("Failed to send Google Chat DM for project.task write: %s", str(e))
+        return res
+
+
+class SaleOrder(models.Model):
+    _inherit = 'sale.order'
+
+    def write(self, vals):
+        old_user_dict = {rec.id: rec.user_id for rec in self}
+        res = super(SaleOrder, self).write(vals)
+        
+        if 'user_id' in vals:
+            for rec in self:
+                old_user = old_user_dict.get(rec.id)
+                new_user = rec.user_id
+                if new_user and new_user != old_user and new_user.email and new_user != self.env.user:
+                    try:
+                        msg = f"💼 *[영업(Sale) 담당자 배정]*\n"
+                        msg += f"👤 *배정자*: {self.env.user.name}\n"
+                        msg += f"📄 *주문서*: {rec.name}\n"
+                        msg += f"🏢 *고객사*: {rec.partner_id.name or '미지정'}\n"
+                        msg += f"👉 Odoo 영업 메뉴에서 상세 내용을 확인해 주세요."
+                        send_chat_dm(self.env, new_user.email, msg)
+                    except Exception as e:
+                        _logger.error("Failed to send DM for sale.order write: %s", str(e))
+        return res
+
+
+class MrpProduction(models.Model):
+    _inherit = 'mrp.production'
+
+    def write(self, vals):
+        old_user_dict = {rec.id: rec.user_id for rec in self}
+        res = super(MrpProduction, self).write(vals)
+        
+        if 'user_id' in vals:
+            for rec in self:
+                old_user = old_user_dict.get(rec.id)
+                new_user = rec.user_id
+                if new_user and new_user != old_user and new_user.email and new_user != self.env.user:
+                    try:
+                        msg = f"🏭 *[제조(MRP) 담당자 배정]*\n"
+                        msg += f"👤 *배정자*: {self.env.user.name}\n"
+                        msg += f"📄 *제조지시서*: {rec.name}\n"
+                        msg += f"📦 *제품*: {rec.product_id.name or '미지정'}\n"
+                        msg += f"👉 Odoo 제조 메뉴에서 상세 내용을 확인해 주세요."
+                        send_chat_dm(self.env, new_user.email, msg)
+                    except Exception as e:
+                        _logger.error("Failed to send DM for mrp.production write: %s", str(e))
+        return res
+
+
+class PurchaseOrder(models.Model):
+    _inherit = 'purchase.order'
+
+    def write(self, vals):
+        old_user_dict = {rec.id: rec.user_id for rec in self}
+        res = super(PurchaseOrder, self).write(vals)
+        
+        if 'user_id' in vals:
+            for rec in self:
+                old_user = old_user_dict.get(rec.id)
+                new_user = rec.user_id
+                if new_user and new_user != old_user and new_user.email and new_user != self.env.user:
+                    try:
+                        msg = f"🛒 *[구매(Purchase) 담당자 배정]*\n"
+                        msg += f"👤 *배정자*: {self.env.user.name}\n"
+                        msg += f"📄 *발주서*: {rec.name}\n"
+                        msg += f"🏢 *공급업체*: {rec.partner_id.name or '미지정'}\n"
+                        msg += f"👉 Odoo 구매 메뉴에서 상세 내용을 확인해 주세요."
+                        send_chat_dm(self.env, new_user.email, msg)
+                    except Exception as e:
+                        _logger.error("Failed to send DM for purchase.order write: %s", str(e))
+        return res
+

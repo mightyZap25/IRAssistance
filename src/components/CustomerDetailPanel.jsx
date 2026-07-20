@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebase';
-import { collection, getDocs, query, where, orderBy, limit } from '../firebase';
+import { db } from '../database';
+import { collection, getDocs, query, where, orderBy, limit } from '../database';
 import { Building2, X, Phone, User, Mail, History, Package, FileText, Receipt, DollarSign, PenTool, Printer, ChevronRight, ExternalLink, MapPin } from 'lucide-react';
 import { createPortal } from 'react-dom';
 

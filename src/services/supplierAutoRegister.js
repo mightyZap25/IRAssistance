@@ -10,8 +10,8 @@
  *  - BOMImportModal.jsx (구글 시트 BOM 가져오기 커밋 후)
  */
 
-import { collection, getDocs, addDoc, serverTimestamp } from '../firebase';
-import { db } from '../firebase';
+import { collection, getDocs, addDoc, serverTimestamp } from '../database';
+import { db } from '../database';
 
 /**
  * 문자열 배열 중 DB에 없는 항목만 필터링하여 반환 (대소문자·공백 무시)

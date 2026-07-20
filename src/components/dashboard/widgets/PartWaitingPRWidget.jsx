@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../../../firebase';
-import { collection, getDocs, query, where, orderBy } from '../../../firebase';
+import { db } from '../../../database';
+import { collection, getDocs, query, where, orderBy } from '../../../database';
 import { AlertCircle, Package, ShoppingCart, ArrowRight } from 'lucide-react';
 
 export default function PartWaitingPRWidget({ viewType = 'list' }) {

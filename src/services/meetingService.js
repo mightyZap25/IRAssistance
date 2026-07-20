@@ -1,4 +1,4 @@
-import { db } from '../firebase';
+import { db } from '../database';
 import { getDriveMeetings } from './googleService';
 import { 
     collection, 
@@ -11,7 +11,7 @@ import {
     query, 
     orderBy,
     serverTimestamp 
-} from '../firebase';
+} from '../database';
 
 const MEETINGS_COLLECTION = 'meetings';
 const WEEKLY_MEETINGS_COLLECTION = 'weekly_meetings';

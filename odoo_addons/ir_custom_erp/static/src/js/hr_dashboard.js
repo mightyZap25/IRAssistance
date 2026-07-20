@@ -8,6 +8,7 @@ import { rpc } from "@web/core/network/rpc";
 export class HrDashboard extends Component {
     setup() {
         this.action = useService("action");
+        this.notification = useService("notification");
         
         this.state = useState({
             data: {
@@ -37,12 +38,20 @@ export class HrDashboard extends Component {
                     endDate: '',
                     reason: ''
                 }
+            },
+            // 결재대기 목록 패널
+            pendingPanel: {
+                open: false,
+                my_requests: [],
+                to_approve: [],
+                loading: false,
             }
         });
 
         onWillStart(async () => {
             await this.loadData();
             await this.loadCalendarData();
+            await this.loadPendingList();
         });
     }
 
@@ -56,6 +65,34 @@ export class HrDashboard extends Component {
             Object.assign(this.state.data, result);
         } catch (e) {
             console.error("RPC Error:", e);
+        }
+    }
+
+    async loadPendingList() {
+        this.state.pendingPanel.loading = true;
+        try {
+            const result = await rpc("/api/hr_dashboard/pending_list", {});
+            if (result) {
+                this.state.pendingPanel.my_requests = result.my_requests || [];
+                this.state.pendingPanel.to_approve = result.to_approve || [];
+
+                // 내가 결재해야 할 건이 있으면 상단 알림 표시
+                const toApproveCount = this.state.pendingPanel.to_approve.length;
+                if (toApproveCount > 0) {
+                    this.notification.add(
+                        `결재 대기: ${toApproveCount}건의 휴가 신청이 귀하의 승인을 기다리고 있습니다.`,
+                        {
+                            type: 'warning',
+                            title: '결재 대기 알림',
+                            sticky: false,
+                        }
+                    );
+                }
+            }
+        } catch (e) {
+            console.error("RPC Error (PendingList):", e);
+        } finally {
+            this.state.pendingPanel.loading = false;
         }
     }
 
@@ -218,7 +255,77 @@ export class HrDashboard extends Component {
     }
 
     _onClickPendingApprovals() {
-        this.action.doAction('ir_custom_erp.action_hr_pending_approvals_wizard');
+        // 모달 팝업 대신 Odoo 기본 '관리 - 휴가' (결재 대기) 화면으로 이동
+        this.action.doAction('hr_holidays.hr_leave_action_action_approve_department');
+    }
+
+    _onClickClosePendingPanel() {
+        this.state.pendingPanel.open = false;
+    }
+
+    async _onClickApproveLeave(leaveId) {
+        if (!confirm("해당 휴가 신청을 승인하시겠습니까?")) return;
+        
+        this.state.pendingPanel.loading = true;
+        try {
+            const result = await rpc("/api/hr_dashboard/action_leave", {
+                leave_id: leaveId,
+                action_type: 'approve'
+            });
+            
+            if (result.error) {
+                if (this.notification) this.notification.add(result.error, { type: "danger" });
+            } else {
+                if (this.notification) this.notification.add("휴가가 성공적으로 승인되었습니다.", { type: "success" });
+                await this.loadPendingList();
+                await this.loadData();
+                if (this.render) this.render();
+            }
+        } catch (e) {
+            if (this.notification) this.notification.add("승인 처리 중 오류가 발생했습니다.", { type: "danger" });
+            console.error(e);
+        } finally {
+            this.state.pendingPanel.loading = false;
+        }
+    }
+
+    async _onClickRefuseLeave(leaveId) {
+        if (!confirm("해당 휴가 신청을 반려하시겠습니까?")) return;
+        
+        this.state.pendingPanel.loading = true;
+        try {
+            const result = await rpc("/api/hr_dashboard/action_leave", {
+                leave_id: leaveId,
+                action_type: 'refuse'
+            });
+            
+            if (result.error) {
+                if (this.notification) this.notification.add(result.error, { type: "danger" });
+            } else {
+                if (this.notification) this.notification.add("휴가가 성공적으로 반려되었습니다.", { type: "success" });
+                await this.loadPendingList();
+                await this.loadData();
+                if (this.render) this.render();
+            }
+        } catch (e) {
+            if (this.notification) this.notification.add("반려 처리 중 오류가 발생했습니다.", { type: "danger" });
+            console.error(e);
+        } finally {
+            this.state.pendingPanel.loading = false;
+        }
+    }
+
+    _onClickMyLeave(leaveId) {
+        // 내 신청 상세 조회
+        this.action.doAction({
+            type: 'ir.actions.act_window',
+            name: '내 휴가 신청',
+            res_model: 'hr.leave',
+            res_id: leaveId,
+            views: [[false, 'form']],
+            view_mode: 'form',
+            target: 'current',
+        });
     }
 
     closeModal() {

@@ -759,15 +759,30 @@ async function getGoogleChatAccessToken(serviceAccount) {
 }
 
 async function sendGoogleChatDM(userEmail, text) {
-    const configPath = path.join(process.cwd(), 'service_account.json');
+    console.log(`\n🚀 [Google Chat] 알림 전송 시작 (수신인: ${userEmail})`);
+    
+    let configPath = path.join(process.cwd(), 'service_account.json');
     if (!fs.existsSync(configPath)) {
-        throw new Error('프로젝트 루트 폴더에 service_account.json 파일이 설정되어 있지 않습니다.');
+        // 루트에 없으면 다운로드 폴더의 odooapi 키 파일 사용 시도
+        const fallbackPath = 'c:\\Users\\park sungyong\\Downloads\\odooapi-501907-ad0f75e22803.json';
+        if (fs.existsSync(fallbackPath)) {
+            console.log(`   [INFO] 루트에 service_account.json이 없어 다운로드 폴더 키를 사용합니다: ${fallbackPath}`);
+            configPath = fallbackPath;
+        } else {
+            console.error('❌ [ERROR] Google Chat 서비스 계정 키 파일이 설정되어 있지 않습니다.');
+            throw new Error('프로젝트 루트 폴더에 service_account.json 파일이 설정되어 있지 않습니다.');
+        }
     }
     
+    console.log(`   [1/4] 서비스 계정 키 정보 읽는 중...`);
     const serviceAccount = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    
+    console.log('   [2/4] Google OAuth 2.0 액세스 토큰 요청 중...');
     const accessToken = await getGoogleChatAccessToken(serviceAccount);
+    console.log('   [INFO] 액세스 토큰 획득 성공!');
     
     // 1. Setup space (look up direct message space with email)
+    console.log(`   [3/4] 수신자(${userEmail})와의 1:1 DM 스페이스 개설 조회 중...`);
     const setupResponse = await fetch('https://chat.googleapis.com/v1/spaces:setup', {
         method: 'POST',
         headers: {
@@ -786,12 +801,15 @@ async function sendGoogleChatDM(userEmail, text) {
     
     const setupData = await setupResponse.json();
     if (setupData.error) {
+        console.error(`   ❌ [ERROR] 구글 챗 스페이스 설정 실패:`, setupData.error);
         throw new Error(`Google Chat Space setup failed: ${setupData.error.message}`);
     }
     
     const spaceName = setupData.name;
+    console.log(`   [INFO] DM 스페이스 연결에 성공하였습니다: ${spaceName}`);
     
     // 2. Post DM Message
+    console.log(`   [4/4] Google Chat 메시지 발송 중...`);
     const msgResponse = await fetch(`https://chat.googleapis.com/v1/${spaceName}/messages`, {
         method: 'POST',
         headers: {
@@ -805,26 +823,57 @@ async function sendGoogleChatDM(userEmail, text) {
     
     const msgData = await msgResponse.json();
     if (msgData.error) {
+        console.error(`   ❌ [ERROR] 구글 챗 메시지 발송 실패:`, msgData.error);
         throw new Error(`Google Chat message send failed: ${msgData.error.message}`);
     }
+    console.log(`   ✅ [SUCCESS] Google Chat DM 전송 완료! (ID: ${msgData.name})`);
     return msgData;
 }
+
+// --- Google Chat Webhook Logs In-Memory Storage ---
+const webhookLogs = [];
+const addWebhookLog = (type, email, messageSummary, details) => {
+    webhookLogs.unshift({
+        id: Date.now().toString() + Math.floor(Math.random() * 1000),
+        timestamp: new Date().toISOString(),
+        type, // 'INFO', 'SUCCESS', 'ERROR'
+        email,
+        messageSummary,
+        details
+    });
+    // Keep only last 100 logs
+    if (webhookLogs.length > 100) webhookLogs.length = 100;
+};
+
+// GET endpoint to retrieve the logs
+app.get('/api/webhook-logs', (req, res) => {
+    res.json({ success: true, logs: webhookLogs });
+});
 
 // Odoo event receiver and forwarder route
 app.post('/api/odoo-notification', async (req, res) => {
     const { recipient_email, message } = req.body;
     
+    const summary = message ? message.substring(0, 50) + (message.length > 50 ? '...' : '') : '없음';
+    console.log(`\n[Webhook HTTP Inflow] Odoo 알림 이벤트 감지!`);
+    console.log(` - 대상 이메일: ${recipient_email}`);
+    console.log(` - 메시지 요약: ${summary}`);
+    
+    addWebhookLog('INFO', recipient_email || '알 수 없음', summary, 'Odoo로부터 웹훅 이벤트 수신됨');
+    
     if (!recipient_email || !message) {
+        console.error(' - ❌ 유효하지 않은 웹훅 호출: 필수 정보 누락');
+        addWebhookLog('ERROR', recipient_email || '누락됨', summary, '필수 정보(이메일 또는 메시지) 누락으로 거부됨');
         return res.status(400).json({ error: 'recipient_email and message are required' });
     }
     
-    console.log(`[Google Chat Notification] Forwarding Odoo event to: ${recipient_email}`);
-    
     try {
         await sendGoogleChatDM(recipient_email, message);
+        addWebhookLog('SUCCESS', recipient_email, summary, 'Google Chat 메시지 발송 완료');
         res.json({ success: true, message: 'Google Chat notification sent successfully.' });
     } catch (err) {
-        console.error('[Google Chat Notification] Error:', err.message);
+        console.error(' - ❌ 최종 전달 과정에서 에러 발생:', err.message);
+        addWebhookLog('ERROR', recipient_email, summary, `전송 실패: ${err.message}`);
         res.status(500).json({ success: false, error: err.message });
     }
 });

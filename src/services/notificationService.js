@@ -1,4 +1,4 @@
-import { db, collection, addDoc, serverTimestamp, doc, getDoc } from '../firebase';
+import { db, collection, addDoc, serverTimestamp, doc, getDoc } from '../database';
 
 /**
  * 전역 알림 생성 서비스

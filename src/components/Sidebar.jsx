@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { db } from '../firebase';
-import { collection, query, where, onSnapshot } from '../firebase';
+import { db } from '../database';
+import { collection, query, where, onSnapshot } from '../database';
 import { useAuth } from '../contexts/AuthContext';
 import {
     LayoutDashboard, Package, Layers, Settings, History,
@@ -46,14 +46,14 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
     });
 
     const handleOdooLink = async () => {
-        const password = window.prompt("Odoo 연동을 위해 비밀번호를 입력해주세요:");
+        const password = window.prompt("Odoo 자동 로그인을 위해 비밀번호를 입력해주세요:");
         if (!password) return;
         try {
             await linkOdoo(password);
-            alert("Odoo 연동 성공!");
+            alert("Odoo 자동 로그인 설정 완료!");
             window.location.reload();
         } catch(e) {
-            alert("Odoo 연동 실패: " + e.message);
+            alert("Odoo 로그인 실패: " + e.message);
         }
     };
     
@@ -63,7 +63,9 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
             setShowAiMenu(localStorage.getItem('sidebar_show_ai_menu') !== 'false');
         };
         window.addEventListener('storage', handleStorageChange);
-        return () => window.removeEventListener('storage', handleStorageChange);
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+        };
     }, []);
 
     useEffect(() => {
@@ -151,6 +153,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
             items: [
                 { name: 'Gmail', path: '/workspace/mail', icon: Mail },
                 { name: 'Google Drive', path: '/workspace/drive', icon: Cloud },
+                { name: 'Google Calendar', path: '/workspace/calendar', icon: CalendarDays },
                 { name: 'Google Chat', path: '/workspace/chat', icon: MessageSquare },
                 ...(showAiMenu ? [
                     { name: 'Gemini', path: '/workspace/gemini', icon: Sparkles },
@@ -188,7 +191,10 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         'IoT': 'IoT 기기',
         'Helpdesk': '고객 서비스',
         'Repairs': '수리',
-        'CRM': 'CRM'
+        'CRM': 'CRM',
+        'Expenses': '경비처리',
+        'To-do': '할일관리',
+        'To-Do': '할일관리'
     };
 
     const ODOO_CATEGORY_MAP = {
@@ -208,7 +214,10 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         'Time Off': '근태관리',
         'Employees': '근태관리',
         '근태/휴가 대시보드': '근태관리',
-        'Projects': '협업 & 기타'
+        'Projects': '협업 & 기타',
+        'Expenses': '협업 & 기타',
+        'To-do': '협업 & 기타',
+        'To-Do': '협업 & 기타'
     };
 
     // Odoo 메뉴별 어울리는 Lucide 아이콘 매핑
@@ -229,7 +238,10 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         'Maintenance': Wrench,
         'IoT': Cpu,
         'Helpdesk': HeadphonesIcon,
-        'Repairs': Wrench
+        'Repairs': Wrench,
+        'Expenses': Receipt,
+        'To-do': ListTodo,
+        'To-Do': ListTodo
     };
 
     // UI에 보여줄 카테고리 순서 정의
@@ -254,7 +266,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
     };
 
     const ODOO_HIDDEN_MENUS = new Set([
-        'Discuss', 'Calendar', 'Contacts', 'To-Do', 'Dashboards', 'App Store', 'Settings', 'Apps', 'Tests', 'Link Tracker'
+        'Discuss', 'Calendar', 'Contacts', 'Dashboards', 'App Store', 'Settings', 'Apps', 'Tests', 'Link Tracker', 'Attendances', 'Time Off', '근태', '휴가'
     ]);
 
     const getOdooDynamicGroups = () => {
@@ -453,7 +465,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                         <div className="fixed inset-0 z-45" onClick={() => setProfileMenuOpen(false)} />
                         <div className={`absolute border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-[0_20px_50px_rgba(15,23,42,0.15)] z-50 p-3 flex flex-col gap-2.5 text-left bg-white/95 dark:bg-slate-950/95 backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-150 ${isCollapsed ? 'left-12 top-0 w-56' : 'left-0 right-0 top-full mt-2'}`}>
                             <div className="px-1 py-0.5">
-                                <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">연동 계정 관리</p>
+                                <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">통합 로그인 상태</p>
                             </div>
                             
                             {!isOdooOnlyAuth && (
@@ -463,7 +475,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                                             <span className="w-3.5 h-3.5 rounded-full bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 flex items-center justify-center font-black text-[8px]">G</span>
                                             <span className="text-slate-800 dark:text-slate-200 font-black text-[9px]">Google Workspace</span>
                                         </div>
-                                        <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-400">연동됨</span>
+                                        <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-400">로그인됨</span>
                                     </div>
                                     <div className="flex items-center justify-between gap-1.5">
                                         <p className="text-[8px] text-slate-500 dark:text-slate-400 font-semibold truncate flex-1" title={currentUser?.email}>
@@ -489,9 +501,25 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                                         <span className="w-3.5 h-3.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-650 dark:text-emerald-400 flex items-center justify-center font-black text-[8px]">O</span>
                                         <span className="text-slate-800 dark:text-slate-200 font-black text-[9px]">Odoo ERP</span>
                                     </div>
-                                    <span className={`text-[8px] font-black ${odooLinked ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}`}>
-                                        {odooLinked ? '연동됨' : '미연동'}
-                                    </span>
+                                    <button 
+                                        className={`text-[8px] font-black px-1.5 py-0.5 rounded transition-colors ${odooLinked ? 'text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40' : 'text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40'}`}
+                                        onClick={() => {
+                                            setProfileMenuOpen(false);
+                                            if (odooLinked) {
+                                                if (isOdooOnlyAuth) {
+                                                    logout();
+                                                } else {
+                                                    localStorage.removeItem('odoo_password');
+                                                    window.dispatchEvent(new CustomEvent('clear-odoo-session'));
+                                                    window.location.reload();
+                                                }
+                                            } else {
+                                                handleOdooLink();
+                                            }
+                                        }}
+                                    >
+                                        {odooLinked ? '로그아웃' : '로그인'}
+                                    </button>
                                 </div>
                                 <div className="flex items-center justify-between gap-1.5">
                                     <p className="text-[8px] text-slate-500 dark:text-slate-400 font-semibold truncate flex-1" title={currentUser?.email}>
@@ -509,8 +537,8 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                                                     window.location.reload();
                                                 }
                                             }}
-                                            className="p-1 rounded hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-500 transition-colors active:scale-90"
-                                            title="Odoo 연동 해제"
+                                            className="p-1 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-500 transition-colors active:scale-90"
+                                            title="Odoo 로그아웃"
                                         >
                                             <LogOut size={10} />
                                         </button>
@@ -520,9 +548,9 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                                                 setProfileMenuOpen(false);
                                                 handleOdooLink();
                                             }}
-                                            className="px-2 py-1 text-[9px] font-bold text-white bg-blue-655 hover:bg-blue-700 rounded transition-all active:scale-95 shadow-sm"
+                                            className="px-2 py-1 text-[9px] font-bold text-white bg-blue-600 hover:bg-blue-700 rounded transition-all active:scale-95 shadow-sm"
                                         >
-                                            연동하기
+                                            로그인
                                         </button>
                                     )}
                                 </div>
@@ -573,6 +601,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                                             <NavLink 
                                                 key={item.path} 
                                                 to={item.path} 
+                                                replace={true}
                                                 className={({ isActive }) => 
                                                     isCollapsed
                                                         ? `flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 relative ${

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, CheckCircle, XCircle, AlertTriangle, Camera, Package, Info, CheckCircle2, Cloud, ExternalLink, FileText, ClipboardList, Trash2, Plus } from 'lucide-react';
-import { updateDoc, doc, collection, getDocs, addDoc, serverTimestamp, writeBatch, getDoc, query, where } from '../firebase';
-import { db } from '../firebase';
+import { updateDoc, doc, collection, getDocs, addDoc, serverTimestamp, writeBatch, getDoc, query, where } from '../database';
+import { db } from '../database';
 import { useAuth } from '../contexts/AuthContext';
 import { autoRegisterDefect } from '../services/defectAutoRegister';
 import clsx from 'clsx';

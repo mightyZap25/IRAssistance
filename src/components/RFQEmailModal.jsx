@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Send, Mail, Edit3, ClipboardCheck, Info, Plus, Check, FileDown, Printer } from 'lucide-react';
-import { db, collection, getDocs, query, where } from '../firebase';
+import { db, collection, getDocs, query, where } from '../database';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 

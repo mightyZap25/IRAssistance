@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../../../firebase';
-import { collection, getDocs, limit, orderBy, query } from '../../../firebase';
+import { db } from '../../../database';
+import { collection, getDocs, limit, orderBy, query } from '../../../database';
 import { Layers, ChevronRight, Activity, TrendingUp, CheckCircle } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 

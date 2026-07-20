@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, FileText, UserCheck, ShieldCheck, Clock, AlertCircle, Info, Send } from 'lucide-react';
-import { db, collection, getDocs, query, where } from '../firebase';
+import { db, collection, getDocs, query, where } from '../database';
 import { useAuth } from '../contexts/AuthContext';
 
 const ApprovalModal = ({ isOpen, onClose, poData, onSubmit }) => {
@@ -31,9 +31,51 @@ const ApprovalModal = ({ isOpen, onClose, poData, onSubmit }) => {
 
     const fetchApprovers = async () => {
         try {
-            const q = query(collection(db, 'users'), where('role', 'in', ['MANAGER', 'ADMIN']));
-            const snap = await getDocs(q);
-            setApprovers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            // 1순위: Odoo 데이터베이스에서 사내 전체 직원(res_users) 목록을 직접 긁어옵니다.
+            const res = await fetch('http://localhost:5050/api/sql/execute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sql: "SELECT u.login as email, p.name FROM res_users u JOIN res_partner p ON u.partner_id = p.id WHERE u.active = true" })
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                if (data.rows && data.rows.length > 0) {
+                    const users = data.rows.map(row => ({
+                        id: row.email, // Odoo 이메일 주소를 고유 ID로 사용 (알림 시스템 연동을 위함)
+                        displayName: row.name,
+                        email: row.email,
+                        role: (row.email && (row.email.includes('admin') || row.email.includes('manager'))) ? '관리자' : '직원'
+                    })).filter(u => u.email); // 이메일 없는 계정(시스템 계정 등) 제외
+                    
+                    // 관리자급 상단 정렬, 이후 가나다순 정렬
+                    users.sort((a, b) => {
+                        if (a.role === '관리자' && b.role !== '관리자') return -1;
+                        if (a.role !== '관리자' && b.role === '관리자') return 1;
+                        return a.displayName.localeCompare(b.displayName);
+                    });
+                    
+                    setApprovers(users);
+                    console.log("[ApprovalModal] Odoo DB에서 전체 직원 명단 갱신 완료");
+                    return; // 성공 시 여기서 종료
+                }
+            }
+        } catch (err) {
+            console.warn("[ApprovalModal] Odoo 직원 목록 조회 실패. 로컬 데이터로 폴백합니다.", err);
+        }
+
+        // 2순위: Odoo 서버 장애 시 기존 방식(로컬 DB)으로 폴백
+        try {
+            const snap = await getDocs(collection(db, 'users'));
+            const users = snap.docs.map(d => ({ id: d.email || d.id, ...d.data() })); // 이메일 기준 통일
+            users.sort((a, b) => {
+                const roleA = (a.role || '').toLowerCase();
+                const roleB = (b.role || '').toLowerCase();
+                if (roleA.includes('admin') || roleA.includes('manager')) return -1;
+                if (roleB.includes('admin') || roleB.includes('manager')) return 1;
+                return (a.displayName || '').localeCompare(b.displayName || '');
+            });
+            setApprovers(users);
         } catch (err) { console.error(err); }
     };
 

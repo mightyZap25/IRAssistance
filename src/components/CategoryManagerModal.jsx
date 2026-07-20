@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Folder, Package, Trash2, Edit2, Check, XCircle } from 'lucide-react';
-import { db } from '../firebase';
-import { collection, getDocs, updateDoc, deleteDoc, doc, serverTimestamp, setDoc, query, where } from '../firebase';
+import { db } from '../database';
+import { collection, getDocs, updateDoc, deleteDoc, doc, serverTimestamp, setDoc, query, where } from '../database';
 
 export default function CategoryManagerModal({ onClose, onUpdate }) {
     const [folders, setFolders] = useState([]);

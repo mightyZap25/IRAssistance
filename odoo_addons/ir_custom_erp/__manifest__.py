@@ -6,7 +6,10 @@
     'description': """
         Extends product.template to support custom fields and auto ID generation (Part ID).
     """,
-    'depends': ['base', 'product', 'mrp', 'purchase', 'stock', 'hr_attendance', 'hr_holidays'],
+    'depends': ['base', 'product', 'mrp', 'purchase', 'stock', 'hr_attendance', 'hr_holidays', 'project', 'sale'],
+    'external_dependencies': {
+        'python': ['jwt'],
+    },
     'data': [
         'security/security.xml',
         'security/ir.model.access.csv',

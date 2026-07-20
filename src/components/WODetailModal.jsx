@@ -8,7 +8,7 @@ import {
   collection, addDoc, doc, updateDoc, 
   getDocs, query, where, serverTimestamp, increment 
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../database';
 
 const WODetailModal = ({ open, onClose, woData, onSave }) => {
   const [actualQty, setActualQty] = useState(0);

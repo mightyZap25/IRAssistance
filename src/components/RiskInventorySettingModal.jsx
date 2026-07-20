@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { collection, query, getDocs, doc, setDoc, deleteDoc, orderBy, where } from '../firebase';
-import { db } from '../firebase';
+import { collection, query, getDocs, doc, setDoc, deleteDoc, orderBy, where } from '../database';
+import { db } from '../database';
 import { X, ShieldAlert, Package, Plus, Trash2, Info, Settings, Save, Factory, CheckCircle2 } from 'lucide-react';
 
 const RiskInventorySettingModal = ({ isOpen, onClose, onRefresh }) => {

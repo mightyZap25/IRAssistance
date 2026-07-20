@@ -1,14 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, UserPlus, Trash2, Save, CheckCircle2, XCircle, MessageSquare, Clock, User, Star, ChevronRight } from 'lucide-react';
-import { db } from '../../firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, onSnapshot, doc, updateDoc, arrayUnion, getDoc } from '../../firebase';
+import { db } from '../../database';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, onSnapshot, doc, updateDoc, arrayUnion, getDoc } from '../../database';
 import { useAuth } from '../../contexts/AuthContext';
 
-async function createNotification(targetUid, title, message, link = '') {
+async function createNotification(targetIdentifier, title, message, link = '') {
     try {
-        const userSnap = await getDoc(doc(db, 'users', targetUid));
-        if (!userSnap.exists()) return;
-        const userEmail = userSnap.data().email;
+        let userEmail = targetIdentifier;
+        // targetIdentifier가 이메일 형식이 아니라면(Firebase UID라면) DB에서 이메일을 찾아옵니다.
+        if (targetIdentifier && !targetIdentifier.includes('@')) {
+            const userSnap = await getDoc(doc(db, 'users', targetIdentifier));
+            if (userSnap.exists()) userEmail = userSnap.data().email;
+        }
+        
+        if (!userEmail) return;
+        
         await addDoc(collection(db, 'notifications'), {
             userEmail, title, message, link, read: false, createdAt: serverTimestamp()
         });
@@ -28,14 +34,35 @@ export function ApprovalLineEditor({ onSelectTemplate, initialSteps = [], onStep
 
     useEffect(() => {
         const fetchUsers = async () => {
+            try {
+                // 1순위: Odoo DB에서 사내 전체 직원 조회
+                const res = await fetch('http://localhost:5050/api/sql/execute', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sql: "SELECT u.login as email, p.name FROM res_users u JOIN res_partner p ON u.partner_id = p.id WHERE u.active = true" })
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.rows && data.rows.length > 0) {
+                        const users = data.rows.map(row => ({
+                            uid: row.email,
+                            displayName: row.name,
+                            email: row.email
+                        })).filter(u => u.email);
+                        
+                        users.sort((a, b) => a.displayName.localeCompare(b.displayName));
+                        setAllUsers(users);
+                        return;
+                    }
+                }
+            } catch (err) { console.warn("Odoo 직원 목록 조회 실패, 로컬 DB로 폴백:", err); }
+
+            // 2순위: 로컬 DB 폴백
             const snap = await getDocs(collection(db, 'users'));
-            setAllUsers(snap.docs.map(d => ({ uid: d.id, ...d.data() })));
+            setAllUsers(snap.docs.map(d => ({ uid: d.email || d.id, ...d.data() })).sort((a, b) => (a.displayName || '').localeCompare(b.displayName || '')));
         };
         fetchUsers();
-        if (currentUser) {
-            const q = query(collection(db, 'users', currentUser.uid, 'approval_templates'));
-            return onSnapshot(q, (snap) => setSavedTemplates(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-        }
     }, [currentUser]);
 
     const handleSave = async () => {
@@ -67,17 +94,6 @@ export function ApprovalLineEditor({ onSelectTemplate, initialSteps = [], onStep
                         </div>
                     ))}
                 </div>
-                {savedTemplates.length > 0 && (
-                    <div className="border-t pt-4 space-y-2">
-                        <p className="text-xs font-black text-slate-400">저장된 템플릿</p>
-                        {savedTemplates.map(t => (
-                            <button type="button" key={t.id} onClick={() => { setSteps(t.steps); if(onSelectTemplate) onSelectTemplate(t); }} className="w-full text-left p-3 rounded-xl border hover:border-blue-500 flex items-center gap-2">
-                                <Star size={14} className="text-amber-400"/>
-                                <div className="flex-1"><p className="text-xs font-bold">{t.name}</p><p className="text-[9px] text-slate-400">{(t.steps || []).length}단계</p></div>
-                            </button>
-                        ))}
-                    </div>
-                )}
             </div>
         </div>
     );

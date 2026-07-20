@@ -8,8 +8,8 @@ import {
     updateDoc, 
     deleteDoc,
     serverTimestamp 
-} from '../firebase';
-import { db } from '../firebase';
+} from '../database';
+import { db } from '../database';
 
 const COLLECTION_NAME = 'metadata_fields';
 

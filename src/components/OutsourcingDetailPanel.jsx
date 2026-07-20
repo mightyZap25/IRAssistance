@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Factory, Calendar, MapPin, PackageCheck, Truck, ChevronRight, CheckCircle2, Clock, AlertCircle, FileText, Edit, Printer, List } from 'lucide-react';
-import { updateDoc, doc, writeBatch, serverTimestamp, collection, getDoc, query, where, getDocs } from '../firebase';
-import { db } from '../firebase';
+import { updateDoc, doc, writeBatch, serverTimestamp, collection, getDoc, query, where, getDocs } from '../database';
+import { db } from '../database';
 import { useAuth } from '../contexts/AuthContext';
 import MasterDataGrid from './common/MasterDataGrid';
 

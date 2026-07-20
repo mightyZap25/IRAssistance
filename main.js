@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, shell, session, ipcMain, nativeTheme, dialog } from 'electron';
+import { app, BrowserWindow, Tray, Menu, shell, session, ipcMain, nativeTheme, dialog, Notification } from 'electron';
 import path from 'path';
 import { createRequire } from 'module';
 import pkg from 'electron-updater';
@@ -19,6 +19,32 @@ console.log('[Electron Main] .env 로드 경로:', envPath);
 
 // Override default User Agent to completely bypass Google's "secure browser" check on login popups and webviews
 app.userAgentFallback = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
+// 윈도우 OS 네이티브 알림(Notification)이 정상 작동하기 위한 필수 설정
+app.setAppUserModelId('com.mightyzap.ir-assistant');
+
+// 알림 전용 아이콘 자동 다운로드 함수
+function ensureNotificationIcons() {
+    const iconDir = path.join(app.getAppPath(), 'build');
+    if (!fs.existsSync(iconDir)) fs.mkdirSync(iconDir, { recursive: true });
+
+    const downloadIcon = (url, filename) => {
+        const dest = path.join(iconDir, filename);
+        if (!fs.existsSync(dest)) {
+            const https = require('https');
+            https.get(url, (res) => {
+                if (res.statusCode === 200) {
+                    const file = fs.createWriteStream(dest);
+                    res.pipe(file);
+                }
+            }).on('error', err => console.error('[Icon Download Error]', err));
+        }
+    };
+
+    downloadIcon('https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Gmail_icon_%282020%29.svg/512px-Gmail_icon_%282020%29.svg.png', 'gmail.png');
+    downloadIcon('https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Google_Chat_icon_%282020%29.svg/512px-Google_Chat_icon_%282020%29.svg.png', 'gchat.png');
+    downloadIcon('https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Google_Calendar_icon_%282020%29.svg/512px-Google_Calendar_icon_%282020%29.svg.png', 'gcalendar.png');
+}
 
 // Force Light Mode as the initial theme for all renderer contents and webviews
 nativeTheme.themeSource = 'light';
@@ -126,6 +152,18 @@ function createWindow() {
         }
     });
 
+    // 윈도우 마우스 드라이버나 키보드 단축키(Alt+Left)로 인한 Chromium 네이티브 뒤로가기(React Hash 변경)를 원천 차단합니다.
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+        if (input.key === 'BrowserBack' || (input.alt && input.key === 'ArrowLeft')) {
+            event.preventDefault();
+            if (input.type === 'keyDown') mainWindow.webContents.send('app-go-back');
+        }
+        if (input.key === 'BrowserForward' || (input.alt && input.key === 'ArrowRight')) {
+            event.preventDefault();
+            if (input.type === 'keyDown') mainWindow.webContents.send('app-go-forward');
+        }
+    });
+
     mainWindow.on('closed', () => {
         mainWindow = null;
     });
@@ -196,6 +234,9 @@ if (!gotTheLock) {
     });
 
     app.on('ready', () => {
+        // 필수 아이콘 준비
+        ensureNotificationIcons();
+
         // Automatically allow notifications and other basic permissions for webviews
         session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
             const allowedPermissions = ['notifications', 'media', 'fullscreen'];
@@ -205,11 +246,105 @@ if (!gotTheLock) {
                 callback(true); // Allow by default for internal ERP
             }
         });
+        session.defaultSession.setPermissionCheckHandler((webContents, permission) => true);
+
+        // Odoo 전용 파티션 세션 알림 허용
+        const odooSession = session.fromPartition('persist:odoo');
+        odooSession.setPermissionRequestHandler((webContents, permission, callback) => {
+            callback(true);
+        });
+        odooSession.setPermissionCheckHandler((webContents, permission) => {
+            return true;
+        });
 
         // Global CSS Injection to force Light Mode for Google previewers and iframes
         app.on('web-contents-created', (event, contents) => {
+            // 모든 호스트(주로 메인 윈도우)에서 webview가 생성될 때 가로채기
+            contents.on('will-attach-webview', (e, webPreferences, params) => {
+                const preloadPath = path.join(app.getAppPath(), 'global-preload.js');
+                webPreferences.preload = preloadPath;
+                webPreferences.contextIsolation = false; // 전역 객체 덮어쓰기를 위해 격리 해제
+                webPreferences.backgroundThrottling = false; // 백그라운드 웹뷰(Gmail 등)의 타이머/웹소켓 지연 방지
+            });
+
             // If it is a webview guest contents, intercept all popups and open them in-place!
             if (contents.getType() === 'webview') {
+                // ✅ 웹뷰 자체 세션에도 알림 권한 허용 설정
+                contents.session.setPermissionRequestHandler((wc, permission, callback) => {
+                    callback(true);
+                });
+                contents.session.setPermissionCheckHandler((wc, permission) => {
+                    return true;
+                });
+
+                // Webview 내부에서 보내는 IPC 메시지 감지
+                contents.on('ipc-message', (e, channel, ...args) => {
+                    if (channel === 'odoo-desktop-notification') {
+                        const data = args[0] || {};
+                        console.log('\n======================================');
+                        console.log('[Electron Main] 🔔 앱 푸시 알림 수신!');
+                        console.log('- 제목:', data.title);
+                        console.log('- 내용:', data.options?.body || '');
+                        console.log('======================================\n');
+                        if (Notification.isSupported()) {
+                            const notif = new Notification({
+                                title: data.title || '새 알림',
+                                body: data.options?.body || '',
+                                icon: path.join(app.getAppPath(), 'build', 'icon.png')
+                            });
+                            notif.show();
+                        }
+                    }
+                });
+
+                // Preload 스크립트의 console.log를 터미널로 중계 및 알림 처리
+                contents.on('console-message', (event, level, message, line, sourceId) => {
+                    const msg = message || '';
+                    if (msg.startsWith('[ILink-Preload]')) {
+                        console.log(msg);
+                    } else if (msg.startsWith('ILINK_NOTIF::')) {
+                        try {
+                            const data = JSON.parse(msg.slice('ILINK_NOTIF::'.length));
+                            
+                            // 출처에 따라 제목에 접두사(Prefix) 붙이기 및 아이콘 설정
+                            let prefix = '';
+                            let iconName = 'icon.png';
+                            if (data.source) {
+                                if (data.source.includes('mail.google.com')) { prefix = '[지메일] '; iconName = 'gmail.png'; }
+                                else if (data.source.includes('chat.google.com')) { prefix = '[구글챗] '; iconName = 'gchat.png'; }
+                                else if (data.source.includes('calendar.google.com')) { prefix = '[캘린더] '; iconName = 'gcalendar.png'; }
+                                else if (data.source.includes('100.67.238.32')) { prefix = '[Odoo] '; iconName = 'icon.png'; }
+                            }
+                            
+                            const finalTitle = prefix + (data.title || '새 알림');
+                            
+                            console.log('\n======================================');
+                            console.log(`[Electron Main] 🔔 앱 푸시 알림 수신 (Console)!`);
+                            console.log('- 출처:', data.source || '알 수 없음');
+                            console.log('- 제목:', finalTitle);
+                            console.log('- 내용:', data.body);
+                            console.log('======================================\n');
+                            
+                            if (Notification.isSupported()) {
+                                // 다운로드된 아이콘 파일이 존재하는지 확인, 없으면 기본 아이콘 사용
+                                let iconPath = path.join(app.getAppPath(), 'build', iconName);
+                                if (!fs.existsSync(iconPath)) {
+                                    iconPath = path.join(app.getAppPath(), 'build', 'icon.png');
+                                }
+                                
+                                const notif = new Notification({
+                                    title: finalTitle,
+                                    body: data.body || '',
+                                    icon: iconPath
+                                });
+                                notif.show();
+                            }
+                        } catch(ex) {
+                            console.error('[Electron Main] 알림 파싱 실패:', ex);
+                        }
+                    }
+                });
+
                 contents.setWindowOpenHandler(({ url }) => {
                     console.log('[Electron Main] Intercepted webview popup window. Loading in-place:', url);
                     contents.loadURL(url).catch(err => {
@@ -415,6 +550,32 @@ if (app.isPackaged) {
 
 ipcMain.handle('get-app-version', () => {
     return app.getVersion();
+});
+
+ipcMain.handle('get-preload-path', () => {
+    const p = path.join(app.getAppPath(), 'odoo-preload.js');
+    return url.pathToFileURL(p).href;
+});
+
+ipcMain.on('odoo-desktop-notification', (event, data) => {
+    const { title, options } = data;
+    console.log('\n=======================================');
+    console.log(`[Electron Main] 🔔 Odoo 푸시 알림 수신됨!`);
+    console.log(`- 제목: ${title}`);
+    console.log(`- 내용: ${options?.body}`);
+    console.log('=======================================\n');
+
+    if (Notification.isSupported()) {
+        const notif = new Notification({
+            title: title || 'Odoo 알림',
+            body: options?.body || '',
+            icon: path.join(app.getAppPath(), 'build', 'icon.png')
+        });
+        notif.show();
+        console.log('[Electron Main] 네이티브 윈도우 알림을 성공적으로 표시했습니다.');
+    } else {
+        console.log('[Electron Main] ❌ 현재 OS에서 네이티브 알림을 지원하지 않거나 비활성화되어 있습니다.');
+    }
 });
 
 // ==========================================

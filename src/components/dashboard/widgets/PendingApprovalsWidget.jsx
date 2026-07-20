@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../../../firebase';
-import { collection, query, where, getDocs, limit, orderBy } from '../../../firebase';
+import { db } from '../../../database';
+import { collection, query, where, getDocs, limit, orderBy } from '../../../database';
 import { ShieldCheck, Clock, ArrowRight, FileCheck, FileText, ShoppingCart, UserCheck } from 'lucide-react';
 import ApprovalReviewModal from '../../ApprovalReviewModal';
 import { useNavigate } from 'react-router-dom';

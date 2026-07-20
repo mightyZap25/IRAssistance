@@ -87,6 +87,7 @@
             "dist/**/*",
             "main.js",
             "preload.js",
+            "googlechat-preload.js",
             "server.js",
             "odoo_routes.js",
             "odoo_rpc.js",

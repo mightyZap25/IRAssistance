@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { collection, query, getDocs, orderBy, where, onSnapshot } from '../firebase';
-import { db } from '../firebase';
+import { collection, query, getDocs, orderBy, where, onSnapshot } from '../database';
+import { db } from '../database';
 import { ShoppingCart, Plus, X, AlertCircle, Trash2, Info, Calendar, Search, Package, Factory, TrendingDown, ClipboardList, Send, Mail, Building2, User, Phone } from 'lucide-react';
 import { productionService } from '../services/productionService';
 import { useAuth } from '../contexts/AuthContext';

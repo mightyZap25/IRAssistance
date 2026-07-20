@@ -23,6 +23,125 @@ export default function OdooWebView() {
     const [menusLoaded, setMenusLoaded] = React.useState(globalOdooMenus.length > 0);
     const [odooBaseUrl, setOdooBaseUrl] = React.useState(ODOO_LOCAL_URL);
 
+    const isElectron = window.electronAPI?.isElectron ||
+                       (window && window.process && window.process.type === 'renderer') ||
+                       (navigator.userAgent.toLowerCase().indexOf(' electron/') > -1);
+
+    // 웹뷰 내비게이션 디버깅 및 마우스 뒤로가기 직접 후킹
+    useEffect(() => {
+        const webview = webviewRef.current;
+        if (!webview) return;
+        
+        const handleConsoleMessage = (e) => {
+            if (e.message && e.message.includes('[I-Link BackNav]')) {
+                console.log(e.message);
+            }
+        };
+
+        const handleDomReady = () => {
+            // 웹뷰 내부에 마우스 이벤트 리스너를 직접 심어서 뒤로가기(button 3)를 감지합니다.
+            webview.executeJavaScript(`
+                if (!window._iLinkBackHook) {
+                    window._iLinkBackHook = true;
+                    console.log('[I-Link BackNav] 웹뷰 내부 마우스 후킹 완료');
+                    
+                    window.addEventListener('mouseup', function(e) {
+                        // button 3은 뒤로가기(Back), 4는 앞으로가기(Forward)
+                        if (e.button === 3) {
+                            console.log('[I-Link BackNav] 마우스 뒤로가기 버튼(3번) 입력 감지됨!');
+                            
+                            function triggerClick(el, label) {
+                                if (!el) return false;
+                                console.log('[I-Link BackNav] 타겟 클릭 시도:', label, el);
+                                ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(type => {
+                                    el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+                                });
+                                return true;
+                            }
+
+                            const closeBtn = document.querySelector('.modal-header .btn-close, .modal-header .close, .o_dialog .btn-close');
+                            if (closeBtn && closeBtn.offsetParent !== null) { triggerClick(closeBtn, '모달 닫기 버튼'); return; }
+
+                            const backBtn = document.querySelector('.o_back_button, .o_form_button_cancel, [data-hotkey="b"]');
+                            if (backBtn && backBtn.offsetParent !== null) { triggerClick(backBtn, '명시적 뒤로가기/취소 버튼'); return; }
+                            
+                            const breadcrumbs = document.querySelectorAll('.breadcrumb-item, .o_breadcrumb_item, .o_breadcrumb .active');
+                            const prevItems = Array.from(breadcrumbs).filter(el => {
+                                return !el.classList.contains('active') && el.getAttribute('aria-current') !== 'page';
+                            });
+                            
+                            if (prevItems.length > 0) {
+                                const target = prevItems[prevItems.length - 1];
+                                const link = target.querySelector('a');
+                                triggerClick(link || target, '빵부스러기 이전 단계');
+                                return;
+                            }
+
+                            // 4. 주소값 변경만으로는 Odoo 최신 프레임워크(OWL) 화면이 갱신되지 않는 현상이 있으므로, 
+                            // 사용자님이 지정해주신 '모듈별 디폴트 메뉴 텍스트'를 상단바에서 직접 찾아 클릭합니다!
+                            const defaultMenuMapping = ['매입', '재고관리', '제조관리', '수리'];
+                            
+                            // 상단 네비게이션 바의 메뉴 항목들을 모두 뒤집니다.
+                            const navLinks = document.querySelectorAll('.o_main_navbar a, .o_navbar a, .nav-link, .dropdown-toggle, .o_menu_brand');
+                            let clickedDefault = false;
+                            
+                            for (let i = 0; i < navLinks.length; i++) {
+                                const el = navLinks[i];
+                                const text = el.innerText ? el.innerText.trim() : '';
+                                
+                                // 만약 텍스트가 우리가 지정한 디폴트 메뉴 중 하나라면 클릭!
+                                if (defaultMenuMapping.includes(text)) {
+                                    console.log('[I-Link BackNav] 사용자 지정 디폴트 메뉴 발견! 클릭 시도:', text);
+                                    clickedDefault = triggerClick(el, '디폴트 메뉴(' + text + ')');
+                                    if (clickedDefault) break;
+                                }
+                            }
+
+                            if (clickedDefault) return;
+
+                            // 5. 만약 텍스트 메뉴를 못 찾았을 경우, 최후의 수단으로 디폴트 주소값 적용 후 '강제 새로고침(reload)'하여 화면을 갱신합니다.
+                            let rootHash = window._iLinkRootHash;
+                            try { if (!rootHash) rootHash = sessionStorage.getItem('iLinkRootHash'); } catch(e) {}
+                            
+                            if (!rootHash && window.location.hash.includes('menu_id=')) {
+                                const match = window.location.hash.match(/(menu_id=\\d+)/);
+                                if (match) rootHash = match[1];
+                            }
+
+                            if (rootHash) {
+                                console.log('[I-Link BackNav] 디폴트 메뉴 텍스트 탐색 실패. 주소 이동 후 강제 새로고침 실행:', rootHash);
+                                window.location.hash = rootHash;
+                                window.location.reload();
+                                return;
+                            }
+
+                            console.log('[I-Link BackNav] 모든 수단 실패. 기본 history.back() 실행');
+                            window.history.back();
+                        }
+                    });
+                }
+            `).catch(() => {});
+        };
+        
+        const handleIpcMessage = (e) => {
+            if (e.channel === 'odoo-notification') {
+                const { title, options } = e.args[0];
+                console.log('[OdooWebView] IPC Notification Request Received:', title);
+                // 메인 렌더러(I-Link) 권한으로 진짜 윈도우 알림을 띄웁니다!
+                new window.Notification(title, options);
+            }
+        };
+
+        webview.addEventListener('console-message', handleConsoleMessage);
+        webview.addEventListener('dom-ready', handleDomReady);
+        webview.addEventListener('ipc-message', handleIpcMessage);
+        return () => {
+            webview.removeEventListener('console-message', handleConsoleMessage);
+            webview.removeEventListener('dom-ready', handleDomReady);
+            webview.removeEventListener('ipc-message', handleIpcMessage);
+        };
+    }, []);
+
     // 활성화된 프로필에 맞는 Odoo URL 가져오기
     useEffect(() => {
         fetch('/api/config/db')
@@ -42,9 +161,7 @@ export default function OdooWebView() {
             });
     }, []);
 
-    const isElectron = window.electronAPI?.isElectron ||
-                       (window && window.process && window.process.type === 'renderer') ||
-                       (navigator.userAgent.toLowerCase().indexOf(' electron/') > -1);
+
 
     // 목표 URL 계산
     const getTargetUrl = () => {
@@ -98,25 +215,53 @@ export default function OdooWebView() {
         return `${odooBaseUrl}/web`;
     };
 
+    const isFirstRender = useRef(true);
+
     // 경로 변경 시 webview URL 이동
     useEffect(() => {
         const targetUrl = getTargetUrl();
         if (webviewRef.current && isElectron) {
+            if (isFirstRender.current) {
+                isFirstRender.current = false;
+                return;
+            }
             try {
                 const currentUrl = webviewRef.current.getURL();
-                // 만약 Base URL은 같은데 hash만 다르다면, loadURL 대신 JS로 hash만 변경 (ERR_ABORTED 방지)
                 const targetBase = targetUrl.split('#')[0];
                 const currentBase = currentUrl.split('#')[0];
+                const hashPart = targetUrl.includes('#') ? targetUrl.split('#')[1] : '';
                 
+                // 모듈 이동 시, 해당 모듈의 루트(디폴트) 주소를 웹뷰 내부에 2중으로 저장(sessionStorage)해 둡니다.
+                if (hashPart) {
+                    webviewRef.current.executeJavaScript(`
+                        window._iLinkRootHash = '${hashPart}';
+                        try { sessionStorage.setItem('iLinkRootHash', '${hashPart}'); } catch(e) {}
+                    `).catch(() => {});
+                }
+
                 if (currentUrl !== targetUrl) {
                     if (currentBase === targetBase && targetUrl.includes('#')) {
-                        const hashPart = targetUrl.split('#')[1];
-                        webviewRef.current.executeJavaScript(`window.location.hash = '${hashPart}';`).catch(() => {});
+                        webviewRef.current.executeJavaScript(`window.location.hash = '${hashPart}';`)
+                            .then(() => {
+                                // 사이드바 메뉴 이동 시, 이전 메뉴(모듈)의 웹뷰 내부 기록을 지워서
+                                // 뒤로가기 버튼 클릭 시 이전 모듈(예: 재고 -> 휴가)로 튕기는 네이티브 브라우저 동작을 차단합니다.
+                                if (webviewRef.current && webviewRef.current.clearHistory) {
+                                    webviewRef.current.clearHistory();
+                                    console.log('[OdooWebView] 사이드바 이동 완료, 웹뷰 내부 이전 기록(History) 삭제 완료');
+                                }
+                            })
+                            .catch(() => {});
                     } else {
+                        // Odoo는 초기 로드 시 hash가 URL에 있어야 올바른 메뉴를 렌더링합니다.
                         const loadPromise = webviewRef.current.loadURL(targetUrl);
                         if (loadPromise && loadPromise.catch) {
-                            loadPromise.catch(err => {
-                                if (err.code !== 'ERR_ABORTED') {
+                            loadPromise.then(() => {
+                                if (webviewRef.current && webviewRef.current.clearHistory) {
+                                    webviewRef.current.clearHistory();
+                                }
+                            }).catch(err => {
+                                // ERR_ABORTED 관련 에러는 정상적인 내부 라우팅 과정에서 발생할 수 있으므로 무시
+                                if (err && err.message && !err.message.includes('ERR_ABORTED')) {
                                     console.warn('[OdooWebView] loadURL warning:', err);
                                 }
                             });
@@ -899,6 +1044,43 @@ export default function OdooWebView() {
                 }
             `).catch(() => {});
             
+            // --- Detect session expiration and auto-relogin ---
+            (async () => {
+                try {
+                    const bodyText = await webview.executeJavaScript('document.body.innerText || ""');
+                    if (bodyText.includes('세션이 만료되었습니다') || bodyText.includes('Session Expired')) {
+                        console.warn('[OdooWebView] 세션 만료 감지, 자동 재로그인 시도');
+                        const creds = window._odooPendingCreds;
+                        if (creds) {
+                            const uid = await webview.executeJavaScript(`
+                                (async () => {
+                                    try {
+                                        const r = await fetch('/web/session/authenticate', {
+                                            method: 'POST',
+                                            credentials: 'include',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ jsonrpc: '2.0', id: 1, params: { db: '${creds.db}', login: '${creds.login}', password: '${creds.password}' } })
+                                        });
+                                        const d = await r.json();
+                                        return d.result?.uid || null;
+                                    } catch (e) { return null; }
+                                })()
+                            `);
+                            if (uid) {
+                                console.log('[OdooWebView] 자동 재로그인 성공, 현재 페이지 유지');
+                                // Optionally update stored uid
+                                window._odooPendingCreds.uid = uid;
+                            } else {
+                                console.warn('[OdooWebView] 자동 재로그인 실패, 알림 팝업 표시');
+                                webview.executeJavaScript('alert("자동 재로그인 실패. 로그인 페이지를 확인하세요.")');
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error('[OdooWebView] 세션 체크 오류:', e);
+                }
+            })();
+
             // webview 내부(= Odoo 서버와 같은 origin)에서 JSON-RPC 호출
             // → CORS 없음, Odoo 세션 쿠키 자동 포함
             try {
@@ -1163,10 +1345,11 @@ export default function OdooWebView() {
         <div className="w-full h-full bg-white flex flex-col">
             <webview
                 ref={webviewRef}
-                src={getTargetUrl()}
+                src={`${odooBaseUrl}/web`}
                 style={{ width: '100%', height: '100%', border: 'none' }}
                 allowpopups="true"
                 partition="persist:odoo"
+                webpreferences="contextIsolation=no"
                 useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             />
         </div>

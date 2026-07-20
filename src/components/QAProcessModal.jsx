@@ -7,7 +7,7 @@ import {
 import { db, 
     doc, getDoc, updateDoc, addDoc, collection, 
     serverTimestamp, writeBatch, query, where, getDocs 
-} from '../firebase';
+} from '../database';
 import { autoRegisterDefect } from '../services/defectAutoRegister';
 import QAItemReportModal from './QAItemReportModal';
 import { inventoryService } from '../services/inventoryService';

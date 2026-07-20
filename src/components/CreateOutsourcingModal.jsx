@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { collection, query, getDocs, orderBy, where } from '../firebase';
-import { db } from '../firebase';
+import { collection, query, getDocs, orderBy, where } from '../database';
+import { db } from '../database';
 import { ShoppingCart, Plus, X, AlertCircle, Trash2, Info, Package, ArrowRight, Settings, ClipboardList } from 'lucide-react';
 import { productionService } from '../services/productionService';
 

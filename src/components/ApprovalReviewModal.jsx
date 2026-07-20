@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, CheckCircle2, XCircle, MessageSquare, Clock, User, ShieldCheck, ShoppingCart, FileText, ExternalLink } from 'lucide-react';
-import { db, doc, updateDoc, getDoc, serverTimestamp } from '../firebase';
+import { db, doc, updateDoc, getDoc, serverTimestamp } from '../database';
 import { useAuth } from '../contexts/AuthContext';
 import { createNotification } from '../services/notificationService';
 

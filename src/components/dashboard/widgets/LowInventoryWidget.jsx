@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../../../firebase';
-import { collection, getDocs, query, where } from '../../../firebase';
+import { db } from '../../../database';
+import { collection, getDocs, query, where } from '../../../database';
 import { AlertTriangle, Package, Warehouse, BarChart3 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 

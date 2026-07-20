@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { db } from '../firebase';
-import { collection, addDoc, serverTimestamp, doc, updateDoc } from '../firebase';
+import { db } from '../database';
+import { collection, addDoc, serverTimestamp, doc, updateDoc } from '../database';
 import { useAuth } from '../contexts/AuthContext';
 import { ApprovalLineEditor, notifyFirstApprover } from './common/ApprovalSystem';
 import { Save, Send, Plus, Trash2, ArrowLeft } from 'lucide-react';

@@ -120,19 +120,27 @@ class HrDashboardAPI(http.Controller):
         remaining_days = total_allocated - total_taken
         remaining_hours = remaining_days * 8 # 1일 8시간 기준
 
-        # 4. 결재 대기 건수 (기본 휴가 신청서 + 근무일정 변경)
-        pending_approvals = 0
+        # 4. 결재 대기 건수
+        # 4-1. 내가 신청한 휴가 중 결재 대기 중인 것
+        my_pending_leaves_count = 0
         if 'hr.leave' in request.env:
-            pending_approvals += request.env['hr.leave'].search_count([
-                ('state', '=', 'confirm'),
+            my_pending_leaves_count = request.env['hr.leave'].search_count([
+                ('state', 'in', ['confirm', 'validate1']),
                 ('employee_id', '=', employee.id)
             ])
-        if 'hr.schedule.change' in request.env:
-            pending_approvals += request.env['hr.schedule.change'].search_count([
-                ('state', '=', 'confirm'),
-                ('employee_id', '=', employee.id)
-            ])
-        # TODO: ECO나 다른 모델의 결재도 합산 가능
+
+        # 4-2. 내가 결재해야 할 휴가 (부서장/관리자로 지정된 직원의 신청건 또는 전체 휴가 관리자)
+        to_approve_count = 0
+        if 'hr.leave' in request.env:
+            try:
+                domain = [('state', 'in', ['confirm', 'validate1'])]
+                if not user.has_group('hr_holidays.group_hr_holidays_user'):
+                    domain += ['|', ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.leave_manager_id.user_id', '=', user.id)]
+                to_approve_count = request.env['hr.leave'].sudo().search_count(domain)
+            except Exception as e:
+                _logger.error(f"Error fetching to_approve_count: {e}")
+
+        pending_approvals = my_pending_leaves_count + to_approve_count
 
         # 5. 신청 가능한 휴가/근태 분류 (hr.leave.type) 가져오기
         leave_types_records = request.env['hr.leave.type'].search([('active', '=', True)])
@@ -253,3 +261,98 @@ class HrDashboardAPI(http.Controller):
             return {'success': True}
         except Exception as e:
             return {'error': str(e)}
+
+    @http.route('/api/hr_dashboard/pending_list', type='json', auth='user')
+    def get_pending_list(self):
+        """결재 대기 상세 목록: 내가 신청한 것 + 내가 결재해야 할 것"""
+        user = request.env.user
+        employee = user.employee_id
+        if not employee:
+            return {'my_requests': [], 'to_approve': []}
+
+        import pytz
+        user_tz = pytz.timezone(user.tz or 'Asia/Seoul')
+
+        def fmt_date(dt):
+            if not dt: return ''
+            if isinstance(dt, datetime.datetime):
+                return pytz.utc.localize(dt).astimezone(user_tz).strftime('%Y-%m-%d')
+            return dt.strftime('%Y-%m-%d')
+
+        def leave_state_label(state):
+            mapping = {
+                'draft': '임시저장',
+                'confirm': '결재대기',
+                'validate1': '1차승인',
+                'validate': '승인완료',
+                'refuse': '반려'
+            }
+            return mapping.get(state, state)
+
+        # 내가 신청한 휴가 중 결재 대기 중인 목록
+        my_leaves = []
+        if 'hr.leave' in request.env:
+            records = request.env['hr.leave'].search([
+                ('state', 'in', ['confirm', 'validate1']),
+                ('employee_id', '=', employee.id)
+            ], order='date_from asc', limit=20)
+            for r in records:
+                my_leaves.append({
+                    'id': r.id,
+                    'name': r.name or (r.holiday_status_id.name if r.holiday_status_id else '휴가'),
+                    'leave_type': r.holiday_status_id.name if r.holiday_status_id else '',
+                    'date_from': fmt_date(r.date_from),
+                    'date_to': fmt_date(r.date_to),
+                    'number_of_days': r.number_of_days,
+                    'state': leave_state_label(r.state),
+                    'state_raw': r.state,
+                })
+
+        # 내가 결재해야 할 휴가 목록 (부서장/관리자로 지정된 직원의 신청건 또는 휴가 관리자)
+        to_approve = []
+        if 'hr.leave' in request.env:
+            try:
+                domain = [('state', 'in', ['confirm', 'validate1'])]
+                if not user.has_group('hr_holidays.group_hr_holidays_user'):
+                    domain += ['|', ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.leave_manager_id.user_id', '=', user.id)]
+                    
+                records = request.env['hr.leave'].sudo().search(domain, order='date_from asc', limit=20)
+                for r in records:
+                    to_approve.append({
+                        'id': r.id,
+                        'employee_name': r.employee_id.name if r.employee_id else '',
+                        'department': r.employee_id.department_id.name if r.employee_id and r.employee_id.department_id else '',
+                        'name': r.name or (r.holiday_status_id.name if r.holiday_status_id else '휴가'),
+                        'leave_type': r.holiday_status_id.name if r.holiday_status_id else '',
+                        'date_from': fmt_date(r.date_from),
+                        'date_to': fmt_date(r.date_to),
+                        'number_of_days': r.number_of_days,
+                        'state': leave_state_label(r.state),
+                        'state_raw': r.state,
+                    })
+            except Exception as e:
+                _logger.error(f"Error fetching to_approve list: {e}")
+
+        return {
+            'my_requests': my_leaves,
+            'to_approve': to_approve,
+        }
+
+    @http.route('/api/hr_dashboard/action_leave', type='json', auth='user')
+    def action_leave(self, leave_id, action_type):
+        """휴가 결재 대기 목록에서 즉시 승인/반려 처리"""
+        try:
+            leave = request.env['hr.leave'].sudo().browse(int(leave_id))
+            if not leave.exists():
+                return {'error': '해당 휴가 신청건을 찾을 수 없습니다.'}
+            
+            if action_type == 'approve':
+                leave.action_approve()
+            elif action_type == 'refuse':
+                leave.action_refuse()
+            else:
+                return {'error': '알 수 없는 동작입니다.'}
+            
+            return {'success': True}
+        except Exception as e:
+            return {'error': f"오류 발생: {str(e)}"}

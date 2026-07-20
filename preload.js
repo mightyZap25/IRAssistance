@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     startDownload: () => ipcRenderer.send('start-download'),
     restartApp: () => ipcRenderer.send('restart-app'),
     getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+    getPreloadPath: () => ipcRenderer.invoke('get-preload-path'),
     googleOAuthSignIn: () => ipcRenderer.invoke('google-oauth-signin'),
     clearGoogleCookies: () => ipcRenderer.invoke('clear-google-cookies'),
     clearOdooCookies: () => ipcRenderer.invoke('clear-odoo-cookies'),

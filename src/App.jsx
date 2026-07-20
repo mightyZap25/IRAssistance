@@ -23,8 +23,8 @@ import AgentChatPage from './pages/AgentChatPage'
 
 function PrivateRoute({ children, disableForOdoo }) {
     const { currentUser, isOdooOnlyAuth } = useAuth();
-    if (!currentUser) return <Navigate to="/login" />;
-    if (disableForOdoo && isOdooOnlyAuth) return <Navigate to="/" />;
+    if (!currentUser) return <Navigate to="/login" replace />;
+    if (disableForOdoo && isOdooOnlyAuth) return <Navigate to="/" replace />;
     return children;
 }
 
@@ -32,7 +32,7 @@ function AppContent() {
     const { currentUser } = useAuth();
     return (
         <Routes>
-            <Route path="/login" element={!currentUser ? <Login /> : <Navigate to="/" />} />
+            <Route path="/login" element={!currentUser ? <Login /> : <Navigate to="/" replace />} />
 
             {/* Odoo Webview 공통 연결 라우트 (기존 ERP 페이지들을 모두 이걸로 대체) */}
             {[
@@ -70,7 +70,7 @@ function AppContent() {
             <Route path="/approval" element={<PrivateRoute disableForOdoo={true}><Layout><ApprovalPage /></Layout></PrivateRoute>} />
 
             {/* Catch all */}
-            <Route path="*" element={<Navigate to="/" />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
     );
 }

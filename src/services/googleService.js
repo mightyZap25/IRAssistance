@@ -4,7 +4,8 @@
  */
 
 const CLIENT_ID = '602256994765-ntop38htqblvjced9ogfsrfr8kpvc3dc.apps.googleusercontent.com';
-const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/documents';
+// Drive, Docs 권한 외에 Calendar 생성 및 일정 조회 권한 추가
+const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/calendar';
 
 export const MEETING_FOLDER_ID = '1ri7Wac0KxC5ze9mLinX01xUTfzRzkrWL';
 

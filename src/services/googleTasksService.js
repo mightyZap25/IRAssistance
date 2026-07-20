@@ -1,5 +1,5 @@
 import { fetchDrive } from './googleService';
-import { db, collection, query, where, getDocs, getDoc, updateDoc, doc, addDoc, serverTimestamp, deleteDoc } from '../firebase';
+import { db, collection, query, where, getDocs, getDoc, updateDoc, doc, addDoc, serverTimestamp, deleteDoc } from '../database';
 
 const TASKS_API_BASE = 'https://tasks.googleapis.com/tasks/v1';
 const TASKLIST_NAME = 'I-Link Tasks';

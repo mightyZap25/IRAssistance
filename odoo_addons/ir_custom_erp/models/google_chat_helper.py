@@ -1,122 +1,127 @@
 import time
 import json
-import base64
 import logging
 import requests
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.hazmat.primitives import hashes
+import base64
+import jwt
+from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
-def get_google_chat_token(service_account_json):
-    """ service_account_json 문자열을 파싱해 Google JWT 토큰을 발행하고 access_token을 받습니다. """
+def get_google_access_token(service_account_json):
+    """ service_account_json (dict) 기반으로 Google Chat API용 Access Token (User Auth) 발급 """
     try:
-        sa = json.loads(service_account_json)
-        private_key_pem = sa['private_key'].encode('utf-8')
-        private_key = serialization.load_pem_private_key(private_key_pem, password=None)
-        
         iat = int(time.time())
         exp = iat + 3600
         
-        header = {"alg": "RS256", "typ": "JWT"}
+        # 관리자 계정 이메일 (임시 하드코딩, 필요시 파라미터화)
+        admin_email = "jogak@mightyzap.com"
+        
         payload = {
-            "iss": sa["client_email"],
-            "sub": sa["client_email"],
-            "scope": "https://www.googleapis.com/auth/chat.spaces https://www.googleapis.com/auth/chat.messages https://www.googleapis.com/auth/chat.bot",
+            "iss": service_account_json["client_email"],
+            "sub": admin_email, # DWD를 이용한 관리자 계정 임퍼소네이션 (중요!)
+            "scope": "https://www.googleapis.com/auth/chat.spaces https://www.googleapis.com/auth/chat.messages",
             "aud": "https://oauth2.googleapis.com/token",
             "exp": exp,
             "iat": iat
         }
         
-        def base64url_encode(data):
-            return base64.urlsafe_b64encode(json.dumps(data).encode('utf-8')).decode('utf-8').rstrip('=')
-            
-        signing_input = f"{base64url_encode(header)}.{base64url_encode(payload)}"
-        
-        signature = private_key.sign(
-            signing_input.encode('utf-8'),
-            padding.PKCS1v15(),
-            hashes.SHA256()
+        # PyJWT를 사용하여 RS256 서명
+        encoded_jwt = jwt.encode(
+            payload,
+            service_account_json["private_key"],
+            algorithm="RS256"
         )
         
-        signature_b64 = base64.urlsafe_b64encode(signature).decode('utf-8').rstrip('=')
-        jwt_token = f"{signing_input}.{signature_b64}"
-        
-        res = requests.post(
-            "https://oauth2.googleapis.com/token",
+        # JWT Token Exchange
+        token_res = requests.post(
+            'https://oauth2.googleapis.com/token',
             data={
-                "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
-                "assertion": jwt_token
+                'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+                'assertion': encoded_jwt
             },
             timeout=10
         )
-        res_data = res.json()
-        if 'error' in res_data:
-            _logger.error("Google Chat OAuth failed: %s", res_data.get('error_description', res_data['error']))
-            return False
-        return res_data.get('access_token')
+        token_data = token_res.json()
+        
+        if 'error' in token_data:
+            _logger.error("Google OAuth Error: %s", token_data)
+            return None
+            
+        return token_data.get('access_token')
     except Exception as e:
-        _logger.error("Failed to generate Google Chat token: %s", str(e))
-        return False
+        _logger.error("Failed to generate Google Access Token: %s", str(e))
+        return None
 
-def send_chat_dm(env, recipient_email, text_message):
-    """ Odoo 시스템 파라미터에서 서비스 계정 키를 읽어 특정 이메일 대상자에게 1:1 DM을 발송합니다. """
-    if not recipient_email:
-        return False
-        
-    # 1. Odoo 시스템 파라미터에서 google_chat_service_account_key 조회
-    sa_json = env['ir.config_parameter'].sudo().get_param('google_chat_service_account_key')
-    if not sa_json:
-        _logger.warning("Google Chat Service Account Key is not configured in System Parameters (google_chat_service_account_key).")
-        return False
-        
-    # 2. 토큰 획득
-    token = get_google_chat_token(sa_json)
-    if not token:
-        return False
-        
+def send_chat_dm(env, recipient_email, message_text):
+    """ 구글 챗 API를 직접 호출하여 DM 발송 (User Auth 방식) """
     try:
+        # 1. 시스템 파라미터에서 JSON 키 읽기
+        json_str = env['ir.config_parameter'].sudo().get_param('google_chat.service_account_json')
+        if not json_str:
+            _logger.error("google_chat.service_account_json 파라미터가 설정되지 않았습니다.")
+            return False
+            
+        sa_json = json.loads(json_str)
+        
+        # 2. Access Token 발급 (관리자 권한)
+        token = get_google_access_token(sa_json)
+        if not token:
+            return False
+            
         headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json; charset=UTF-8"
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json'
         }
         
-        # 3. 1:1 DM Space Setup
-        setup_url = "https://chat.googleapis.com/v1/spaces:setup"
-        setup_data = {
-            "space": {
-                "spaceType": "DIRECT_MESSAGE",
-                "singleUserLookupRequest": {
-                    "userName": f"users/{recipient_email}"
-                }
-            }
-        }
+        # 3. Space Setup (관리자 계정과 수신자 간의 1:1 DM 스페이스 생성/조회)
+        setup_res = requests.post(
+            'https://chat.googleapis.com/v1/spaces:setup',
+            headers=headers,
+            json={
+                "space": {
+                    "spaceType": "DIRECT_MESSAGE"
+                },
+                "memberships": [
+                    {
+                        "member": {
+                            "name": f"users/{recipient_email}",
+                            "type": "HUMAN"
+                        }
+                    }
+                ]
+            },
+            timeout=10
+        )
         
-        setup_res = requests.post(setup_url, json=setup_data, headers=headers, timeout=10)
-        setup_res_data = setup_res.json()
-        
-        if 'error' in setup_res_data:
-            _logger.error("Google Chat Space setup failed for %s: %s", recipient_email, setup_res_data['error']['message'])
+        setup_data = setup_res.json()
+        if 'error' in setup_data:
+            _logger.error("Google Chat Space Setup Error: %s", setup_data)
             return False
             
-        space_name = setup_res_data.get('name')
+        space_name = setup_data.get('name')
         if not space_name:
+            _logger.error("Google Chat API did not return a space name.")
             return False
             
-        # 4. Message 전송
-        msg_url = f"https://chat.googleapis.com/v1/{space_name}/messages"
-        msg_data = {"text": text_message}
+        # 4. Message 발송 (해당 DM 방에 메시지 쏘기)
+        msg_res = requests.post(
+            f'https://chat.googleapis.com/v1/{space_name}/messages',
+            headers=headers,
+            json={
+                "text": message_text
+            },
+            timeout=10
+        )
         
-        msg_res = requests.post(msg_url, json=msg_data, headers=headers, timeout=10)
-        msg_res_data = msg_res.json()
-        
-        if 'error' in msg_res_data:
-            _logger.error("Google Chat Message send failed for %s: %s", recipient_email, msg_res_data['error']['message'])
+        msg_data = msg_res.json()
+        if 'error' in msg_data:
+            _logger.error("Google Chat Message Send Error: %s", msg_data)
             return False
             
         _logger.info("Successfully sent Google Chat DM to %s", recipient_email)
         return True
+        
     except Exception as e:
-        _logger.error("Error occurred while sending Google Chat DM: %s", str(e))
+        _logger.error("Exception in send_chat_dm: %s", str(e))
         return False

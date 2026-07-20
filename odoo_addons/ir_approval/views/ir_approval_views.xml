@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ir_approval_request_tree" model="ir.ui.view">
+        <field name="name">ir_approval.request.list</field>
+        <field name="model">ir_approval.request</field>
+        <field name="arch" type="xml">
+            <list string="전자결재 문서">
+                <field name="doc_type" widget="badge"/>
+                <field name="name"/>
+                <field name="requestor_id"/>
+                <field name="ref_name"/>
+                <field name="status" widget="badge"/>
+                <field name="create_date"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ir_approval_request_form" model="ir.ui.view">
+        <field name="name">ir_approval.request.form</field>
+        <field name="model">ir_approval.request</field>
+        <field name="arch" type="xml">
+            <form string="전자결재 문서">
+                <header>
+                    <button name="action_submit" string="결재 상신" type="object" class="oe_highlight" invisible="status != 'draft'"/>
+                    <button name="action_approve" string="승인" type="object" class="oe_highlight" invisible="status != 'pending'"/>
+                    <button name="action_reject" string="반려" type="object" class="btn-danger" invisible="status != 'pending'"/>
+                    <field name="status" widget="statusbar" statusbar_visible="draft,pending,approved,rejected"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="기안서 제목..."/>
+                        </h1>
+                    </div>
+                    <group>
+                        <!-- 문서 종류 및 기본 정보 -->
+                        <group>
+                            <field name="doc_type" required="1"/>
+                            <field name="requestor_id"/>
+                            <field name="department_id"/>
+                        </group>
+                        
+                        <group>
+                            <field name="draft_date"/>
+                            <field name="retention_period"/>
+                        </group>
+                        
+                        <!-- 구매/지출 전용 필드 -->
+                        <group string="구매/지출 상세" invisible="doc_type != 'PURCHASE_REQUEST'">
+                            <field name="vendor_id"/>
+                            <field name="purchase_amount"/>
+                        </group>
+                        
+                        <!-- 지출결의서 전용 필드 -->
+                        <group string="지출 결의 상세" invisible="doc_type != 'EXPENSE_RESOLUTION'">
+                            <group>
+                                <field name="expense_user"/>
+                                <field name="expense_job_title"/>
+                                <field name="expense_date"/>
+                                <field name="expense_vendor"/>
+                            </group>
+                            <group>
+                                <field name="expense_amount"/>
+                                <field name="expense_dept"/>
+                                <field name="expense_amount" string="금액" readonly="1"/>
+                            </group>
+                        </group>
+                        
+                        <group invisible="doc_type != 'EXPENSE_RESOLUTION'">
+                            <field name="expense_details"/>
+                            <field name="expense_etc"/>
+                        </group>
+
+                        <!-- ECO 전용 필드 -->
+                        <group string="ECO 상세" invisible="doc_type != 'ECO'">
+                            <field name="eco_spec_no"/>
+                            <field name="eco_issue_date"/>
+                            <field name="eco_applied_models_chk"/>
+                            <field name="eco_comm_method"/>
+                            <field name="eco_applied_model_text"/>
+                            <field name="eco_spec_type" widget="radio"/>
+                            <field name="eco_change_reason"/>
+                            <field name="eco_publish_change"/>
+                            <field name="eco_publish_change_detail" invisible="eco_publish_change != 'yes'"/>
+                            <field name="eco_improvement_effect"/>
+                            <field name="eco_dept_opinion"/>
+                            <field name="eco_revision_no"/>
+                        </group>
+
+                        <!-- 불출요청서 전용 필드 -->
+                        <group string="불출 상세" invisible="doc_type != 'ISSUE_REQUEST'">
+                            <field name="issue_request_date"/>
+                            <field name="issue_customer"/>
+                            <field name="issue_purpose"/>
+                        </group>
+
+                    </group>
+                    
+                    <notebook>
+                        <page string="불출 목록" invisible="doc_type != 'ISSUE_REQUEST'">
+                            <field name="issue_line_ids">
+                                <list editable="bottom">
+                                    <field name="item_no"/>
+                                    <field name="name"/>
+                                    <field name="quantity"/>
+                                    <field name="price_unit"/>
+                                    <field name="price_subtotal"/>
+                                    <field name="remarks"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="설계변경 목록" invisible="doc_type != 'ECO'">
+                            <field name="eco_line_ids">
+                                <list editable="bottom">
+                                    <field name="name"/>
+                                    <field name="list_no"/>
+                                    <field name="spec_before"/>
+                                    <field name="spec_after"/>
+                                    <field name="quantity"/>
+                                    <field name="apply_date_method"/>
+                                    <field name="remarks"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="상세 내용">
+                            <field name="description" placeholder="상세 내용을 입력하세요..."/>
+                        </page>
+                        <page string="결재선">
+                            <field name="step_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="approver_id"/>
+                                    <field name="status" readonly="1"/>
+                                    <field name="comment"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter>
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </chatter>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ir_approval_request" model="ir.actions.act_window">
+        <field name="name">전자결재 문서</field>
+        <field name="res_model">ir_approval.request</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Top Menu -->
+    <menuitem id="menu_ir_approval_root" name="전자결재" sequence="10"/>
+    <menuitem id="menu_ir_approval_request" name="결재 문서함" parent="menu_ir_approval_root" action="action_ir_approval_request" sequence="10"/>
+</odoo>

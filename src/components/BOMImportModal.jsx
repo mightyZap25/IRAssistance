@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Globe, FileSpreadsheet, Eye, CheckCircle2, Play, AlertTriangle, HelpCircle, Layers, Check, Loader2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { collection, doc, writeBatch, getDocs, serverTimestamp } from '../firebase';
-import { db } from '../firebase';
+import { collection, doc, writeBatch, getDocs, serverTimestamp } from '../database';
+import { db } from '../database';
 import BOMTree from './BOMTree';
 import { autoRegisterFromParts } from '../services/supplierAutoRegister';
 

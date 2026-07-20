@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../../../firebase';
-import { collection, getDocs, query, where } from '../../../firebase';
+import { db } from '../../../database';
+import { collection, getDocs, query, where } from '../../../database';
 import { UserX, Plane, Briefcase, Home, Coffee, Users } from 'lucide-react';
 
 export default function AttendanceWidget({ viewType = 'list' }) {

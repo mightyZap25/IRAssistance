@@ -574,3 +574,169 @@
         flex-direction: column;
     }
 }
+
+/* =========================================
+   결재 대기 모달 팝업
+   ========================================= */
+.pending_modal_backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.pending_modal_content {
+    background: #ffffff;
+    border-radius: 20px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 85vh;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    animation: scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes scaleUp {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+.pending_modal_header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.pending_modal_header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #2b3674;
+}
+
+.pending_modal_header .btn_close {
+    background: transparent;
+    border: none;
+    font-size: 1.2rem;
+    color: #a3aed1;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.pending_modal_header .btn_close:hover {
+    color: #ef4444;
+}
+
+.pending_modal_body {
+    padding: 24px;
+    overflow-y: auto;
+}
+
+.pending_loading {
+    text-align: center;
+    padding: 24px;
+    color: #a3aed1;
+    font-size: 0.9rem;
+}
+
+.pending_section {
+    margin-bottom: 22px;
+}
+
+.pending_section:last-child {
+    margin-bottom: 0;
+}
+
+.pending_section_title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #2b3674;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #f4f7fe;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pending_section_title .badge {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 20px;
+}
+
+.badge-primary { background: #4318ff; color: #fff; }
+.badge-warning  { background: #ffb547; color: #fff; }
+
+.pending_empty {
+    text-align: center;
+    color: #a3aed1;
+    font-size: 0.85rem;
+    padding: 16px 0;
+    font-style: italic;
+}
+
+.pending_table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.pending_table thead tr {
+    background: #f4f7fe;
+}
+
+.pending_table th {
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 700;
+    color: #a3aed1;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.pending_table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f4f7fe;
+    color: #2b3674;
+    vertical-align: middle;
+}
+
+.pending_table tbody tr:hover {
+    background: #f8f9ff;
+}
+
+.pending_table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* 상태 뱃지 */
+.state_badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.state_confirm  { background: #fff3cd; color: #856404; }
+.state_validate1 { background: #cff4fc; color: #0c7fa2; }
+.state_validate { background: #d1e7dd; color: #0f5132; }
+.state_refuse   { background: #f8d7da; color: #842029; }

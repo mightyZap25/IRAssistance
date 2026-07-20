@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { collection, query, getDocs, orderBy, where, doc, getDoc } from '../firebase';
-import { db } from '../firebase';
+import { collection, query, getDocs, orderBy, where, doc, getDoc } from '../database';
+import { db } from '../database';
 import { X, History, ArrowUpRight, ArrowDownRight, Package, User, FileText, ExternalLink, Info, AlertCircle, Link as LinkIcon, Factory, Ban } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { inventoryService } from '../services/inventoryService';

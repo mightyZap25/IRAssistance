@@ -5,7 +5,7 @@ import {
     CheckCircle2, AlertTriangle, FileText, 
     ExternalLink, ClipboardList, Zap, Gauge
 } from 'lucide-react';
-import { db } from '../firebase';
+import { db } from '../database';
 import { 
     doc, getDoc, addDoc, collection, 
     serverTimestamp, writeBatch, query, where, getDocs 

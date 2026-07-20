@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ir_approval_request,ir_approval.request,model_ir_approval_request,base.group_user,1,1,1,0
+access_ir_approval_step,ir_approval.step,model_ir_approval_step,base.group_user,1,1,1,0
+access_ir_approval_eco_line,ir_approval.eco.line,model_ir_approval_eco_line,base.group_user,1,1,1,0
+access_ir_approval_issue_line,ir_approval.issue.line,model_ir_approval_issue_line,base.group_user,1,1,1,0

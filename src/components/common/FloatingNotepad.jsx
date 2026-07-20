@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { db, doc, onSnapshot, setDoc, serverTimestamp } from '../../firebase';
+import { db, doc, onSnapshot, setDoc, serverTimestamp } from '../../database';
 import { StickyNote, X, Move } from 'lucide-react';
 import RichMemoEditor from './RichMemoEditor';
 

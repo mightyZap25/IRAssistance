@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebase';
-import { collection, getDocs, query, where, limit, orderBy } from '../firebase';
+import { db } from '../database';
+import { collection, getDocs, query, where, limit, orderBy } from '../database';
 import { X, Layers, ArrowRightLeft, Clock, FileText, User, Package, Box, Ruler, Factory, Settings, DollarSign, Tag } from 'lucide-react';
 
 export default function PartDetailModal({ data, onClose }) {
