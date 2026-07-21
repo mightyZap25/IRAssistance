@@ -29,9 +29,31 @@ export function AuthProvider({ children }) {
     // Domain restriction configuration
     const ALLOWED_DOMAINS = ['mightyzap.com', 'irrobot.com'];
     
-    // Odoo API 기본 설정
-    const ODOO_API_URL = 'http://100.67.238.32:8069';
+    // Odoo API 동적 설정 (로컬 망 1차 시도 후 Tailscale 외부망 폴백)
+    const [odooApiUrl, setOdooApiUrl] = useState('http://192.168.0.7:8069'); // 기본 로컬 주소
     const ODOO_DB = 'odoo';
+
+    useEffect(() => {
+        const checkOdooConnection = async () => {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2000); // 2초 대기 후 타임아웃
+                // no-cors 모드를 사용하여 CORS 제한 없이 네트워크 도달 가능성만 단순 체크 (응답 여부만 판단)
+                await fetch('http://192.168.0.7:8069/web/login', {
+                    method: 'GET',
+                    mode: 'no-cors',
+                    signal: controller.signal,
+                });
+                clearTimeout(timeoutId);
+                console.log('[Odoo Fallback] 로컬 사내망(192.168.0.7) Odoo 서버 접근 가능! 로컬 주소를 유지합니다.');
+                setOdooApiUrl('http://192.168.0.7:8069');
+            } catch (err) {
+                console.warn('[Odoo Fallback] 로컬 사내망 Odoo 접근 불가! (2초 타임아웃 또는 연결거부). Tailscale(100.67.238.32)로 전환합니다.', err.message);
+                setOdooApiUrl('http://100.67.238.32:8069');
+            }
+        };
+        checkOdooConnection();
+    }, []);
 
     async function login() {
         try {
@@ -79,7 +101,7 @@ export function AuthProvider({ children }) {
             if (!username) throw new Error("Google 로그인이 필요합니다.");
 
             // 메인 렌더러에서도 인증 확인 (uid 체크용)
-            const response = await fetch(`${ODOO_API_URL}/web/session/authenticate`, {
+            const response = await fetch(`${odooApiUrl}/web/session/authenticate`, {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
@@ -99,9 +121,9 @@ export function AuthProvider({ children }) {
                 setOdooLinked(true);
                 
                 // 인증 성공시 웹뷰 자동 로그인 트리거
-                window._odooPendingCreds = { login: username, password, db: ODOO_DB, url: ODOO_API_URL };
+                window._odooPendingCreds = { login: username, password, db: ODOO_DB, url: odooApiUrl };
                 window.dispatchEvent(new CustomEvent('odoo-auto-login', {
-                    detail: { login: username, password, db: ODOO_DB, url: ODOO_API_URL }
+                    detail: { login: username, password, db: ODOO_DB, url: odooApiUrl }
                 }));
             } else {
                 throw new Error('비밀번호가 올바르지 않습니다.');
@@ -117,13 +139,13 @@ export function AuthProvider({ children }) {
         try {
             setError('');
             // 웹뷰가 직접 Odoo 로그인을 처리할 수 있도록 자격증명을 메모리에 임시 저장
-            window._odooPendingCreds = { login: username, password, db: ODOO_DB, url: ODOO_API_URL };
+            window._odooPendingCreds = { login: username, password, db: ODOO_DB, url: odooApiUrl };
             window.dispatchEvent(new CustomEvent('odoo-auto-login', {
-                detail: { login: username, password, db: ODOO_DB, url: ODOO_API_URL }
+                detail: { login: username, password, db: ODOO_DB, url: odooApiUrl }
             }));
 
             // 메인 렌더러에서도 인증 확인 (uid 체크용)
-            const response = await fetch(`${ODOO_API_URL}/web/session/authenticate`, {
+            const response = await fetch(`${odooApiUrl}/web/session/authenticate`, {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
@@ -234,9 +256,9 @@ export function AuthProvider({ children }) {
                     // Odoo 비밀번호가 저장되어 있다면 자동으로 웹뷰 로그인 진행
                     const savedOdooPwd = localStorage.getItem('odoo_password');
                     if (savedOdooPwd) {
-                        window._odooPendingCreds = { login: user.email, password: savedOdooPwd, db: ODOO_DB, url: ODOO_API_URL };
+                        window._odooPendingCreds = { login: user.email, password: savedOdooPwd, db: ODOO_DB, url: odooApiUrl };
                         window.dispatchEvent(new CustomEvent('odoo-auto-login', {
-                            detail: { login: user.email, password: savedOdooPwd, db: ODOO_DB, url: ODOO_API_URL }
+                            detail: { login: user.email, password: savedOdooPwd, db: ODOO_DB, url: odooApiUrl }
                         }));
                     } else {
                         // 저장된 비밀번호가 없으면 Odoo 로그인(연동) 창 띄우기 요청
@@ -269,6 +291,7 @@ export function AuthProvider({ children }) {
         linkOdoo,
         isOdooOnlyAuth,
         odooLinked,
+        odooApiUrl,
         logout,
         error
     };

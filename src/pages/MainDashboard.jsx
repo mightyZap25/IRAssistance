@@ -13,7 +13,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 
 const MainDashboard = () => {
-    const { currentUser } = useAuth();
+    const { currentUser, odooApiUrl } = useAuth();
     const [data, setData] = useState({
         user_name: '',
         department: '',
@@ -32,7 +32,7 @@ const MainDashboard = () => {
         const fetchDashboardData = async () => {
             try {
                 // Call Odoo JSON-RPC API
-                const response = await fetch('http://100.67.238.32:8069/api/main_dashboard/data', {
+                const response = await fetch(`${odooApiUrl}/api/main_dashboard/data`, {
                     method: 'POST',
                     credentials: 'include',
                     headers: {
@@ -74,8 +74,10 @@ const MainDashboard = () => {
             }
         };
 
-        fetchDashboardData();
-    }, []);
+        if (odooApiUrl) {
+            fetchDashboardData();
+        }
+    }, [odooApiUrl]);
 
     const formatCurrency = (amount) => {
         return new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(amount);

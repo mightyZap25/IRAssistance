@@ -22,7 +22,7 @@ console.log('[Electron Main] .env 로드 경로:', envPath);
 app.userAgentFallback = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 // 윈도우 OS 네이티브 알림(Notification)이 정상 작동하기 위한 필수 설정
-app.setAppUserModelId('com.mightyzap.ir-assistant');
+app.setAppUserModelId('com.irassistant.app');
 
 // 알림 전용 아이콘 자동 다운로드 함수
 function ensureNotificationIcons() {
@@ -306,7 +306,7 @@ if (!gotTheLock) {
                                 if (data.source.includes('mail.google.com')) { prefix = '[지메일] '; iconName = 'gmail.png'; }
                                 else if (data.source.includes('chat.google.com')) { prefix = '[구글챗] '; iconName = 'gchat.png'; }
                                 else if (data.source.includes('calendar.google.com')) { prefix = '[캘린더] '; iconName = 'gcalendar.png'; }
-                                else if (data.source.includes('100.67.238.32')) { prefix = '[Odoo] '; iconName = 'icon.png'; }
+                                else if (data.source.includes('192.168.0.7') || data.source.includes('100.67.238.32')) { prefix = '[Odoo] '; iconName = 'icon.png'; }
                             }
                             
                             const finalTitle = prefix + (data.title || '새 알림');

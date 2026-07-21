@@ -9,7 +9,7 @@ import GeminiWebviewPanel from './common/GeminiWebviewPanel';
 import { BotMessageSquare } from 'lucide-react';
 
 export default function Layout({ children }) {
-    const { currentUser, isOdooOnlyAuth } = useAuth();
+    const { currentUser, isOdooOnlyAuth, odooApiUrl } = useAuth();
     useTaskAlarm(currentUser);
 
     const [appVersion, setAppVersion] = React.useState('0.9.4');
@@ -21,6 +21,18 @@ export default function Layout({ children }) {
             window.electronAPI.getAppVersion().then(setAppVersion).catch(() => {});
         }
     }, []);
+
+    React.useEffect(() => {
+        const handleSessionReady = () => {
+            const bgWebview = document.getElementById('odoo-bg-webview');
+            if (bgWebview && bgWebview.loadURL) {
+                console.log('[Layout] odoo-session-ready 수신, 백그라운드 웹뷰 새로고침 시도');
+                bgWebview.loadURL(`${odooApiUrl}/web`).catch(() => {});
+            }
+        };
+        window.addEventListener('odoo-session-ready', handleSessionReady);
+        return () => window.removeEventListener('odoo-session-ready', handleSessionReady);
+    }, [odooApiUrl]);
 
     React.useEffect(() => {
         if (!window.electronAPI) return;
@@ -254,10 +266,13 @@ export default function Layout({ children }) {
                             display: 'block'
                         }}>
                             <webview 
+                                id="odoo-bg-webview"
                                 key={`odoo-bg-${currentUser.uid}`}
-                                src="http://100.67.238.32:8069/web"
+                                src={`${odooApiUrl}/web`}
                                 style={{ width: '100%', height: '100%', border: 'none' }}
                                 allowpopups="true"
+                                partition="persist:odoo"
+                                webpreferences="contextIsolation=no"
                             />
                         </div>
                     )}

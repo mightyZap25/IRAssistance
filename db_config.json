@@ -8,7 +8,7 @@
         "database": "postgres"
     },
     "remote": {
-        "host": "100.67.238.32",
+        "host": "192.168.0.7",
         "port": 15432,
         "user": "irerp",
         "password": "irerp060705!",

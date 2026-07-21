@@ -48,5 +48,11 @@ webFrame.executeJavaScript(`
             };
             window.ServiceWorkerRegistration.prototype.showNotification.toString = function() { return 'function showNotification() { [native code] }'; };
         }
+
+        // 백그라운드 웹뷰(Odoo 등)에서 화면이 숨겨져 있다고 인식하게 만들어 항상 데스크톱 알림을 보내도록 유도
+        if (window.location.hostname.includes('192.168.0.7') || window.location.hostname.includes('100.67.238.32') || window.location.hostname.includes('odoo')) {
+            Object.defineProperty(document, 'hidden', { get: function() { return true; } });
+            Object.defineProperty(document, 'visibilityState', { get: function() { return 'hidden'; } });
+        }
     })();
 `).catch(console.error);

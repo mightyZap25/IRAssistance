@@ -1,10 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { createSpreadsheet, updateSpreadsheetValues } from '../services/googleService';
-
-// 기본 사내망 Odoo 주소 및 테일스케일 Odoo 주소 (현재 외부 접속 테스트를 위해 통일)
-const ODOO_LOCAL_URL = 'http://100.67.238.32:8069'; 
-const ODOO_REMOTE_URL = 'http://100.67.238.32:8069';
+import { useAuth } from '../contexts/AuthContext';
 
 let globalOdooMenus = (() => {
     try {
@@ -18,10 +15,10 @@ let globalOdooMenus = (() => {
 let lastAuthenticatedUser = null;
 
 export default function OdooWebView() {
+    const { odooApiUrl } = useAuth();
     const location = useLocation();
     const webviewRef = useRef(null);
     const [menusLoaded, setMenusLoaded] = React.useState(globalOdooMenus.length > 0);
-    const [odooBaseUrl, setOdooBaseUrl] = React.useState(ODOO_LOCAL_URL);
 
     const isElectron = window.electronAPI?.isElectron ||
                        (window && window.process && window.process.type === 'renderer') ||
@@ -147,42 +144,25 @@ export default function OdooWebView() {
         };
     }, []);
 
-    // 활성화된 프로필에 맞는 Odoo URL 가져오기
-    useEffect(() => {
-        fetch('/api/config/db')
-            .then(res => res.json())
-            .then(data => {
-                if (data && data.currentProfile === 'remote') {
-                    setOdooBaseUrl(ODOO_REMOTE_URL);
-                    console.log('[OdooWebView] 외부 원격 프로필(Tailscale) 적용됨:', ODOO_REMOTE_URL);
-                } else {
-                    setOdooBaseUrl(ODOO_LOCAL_URL);
-                    console.log('[OdooWebView] 사내 로컬 프로필 적용됨:', ODOO_LOCAL_URL);
-                }
-            })
-            .catch(err => {
-                console.error('[OdooWebView] DB 설정 로드 실패, 기본 로컬 주소 사용:', err);
-                setOdooBaseUrl(ODOO_LOCAL_URL);
-            });
-    }, []);
+
 
 
 
     // 목표 URL 계산
     const getTargetUrl = () => {
         if (location.pathname === '/odoo/apps') {
-            return `${odooBaseUrl}/odoo/apps`;
+            return `${odooApiUrl}/odoo/apps`;
         }
         if (location.pathname === '/odoo/login') {
-            return `${odooBaseUrl}/web/login`;
+            return `${odooApiUrl}/web/login`;
         }
         if (location.pathname === '/odoo/logout') {
-            return `${odooBaseUrl}/web/session/logout`;
+            return `${odooApiUrl}/web/session/logout`;
         }
         if (location.pathname === '/odoo/view') {
             const searchParams = new URLSearchParams(location.search);
             const menuId = searchParams.get('menu_id');
-            if (menuId) return `${odooBaseUrl}/web#menu_id=${menuId}`;
+            if (menuId) return `${odooApiUrl}/web#menu_id=${menuId}`;
         }
         
         // 기존 네이티브 메뉴 경로를 Odoo 앱(App) 이름으로 매핑
@@ -206,18 +186,18 @@ export default function OdooWebView() {
         if (targetAppName && globalOdooMenus.length > 0) {
             const matchedMenu = globalOdooMenus.find(m => m.name === targetAppName || m.name === 'Invoicing');
             if (matchedMenu) {
-                return `${odooBaseUrl}/web#menu_id=${matchedMenu.menu_id}`;
+                return `${odooApiUrl}/web#menu_id=${matchedMenu.menu_id}`;
             }
         }
 
         if (location.pathname === '/' && globalOdooMenus.length > 0) {
             const hrMenu = globalOdooMenus.find(m => m.name === '근태/휴가 대시보드');
             if (hrMenu) {
-                return `${odooBaseUrl}/web#menu_id=${hrMenu.menu_id}`;
+                return `${odooApiUrl}/web#menu_id=${hrMenu.menu_id}`;
             }
         }
 
-        return `${odooBaseUrl}/web`;
+        return `${odooApiUrl}/web`;
     };
 
     const isFirstRender = useRef(true);
@@ -305,7 +285,7 @@ export default function OdooWebView() {
                     `).catch(() => {});
                 } catch(e) {}
                 
-                webviewRef.current.loadURL(`${odooBaseUrl}/web/login`);
+                webviewRef.current.loadURL(`${odooApiUrl}/web/login`);
             }
             
             if (isElectron && window.electronAPI?.clearOdooCookies) {
@@ -314,7 +294,7 @@ export default function OdooWebView() {
         };
         window.addEventListener('clear-odoo-session', handleClearSession);
         return () => window.removeEventListener('clear-odoo-session', handleClearSession);
-    }, [isElectron, odooBaseUrl]);
+    }, [isElectron, odooApiUrl]);
 
     // odoo-auto-login 이벤트 수신: 웹뷰가 직접 Odoo 로그인 처리
     useEffect(() => {
@@ -372,6 +352,8 @@ export default function OdooWebView() {
                             }
                         }
                         webview.loadURL(targetUrl).catch(() => {});
+                        // 백그라운드 웹뷰(Layout.jsx)도 쿠키가 세팅된 상태로 /web을 다시 로드하도록 알림
+                        window.dispatchEvent(new CustomEvent('odoo-session-ready'));
                     } else {
                         console.warn('[OdooWebView] 웹뷰 자동 로그인: uid 없음 (잘못된 자격증명?)');
                     }
@@ -398,11 +380,11 @@ export default function OdooWebView() {
                 const webview = webviewRef.current;
                 if (!webview) return;
                 
-                let targetUrl = odooBaseUrl + '/web';
+                let targetUrl = odooApiUrl + '/web';
                 if (globalOdooMenus && globalOdooMenus.length > 0) {
                     const hrMenu = globalOdooMenus.find(m => m.name === '근태/휴가 대시보드');
                     if (hrMenu) {
-                        targetUrl = `${odooBaseUrl}/web#menu_id=${hrMenu.menu_id}`;
+                        targetUrl = `${odooApiUrl}/web#menu_id=${hrMenu.menu_id}`;
                     }
                 }
                 
@@ -412,7 +394,7 @@ export default function OdooWebView() {
         };
         window.addEventListener('odoo-google-login', handleGoogleLogin);
         return () => window.removeEventListener('odoo-google-login', handleGoogleLogin);
-    }, [isElectron, odooBaseUrl]);
+    }, [isElectron, odooApiUrl]);
 
     // webview 내부에서 직접 JSON-RPC 호출 (Odoo 세션 쿠키 사용)
     useEffect(() => {
@@ -1331,7 +1313,7 @@ export default function OdooWebView() {
         <div className="w-full h-full bg-white flex flex-col">
             <webview
                 ref={webviewRef}
-                src={`${odooBaseUrl}/web`}
+                src={`${odooApiUrl}/web`}
                 style={{ width: '100%', height: '100%', border: 'none' }}
                 allowpopups="true"
                 partition="persist:odoo"
