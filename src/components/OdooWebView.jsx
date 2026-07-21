@@ -1211,35 +1211,7 @@ export default function OdooWebView() {
                                 
                                 let modified = false;
                                 
-                                // 3. 구글 시트 저장 버튼 주입
-                                if (el.tagName && el.tagName.toLowerCase() === 'button') {
-                                    if (el.textContent.includes('인쇄') || el.classList.contains('o_mrp_bom_print')) {
-                                        // 인쇄 버튼 옆에 구글 시트 저장 버튼 삽입 (아직 없으면)
-                                        if (!document.getElementById('ir_btn_save_sheet')) {
-                                            const btnHtml = \`
-                                                <button type="button" id="ir_btn_save_sheet" style="display:inline-flex; align-items:center; gap:6px; margin-right:12px; background:#10b981; color:white; padding:6px 14px; border-radius:6px; border:none; font-size:13px; font-weight:700; cursor:pointer; vertical-align: middle; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: 0.2s;" onmouseover="this.style.background='#059669'" onmouseout="this.style.background='#10b981'">
-                                                    📊 구글 시트로 저장
-                                                </button>
-                                            \`;
-                                            el.insertAdjacentHTML('beforebegin', btnHtml);
-                                            
-                                            document.getElementById('ir_btn_save_sheet').addEventListener('click', (e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                
-                                                // 로딩 표시
-                                                const loader = document.createElement('div');
-                                                loader.id = 'ir-sheet-loader';
-                                                loader.innerHTML = '<div style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.95); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:sans-serif;"><h2 style="color:#10b981; font-size:26px; font-weight:900; margin-bottom:12px;">구글 시트 생성 중...</h2><p style="color:#64748b; font-size:16px;">데이터를 추출하고 있습니다.</p></div>';
-                                                document.body.appendChild(loader);
-                                                
-                                                // React 앱으로 추출 신호 전송
-                                                console.log('__IR_SAVE_SHEET__');
-                                            });
-                                            modified = true;
-                                        }
-                                    }
-                                }
+                                // 구글 시트 저장 버튼 주입 기능 제거됨 (자동 동기화로 대체)
                                 
                                 if (modified) {
                                     el.dataset.irParsed = 'true';

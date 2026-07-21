@@ -3,7 +3,148 @@ import OdooClient from './odoo_rpc.js';
 
 const router = express.Router();
 
+router.post('/sync-google-drive', async (req, res) => {
+    const { actionType, sessionId } = req.body;
+    try {
+        const ODOO_URL  = process.env.ODOO_URL  || 'http://100.67.238.32:8069';
+        const ODOO_DB   = process.env.ODOO_DB   || 'odoo';
+        const ODOO_USER = process.env.ODOO_USER;
+        const ODOO_PASS = process.env.ODOO_API_KEY;
+        const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxTyElWhAWRULd9vqv8Nzw5CmigJj1xA8moFAWqtcf9igsuFDMXpX3gNzawwtbEj-P8KQ/exec";
 
+        if (!sessionId && (!ODOO_USER || !ODOO_PASS)) {
+            return res.status(500).json({ success: false, error: '세션 정보나 API 키가 없습니다.' });
+        }
+
+        const odoo = new OdooClient(ODOO_URL, ODOO_DB, ODOO_USER, ODOO_PASS, sessionId);
+        await odoo.authenticate();
+
+        const modelsToSync = ['sale.order', 'purchase.order', 'mrp.production', 'stock.picking', 'product.template'];
+        
+        function getAppName(model) {
+            if(model === 'sale.order') return 'Sales';
+            if(model === 'purchase.order') return 'Purchase';
+            if(model === 'mrp.production') return 'Manufacturing';
+            if(model === 'stock.picking') return 'Inventory';
+            if(model === 'product.template') return 'Item';
+            return 'Other';
+        }
+
+        let totalSynced = 0;
+
+        if (actionType === 'all_data') {
+            for (const model of modelsToSync) {
+                // 1. 모델의 필드 정보 가져오기
+                let fieldsInfo = {};
+                try {
+                    fieldsInfo = await odoo.execute_kw(model, 'fields_get', []);
+                } catch (e) {
+                    console.log(`Model ${model} not found or accessible, skipping.`);
+                    continue;
+                }
+
+                // 2. 무거운 관계형 필드 및 바이너리 제외
+                const safeFields = [];
+                for (const [fname, field] of Object.entries(fieldsInfo)) {
+                    if (!['binary', 'one2many', 'many2many'].includes(field.type)) {
+                        safeFields.push(fname);
+                    }
+                }
+
+                // 3. 해당 모델의 모든 레코드 긁어오기 (fields 한정)
+                let records = [];
+                try {
+                    records = await odoo.execute_kw(model, 'search_read', [[]], { fields: safeFields });
+                } catch(e) {
+                    console.error(`Error reading ${model}:`, e.message);
+                }
+
+                // 4. CSV 변환 (레코드가 없어도 헤더는 생성되도록 보장)
+                let csv = safeFields.join(',') + '\n';
+                
+                for (const record of records) {
+                    const row = safeFields.map(f => {
+                        let val = record[f];
+                        if (Array.isArray(val)) {
+                            val = val[1]; // many2one returns [id, display_name]
+                        } else if (val === false || val === null || val === undefined) {
+                            val = '';
+                        }
+                        val = String(val).replace(/"/g, '""');
+                        return `"${val}"`;
+                    });
+                    csv += row.join(',') + '\n';
+                }
+
+                const appName = getAppName(model);
+                const recordName = `BULK_ALL_${appName}_Records`;
+
+                // 5. 구글 앱스크립트로 직접 POST
+                const payload = {
+                    app_name: appName,
+                    record_name: recordName,
+                    csv_data: csv
+                };
+
+                try {
+                    await fetch(WEBHOOK_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    totalSynced += records.length;
+                } catch (e) {
+                    console.error(`Webhook error for ${model}:`, e);
+                }
+            }
+            return res.json({ success: true, message: `통합 동기화 완료: ${totalSynced}개 데이터 처리됨` });
+
+        } else if (actionType === 'schema') {
+            for (const model of modelsToSync) {
+                let fieldsInfo = {};
+                try {
+                    fieldsInfo = await odoo.execute_kw(model, 'fields_get', []);
+                } catch (e) { continue; }
+
+                let csv = "Field Name,Field Label,Field Type,Required,Readonly,Help / Description\n";
+                for (const [fname, field] of Object.entries(fieldsInfo)) {
+                    const row = [
+                        fname,
+                        field.string || '',
+                        field.type || '',
+                        field.required ? 'Yes' : 'No',
+                        field.readonly ? 'Yes' : 'No',
+                        field.help || ''
+                    ];
+                    csv += row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',') + '\n';
+                }
+
+                const appName = "Schema";
+                const recordName = `Schema_${model.replace(/\./g, '_')}`;
+
+                const payload = {
+                    app_name: appName,
+                    record_name: recordName,
+                    csv_data: csv
+                };
+
+                try {
+                    await fetch(WEBHOOK_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                } catch (e) {
+                    console.error(`Webhook schema error for ${model}:`, e);
+                }
+            }
+            return res.json({ success: true, message: '스키마 동기화 완료' });
+        }
+    } catch (err) {
+        console.error("Google Drive Sync Error:", err);
+        return res.status(500).json({ success: false, error: err.message });
+    }
+});
 
 router.post('/import-bom', async (req, res) => {
     const { items, relations, overwriteExisting, sessionId } = req.body;

@@ -19,23 +19,21 @@ action = model.action_sync_schema()
         </field>
     </record>
 
-    <record id="res_config_settings_view_form_google_drive" model="ir.ui.view">
-        <field name="name">res.config.settings.view.form.google.drive</field>
-        <field name="model">res.config.settings</field>
-        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
-        <field name="arch" type="xml">
-            <xpath expr="//form" position="inside">
-                <app data-string="Google Drive Sync" string="Google Drive Sync" name="ir_custom_erp">
-                    <block title="Google Drive Data Sync" name="google_drive_sync">
-                        <setting string="기존 데이터 전체 동기화" help="영업, 구매, 생산, 재고 모듈의 기존 전체 데이터를 백그라운드에서 구글 드라이브로 강제 전송합니다.">
-                            <button name="action_sync_all_existing_data" type="object" string="전체 데이터 백업 실행" class="btn-primary" icon="fa-cloud-upload"/>
-                        </setting>
-                        <setting string="DB 스키마 동기화" help="현재 동기화 중인 주요 테이블 구조(필드 목록)를 구글 드라이브에 저장합니다.">
-                            <button name="action_sync_schema" type="object" string="스키마 내보내기" class="btn-secondary" icon="fa-database"/>
-                        </setting>
-                    </block>
-                </app>
-            </xpath>
-        </field>
-    </record>
+    <!-- Settings 앱의 상단 메뉴바에 직접 버튼 메뉴 추가 -->
+    <menuitem id="menu_google_drive_sync_main" 
+              name="Google Drive 백업" 
+              parent="base.menu_administration" 
+              sequence="100"/>
+              
+    <menuitem id="menu_sync_all_data_btn" 
+              name="전체 데이터 백업 실행" 
+              parent="menu_google_drive_sync_main" 
+              action="action_sync_all_existing_data" 
+              sequence="10"/>
+              
+    <menuitem id="menu_sync_schema_btn" 
+              name="스키마 내보내기" 
+              parent="menu_google_drive_sync_main" 
+              action="action_sync_schema" 
+              sequence="20"/>
 </odoo>

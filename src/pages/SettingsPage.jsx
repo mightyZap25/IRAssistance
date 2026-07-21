@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import RoleGuard from '../components/common/RoleGuard';
 import { getAllUsers, updateUserRoleAndDepartment, USER_ROLES, ROLE_LABELS } from '../services/userService';
 import OdooBulkBOMSync from '../components/OdooBulkBOMSync';
+import OdooGoogleDriveSync from '../components/OdooGoogleDriveSync';
 
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState('database');
@@ -598,6 +599,9 @@ export default function SettingsPage() {
 
                                     {/* Odoo Bulk Sync Section */}
                                     <OdooBulkBOMSync />
+                                    
+                                    {/* Odoo Google Drive Sync Section */}
+                                    <OdooGoogleDriveSync />
 
                                     <div className="pt-4 border-t border-slate-100">
                                         <button type="submit" disabled={loading} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-black flex items-center gap-2 shadow-sm">

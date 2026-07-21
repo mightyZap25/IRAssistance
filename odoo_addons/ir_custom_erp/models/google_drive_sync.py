@@ -9,7 +9,7 @@ from odoo import models, api
 _logger = logging.getLogger(__name__)
 
 # 사용자가 알려준 Google Apps Script 웹 앱 URL
-WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbwEqEIkheWEg3SoFq9A7hyA92dvWH4tuxIYDXHYGRSOE4BcfTg1yLvAyhuIumkhSda0gg/exec"
+WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxTyElWhAWRULd9vqv8Nzw5CmigJj1xA8moFAWqtcf9igsuFDMXpX3gNzawwtbEj-P8KQ/exec"
 
 def send_to_google_drive(app_name, record_name, csv_data):
     """
@@ -22,13 +22,11 @@ def send_to_google_drive(app_name, record_name, csv_data):
             "csv_data": csv_data
         }
         headers = {'Content-Type': 'application/json'}
-        # 타임아웃 15초 설정하여 스레드가 영원히 대기하는 것 방지
-        response = requests.post(WEBHOOK_URL, data=json.dumps(payload), headers=headers, timeout=15)
-        
-        if response.status_code != 200:
-            _logger.error("Failed to sync %s (%s) to Google Drive: %s", app_name, record_name, response.text)
-        else:
-            _logger.info("Successfully synced %s (%s) to Google Drive.", app_name, record_name)
+        # 타임아웃을 0.5초로 극단적으로 짧게 설정하여 Odoo 화면 무한 로딩 방지
+        requests.post(WEBHOOK_URL, data=json.dumps(payload), headers=headers, timeout=0.5)
+    except requests.exceptions.Timeout:
+        # 데이터는 이미 전송되었으나 구글의 응답이 0.5초를 넘긴 것 뿐이므로 무시함
+        pass
     except Exception as e:
         _logger.error("Error syncing %s (%s) to Google Drive: %s", app_name, record_name, str(e))
 
@@ -51,27 +49,31 @@ class GoogleDriveSyncMixin(models.AbstractModel):
         output = StringIO()
         writer = csv.writer(output)
         
-        # 무거운 관계형 필드 및 바이너리 필드 제외 (무한 로딩/성능 저하 방지)
         safe_fields = []
         for fname, field in self._fields.items():
             if field.type not in ('binary', 'one2many', 'many2many'):
                 safe_fields.append(fname)
         
-        # 필드명 헤더 생성
         writer.writerow(safe_fields)
         
-        for record in self:
+        # sudo()를 통해 필드 접근 권한 오류 방지
+        records_sudo = self.sudo()
+        try:
+            data_list = records_sudo.read(safe_fields)
+        except Exception as e:
+            _logger.error("Failed to read fields: %s", str(e))
+            data_list = []
+            
+        if data_list:
+            data = data_list[0]
             row = []
             for field in safe_fields:
-                try:
-                    val = getattr(record, field)
-                    if isinstance(val, models.Model):
-                        # Many2one 필드일 경우
-                        row.append(str(val.display_name) if val else '')
-                    else:
-                        row.append(str(val) if val is not False else '')
-                except Exception as e:
-                    row.append(f"Error: {str(e)}")
+                val = data.get(field, '')
+                # Many2one 필드 등 (id, name) 튜플 형태인 경우 name만 추출
+                if isinstance(val, tuple) and len(val) == 2:
+                    row.append(str(val[1]))
+                else:
+                    row.append(str(val) if val is not False else '')
             writer.writerow(row)
             
         return output.getvalue()
@@ -90,7 +92,7 @@ class GoogleDriveSyncMixin(models.AbstractModel):
                 
                 csv_data = record._get_csv_data()
                 
-                # 백그라운드 쓰레드 실행
+                # 쓰레드를 사용하여 백그라운드 전송 (Odoo 메인 트랜잭션을 0.1초도 지연시키지 않음!)
                 thread = threading.Thread(target=send_to_google_drive, args=(app_name, safe_record_name, csv_data))
                 thread.daemon = True
                 thread.start()

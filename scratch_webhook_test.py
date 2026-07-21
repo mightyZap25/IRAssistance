@@ -1,7 +1,7 @@
 import requests
 import json
 
-WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbwEqEIkheWEg3SoFq9A7hyA92dvWH4tuxIYDXHYGRSOE4BcfTg1yLvAyhuIumkhSda0gg/exec"
+WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzy_sushJpzlgyvhpOeoUnuVagoCl5PEw2sw2iuuoxMSadPmi94iHJgNNRReLYOJBiZ/exec"
 
 payload = {
     "app_name": "TestApp",
