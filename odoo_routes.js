@@ -10,7 +10,7 @@ router.post('/sync-google-drive', async (req, res) => {
         const ODOO_DB   = process.env.ODOO_DB   || 'odoo';
         const ODOO_USER = process.env.ODOO_USER;
         const ODOO_PASS = process.env.ODOO_API_KEY;
-        const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxTyElWhAWRULd9vqv8Nzw5CmigJj1xA8moFAWqtcf9igsuFDMXpX3gNzawwtbEj-P8KQ/exec";
+        const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyFGjsOG0VUIs2ujZI0PjMYlOWUN5LkyDQd6t8hN7xxhAJEeL0z79bItKG153k99J1Mpw/exec";
 
         if (!sessionId && (!ODOO_USER || !ODOO_PASS)) {
             return res.status(500).json({ success: false, error: '세션 정보나 API 키가 없습니다.' });
@@ -19,13 +19,13 @@ router.post('/sync-google-drive', async (req, res) => {
         const odoo = new OdooClient(ODOO_URL, ODOO_DB, ODOO_USER, ODOO_PASS, sessionId);
         await odoo.authenticate();
 
-        const modelsToSync = ['sale.order', 'purchase.order', 'mrp.production', 'stock.picking', 'product.template'];
+        const modelsToSync = ['sale.order.line', 'purchase.order.line', 'mrp.production', 'stock.move', 'product.template'];
         
         function getAppName(model) {
-            if(model === 'sale.order') return 'Sales';
-            if(model === 'purchase.order') return 'Purchase';
+            if(model === 'sale.order.line') return 'Sales';
+            if(model === 'purchase.order.line') return 'Purchase';
             if(model === 'mrp.production') return 'Manufacturing';
-            if(model === 'stock.picking') return 'Inventory';
+            if(model === 'stock.move') return 'Inventory';
             if(model === 'product.template') return 'Item';
             return 'Other';
         }
@@ -34,22 +34,43 @@ router.post('/sync-google-drive', async (req, res) => {
 
         if (actionType === 'all_data') {
             for (const model of modelsToSync) {
-                // 1. 모델의 필드 정보 가져오기
+                // 1. 모델의 필드 정보 가져오기 (한글 번역 강제 적용)
                 let fieldsInfo = {};
                 try {
-                    fieldsInfo = await odoo.execute_kw(model, 'fields_get', []);
+                    fieldsInfo = await odoo.execute_kw(model, 'fields_get', [], { context: { lang: 'ko_KR' } });
                 } catch (e) {
                     console.log(`Model ${model} not found or accessible, skipping.`);
                     continue;
                 }
 
-                // 2. 무거운 관계형 필드 및 바이너리 제외
-                const safeFields = [];
+                let safeFields = [];
                 for (const [fname, field] of Object.entries(fieldsInfo)) {
                     if (!['binary', 'one2many', 'many2many'].includes(field.type)) {
                         safeFields.push(fname);
                     }
                 }
+                // 사용자의 요청에 따라 주요 필드를 맨 앞으로 배치 (순서대로)
+                const priorityFields = [
+                    'id',
+                    'order_id', 'picking_id', 'raw_material_production_id',
+                    'display_name',
+                    'state',
+                    'selected_seller_id',
+                    'product_uom_qty', 'product_qty', 'qty_done',
+                    'date_planned', 'date_order', 'date', 'date_approve',
+                    'currency_id',
+                    'price_unit',
+                    'price_subtotal', 'price_total'
+                ];
+                
+                const finalFields = [];
+                for (const pf of priorityFields) {
+                    if (safeFields.includes(pf)) {
+                        finalFields.push(pf);
+                        safeFields = safeFields.filter(f => f !== pf);
+                    }
+                }
+                safeFields = finalFields.concat(safeFields);
 
                 // 3. 해당 모델의 모든 레코드 긁어오기 (fields 한정)
                 let records = [];
@@ -60,7 +81,12 @@ router.post('/sync-google-drive', async (req, res) => {
                 }
 
                 // 4. CSV 변환 (레코드가 없어도 헤더는 생성되도록 보장)
-                let csv = safeFields.join(',') + '\n';
+                // Odoo에 내장된 한글 라벨(string)을 추출하여 헤더로 사용 (단, id는 앱스 스크립트 검색을 위해 그대로 유지)
+                let headerRow = safeFields.map(f => {
+                    if (f === 'id') return 'id';
+                    return fieldsInfo[f] && fieldsInfo[f].string ? fieldsInfo[f].string : f;
+                });
+                let csv = headerRow.join(',') + '\n';
                 
                 for (const record of records) {
                     const row = safeFields.map(f => {

@@ -363,7 +363,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
 
     const fOdoo = filterGroups(ODOO_DYNAMIC_GROUPS);
     const fCollab = isOdooOnlyAuth ? [] : filterGroups(COLLAB_MENU_GROUPS);
-    const fAdmin = isOdooOnlyAuth ? [] : filterGroups(ADMIN_GROUPS);
+    const fAdmin = (isOdooOnlyAuth || currentUser?.email !== 'jogak@mightyzap.com') ? [] : filterGroups(ADMIN_GROUPS);
 
     const roleInfo = {
         admin: { label: '최고관리자', color: 'bg-rose-500' },

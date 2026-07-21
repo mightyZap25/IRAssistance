@@ -106,6 +106,7 @@
         },
         "mac": {
             "icon": "build/icon.png",
+            "identity": null,
             "target": [
                 "dmg",
                 "zip"

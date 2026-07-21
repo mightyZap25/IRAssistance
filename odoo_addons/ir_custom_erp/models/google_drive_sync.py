@@ -9,7 +9,7 @@ from odoo import models, api
 _logger = logging.getLogger(__name__)
 
 # 사용자가 알려준 Google Apps Script 웹 앱 URL
-WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxTyElWhAWRULd9vqv8Nzw5CmigJj1xA8moFAWqtcf9igsuFDMXpX3gNzawwtbEj-P8KQ/exec"
+WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyFGjsOG0VUIs2ujZI0PjMYlOWUN5LkyDQd6t8hN7xxhAJEeL0z79bItKG153k99J1Mpw/exec"
 
 def send_to_google_drive(app_name, record_name, csv_data):
     """
@@ -22,8 +22,8 @@ def send_to_google_drive(app_name, record_name, csv_data):
             "csv_data": csv_data
         }
         headers = {'Content-Type': 'application/json'}
-        # 타임아웃을 0.5초로 극단적으로 짧게 설정하여 Odoo 화면 무한 로딩 방지
-        requests.post(WEBHOOK_URL, data=json.dumps(payload), headers=headers, timeout=0.5)
+        # 백그라운드 쓰레드이므로 타임아웃을 넉넉히 주거나 제거하여 구글 스크립트가 온전히 실행되게 함
+        requests.post(WEBHOOK_URL, data=json.dumps(payload), headers=headers, timeout=10)
     except requests.exceptions.Timeout:
         # 데이터는 이미 전송되었으나 구글의 응답이 0.5초를 넘긴 것 뿐이므로 무시함
         pass
@@ -54,7 +54,41 @@ class GoogleDriveSyncMixin(models.AbstractModel):
             if field.type not in ('binary', 'one2many', 'many2many'):
                 safe_fields.append(fname)
         
-        writer.writerow(safe_fields)
+        # 사용자의 요청에 따라 주요 필드를 맨 앞으로 배치 (순서대로)
+        priority_fields = [
+            'id',
+            'order_id', 'picking_id', 'raw_material_production_id',
+            'display_name',
+            'state',
+            'selected_seller_id',
+            'product_uom_qty', 'product_qty', 'qty_done',
+            'date_planned', 'date_order', 'date', 'date_approve',
+            'currency_id',
+            'price_unit',
+            'price_subtotal', 'price_total'
+        ]
+        
+        final_fields = []
+        for pf in priority_fields:
+            if pf in safe_fields:
+                final_fields.append(pf)
+                safe_fields.remove(pf)
+                
+        safe_fields = final_fields + safe_fields
+        
+        # Odoo DB에 저장된 공식 한글 라벨을 강제로 가져옴 (lang='ko_KR')
+        fields_records = self.env['ir.model.fields'].sudo().with_context(lang='ko_KR').search([('model', '=', self._name), ('name', 'in', safe_fields)])
+        field_labels = {record.name: record.field_description for record in fields_records}
+        
+        header_row = []
+        for f in safe_fields:
+            if f == 'id':
+                header_row.append('id')
+            else:
+                label = field_labels.get(f) or self._fields[f].string or f
+                header_row.append(str(label))
+                
+        writer.writerow(header_row)
         
         # sudo()를 통해 필드 접근 권한 오류 방지
         records_sudo = self.sudo()
@@ -85,7 +119,7 @@ class GoogleDriveSyncMixin(models.AbstractModel):
         for record in self:
             try:
                 app_name = record._get_app_name()
-                record_name = record.display_name or record.name or f"{record._name}_{record.id}"
+                record_name = str(record.id)
                 
                 # 파일명에 슬래시나 특수문자가 들어가면 에러가 날 수 있으므로 치환
                 safe_record_name = record_name.replace('/', '_').replace('\\', '_')
@@ -100,9 +134,9 @@ class GoogleDriveSyncMixin(models.AbstractModel):
                 _logger.error("Failed to prepare sync for %s: %s", record._name, str(e))
 
 
-class SaleOrderDriveSync(models.Model):
-    _name = 'sale.order'
-    _inherit = ['sale.order', 'google.drive.sync.mixin']
+class SaleOrderLineDriveSync(models.Model):
+    _name = 'sale.order.line'
+    _inherit = ['sale.order.line', 'google.drive.sync.mixin']
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -116,9 +150,9 @@ class SaleOrderDriveSync(models.Model):
         return res
 
 
-class PurchaseOrderDriveSync(models.Model):
-    _name = 'purchase.order'
-    _inherit = ['purchase.order', 'google.drive.sync.mixin']
+class PurchaseOrderLineDriveSync(models.Model):
+    _name = 'purchase.order.line'
+    _inherit = ['purchase.order.line', 'google.drive.sync.mixin']
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -148,9 +182,9 @@ class MrpProductionDriveSync(models.Model):
         return res
 
 
-class StockPickingDriveSync(models.Model):
-    _name = 'stock.picking'
-    _inherit = ['stock.picking', 'google.drive.sync.mixin']
+class StockMoveDriveSync(models.Model):
+    _name = 'stock.move'
+    _inherit = ['stock.move', 'google.drive.sync.mixin']
 
     @api.model_create_multi
     def create(self, vals_list):
