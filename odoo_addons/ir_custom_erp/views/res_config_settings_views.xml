@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Server Actions for Google Drive Sync -->
+    <record id="action_sync_all_existing_data" model="ir.actions.server">
+        <field name="name">구글 드라이브 전체 강제 동기화 (기존 데이터)</field>
+        <field name="model_id" ref="base.model_res_config_settings"/>
+        <field name="state">code</field>
+        <field name="code">
+action = model.action_sync_all_existing_data()
+        </field>
+    </record>
+
+    <record id="action_sync_schema" model="ir.actions.server">
+        <field name="name">DB 스키마(구조) 구글 드라이브로 백업</field>
+        <field name="model_id" ref="base.model_res_config_settings"/>
+        <field name="state">code</field>
+        <field name="code">
+action = model.action_sync_schema()
+        </field>
+    </record>
+
+    <record id="res_config_settings_view_form_google_drive" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.google.drive</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Google Drive Sync" string="Google Drive Sync" name="ir_custom_erp">
+                    <block title="Google Drive Data Sync" name="google_drive_sync">
+                        <setting string="기존 데이터 전체 동기화" help="영업, 구매, 생산, 재고 모듈의 기존 전체 데이터를 백그라운드에서 구글 드라이브로 강제 전송합니다.">
+                            <button name="action_sync_all_existing_data" type="object" string="전체 데이터 백업 실행" class="btn-primary" icon="fa-cloud-upload"/>
+                        </setting>
+                        <setting string="DB 스키마 동기화" help="현재 동기화 중인 주요 테이블 구조(필드 목록)를 구글 드라이브에 저장합니다.">
+                            <button name="action_sync_schema" type="object" string="스키마 내보내기" class="btn-secondary" icon="fa-database"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>

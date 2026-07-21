@@ -20,6 +20,7 @@
         'views/mrp_bom_views.xml',
         'views/hr_dashboard_views.xml',
         'views/hr_schedule_change_views.xml',
+        'views/res_config_settings_views.xml',
     ],
     'assets': {
         'web.assets_backend': [

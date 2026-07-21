@@ -9,7 +9,7 @@ from odoo import models, api
 _logger = logging.getLogger(__name__)
 
 # 사용자가 알려준 Google Apps Script 웹 앱 URL
-WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzXnkjOb9Z6IfkDKrVbWhjZIn8TWrnjmEMHmcmrVVXafRB2j8SGOX5AYu66W-WWQ3v8/exec"
+WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbwEqEIkheWEg3SoFq9A7hyA92dvWH4tuxIYDXHYGRSOE4BcfTg1yLvAyhuIumkhSda0gg/exec"
 
 def send_to_google_drive(app_name, record_name, csv_data):
     """

@@ -5,12 +5,15 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTaskAlarm } from '../hooks/useTaskAlarm';
 import UpdateNotificationModal from './common/UpdateNotificationModal';
 import FloatingNotepad from './common/FloatingNotepad';
+import GeminiWebviewPanel from './common/GeminiWebviewPanel';
+import { BotMessageSquare } from 'lucide-react';
 
 export default function Layout({ children }) {
     const { currentUser, isOdooOnlyAuth } = useAuth();
     useTaskAlarm(currentUser);
 
     const [appVersion, setAppVersion] = React.useState('0.9.4');
+    const [isGeminiPanelOpen, setIsGeminiPanelOpen] = React.useState(false);
     const navigate = useNavigate();
 
     React.useEffect(() => {
@@ -269,9 +272,26 @@ export default function Layout({ children }) {
                     {/* 플로팅 개인 메모장 */}
                     <FloatingNotepad />
 
+                    {/* 제미나이 헬프봇 플로팅 버튼 (우측 하단) */}
+                    {!isGeminiPanelOpen && (
+                        <button
+                            onClick={() => setIsGeminiPanelOpen(true)}
+                            className="fixed bottom-6 right-6 z-[9000] p-3 md:p-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.2)] hover:shadow-[0_8px_30px_rgb(59,130,246,0.3)] transition-all duration-300 hover:scale-110 flex items-center justify-center group"
+                            title="Odoo 헬프봇 열기"
+                        >
+                            <BotMessageSquare className="w-6 h-6 md:w-7 md:h-7 group-hover:animate-pulse" />
+                        </button>
+                    )}
+
+                    {/* 제미나이 헬프봇 사이드 패널 */}
+                    <GeminiWebviewPanel 
+                        isOpen={isGeminiPanelOpen} 
+                        onClose={() => setIsGeminiPanelOpen(false)} 
+                    />
+
                     {/* 우측 하단 고정 버전 배지 */}
                     {!isFullPage && (
-                        <div className="fixed bottom-4 right-5 z-40 bg-white/60 dark:bg-slate-900/60 border border-slate-200/40 dark:border-slate-800/40 backdrop-blur-md px-2 py-0.5 rounded-md shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-[9px] font-black text-slate-400 dark:text-slate-500 select-none tracking-wider pointer-events-none transition-all">
+                        <div className="fixed bottom-4 right-20 z-40 bg-white/60 dark:bg-slate-900/60 border border-slate-200/40 dark:border-slate-800/40 backdrop-blur-md px-2 py-0.5 rounded-md shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-[9px] font-black text-slate-400 dark:text-slate-500 select-none tracking-wider pointer-events-none transition-all">
                             VER v{appVersion}
                         </div>
                     )}

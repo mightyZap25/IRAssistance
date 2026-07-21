@@ -180,6 +180,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
             items: [
                 { name: 'Gmail', path: '/workspace/mail', icon: Mail },
                 { name: 'Google Drive', path: '/workspace/drive', icon: Cloud },
+                { name: 'Google Gemini', path: '/workspace/gemini', icon: Sparkles },
                 { name: 'Google Calendar', path: '/workspace/calendar', icon: CalendarDays },
                 { name: 'Google Chat', path: '/workspace/chat', icon: MessageSquare },
                 { name: 'NotebookLM', path: '/workspace/notebooklm', icon: BookOpen },
