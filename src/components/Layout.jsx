@@ -297,7 +297,7 @@ export default function Layout({ children }) {
                         </div>
                     )}
                     
-                    <div className={`${isFullPage ? 'max-w-none w-full h-screen' : 'max-w-[1300px] mx-auto h-[calc(100vh-48px)]'} animate-fade-in`} style={{ display: ((isGoogleChat || isGoogleMail || isGoogleCalendar) && isElectron) ? 'none' : 'block' }}>
+                    <div className={`${isFullPage ? 'max-w-none w-full h-screen' : 'max-w-[1300px] mx-auto h-[calc(100vh-48px)]'} animate-fade-in`} style={{ display: (((isGoogleChat || isGoogleMail || isGoogleCalendar) && isElectron) || isOdooView) ? 'none' : 'block' }}>
                         {children}
                     </div>
 
