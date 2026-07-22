@@ -6,18 +6,33 @@ import { useAuth } from '../../contexts/AuthContext';
 
 async function createNotification(targetIdentifier, title, message, link = '') {
     try {
-        let userEmail = targetIdentifier;
-        // targetIdentifier가 이메일 형식이 아니라면(Firebase UID라면) DB에서 이메일을 찾아옵니다.
-        if (targetIdentifier && !targetIdentifier.includes('@')) {
-            const userSnap = await getDoc(doc(db, 'users', targetIdentifier));
-            if (userSnap.exists()) userEmail = userSnap.data().email;
+        let userEmail = '';
+        let targetUid = '';
+
+        if (targetIdentifier) {
+            if (targetIdentifier.includes('@')) {
+                userEmail = targetIdentifier;
+            } else {
+                targetUid = targetIdentifier;
+                try {
+                    const userSnap = await getDoc(doc(db, 'users', targetIdentifier));
+                    if (userSnap.exists()) userEmail = userSnap.data().email || '';
+                } catch(e) {}
+            }
         }
         
-        if (!userEmail) return;
-        
         await addDoc(collection(db, 'notifications'), {
-            userEmail, title, message, link, read: false, createdAt: serverTimestamp()
+            userEmail: userEmail || targetIdentifier || '',
+            targetEmail: userEmail || '',
+            targetUid: targetUid || '',
+            targetIdentifier: targetIdentifier || '',
+            title, 
+            message, 
+            link, 
+            read: false, 
+            createdAt: serverTimestamp()
         });
+        console.log(`[Approval Notification] Sent to ${userEmail || targetIdentifier} (${title})`);
     } catch (err) { console.error("Notification failed:", err); }
 }
 

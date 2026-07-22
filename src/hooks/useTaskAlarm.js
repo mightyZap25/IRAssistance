@@ -70,11 +70,20 @@ export function useTaskAlarm(currentUser) {
     }, [currentUser]);
 
     const sendBrowserNotification = (title, dueDate) => {
+        const body = `[${title}] 마감: ${dueDate.toLocaleTimeString()}`;
+        
+        // Electron 빌드 환경: IPC를 통해 main process에서 네이티브 알림 사용 (빌드 후에도 안정적)
+        if (window.electronAPI?.showNotification) {
+            window.electronAPI.showNotification('I-Link: Task 알람', body);
+            return;
+        }
+
+        // 웹 브라우저 환경 fallback: Web Notification API
         if (!("Notification" in window)) return;
 
         const trigger = () => {
             new Notification("I-Link: Task 알람", {
-                body: `[${title}] 마감: ${dueDate.toLocaleTimeString()}`,
+                body,
                 icon: '/favicon.ico'
             });
         };

@@ -7,7 +7,7 @@ import {
     LayoutDashboard, Package, Layers, Settings, History,
     Users, ClipboardList, ShoppingCart, Truck, Factory,
     FileCheck, BookOpen, AlertCircle, Building2,
-    PlayCircle, ChevronDown, UserCheck, Briefcase, 
+    PlayCircle, ChevronDown, UserCheck, Briefcase,
     ListTodo, CalendarDays, Cloud, Mail, Activity,
     TrendingUp, FileText, CreditCard, StickyNote, MessageSquare, Microscope,
     DollarSign, BarChart2, Wrench, HeadphonesIcon, Globe, Cpu,
@@ -48,7 +48,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
     const [showOdooPrompt, setShowOdooPrompt] = useState(false);
     const [odooPromptPwd, setOdooPromptPwd] = useState('');
     const [isOdooPromptLoading, setIsOdooPromptLoading] = useState(false);
-    
+
     const handleOdooLink = () => {
         setOdooPromptPwd('');
         setShowOdooPrompt(true);
@@ -62,7 +62,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
             await linkOdoo(odooPromptPwd);
             alert("Odoo 자동 로그인 설정 완료!");
             window.location.reload();
-        } catch(e) {
+        } catch (e) {
             alert("Odoo 로그인 실패: " + e.message);
         } finally {
             setIsOdooPromptLoading(false);
@@ -70,7 +70,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         }
     };
 
-    
+
     // 설정 페이지에서 localStorage 변경 시 즉시 반영
     useEffect(() => {
         const handleStorageChange = () => {
@@ -133,7 +133,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         window.addEventListener('odoo-menus-loaded', handleOdooMenus);
 
         if (window.electronAPI?.getAppVersion) {
-            window.electronAPI.getAppVersion().then(setAppVersion).catch(() => {});
+            window.electronAPI.getAppVersion().then(setAppVersion).catch(() => { });
         }
 
         return () => window.removeEventListener('odoo-menus-loaded', handleOdooMenus);
@@ -145,15 +145,16 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         const path = item.path;
         if (item.isExternal) return true;
         if (path === '/settings' || path === '/odoo/login' || path === '/odoo/logout') return true;
-        
-        if (path.startsWith('/odoo/view')) {
+
+        if (path.startsWith('/odoo/')) {
             // 특정 Odoo 메뉴들은 React 앱의 네이티브 권한 경로와 매핑하여 표시 여부 결정
             if (item.name === '판매' || item.name === 'Sales') return allowedPaths.includes('/sales/dashboard');
             if (item.name === '청구서' || item.name === 'Invoicing') return allowedPaths.includes('/sales/billing');
             if (item.name === '구매 & 외주' || item.name === 'Purchase') return allowedPaths.includes('/purchasing');
             if (item.name === '제조관리' || item.name === 'Manufacturing') return allowedPaths.includes('/prod-execution');
             if (item.name === '도면 & BOM & ECO' || item.name === 'PLM') return allowedPaths.includes('/plm');
-            
+
+            // 동적 메뉴 권한을 가진 사용자에게 모두 허용
             return allowedPaths.includes('/odoo/view');
         }
         return allowedPaths.includes(path);
@@ -201,7 +202,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
     // Odoo 영문 메뉴명 → 한글 변환 맵
     const ODOO_NAME_MAP = {
         'Sales': '판매',
-        'Purchase': '구매 & 외주',
+        'Purchase': '매입',
         'Inventory': '재고',
         'Manufacturing': '제조관리',
         'Quality': '품질',
@@ -217,7 +218,6 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         'Repairs': '수리',
         'CRM': 'CRM',
         'Expenses': '경비처리',
-        'To-do': '할일관리',
         'To-Do': '할일관리'
     };
 
@@ -240,7 +240,6 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         '근태/휴가 대시보드': '근태관리',
         'Projects': '협업 & 기타',
         'Expenses': '협업 & 기타',
-        'To-do': '협업 & 기타',
         'To-Do': '협업 & 기타'
     };
 
@@ -264,7 +263,6 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         'Helpdesk': HeadphonesIcon,
         'Repairs': Wrench,
         'Expenses': Receipt,
-        'To-do': ListTodo,
         'To-Do': ListTodo
     };
 
@@ -298,6 +296,23 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
     const getOdooDynamicGroups = () => {
         const groupsMap = {};
 
+        // Odoo 17 직접 라우팅 주소 키워드 매핑 (어떤 이름으로 들어오든 포괄적으로 잡아냄)
+        const ODOO_17_ROUTES = [
+            { keywords: ['할일', '할 일', 'to-do'], path: '/odoo/to-do' },
+            { keywords: ['전자결재'], path: '/odoo/action-707' },
+            { keywords: ['대시보드', '현황판'], path: '/odoo/dashboards?dashboard_id=3' },
+            { keywords: ['판매', 'sales'], path: '/odoo/sales' },
+            { keywords: ['청구', 'invoicing'], path: '/odoo/customer-invoices' },
+            { keywords: ['프로젝트', 'project'], path: '/odoo/project' },
+            { keywords: ['매입', '구매', 'purchase'], path: '/odoo/purchase' },
+            { keywords: ['재고', 'inventory'], path: '/odoo/inventory' },
+            { keywords: ['제조', 'manufacturing'], path: '/odoo/manufacturing' },
+            { keywords: ['수리', 'repairs'], path: '/odoo/repairs' },
+            { keywords: ['인사', '임직원', 'employees'], path: '/odoo/employees' },
+            { keywords: ['경비', 'expenses'], path: '/odoo/expenses' },
+            { keywords: ['근태', '휴가', 'time off', 'attendances'], path: '/odoo/action-724' }
+        ];
+
         const CUSTOM_APPS = [
             { cat: '협업 & 기타', name: '전자결재', path: '/approval', icon: FileCheck },
             { cat: '시스템 제어', name: 'Odoo 로그인', path: '/odoo/login', icon: UserCheck },
@@ -320,19 +335,33 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                 .forEach(app => {
                     const cleanName = app.name.replace(/\s*\(custom\)\s*/i, '').trim();
                     if (ODOO_HIDDEN_MENUS.has(cleanName) || ODOO_HIDDEN_MENUS.has(app.name)) return;
-                    
+
                     const cat = ODOO_CATEGORY_MAP[cleanName] || ODOO_CATEGORY_MAP[app.name] || 'Project 관리';
                     if (!groupsMap[cat]) {
                         groupsMap[cat] = [];
                     }
+                    
+                    const mappedName = ODOO_NAME_MAP[cleanName] || ODOO_NAME_MAP[app.name] || cleanName;
+                    
+                    let targetPath = `/odoo/view?menu_id=${app.menu_id}`;
+                    const lowercaseName = mappedName.toLowerCase();
+                    const lowercaseOriginal = app.name.toLowerCase();
+                    
+                    for (const route of ODOO_17_ROUTES) {
+                        if (route.keywords.some(kw => lowercaseName.includes(kw) || lowercaseOriginal.includes(kw))) {
+                            targetPath = route.path;
+                            break;
+                        }
+                    }
+
                     groupsMap[cat].push({
-                        name: ODOO_NAME_MAP[cleanName] || ODOO_NAME_MAP[app.name] || cleanName,
-                        path: `/odoo/view?menu_id=${app.menu_id}`,
+                        name: mappedName,
+                        path: targetPath,
                         icon: ODOO_ICON_MAP[cleanName] || ODOO_ICON_MAP[app.name] || Package
                     });
                 });
         }
-        
+
         // 정렬: 근태관리 내의 순서를 고정
         const SORT_ORDER = {
             '근태/휴가 대시보드': 1,
@@ -400,8 +429,8 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                             <span className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold">IR</span>
                             <span>I-Link</span>
                         </div>
-                        <button 
-                            onClick={toggleSidebar} 
+                        <button
+                            onClick={toggleSidebar}
                             className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-655 dark:hover:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95 animate-fade-in"
                             title="메뉴 접기"
                         >
@@ -409,8 +438,8 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                         </button>
                     </>
                 ) : (
-                    <button 
-                        onClick={toggleSidebar} 
+                    <button
+                        onClick={toggleSidebar}
                         className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-655 dark:hover:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95 hover:scale-105"
                         title="메뉴 펼치기"
                     >
@@ -423,8 +452,8 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
             <div className={`relative ${isCollapsed ? 'mx-2 mt-3 flex flex-col items-center gap-2' : 'mx-3 mt-3 p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200/60 dark:border-slate-800/80 rounded-2xl flex flex-col gap-2.5'}`}>
                 {isCollapsed ? (
                     <>
-                        <button 
-                            onClick={() => setProfileMenuOpen(v => !v)} 
+                        <button
+                            onClick={() => setProfileMenuOpen(v => !v)}
                             className={`w-9 h-9 rounded-full overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-150 shadow-sm hover:scale-105 transition-all relative ${profileMenuOpen ? 'ring-2 ring-blue-500' : ''}`}
                             title="계정 정보"
                         >
@@ -498,7 +527,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                             <div className="px-1 py-0.5">
                                 <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">통합 로그인 상태</p>
                             </div>
-                            
+
                             {!isOdooOnlyAuth && (
                                 <div className="flex flex-col gap-1.5 p-2 bg-slate-50/70 dark:bg-slate-900/70 border border-slate-100 dark:border-slate-800/60 rounded-xl">
                                     <div className="flex items-center justify-between">
@@ -532,7 +561,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                                         <span className="w-3.5 h-3.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-650 dark:text-emerald-400 flex items-center justify-center font-black text-[8px]">O</span>
                                         <span className="text-slate-800 dark:text-slate-200 font-black text-[9px]">Odoo ERP</span>
                                     </div>
-                                    <button 
+                                    <button
                                         className={`text-[8px] font-black px-1.5 py-0.5 rounded transition-colors ${odooLinked ? 'text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40' : 'text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40'}`}
                                         onClick={async () => {
                                             setProfileMenuOpen(false);
@@ -645,15 +674,15 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                                             const inactiveClass = isCollapsed
                                                 ? `flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 relative hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-500 dark:text-slate-400`
                                                 : `flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-500 dark:text-slate-400 font-medium`;
-                                            
+
                                             const getClassName = (isActive) => isActive ? activeClass : inactiveClass;
-                                            
+
                                             const onMouseEnter = isCollapsed ? (e) => {
                                                 const rect = e.currentTarget.getBoundingClientRect();
                                                 setTooltip({ label: item.name, y: rect.top + rect.height / 2 });
                                             } : undefined;
                                             const onMouseLeave = isCollapsed ? () => setTooltip(null) : undefined;
-                                            
+
                                             const handleClick = async (e) => {
                                                 if (item.path === '/odoo/logout') {
                                                     e.preventDefault();
@@ -675,10 +704,10 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                                                     handleOdooLink();
                                                 }
                                             };
-                                            
+
                                             const content = (
                                                 <>
-                                                    <item.icon size={16} /> 
+                                                    <item.icon size={16} />
                                                     {!isCollapsed && <span className="text-xs flex-1">{item.name}</span>}
                                                     {item.badge && (
                                                         isCollapsed ? (
@@ -707,9 +736,9 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                                                     {content}
                                                 </a>
                                             ) : (
-                                                <NavLink 
-                                                    key={item.path} 
-                                                    to={item.path} 
+                                                <NavLink
+                                                    key={item.path}
+                                                    to={item.path}
                                                     replace={true}
                                                     className={({ isActive }) => getClassName(checkActive(item.path))}
                                                     onMouseEnter={onMouseEnter}
@@ -789,7 +818,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                                 <p className="text-xs text-slate-500 dark:text-slate-400">자동 로그인을 위해 비밀번호를 입력해주세요</p>
                             </div>
                         </div>
-                        
+
                         <div className="mb-5">
                             <input
                                 type="password"
@@ -801,7 +830,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                                 required
                             />
                         </div>
-                        
+
                         <div className="flex items-center justify-end gap-2">
                             <button
                                 type="button"

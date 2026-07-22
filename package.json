@@ -71,13 +71,22 @@
         "appId": "com.irassistant.app",
         "productName": "ILink",
         "artifactName": "ILink-Setup-${version}.${ext}",
-        "icon": "build/icon.png",
+        "icon": "build/icon.ico",
         "publish": [
             {
                 "provider": "github",
                 "owner": "mightyZap25",
                 "repo": "IRAssistance"
             }
+        ],
+        "asarUnpack": [
+            "dist/**/*",
+            "server.js",
+            "odoo_routes.js",
+            "odoo_rpc.js",
+            "global-preload.js",
+            "odoo-preload.js",
+            "node_modules/**"
         ],
         "extraResources": [
             ".env",
@@ -87,19 +96,22 @@
             "dist/**/*",
             "main.js",
             "preload.js",
+            "global-preload.js",
+            "odoo-preload.js",
             "googlechat-preload.js",
             "server.js",
             "odoo_routes.js",
             "odoo_rpc.js",
             "app_tray_icon.png",
             "build/icon.png",
+            "build/icon.ico",
             "package.json"
         ],
         "directories": {
             "output": "dist-electron"
         },
         "win": {
-            "icon": "build/icon.png",
+            "icon": "build/icon.ico",
             "target": [
                 "nsis"
             ]

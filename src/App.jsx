@@ -44,7 +44,7 @@ function AppContent() {
                 '/project/dashboard', '/project/issues', '/project/tasks', 
                 '/project/task-calendar', '/project/management', 
                 '/sales/dashboard', '/sales/billing', '/odoo/apps', '/odoo/view',
-                '/odoo/login', '/odoo/logout'
+                '/odoo/login', '/odoo/logout', '/odoo/*'
             ].map(path => (
                 <Route key={path} path={path} element={
                     <PrivateRoute>

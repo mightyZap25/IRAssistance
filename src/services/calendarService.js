@@ -15,46 +15,51 @@ export async function getOrCreateCalendar() {
     if (isCalendarDisabled) return null;
 
     const token = getAccessToken();
-    if (!token) throw new Error('No Google Access Token');
+    if (!token || token === 'undefined' || token === 'null') {
+        isCalendarDisabled = true;
+        return null;
+    }
 
-    // 1. 캘린더 목록 조회
     if (token === 'mock_access_token') {
         return 'mock_calendar_id';
     }
 
-    const listRes = await fetch(`${API_BASE}/users/me/calendarList`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-    });
-    
-    if (!listRes.ok) {
-        if (listRes.status === 401 || listRes.status === 403) {
-            if (!isCalendarDisabled) {
-                console.warn("[Calendar] 캘린더 접근 권한이 없거나 토큰이 만료되었습니다. 캘린더 동기화가 비활성화됩니다.");
-                isCalendarDisabled = true;
-            }
+    try {
+        const listRes = await fetch(`${API_BASE}/users/me/calendarList`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!listRes.ok) {
+            // 401, 403 등의 권한 에러 시 콘솔을 더럽히지 않고 조용히 비활성화
+            isCalendarDisabled = true;
             return null;
         }
-        throw new Error('Failed to fetch calendar list');
+        
+        const listData = await listRes.json();
+        let erpCal = listData.items?.find(c => c.summary === CALENDAR_SUMMARY);
+        
+        // 2. 없으면 생성
+        if (!erpCal) {
+            const createRes = await fetch(`${API_BASE}/calendars`, {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ summary: CALENDAR_SUMMARY, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone })
+            });
+            if (!createRes.ok) {
+                isCalendarDisabled = true;
+                return null;
+            }
+            erpCal = await createRes.json();
+        }
+        
+        return erpCal.id;
+    } catch (e) {
+        isCalendarDisabled = true;
+        return null;
     }
-    
-    const listData = await listRes.json();
-    let erpCal = listData.items?.find(c => c.summary === CALENDAR_SUMMARY);
-    
-    // 2. 없으면 생성
-    if (!erpCal) {
-        const createRes = await fetch(`${API_BASE}/calendars`, {
-            method: 'POST',
-            headers: { 
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ summary: CALENDAR_SUMMARY, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone })
-        });
-        if (!createRes.ok) throw new Error('Failed to create calendar');
-        erpCal = await createRes.json();
-    }
-    
-    return erpCal.id;
 }
 
 /**
@@ -261,6 +266,6 @@ export async function pollGoogleCalendarToTasks(ownerUid) {
             }
         }
     } catch (e) {
-        console.error("[Calendar] Polling Sync Error:", e);
+        // 백그라운드 폴링 중 에러 발생 시 콘솔을 소란스럽게 만들지 않고 조용히 처리
     }
 }

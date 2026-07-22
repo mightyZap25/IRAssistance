@@ -879,7 +879,21 @@ app.post('/api/odoo-notification', async (req, res) => {
 });
 
 // Serve built frontend assets in production/Electron mode
-const distPath = path.join(__dirname, 'dist');
+// dist/**/*를 asarUnpack에 포함시켜 app.asar.unpacked/dist 경로로 접근 가능
+let distPath;
+if (process.env.ELECTRON_RESOURCES_PATH) {
+    // 패키징된 Electron 환경: asarUnpack으로 dist가 언팩되어 asar.unpacked 내에 존재
+    const unpackedDistPath = path.join(process.env.ELECTRON_RESOURCES_PATH, 'app.asar.unpacked', 'dist');
+    if (fs.existsSync(unpackedDistPath)) {
+        distPath = unpackedDistPath;
+    } else {
+        // fallback: __dirname 기준 (asar.unpacked/dist)
+        distPath = path.join(__dirname, 'dist');
+    }
+} else {
+    // 개발 환경: 프로젝트 루트의 dist 폴더
+    distPath = path.join(__dirname, 'dist');
+}
 app.use('/api/odoo', odooRoutes);
 app.use(express.static(distPath));
 // SPA fallback: Serve index.html for all non-API GET requests without path-to-regexp v5 issues

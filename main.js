@@ -22,12 +22,20 @@ console.log('[Electron Main] .env 로드 경로:', envPath);
 app.userAgentFallback = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 // 윈도우 OS 네이티브 알림(Notification)이 정상 작동하기 위한 필수 설정
-app.setAppUserModelId('com.irassistant.app');
+// 빌드 후 간혹 설치 방식(포터블/unpacked 등)에 따라 윈도우 시작 메뉴 단축아이콘 AUMID와 매칭이 안 되어 
+// 알림이 무시되는 윈도우 11의 엄격한 정책을 통과하기 위해, package.json에 정의된 appId와 동일한 AUMID를 사용해야 합니다.
+app.setAppUserModelId("com.irassistant.app");
 
 // 알림 전용 아이콘 자동 다운로드 함수
 function ensureNotificationIcons() {
-    const iconDir = path.join(app.getAppPath(), 'build');
+    const iconDir = path.join(app.getPath('userData'), 'icons');
     if (!fs.existsSync(iconDir)) fs.mkdirSync(iconDir, { recursive: true });
+
+    const defaultIconSrc = path.join(app.getAppPath(), 'build', 'icon.png');
+    const defaultIconDest = path.join(iconDir, 'icon.png');
+    if (fs.existsSync(defaultIconSrc) && !fs.existsSync(defaultIconDest)) {
+        fs.copyFileSync(defaultIconSrc, defaultIconDest);
+    }
 
     const downloadIcon = (url, filename) => {
         const dest = path.join(iconDir, filename);
@@ -59,24 +67,64 @@ const PORT = 5050;
 
 // Start Express Backend Server as a child process
 function startBackend() {
-    const serverPath = path.join(app.getAppPath(), 'server.js');
+    const appPath = app.getAppPath();
+    const serverPath = app.isPackaged
+        ? path.join(appPath.replace('app.asar', 'app.asar.unpacked'), 'server.js')
+        : path.join(appPath, 'server.js');
     console.log(`[Electron Main] Starting Backend Server: ${serverPath}`);
     
-    serverProcess = fork(serverPath, [], {
-        env: { 
-            ...process.env, 
-            PORT: PORT.toString(),
-            ELECTRON_RESOURCES_PATH: app.isPackaged ? process.resourcesPath : app.getAppPath()
+    // 백엔드 로그 저장을 위한 파일 경로
+    const logDir = app.getPath('userData');
+    const logFile = path.join(logDir, 'backend.log');
+
+    try {
+        serverProcess = fork(serverPath, [], {
+            silent: true, // stdout, stderr 캡처
+            env: { 
+                ...process.env, 
+                PORT: PORT.toString(),
+                ELECTRON_RESOURCES_PATH: app.isPackaged ? process.resourcesPath : app.getAppPath()
+            }
+        });
+
+        if (serverProcess.stdout) {
+            serverProcess.stdout.on('data', (data) => {
+                const msg = data.toString();
+                console.log(`[Backend Server Output] ${msg}`);
+                fs.appendFileSync(logFile, `[STDOUT] ${new Date().toISOString()} - ${msg}`);
+            });
         }
-    });
 
-    serverProcess.on('error', (err) => {
-        console.error('[Electron Main] Failed to start backend process:', err);
-    });
+        if (serverProcess.stderr) {
+            serverProcess.stderr.on('data', (data) => {
+                const msg = data.toString();
+                console.error(`[Backend Server Error] ${msg}`);
+                fs.appendFileSync(logFile, `[STDERR] ${new Date().toISOString()} - ${msg}`);
+            });
+        }
 
-    serverProcess.on('exit', (code, signal) => {
-        console.log(`[Electron Main] Backend process exited with code ${code} (Signal: ${signal})`);
-    });
+        serverProcess.on('error', (err) => {
+            console.error('[Electron Main] Failed to start backend process:', err);
+            dialog.showErrorBox('백엔드 서버 시작 오류', `백엔드 서버 프로세스 시작에 실패했습니다:\n${err.message}`);
+        });
+
+        serverProcess.on('exit', (code, signal) => {
+            console.log(`[Electron Main] Backend process exited with code ${code} (Signal: ${signal})`);
+            if (code !== 0 && code !== null && !isQuitting) {
+                let errorMsg = `백엔드 서버(PORT ${PORT})가 예기치 않게 종료되었습니다. (종료 코드: ${code})\n로그 파일: ${logFile}`;
+                if (fs.existsSync(logFile)) {
+                    try {
+                        const lastLogs = fs.readFileSync(logFile, 'utf8').slice(-1000);
+                        errorMsg += `\n\n최근 오류 로그:\n${lastLogs}`;
+                    } catch(e) {}
+                }
+                dialog.showErrorBox('백엔드 서버 종료됨', errorMsg);
+            }
+        });
+    } catch (e) {
+        console.error('[Electron Main] Fork Exception:', e);
+        dialog.showErrorBox('백엔드 실행 실패', e.message);
+    }
 }
 
 function createWindow() {
@@ -86,7 +134,7 @@ function createWindow() {
         minWidth: 1024,
         minHeight: 720,
         title: 'I-Link',
-        icon: path.join(app.getAppPath(), 'build', 'icon.png'),
+        icon: path.join(app.getAppPath(), 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -99,14 +147,28 @@ function createWindow() {
     const isDev = !app.isPackaged;
     const primaryUrl = isDev ? 'http://localhost:5173' : 'http://localhost:5050';
 
+    let loadRetryCount = 0;
     const loadApp = () => {
+        loadRetryCount++;
+        console.log(`[Electron Main] Loading URL: ${primaryUrl} (Attempt ${loadRetryCount})`);
         mainWindow.loadURL(primaryUrl).catch(err => {
             console.log(`[Electron Main] Failed to load ${primaryUrl}, retrying in 1.5s...`);
-            setTimeout(loadApp, 1500);
+            if (loadRetryCount < 20) {
+                setTimeout(loadApp, 1500);
+            } else {
+                dialog.showErrorBox('페이지 로딩 실패', `서버(${primaryUrl}) 연결에 실패했습니다.\n오류: ${err.message}`);
+            }
         });
     };
 
     loadApp();
+
+    // DevTools 키보드 단축키 (F12 또는 Ctrl+Shift+I) 항상 등록
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+        if (input.type === 'keyDown' && (input.key === 'F12' || (input.control && input.shift && input.key.toUpperCase() === 'I'))) {
+            mainWindow.webContents.toggleDevTools();
+        }
+    });
 
     // Handle external links (open in default browser instead of electron window)
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -170,7 +232,7 @@ function createWindow() {
 }
 
 function createTray() {
-    const activeIconPath = path.join(app.getAppPath(), 'build', 'icon.png');
+    const activeIconPath = path.join(app.getAppPath(), 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
     
     tray = new Tray(activeIconPath);
     
@@ -261,7 +323,12 @@ if (!gotTheLock) {
         app.on('web-contents-created', (event, contents) => {
             // 모든 호스트(주로 메인 윈도우)에서 webview가 생성될 때 가로채기
             contents.on('will-attach-webview', (e, webPreferences, params) => {
-                const preloadPath = path.join(app.getAppPath(), 'global-preload.js');
+                // global-preload.js는 webview preload로 주입되므로 asar 내부 경로를 사용할 수 없음
+                // 패키징 환경에서는 app.asar.unpacked 경로를 사용해야 합니다
+                const appPath = app.getAppPath();
+                const preloadPath = app.isPackaged
+                    ? path.join(appPath.replace('app.asar', 'app.asar.unpacked'), 'global-preload.js')
+                    : path.join(appPath, 'global-preload.js');
                 webPreferences.preload = preloadPath;
                 webPreferences.contextIsolation = false; // 전역 객체 덮어쓰기를 위해 격리 해제
                 webPreferences.backgroundThrottling = false; // 백그라운드 웹뷰(Gmail 등)의 타이머/웹소켓 지연 방지
@@ -285,12 +352,41 @@ if (!gotTheLock) {
                             const notif = new Notification({
                                 title: data.title || '새 알림',
                                 body: data.options?.body || '',
-                                icon: path.join(app.getAppPath(), 'build', 'icon.png')
+                                icon: path.join(app.getPath('userData'), 'icons', 'icon.png')
+                            });
+                            notif.show();
+                        }
+                    }
+                    
+                    // global-preload.js에서 ipcRenderer.sendToHost로 전송한 알림 처리
+                    // 빌드 후에도 안정적으로 동작하는 방식 (console.log 방식의 대안)
+                    if (channel === 'ilink-notification') {
+                        const data = args[0] || {};
+                        console.log('[Electron Main] ilink-notification 수신:', data);
+                        
+                        let prefix = '';
+                        let iconName = 'icon.png';
+                        const source = data.source || '';
+                        if (source.includes('mail.google.com')) { prefix = '[지메일] '; iconName = 'gmail.png'; }
+                        else if (source.includes('chat.google.com')) { prefix = '[구글챗] '; iconName = 'gchat.png'; }
+                        else if (source.includes('calendar.google.com')) { prefix = '[캘린더] '; iconName = 'gcalendar.png'; }
+                        else if (source.includes('192.168.0.7') || source.includes('100.67.238.32')) { prefix = '[Odoo] '; iconName = 'icon.png'; }
+                        
+                        if (Notification.isSupported()) {
+                            let iconPath = path.join(app.getPath('userData'), 'icons', iconName);
+                            if (!fs.existsSync(iconPath)) {
+                                iconPath = path.join(app.getPath('userData'), 'icons', 'icon.png');
+                            }
+                            const notif = new Notification({
+                                title: prefix + (data.title || '새 알림'),
+                                body: data.body || '',
+                                icon: iconPath
                             });
                             notif.show();
                         }
                     }
                 });
+
 
                 // Preload 스크립트의 console.log를 터미널로 중계 및 알림 처리
                 contents.on('console-message', (event, level, message, line, sourceId) => {
@@ -298,6 +394,7 @@ if (!gotTheLock) {
                     if (msg.startsWith('ILINK_NOTIF::')) {
                         try {
                             const data = JSON.parse(msg.slice('ILINK_NOTIF::'.length));
+                            console.log('[Electron Main] Received ILINK_NOTIF::', data);
                             
                             // 출처에 따라 제목에 접두사(Prefix) 붙이기 및 아이콘 설정
                             let prefix = '';
@@ -312,10 +409,10 @@ if (!gotTheLock) {
                             const finalTitle = prefix + (data.title || '새 알림');
                             
                             if (Notification.isSupported()) {
-                                // 다운로드된 아이콘 파일이 존재하는지 확인, 없으면 기본 아이콘 사용
-                                let iconPath = path.join(app.getAppPath(), 'build', iconName);
+                                // 다운로드된 아이콘 파일이 userData 경로에 존재하는지 확인
+                                let iconPath = path.join(app.getPath('userData'), 'icons', iconName);
                                 if (!fs.existsSync(iconPath)) {
-                                    iconPath = path.join(app.getAppPath(), 'build', 'icon.png');
+                                    iconPath = path.join(app.getPath('userData'), 'icons', 'icon.png');
                                 }
                                 
                                 const notif = new Notification({
@@ -398,6 +495,11 @@ if (!gotTheLock) {
                     /* 6. Document Viewer Canvas / Loading background */
                     .ndfHFb-c43Cm-n7FmZ-w7Ozid {
                         background-color: #f1f5f9 !important;
+                    }
+
+                    /* 7. Odoo & Webview 한글/기호 ㅁ (Tofu) 글자 깨짐 방지 폰트 Fallback 패치 */
+                    body, button, input, select, textarea, .o_main_navbar, .o_content, span, div, p, td, th, a {
+                        font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "맑은 고딕", "Noto Sans KR", "Apple SD Gothic Neo", "Segoe UI", Roboto, sans-serif !important;
                     }
                 `, { cssOrigin: 'user' }).catch(err => {});
             });
@@ -538,8 +640,28 @@ ipcMain.handle('get-app-version', () => {
     return app.getVersion();
 });
 
+// Renderer(React)에서 IPC로 요청하는 네이티브 알림 핸들러
+// 빌드 후에도 icon 경로 문제 없이 Electron Notification API로 안정적으로 표시됩니다.
+ipcMain.on('show-notification', (event, { title, body }) => {
+    if (Notification.isSupported()) {
+        let iconPath = path.join(app.getPath('userData'), 'icons', 'icon.png');
+        if (!fs.existsSync(iconPath)) {
+            iconPath = path.join(app.getAppPath(), 'build', 'icon.png');
+        }
+        const notif = new Notification({
+            title: title || 'I-Link',
+            body: body || '',
+            icon: iconPath
+        });
+        notif.show();
+    }
+});
+
 ipcMain.handle('get-preload-path', () => {
-    const p = path.join(app.getAppPath(), 'odoo-preload.js');
+    const appPath = app.getAppPath();
+    const p = app.isPackaged
+        ? path.join(appPath.replace('app.asar', 'app.asar.unpacked'), 'odoo-preload.js')
+        : path.join(appPath, 'odoo-preload.js');
     return url.pathToFileURL(p).href;
 });
 
@@ -555,7 +677,7 @@ ipcMain.on('odoo-desktop-notification', (event, data) => {
         const notif = new Notification({
             title: title || 'Odoo 알림',
             body: options?.body || '',
-            icon: path.join(app.getAppPath(), 'build', 'icon.png')
+            icon: path.join(app.getPath('userData'), 'icons', 'icon.png')
         });
         notif.show();
         console.log('[Electron Main] 네이티브 윈도우 알림을 성공적으로 표시했습니다.');

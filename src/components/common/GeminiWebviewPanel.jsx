@@ -104,7 +104,7 @@ export default function GeminiWebviewPanel({ isOpen, onClose }) {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-y-0 right-0 w-[450px] bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col z-[100] animate-in slide-in-from-right duration-300">
+        <div className="fixed inset-y-0 right-0 w-[450px] bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col z-[10000] animate-in slide-in-from-right duration-300">
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
                 <div className="flex items-center gap-3">

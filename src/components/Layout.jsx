@@ -1,6 +1,7 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import Header from './Header';
 import { useAuth } from '../contexts/AuthContext';
 import { useTaskAlarm } from '../hooks/useTaskAlarm';
 import UpdateNotificationModal from './common/UpdateNotificationModal';
@@ -20,6 +21,10 @@ export default function Layout({ children }) {
         if (window.electronAPI?.getAppVersion) {
             window.electronAPI.getAppVersion().then(setAppVersion).catch(() => {});
         }
+
+        const handleToggleGemini = () => setIsGeminiPanelOpen(v => !v);
+        window.addEventListener('toggle-gemini-panel', handleToggleGemini);
+        return () => window.removeEventListener('toggle-gemini-panel', handleToggleGemini);
     }, []);
 
     React.useEffect(() => {
@@ -27,7 +32,7 @@ export default function Layout({ children }) {
             const bgWebview = document.getElementById('odoo-bg-webview');
             if (bgWebview && bgWebview.loadURL) {
                 console.log('[Layout] odoo-session-ready 수신, 백그라운드 웹뷰 새로고침 시도');
-                bgWebview.loadURL(`${odooApiUrl}/web`).catch(() => {});
+                bgWebview.loadURL(`${odooApiUrl}/web#action=hr_holidays.hr_leave_action_my`).catch(() => {});
             }
         };
         window.addEventListener('odoo-session-ready', handleSessionReady);
@@ -161,6 +166,7 @@ export default function Layout({ children }) {
     const isGoogleChat = location.pathname.includes('/workspace/chat');
     const isGoogleMail = location.pathname.includes('/workspace/mail');
     const isGoogleCalendar = location.pathname.includes('/workspace/calendar');
+    const isOdooView = location.pathname.startsWith('/odoo') || location.pathname.includes('/odoo');
 
     const isElectron = window.electronAPI?.isElectron || 
                       (window && window.process && window.process.type === 'renderer') || 
@@ -184,6 +190,22 @@ export default function Layout({ children }) {
         <div className="flex min-h-screen bg-slate-50 dark:bg-slate-900">
             <Sidebar isCollapsed={isSidebarCollapsed} toggleSidebar={toggleSidebar} />
             <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
+                
+                {/* ─── Odoo 상단 네비게이션바 시계/알림 옆 절대위치(Fixed) AI 챗 버튼 ─── */}
+                <button
+                    onClick={() => setIsGeminiPanelOpen(v => !v)}
+                    className={`fixed top-2.5 right-52 z-[9999] flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all shadow-sm border ${
+                        isGeminiPanelOpen
+                            ? 'bg-slate-800 text-white border-slate-700 ring-2 ring-slate-400/50'
+                            : 'bg-white/90 hover:bg-white text-slate-700 hover:text-slate-900 border-slate-300/80 hover:border-slate-400 shadow-slate-200/50 hover:scale-105 active:scale-95'
+                    }`}
+                    title="AI 챗봇 헬프봇 열기"
+                >
+                    <BotMessageSquare size={14} className={isGeminiPanelOpen ? 'text-white' : 'text-slate-600'} />
+                    <span className="tracking-tight text-[11px] font-bold">AI 챗</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"/>
+                </button>
+
                 <main className={`flex-1 overflow-x-hidden ${isFullPage ? 'p-0' : 'p-6'} ${isGoogleApp ? (isSidebarCollapsed ? 'pl-1 bg-slate-100' : 'pl-2.5 bg-slate-100') : ''} relative`}>
                     {/* Persistent Google Chat Webview */}
                     {isElectron && !isOdooOnlyAuth && (
@@ -268,7 +290,7 @@ export default function Layout({ children }) {
                             <webview 
                                 id="odoo-bg-webview"
                                 key={`odoo-bg-${currentUser.uid}`}
-                                src={`${odooApiUrl}/web`}
+                                src={`${odooApiUrl}/web#action=hr_holidays.hr_leave_action_my`}
                                 style={{ width: '100%', height: '100%', border: 'none' }}
                                 allowpopups="true"
                                 partition="persist:odoo"
@@ -287,17 +309,6 @@ export default function Layout({ children }) {
                     {/* 플로팅 개인 메모장 */}
                     <FloatingNotepad />
 
-                    {/* 제미나이 헬프봇 플로팅 버튼 (우측 하단) */}
-                    {!isGeminiPanelOpen && (
-                        <button
-                            onClick={() => setIsGeminiPanelOpen(true)}
-                            className="fixed bottom-6 right-6 z-[9000] p-3 md:p-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.2)] hover:shadow-[0_8px_30px_rgb(59,130,246,0.3)] transition-all duration-300 hover:scale-110 flex items-center justify-center group"
-                            title="Odoo 헬프봇 열기"
-                        >
-                            <BotMessageSquare className="w-6 h-6 md:w-7 md:h-7 group-hover:animate-pulse" />
-                        </button>
-                    )}
-
                     {/* 제미나이 헬프봇 사이드 패널 */}
                     <GeminiWebviewPanel 
                         isOpen={isGeminiPanelOpen} 
@@ -306,7 +317,7 @@ export default function Layout({ children }) {
 
                     {/* 우측 하단 고정 버전 배지 */}
                     {!isFullPage && (
-                        <div className="fixed bottom-4 right-20 z-40 bg-white/60 dark:bg-slate-900/60 border border-slate-200/40 dark:border-slate-800/40 backdrop-blur-md px-2 py-0.5 rounded-md shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-[9px] font-black text-slate-400 dark:text-slate-500 select-none tracking-wider pointer-events-none transition-all">
+                        <div className="fixed bottom-2 right-6 z-40 bg-white/60 dark:bg-slate-900/60 border border-slate-200/40 dark:border-slate-800/40 backdrop-blur-md px-2 py-0.5 rounded-md shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-[9px] font-black text-slate-400 dark:text-slate-500 select-none tracking-wider pointer-events-none transition-all">
                             VER v{appVersion}
                         </div>
                     )}

@@ -47,5 +47,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return () => {
             ipcRenderer.removeListener('app-go-forward', subscription);
         };
-    }
+    },
+    // Electron 네이티브 알림 (빌드 후에도 안정적으로 동작)
+    showNotification: (title, body) => ipcRenderer.send('show-notification', { title, body })
 });

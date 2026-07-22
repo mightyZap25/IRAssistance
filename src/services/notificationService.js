@@ -12,14 +12,22 @@ export async function createNotification(targetUid, title, message, link = '', t
     try {
         let userEmail = '';
         if (targetUid) {
-            const userSnap = await getDoc(doc(db, 'users', targetUid));
-            if (userSnap.exists()) {
-                userEmail = userSnap.data().email;
+            if (targetUid.includes('@')) {
+                userEmail = targetUid;
+            } else {
+                try {
+                    const userSnap = await getDoc(doc(db, 'users', targetUid));
+                    if (userSnap.exists()) {
+                        userEmail = userSnap.data().email || '';
+                    }
+                } catch(e) {}
             }
         }
 
         await addDoc(collection(db, 'notifications'), {
-            userEmail,
+            userEmail: userEmail || targetUid || '',
+            targetEmail: userEmail || '',
+            targetUid: targetUid || '',
             title,
             message,
             link,
@@ -27,7 +35,7 @@ export async function createNotification(targetUid, title, message, link = '', t
             read: false,
             createdAt: serverTimestamp()
         });
-        console.log(`Notification sent to ${userEmail || 'Departments: ' + targetDepts.join(',')}`);
+        console.log(`Notification sent to ${userEmail || targetUid || 'Departments: ' + targetDepts.join(',')}`);
     } catch (err) {
         console.error("Failed to create notification:", err);
     }
