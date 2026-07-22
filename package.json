@@ -1,7 +1,7 @@
 {
     "name": "ilink",
     "private": true,
-    "version": "0.9.6",
+    "version": "0.9.7",
     "description": "ILink - 스마트 ERP 데스크톱 어플리케이션",
     "author": "Antigravity",
     "type": "module",

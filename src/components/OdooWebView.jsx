@@ -537,8 +537,8 @@ export default function OdooWebView() {
                 return;
             }
 
-            // 웹뷰가 준비되면 내부에서 인증 수행 (딜레이 단축)
-            setTimeout(async () => {
+            // 웹뷰가 준비되면 내부에서 인증 수행
+            const attemptLogin = async () => {
                 const webview = webviewRef.current;
                 if (!webview) return;
                 try {
@@ -583,9 +583,15 @@ export default function OdooWebView() {
                         window.dispatchEvent(new CustomEvent('odoo-session-ready'));
                     }
                 } catch(e) {
-                    // 세션 체크 실패 소리없이 통과
+                    if (e.message && e.message.includes('dom-ready')) {
+                        console.log('[OdooWebView] 웹뷰 DOM 준비 대기 중... 자동 로그인 재시도 (500ms)');
+                        setTimeout(attemptLogin, 500);
+                    } else {
+                        console.log('[OdooWebView] 자동 로그인 실패 소리없이 통과:', e);
+                    }
                 }
-            }, 200);
+            };
+            attemptLogin();
         };
 
         window.addEventListener('odoo-auto-login', handleAutoLogin);
