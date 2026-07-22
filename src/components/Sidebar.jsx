@@ -300,7 +300,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         const ODOO_17_ROUTES = [
             { keywords: ['할일', '할 일', 'to-do'], path: '/odoo/to-do' },
             { keywords: ['전자결재'], path: '/odoo/action-707' },
-            { keywords: ['대시보드', '현황판'], path: '/odoo/dashboards?dashboard_id=3' },
+            // { keywords: ['대시보드', '현황판'], path: '/odoo/dashboards?dashboard_id=3' },
             { keywords: ['판매', 'sales'], path: '/odoo/sales' },
             { keywords: ['청구', 'invoicing'], path: '/odoo/customer-invoices' },
             { keywords: ['프로젝트', 'project'], path: '/odoo/project' },
@@ -309,8 +309,8 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
             { keywords: ['제조', 'manufacturing'], path: '/odoo/manufacturing' },
             { keywords: ['수리', 'repairs'], path: '/odoo/repairs' },
             { keywords: ['인사', '임직원', 'employees'], path: '/odoo/employees' },
-            { keywords: ['경비', 'expenses'], path: '/odoo/expenses' },
-            { keywords: ['근태', '휴가', 'time off', 'attendances'], path: '/odoo/action-724' }
+            { keywords: ['경비', '경비처리', 'expenses'], path: '/odoo/expenses' },
+            { keywords: ['근태/휴가', 'time off', 'attendances'], path: '/odoo/action-724' }
         ];
 
         const CUSTOM_APPS = [
@@ -340,13 +340,13 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                     if (!groupsMap[cat]) {
                         groupsMap[cat] = [];
                     }
-                    
+
                     const mappedName = ODOO_NAME_MAP[cleanName] || ODOO_NAME_MAP[app.name] || cleanName;
-                    
+
                     let targetPath = `/odoo/view?menu_id=${app.menu_id}`;
                     const lowercaseName = mappedName.toLowerCase();
                     const lowercaseOriginal = app.name.toLowerCase();
-                    
+
                     for (const route of ODOO_17_ROUTES) {
                         if (route.keywords.some(kw => lowercaseName.includes(kw) || lowercaseOriginal.includes(kw))) {
                             targetPath = route.path;
