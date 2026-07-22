@@ -77,11 +77,9 @@ export default function OdooWebView() {
                                     if (d.result && d.result.uid) {
                                         console.log('[I-Link Nav] Odoo 세션 자동 재인증 성공! 원래 목표 페이지 복원');
                                         window._isReloggingIn = false;
-                                        let rootHash = window._iLinkRootHash || sessionStorage.getItem('iLinkRootHash') || 'action=hr_holidays.hr_leave_action_my';
-                                        if (rootHash.includes('discuss') || rootHash.includes('mail')) rootHash = 'action=hr_holidays.hr_leave_action_my';
-                                        
-                                        // location.href 변경 시 자동으로 페이지가 로드되므로 reload()를 호출하면 안됨 (호출 시 이전 경로인 /web/login으로 다시 튕겨 Discuss로 빠지는 원인)
-                                        window.location.replace('/web#' + rootHash);
+                                        // Odoo 17 네이티브 경로로 복귀
+                                        const targetPath = window._iLinkTargetPath || sessionStorage.getItem('iLinkTargetPath') || '/odoo/time-off';
+                                        window.location.replace(targetPath);
                                     } else {
                                         window._isReloggingIn = false;
                                     }
@@ -99,71 +97,60 @@ export default function OdooWebView() {
                             console.log('[I-Link Nav] 유효하지 않은 액션 모달 감지됨! 자동 닫고 목표 페이지 재접속');
                             const okBtn = invalidModal.querySelector('.btn-primary, .btn-secondary, button');
                             if (okBtn) okBtn.click();
-
-                            let rootHash = window._iLinkRootHash || sessionStorage.getItem('iLinkRootHash') || 'action=hr_holidays.hr_leave_action_my';
-                            if (rootHash.includes('discuss') || rootHash.includes('mail')) rootHash = 'action=hr_holidays.hr_leave_action_my';
-                            window.location.hash = rootHash;
+                            const targetPath = window._iLinkTargetPath || sessionStorage.getItem('iLinkTargetPath') || '/odoo/time-off';
+                            setTimeout(function() { window.location.replace(targetPath); }, 500);
                         }
                     }, 600);
 
-                    // 2. Odoo Discuss (채팅창) 영구 튕겨내기 수호자 (앱 동작 중 채팅창 접근 원천 차단)
+                    // 2. Odoo Discuss (채팅창) 영구 튕겨내기 수호자 - Odoo 17 경로 기반
                     setInterval(function() {
+                        // Odoo 17에서 채팅창 경로: /odoo/discuss
+                        const pathIndicatesDiscuss = window.location.pathname.startsWith('/odoo/discuss') ||
+                                                     window.location.pathname === '/web' ||
+                                                     window.location.pathname === '/web/';
+                        
+                        // 구형 해시 기반 채팅 체크 (하위호환)
                         const currentHash = window.location.hash;
-                        
-                        // 해시 기반 체크 (명시적인 문자열)
                         const hashIndicatesDiscuss = currentHash.includes('mail.action_discuss') || 
-                                                     currentHash.includes('action=discuss') || 
-                                                     currentHash.includes('menu_id=mail') ||
-                                                     (currentHash === '' && window.location.pathname === '/web');
-                                                     
-                        // DOM 기반 체크 (Odoo가 숫자 ID나 예외 해시로 렌더링했을 때 감지)
-                        const domIndicatesDiscuss = document.querySelector('.o-mail-Discuss, .o_mail_discuss, .o_MessageList, [data-menu-xmlid="mail.menu_root_discuss"].active') !== null;
+                                                     currentHash.includes('action=discuss');
                         
-                        // 브레드크럼 타이틀이나 제목으로 체크 (최후의 보루)
-                        const titleIndicatesDiscuss = document.title.includes('Discuss') || document.title.includes('채팅') || (document.title.includes('메시지') && !document.title.includes('에러'));
+                        // DOM 기반 체크
+                        const domIndicatesDiscuss = document.querySelector('.o-mail-Discuss, .o_mail_discuss, .o_MessageList, [data-menu-xmlid="mail.menu_root_discuss"].active') !== null;
 
-                        const isDiscuss = hashIndicatesDiscuss || domIndicatesDiscuss || titleIndicatesDiscuss;
+                        const isDiscuss = pathIndicatesDiscuss || hashIndicatesDiscuss || domIndicatesDiscuss;
 
                         if (isDiscuss) {
-                            console.log('[I-Link Nav] Odoo 채팅창(Discuss) 무단 진입 감지! (해시/DOM/타이틀 체크됨) 즉시 차단 및 원래 화면으로 튕겨냅니다.');
-                            let targetHash = window._iLinkRootHash || sessionStorage.getItem('iLinkRootHash') || 'action=hr_holidays.hr_leave_action_my';
-                            
-                            // 만약 목표 해시마저도 채팅창이라면 근태/휴가로 리셋
-                            if (targetHash.includes('discuss') || targetHash.includes('mail')) {
-                                targetHash = 'action=hr_holidays.hr_leave_action_my';
-                            }
+                            const targetPath = window._iLinkTargetPath || sessionStorage.getItem('iLinkTargetPath');
+                            if (!targetPath) return; // 목표 경로 없으면 개입하지 않음
 
-                            // [무한 루프 방지 장치] 목표 페이지가 권한이 없거나 삭제되어 Odoo가 계속 채팅창으로 튕겨내는 경우 감지
+                            // 목표 경로 자체가 채팅이면 개입 안 함
+                            if (targetPath.includes('discuss') || targetPath.includes('/web') || targetPath === '/') return;
+
+                            console.log('[I-Link Nav] 채팅창/잘못된 경로 감지! 목표 경로(' + targetPath + ')로 강제 복귀합니다.');
+                            
+                            // 무한 루프 방지
                             let bounceData = null;
                             try { bounceData = JSON.parse(sessionStorage.getItem('odoo_bounce_data') || 'null'); } catch(e) {}
-                            if (!bounceData) bounceData = { count: 0, hash: '', time: 0 };
+                            if (!bounceData) bounceData = { count: 0, path: '', time: 0 };
                             
                             const now = Date.now();
-                            if (bounceData.hash === targetHash && (now - bounceData.time < 8000)) {
+                            if (bounceData.path === targetPath && (now - bounceData.time < 8000)) {
                                 bounceData.count++;
                             } else {
-                                bounceData = { count: 1, hash: targetHash, time: now };
+                                bounceData = { count: 1, path: targetPath, time: now };
                             }
                             bounceData.time = now;
                             try { sessionStorage.setItem('odoo_bounce_data', JSON.stringify(bounceData)); } catch(e) {}
 
                             if (bounceData.count >= 3) {
-                                console.log('[I-Link Nav] 무한 튕김 루프 감지! 목표 해시(' + targetHash + ')가 권한이 없거나 유효하지 않습니다. 안전 주소(근태)로 대피합니다.');
-                                targetHash = 'action=hr_holidays.hr_leave_action_my';
-                                window._iLinkRootHash = targetHash;
-                                try { sessionStorage.setItem('iLinkRootHash', targetHash); } catch(e) {}
-                                try { sessionStorage.setItem('odoo_bounce_data', JSON.stringify({ count: 0, hash: targetHash, time: now })); } catch(e) {}
-                                
-                                // 무한 루프 탈출 시 오류 모달을 띄울 수 있으면 좋지만, 우선 안전한 페이지로 강제 이동
+                                console.log('[I-Link Nav] 무한 튕김 루프 감지! 안전 주소(근태)로 대피합니다.');
+                                window.location.replace('/odoo/time-off');
+                                return;
                             }
-                            
-                            // DOM이 아직도 채팅창을 가리키고 있다면 단순 hash 변경으로는 SPA가 무시할 수 있으므로 강제 리로드 포함
-                            window.location.replace('/web#' + targetHash);
-                            if (domIndicatesDiscuss) {
-                                setTimeout(() => { window.location.reload(); }, 50);
-                            }
+
+                            window.location.replace(targetPath);
                         }
-                    }, 300);
+                    }, 500);
 
                     // Odoo 네비게이션 메뉴 중 Discuss 아이콘 완전 숨기기 (CSS로는 늦을 수 있으므로 DOM 강제 제거)
                     setInterval(function() {
@@ -347,7 +334,21 @@ export default function OdooWebView() {
                 const currentBase = currentUrl.split('#')[0];
                 const hashPart = targetUrl.includes('#') ? targetUrl.split('#')[1] : '';
                 
-                // 모듈 이동 시, 해당 모듈의 루트 주소를 웹뷰 내부에 2중 저장
+                // Odoo 17 네이티브 경로를 웹뷰 내부에 저장 (채팅창 감시 스크립트의 복귀 목표로 사용)
+                const targetPathForStorage = (() => {
+                    try {
+                        const u = new URL(targetUrl);
+                        return u.pathname + u.search + u.hash;
+                    } catch(e) { return ''; }
+                })();
+                if (targetPathForStorage && targetPathForStorage.startsWith('/odoo/') && !targetPathForStorage.includes('discuss')) {
+                    webviewRef.current.executeJavaScript(`
+                        window._iLinkTargetPath = '${targetPathForStorage}';
+                        try { sessionStorage.setItem('iLinkTargetPath', '${targetPathForStorage}'); } catch(e) {}
+                    `).catch(() => {});
+                }
+
+                // 구형 해시 기반도 병행 저장 (하위호환)
                 if (hashPart) {
                     webviewRef.current.executeJavaScript(`
                         window._iLinkRootHash = '${hashPart}';
@@ -356,9 +357,11 @@ export default function OdooWebView() {
                 }
 
                 if (currentUrl !== targetUrl) {
-                    if (currentBase === targetBase && hashPart) {
-                        // 단순히 hash만 바꿀 경우 Odoo OWL 액션 매니저가 유효하지 않다는 오류를 뱉을 수 있으므로
-                        // 1) Odoo 상단 네비게이션바 버튼 클릭 시도 2) 실패 시 안전 주소 교체 및 reload
+                    // Odoo 17 네이티브 경로(/odoo/xxx)는 항상 loadURL로 바로 처리 (가상클릭 불필요)
+                    const isNativeOdoo17Path = targetUrl.includes('/odoo/') && !targetUrl.includes('#');
+                    
+                    if (!isNativeOdoo17Path && currentBase === targetBase && hashPart) {
+                        // [구형 해시 경로 처리] 같은 base이면서 hash만 다른 경우 → 가상 클릭 시도
                         const menuIdMatch = hashPart.match(/menu_id=(\d+)/);
                         const menuId = menuIdMatch ? menuIdMatch[1] : null;
 
@@ -368,11 +371,9 @@ export default function OdooWebView() {
                                 var hashPart = "${hashPart}";
                                 var success = false;
 
-                                // 1. Odoo 상단바에서 menuId 또는 hash에 해당하는 메뉴 요소 찾아서 클릭
                                 if (menuId) {
                                     var el = document.querySelector('[data-menu-id="' + menuId + '"], a[href*="menu_id=' + menuId + '"]');
                                     
-                                    // 화면이 작거나 메뉴가 많아 '더보기' 드롭다운 안에 숨겨진 경우 탐색
                                     if (!el) {
                                         var dropdownItems = document.querySelectorAll('.dropdown-menu a, .o-dropdown--menu a');
                                         for (var i = 0; i < dropdownItems.length; i++) {
@@ -384,7 +385,6 @@ export default function OdooWebView() {
                                     }
 
                                     if (el) {
-                                        // 단순 click 이벤트로는 Odoo OWL 라우터가 반응하지 않을 수 있으므로 실제 마우스 클릭 시퀀스 전체를 흉내냅니다!
                                         ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(type => {
                                             el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
                                         });
@@ -393,7 +393,6 @@ export default function OdooWebView() {
                                 }
 
                                 if (!success) {
-                                    // 2. 만약 DOM 요소 클릭에 완전히 실패했다면 확실하게 주소를 덮어씌운 뒤 하드 리로드
                                     window.location.href = window.location.origin + '/web#' + hashPart;
                                     setTimeout(function() { window.location.reload(); }, 100);
                                 }
@@ -406,7 +405,7 @@ export default function OdooWebView() {
                             webviewRef.current.loadURL(targetUrl).catch(() => {});
                         });
                     } else {
-                        // Odoo는 초기 로드 시 hash가 URL에 있어야 올바른 메뉴를 렌더링합니다.
+                        // Odoo 17 네이티브 경로 또는 완전히 다른 URL → loadURL로 직행
                         const loadPromise = webviewRef.current.loadURL(targetUrl);
                         if (loadPromise && loadPromise.catch) {
                             loadPromise.then(() => {
