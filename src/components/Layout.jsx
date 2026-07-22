@@ -7,6 +7,7 @@ import { useTaskAlarm } from '../hooks/useTaskAlarm';
 import UpdateNotificationModal from './common/UpdateNotificationModal';
 import FloatingNotepad from './common/FloatingNotepad';
 import GeminiWebviewPanel from './common/GeminiWebviewPanel';
+import OdooWebView from './OdooWebView';
 import { BotMessageSquare } from 'lucide-react';
 
 export default function Layout({ children }) {
@@ -166,7 +167,10 @@ export default function Layout({ children }) {
     const isGoogleChat = location.pathname.includes('/workspace/chat');
     const isGoogleMail = location.pathname.includes('/workspace/mail');
     const isGoogleCalendar = location.pathname.includes('/workspace/calendar');
-    const isOdooView = location.pathname.startsWith('/odoo') || location.pathname.includes('/odoo');
+    const isCustomReactRoute = location.pathname.startsWith('/workspace/') || 
+                               location.pathname.startsWith('/settings') || 
+                               location.pathname === '/approval';
+    const isOdooView = !isCustomReactRoute;
 
     const isElectron = window.electronAPI?.isElectron || 
                       (window && window.process && window.process.type === 'renderer') || 
@@ -274,28 +278,22 @@ export default function Layout({ children }) {
                         </div>
                     )}
 
-                    {/* Persistent Odoo Webview (알림 수신 전용 백그라운드 유지) 
-                        - 사용자가 구글 챗/메일 등 다른 화면을 볼 때도 Odoo의 멘션/결재 알림을 받기 위해 백그라운드에서 실행
+                    {/* Persistent Odoo Webview (메인 Odoo 웹뷰를 백그라운드에서 상시 구동) 
+                        - 사용자가 구글 앱이나 커스텀 React 화면(전자결재 등)을 볼 때도 
+                          언마운트되지 않고 상태(세션/채팅/알림)를 유지합니다.
                     */}
                     {isElectron && currentUser?.uid && (
                         <div style={{ 
-                            position: 'absolute',
-                            left: '-9999px',
-                            opacity: 0,
-                            pointerEvents: 'none',
-                            width: '1px', 
-                            height: '1px',
-                            display: 'block'
+                            position: isOdooView ? 'relative' : 'absolute',
+                            left: isOdooView ? 0 : '-9999px',
+                            opacity: isOdooView ? 1 : 0,
+                            pointerEvents: isOdooView ? 'auto' : 'none',
+                            width: '100%', 
+                            height: '100vh',
+                            display: 'block',
+                            zIndex: 10
                         }}>
-                            <webview 
-                                id="odoo-bg-webview"
-                                key={`odoo-bg-${currentUser.uid}`}
-                                src={`${odooApiUrl}/web#action=hr_holidays.hr_leave_action_my`}
-                                style={{ width: '100%', height: '100%', border: 'none' }}
-                                allowpopups="true"
-                                partition="persist:odoo"
-                                webpreferences="contextIsolation=no"
-                            />
+                            <OdooWebView />
                         </div>
                     )}
                     

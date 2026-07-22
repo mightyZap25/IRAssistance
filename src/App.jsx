@@ -8,6 +8,7 @@ import OdooWebView from './components/OdooWebView'
 
 // 커스텀 Google Workspace 화면들 및 기타 유지 화면들
 import MainDashboard from './pages/MainDashboard'
+import WelcomeDashboard from './pages/WelcomeDashboard'
 import GoogleChatPage from './pages/GoogleChatPage'
 import GoogleDrivePage from './pages/GoogleDrivePage'
 import WorkspaceCalendarPage from './pages/WorkspaceCalendarPage'
@@ -49,7 +50,7 @@ function AppContent() {
                 <Route key={path} path={path} element={
                     <PrivateRoute>
                         <Layout>
-                            <OdooWebView />
+                            <React.Fragment />
                         </Layout>
                     </PrivateRoute>
                 } />

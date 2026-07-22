@@ -314,7 +314,6 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         ];
 
         const CUSTOM_APPS = [
-            { cat: '협업 & 기타', name: '전자결재', path: '/approval', icon: FileCheck },
             { cat: '시스템 제어', name: 'Odoo 로그인', path: '/odoo/login', icon: UserCheck },
             { cat: '시스템 제어', name: 'Odoo 로그아웃', path: '/odoo/logout', icon: LogOut },
             { cat: '매뉴얼', name: 'ERP MANUAL', path: 'https://www.odoo.com/documentation/19.0/ko/index.html', icon: BookOpen, isExternal: true }

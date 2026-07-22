@@ -19,6 +19,7 @@ export default function OdooWebView() {
     const location = useLocation();
     const webviewRef = useRef(null);
     const [menusLoaded, setMenusLoaded] = React.useState(globalOdooMenus.length > 0);
+    const [isWebViewLoading, setIsWebViewLoading] = React.useState(true);
 
     const isElectron = window.electronAPI?.isElectron ||
                        (window && window.process && window.process.type === 'renderer') ||
@@ -91,7 +92,7 @@ export default function OdooWebView() {
                                     if (d.result && d.result.uid) {
                                         console.log('[I-Link Nav] ✅ 재인증 성공! uid=' + d.result.uid + ' → 복귀 경로: ' + (window._iLinkTargetPath || '/odoo/time-off'));
                                         window._isReloggingIn = false;
-                                        const targetPath = window._iLinkTargetPath || sessionStorage.getItem('iLinkTargetPath') || '/odoo/time-off';
+                                        const targetPath = window._iLinkTargetPath || sessionStorage.getItem('iLinkTargetPath') || '/odoo/action-724';
                                         window.location.replace(targetPath);
                                     } else {
                                         console.log('[I-Link Nav] ❌ 재인증 실패: ' + JSON.stringify(d.error || {}));
@@ -113,7 +114,7 @@ export default function OdooWebView() {
                             console.log('[I-Link Nav] ⚠️ 유효하지 않은 액션 모달 감지됨! 자동 닫고 목표 페이지 재접속');
                             const okBtn = invalidModal.querySelector('.btn-primary, .btn-secondary, button');
                             if (okBtn) okBtn.click();
-                            const targetPath = window._iLinkTargetPath || sessionStorage.getItem('iLinkTargetPath') || '/odoo/time-off';
+                            const targetPath = window._iLinkTargetPath || sessionStorage.getItem('iLinkTargetPath') || '/odoo/action-724';
                             setTimeout(function() { window.location.replace(targetPath); }, 500);
                         }
                     }, 600);
@@ -205,13 +206,19 @@ export default function OdooWebView() {
             }
         };
 
+        const handleFinishLoad = () => {
+            setIsWebViewLoading(false);
+        };
+
         webview.addEventListener('console-message', handleConsoleMessage);
         webview.addEventListener('dom-ready', handleDomReady);
         webview.addEventListener('ipc-message', handleIpcMessage);
+        webview.addEventListener('did-finish-load', handleFinishLoad);
         return () => {
             webview.removeEventListener('console-message', handleConsoleMessage);
             webview.removeEventListener('dom-ready', handleDomReady);
             webview.removeEventListener('ipc-message', handleIpcMessage);
+            webview.removeEventListener('did-finish-load', handleFinishLoad);
         };
     }, []);
 
@@ -263,28 +270,14 @@ export default function OdooWebView() {
             }
         }
 
-        // 앱 시작 시 (location.pathname === '/') 무조건 '근태/휴가' 대시보드로 접속
+        // 앱 시작 시 (location.pathname === '/') 첫 화면을 근태/휴가 대시보드로 설정
         if (location.pathname === '/') {
-            if (globalOdooMenus.length > 0) {
-                const hrMenu = globalOdooMenus.find(m => 
-                    m.name && (
-                        m.name.includes('근태') || 
-                        m.name.includes('휴가') || 
-                        m.name.toLowerCase().includes('time off') || 
-                        m.name.toLowerCase().includes('attendance') ||
-                        m.name.toLowerCase().includes('leave')
-                    )
-                );
-                if (hrMenu) {
-                    return `${odooApiUrl}/web#menu_id=${hrMenu.menu_id}`;
-                }
-            }
-            // 근태/휴가 메뉴 ID 탐색 전이더라도 채팅창(Discuss)이 아닌 휴가 전용 액션 주소로 접속 보장!
-            return `${odooApiUrl}/web#action=hr_holidays.hr_leave_action_my`;
+            return `${odooApiUrl}/odoo/action-724`;
         }
 
-        // 지정되지 않은 기타 경로일 경우 채팅창 대신 Odoo 메인 웹으로 안전 이동
-        return `${odooApiUrl}/web#action=hr_holidays.hr_leave_action_my`;
+        // 지정되지 않은 기타 경로일 경우 Odoo 외부 화면(예: 전자결재, 설정 등 커스텀 React 화면)이므로 
+        // Odoo 내비게이션 처리를 무시하도록 null 반환
+        return null;
     };
 
     const isFirstRender = useRef(true);
@@ -292,6 +285,11 @@ export default function OdooWebView() {
     // 경로 변경 시 webview URL 이동 및 안전 메뉴 전환 (유효하지 않다 오류 방지)
     useEffect(() => {
         const targetUrl = getTargetUrl();
+        if (!targetUrl) {
+            console.log(`[OdooWebView] ⏸️ 비-Odoo 경로 감지, Odoo 웹뷰 상태 유지 (변경 없음)`);
+            return;
+        }
+        
         console.log(`[OdooWebView] 🔀 경로 변경 감지 | React 경로: ${location.pathname}${location.search} → 목표 URL: ${targetUrl}`);
         if (webviewRef.current && isElectron) {
             if (isFirstRender.current) {
@@ -331,19 +329,97 @@ export default function OdooWebView() {
                 if (currentUrl !== targetUrl) {
                     console.log(`[OdooWebView] 🚀 이동 시도 | ${currentUrl} → ${targetUrl}`);
                     const isNativeOdoo17Path = targetUrl.includes('/odoo/') && !targetUrl.includes('#');
+                    const targetOrigin = (() => { try { return new URL(targetUrl).origin; } catch(e) { return ''; } })();
+                    const currentOrigin = (() => { try { return new URL(currentUrl).origin; } catch(e) { return ''; } })();
                     
-                    if (currentBase === targetBase) {
+                    const isLoginPage = currentUrl.includes('/web/login');
+                    
+                    // SPA 모드를 사용할지 결정
+                    let shouldDoSpa = false;
+                    if (currentOrigin && currentOrigin === targetOrigin && !isLoginPage) {
+                        // 첫 클릭은 Odoo 내부 상태 꼬임을 방지하기 위해 무조건 풀 로드 진행
+                        if (window._isFirstOdooClick === undefined && targetUrl !== `${odooApiUrl}/web`) {
+                            window._isFirstOdooClick = false;
+                            shouldDoSpa = false;
+                            console.log(`[OdooWebView] 🌟 첫 메뉴 클릭 감지! 깔끔한 부팅을 위해 풀 로드 진행: ${targetUrl}`);
+                        } else {
+                            shouldDoSpa = true;
+                        }
+                    }
+                    
+                    if (shouldDoSpa) {
                         // 같은 도메인 내 이동인 경우 웹뷰 전체 새로고침(loadURL)을 피하고 Odoo SPA 내부 라우팅 유도
                         if (isNativeOdoo17Path) {
-                            console.log(`[OdooWebView] 🔄 SPA 네이티브 라우팅 (a 태그 클릭) | 경로: ${targetPathForStorage}`);
+                            console.log(`[OdooWebView] 🔄 SPA 네이티브 라우팅 시도 | 경로: ${targetPathForStorage}`);
                             webviewRef.current.executeJavaScript(`
                                 (function() {
-                                    var a = document.createElement('a');
-                                    a.href = '${targetPathForStorage}';
-                                    a.style.display = 'none';
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    setTimeout(function() { document.body.removeChild(a); }, 100);
+                                    var path = '${targetPathForStorage}';
+                                    
+                                    // 1. Odoo 19 Owl 환경 객체가 노출되어 있는 경우 직접 라우터 호출
+                                    try {
+                                        if (window.odoo && window.odoo.__DEBUG__ && window.odoo.__DEBUG__.services && window.odoo.__DEBUG__.services.router) {
+                                            window.odoo.__DEBUG__.services.router.pushState({ pathname: path });
+                                            return;
+                                        }
+                                        if (window.__owl__ && window.__owl__.env && window.__owl__.env.services && window.__owl__.env.services.router) {
+                                            window.__owl__.env.services.router.pushState({ pathname: path });
+                                            return;
+                                        }
+                                    } catch(e) {}
+
+                                    // 2. Odoo 19 화면 내에 존재하는 실제 네이티브 메뉴 a 태그를 찾아서 클릭 (Owl 라우터가 정상 감지하도록)
+                                    var existingLink = document.querySelector('a[href="' + path + '"]');
+                                    if (existingLink) {
+                                        ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(type => {
+                                            existingLink.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+                                        });
+                                        return;
+                                    }
+
+                                    // 3. Owl 라우터가 이벤트를 정상적으로 가로채는지 확인하고, 안 되면 재시도하는 강력한 로직
+                                    function trySpaNavigation() {
+                                        if (window.location.pathname === path) return;
+                                        
+                                        var existingLink = document.querySelector('a[href="' + path + '"]');
+                                        var a = existingLink || document.createElement('a');
+                                        
+                                        if (!existingLink) {
+                                            a.href = path;
+                                            a.style.opacity = '0';
+                                            a.style.position = 'absolute';
+                                            a.style.zIndex = '-9999';
+                                            document.body.appendChild(a);
+                                        }
+                                        
+                                        var owlHandled = false;
+                                        // window 객체에 이벤트를 달아야 Odoo 라우터(document)가 처리한 후의 상태를 확인 가능
+                                        var windowClickHandler = function(e) {
+                                            // 이벤트 타겟이 우리의 가짜 a 태그이거나 기존 메뉴 링크일 때
+                                            if (e.target === a || a.contains(e.target)) {
+                                                if (e.defaultPrevented) {
+                                                    owlHandled = true; // Odoo 라우터가 정상적으로 가로챔
+                                                } else {
+                                                    e.preventDefault(); // 라우터가 로딩 중이라 못 잡았다면 네이티브 새로고침 차단!
+                                                }
+                                            }
+                                        };
+                                        window.addEventListener('click', windowClickHandler);
+                                        
+                                        ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(type => {
+                                            a.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+                                        });
+                                        
+                                        window.removeEventListener('click', windowClickHandler);
+                                        if (!existingLink && a.parentNode) { a.parentNode.removeChild(a); }
+                                        
+                                        // Owl이 이벤트를 잡지 못했거나 URL이 안 바뀌었다면 아직 로딩 중이므로 0.5초 뒤 재시도
+                                        if (!owlHandled && window.location.pathname !== path) {
+                                            console.log('[I-Link Nav] ⏳ Odoo 라우터가 아직 준비되지 않음. 0.5초 후 재시도...');
+                                            setTimeout(trySpaNavigation, 500);
+                                        }
+                                    }
+                                    
+                                    trySpaNavigation();
                                 })();
                             `).catch(() => {});
                         } else if (hashPart) {
@@ -466,9 +542,11 @@ export default function OdooWebView() {
                 const webview = webviewRef.current;
                 if (!webview) return;
                 try {
-                    // 새 자격증명으로 로그인 (기존 세션 무단 destroy 파기 코드 삭제하여 끊김 방지)
+                    // 새 자격증명으로 로그인 (Race condition 방지를 위해 락 설정)
                     const uid = await webview.executeJavaScript(`
                         (async () => {
+                            if (window._isReloggingIn) return null;
+                            window._isReloggingIn = true;
                             try {
                                 const r = await fetch('/web/session/authenticate', {
                                     method: 'POST',
@@ -477,8 +555,12 @@ export default function OdooWebView() {
                                     body: JSON.stringify({ jsonrpc: '2.0', id: 1, params: { db: '${db}', login: '${login.replace(/'/g, "\\'")}', password: '${password.replace(/'/g, "\\'")}' } })
                                 });
                                 const d = await r.json();
+                                window._isReloggingIn = false;
                                 return d.result?.uid || null;
-                            } catch(err) { return null; }
+                            } catch(err) { 
+                                window._isReloggingIn = false;
+                                return null; 
+                            }
                         })()
                     `);
                     if (uid) {
@@ -495,13 +577,7 @@ export default function OdooWebView() {
                                 }));
                             } catch(e) {}
                         `).catch(() => {});
-                        let targetUrl = `${url}/web#action=hr_holidays.hr_leave_action_my`;
-                        if (globalOdooMenus && globalOdooMenus.length > 0) {
-                            const hrMenu = globalOdooMenus.find(m => m.name && (m.name.includes('근태') || m.name.includes('휴가') || m.name.toLowerCase().includes('time off')));
-                            if (hrMenu) {
-                                targetUrl = `${url}/web#menu_id=${hrMenu.menu_id}`;
-                            }
-                        }
+                        let targetUrl = `${url}/odoo/action-724`;
                         webview.loadURL(targetUrl).catch(() => {});
                         // 백그라운드 웹뷰(Layout.jsx)도 쿠키가 세팅된 상태로 /web을 다시 로드하도록 알림
                         window.dispatchEvent(new CustomEvent('odoo-session-ready'));
@@ -529,13 +605,7 @@ export default function OdooWebView() {
                 const webview = webviewRef.current;
                 if (!webview) return;
                 
-                let targetUrl = `${odooApiUrl}/web#action=hr_holidays.hr_leave_action_my`;
-                if (globalOdooMenus && globalOdooMenus.length > 0) {
-                    const hrMenu = globalOdooMenus.find(m => m.name && (m.name.includes('근태') || m.name.includes('휴가') || m.name.toLowerCase().includes('time off')));
-                    if (hrMenu) {
-                        targetUrl = `${odooApiUrl}/web#menu_id=${hrMenu.menu_id}`;
-                    }
-                }
+                let targetUrl = `${odooApiUrl}/odoo/action-724`;
                 
                 console.log('[OdooWebView] Google 로그인 감지 → Odoo 이동:', targetUrl);
                 webview.loadURL(targetUrl).catch(() => {});
@@ -1459,11 +1529,18 @@ export default function OdooWebView() {
     }
 
     return (
-        <div className="w-full h-full bg-white flex flex-col">
+        <div className="w-full h-full bg-white flex flex-col relative">
+            {isWebViewLoading && (
+                <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="w-12 h-12 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin mb-5 shadow-sm"></div>
+                    <h2 className="text-2xl font-black text-slate-800 mb-2 tracking-tight">환영합니다!</h2>
+                    <p className="text-slate-500 font-medium">Odoo 스마트 업무 환경을 준비하고 있습니다...</p>
+                </div>
+            )}
             <webview
                 ref={webviewRef}
                 src={`${odooApiUrl}/web`}
-                style={{ width: '100%', height: '100%', border: 'none' }}
+                style={{ width: '100%', height: '100%', border: 'none', opacity: isWebViewLoading ? 0 : 1, transition: 'opacity 0.3s ease-in-out' }}
                 allowpopups="true"
                 partition="persist:odoo"
                 webpreferences="contextIsolation=no"
