@@ -133,37 +133,35 @@ const ApprovalModal = ({ isOpen, onClose, poData, onSubmit }) => {
 
                 <form onSubmit={handleFormSubmit} className="flex-1 overflow-y-auto min-h-0 p-6 space-y-6">
                     {/* Basic Info Section - Compact Grid */}
-                    <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm border-b border-slate-100 pb-6">
-                        <div className="space-y-3">
-                            <div>
-                                <label className="text-[11px] font-bold text-slate-400 mb-1 block">기안 제목</label>
-                                <input type="text" value={draftData.Title} onChange={e => setFormData({...draftData, Title: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold outline-none focus:border-amber-500" required />
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-[11px] font-bold text-slate-400 mb-1 block">부서</label>
-                                    <input type="text" value={draftData.Department} readOnly className="w-full bg-slate-100 border border-slate-100 rounded-lg px-3 py-2 font-bold text-slate-500" />
-                                </div>
-                                <div>
-                                    <label className="text-[11px] font-bold text-slate-400 mb-1 block">보존 연한</label>
-                                    <select value={draftData.PreservationPeriod} onChange={e => setFormData({...draftData, PreservationPeriod: e.target.value})} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 font-bold outline-none">
-                                        <option>1년</option><option>3년</option><option>5년</option><option>10년</option>
-                                    </select>
-                                </div>
-                            </div>
+                    <div className="flex flex-col gap-y-2 text-xs border-b border-slate-100 pb-4">
+                        <div>
+                            <label className="text-[10px] font-bold text-slate-400 mb-0.5 block">기안 제목</label>
+                            <input type="text" value={draftData.Title} onChange={e => setFormData({...draftData, Title: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-md px-2 py-1.5 font-bold outline-none focus:border-amber-500" required />
                         </div>
-                        <div className="space-y-3">
-                            <div>
-                                <label className="text-[11px] font-bold text-amber-600 mb-1 block">결재권자 지정</label>
-                                <select value={selectedApprover} onChange={e => setSelectedApprover(e.target.value)} className="w-full bg-amber-50/30 border border-amber-200 rounded-lg px-3 py-2 font-bold outline-none focus:border-amber-500" required>
-                                    <option value="">결재자 선택...</option>
-                                    {approvers.map(a => <option key={a.id} value={a.id}>{a.displayName} ({a.role})</option>)}
-                                </select>
-                            </div>
-                            <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border border-slate-100">
-                                <Info size={14} className="text-slate-400"/>
-                                <p className="text-[11px] font-bold text-slate-500 leading-tight">승인 완료 시 자동으로 발주 시스템과 연동됩니다.</p>
-                            </div>
+                        <div>
+                            <label className="text-[10px] font-bold text-slate-400 mb-0.5 block">부서</label>
+                            <input type="text" value={draftData.Department} readOnly className="w-full bg-slate-100 border border-slate-100 rounded-md px-2 py-1.5 font-bold text-slate-500" />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-bold text-slate-400 mb-0.5 block">보존 연한</label>
+                            <select value={draftData.PreservationPeriod} onChange={e => setFormData({...draftData, PreservationPeriod: e.target.value})} className="w-full bg-white border border-slate-200 rounded-md px-2 py-1.5 font-bold outline-none">
+                                <option>1년</option><option>3년</option><option>5년</option><option>10년</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-bold text-slate-400 mb-0.5 block">기안 일자</label>
+                            <input type="text" value={draftData.DraftDate} readOnly className="w-full bg-slate-100 border border-slate-100 rounded-md px-2 py-1.5 font-bold text-slate-500" />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-bold text-amber-600 mb-0.5 block">결재권자 지정</label>
+                            <select value={selectedApprover} onChange={e => setSelectedApprover(e.target.value)} className="w-full bg-amber-50/30 border border-amber-200 rounded-md px-2 py-1.5 font-bold outline-none focus:border-amber-500" required>
+                                <option value="">결재자 선택...</option>
+                                {approvers.map(a => <option key={a.id} value={a.id}>{a.displayName} ({a.role})</option>)}
+                            </select>
+                        </div>
+                        <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-md border border-slate-100">
+                            <Info size={14} className="text-slate-400 shrink-0"/>
+                            <p className="text-[10px] font-bold text-slate-500 leading-tight">승인 완료 시 자동으로 발주 시스템과 연동됩니다.</p>
                         </div>
                     </div>
 

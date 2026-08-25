@@ -255,8 +255,8 @@ export class HrDashboard extends Component {
     }
 
     _onClickPendingApprovals() {
-        // 모달 팝업 대신 Odoo 기본 '관리 - 휴가' (결재 대기) 화면으로 이동
-        this.action.doAction('hr_holidays.hr_leave_action_action_approve_department');
+        // Odoo 기본 화면 대신 대시보드 내 모달 팝업을 열어서 나와 타인의 결재 대기를 모두 보여줌
+        this.state.pendingPanel.open = true;
     }
 
     _onClickClosePendingPanel() {

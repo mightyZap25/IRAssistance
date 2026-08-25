@@ -157,10 +157,10 @@ export default function SettingsPage() {
     });
 
     const [templateSettings, setTemplateSettings] = useState({
-        poEmailSubject: '[발주서] {PONumber} - I-Link (주)',
-        poEmailBody: '안녕하십니까, I-Link (주)입니다.\n아래와 같이 발주서를 송부드리오니 확인 후 납기 내 납품을 부탁드립니다.',
-        quotationEmailSubject: '[견적요청] {PartName} 외 - I-Link (주)',
-        quotationEmailBody: '안녕하십니까, I-Link (주)입니다.\n첨부된 항목에 대한 견적(단가 및 리드타임)을 회신 부탁드립니다.'
+        poEmailSubject: '[발주서] {PONumber} - mightyONE (주)',
+        poEmailBody: '안녕하십니까, mightyONE (주)입니다.\n아래와 같이 발주서를 송부드리오니 확인 후 납기 내 납품을 부탁드립니다.',
+        quotationEmailSubject: '[견적요청] {PartName} 외 - mightyONE (주)',
+        quotationEmailBody: '안녕하십니까, mightyONE (주)입니다.\n첨부된 항목에 대한 견적(단가 및 리드타임)을 회신 부탁드립니다.'
     });
 
     const [approvalSettings, setApprovalSettings] = useState({
@@ -451,7 +451,7 @@ export default function SettingsPage() {
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div className="space-y-1.5">
                                                     <label className="text-xs font-black text-slate-700">호스트 IP (Host)</label>
-                                                    <input type="text" value={dbSettings.local.host} onChange={e => setDbSettings({...dbSettings, local: {...dbSettings.local, host: e.target.value}})} placeholder="192.168.0.7" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500" required />
+                                                    <input type="text" value={dbSettings.local.host} onChange={e => setDbSettings({...dbSettings, local: {...dbSettings.local, host: e.target.value}})} placeholder="192.168.0.11" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500" required />
                                                 </div>
                                                 <div className="space-y-1.5">
                                                     <label className="text-xs font-black text-slate-700">포트 (Port)</label>
@@ -838,7 +838,7 @@ export default function SettingsPage() {
                             <div className="max-w-2xl animate-fade-in text-slate-800">
                                 <h2 className="text-lg font-black text-slate-900 mb-2">시스템 자동 업데이트 (GitHub Releases)</h2>
                                 <p className="text-sm text-slate-500 font-medium mb-6">
-                                    GitHub Releases를 연동하여 I-Link ERP 프로그램의 최신 버전을 검사하고 자동으로 설치합니다.
+                                    GitHub Releases를 연동하여 mightyONE ERP 프로그램의 최신 버전을 검사하고 자동으로 설치합니다.
                                 </p>
 
                                 <div className="border border-slate-200 rounded-2xl p-6 bg-slate-50 space-y-6 shadow-sm">

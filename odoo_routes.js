@@ -980,4 +980,79 @@ router.post('/leave/refuse', async (req, res) => {
     }
 });
 
+router.post('/approval/submit', async (req, res) => {
+    try {
+        const { formData, items, approvalSteps, currentUser, status } = req.body;
+        const odoo = await getOdooClient();
+
+        let doc_type = 'GENERAL';
+        if (formData.docType === '지출결의서') doc_type = 'EXPENSE_RESOLUTION';
+        else if (formData.docType === '설계변경서') doc_type = 'ECO';
+        else if (formData.docType === '양산이관서') doc_type = 'MASS_PROD_TRANSFER';
+
+        let retention_period = '5';
+        if (formData.retentionPeriod === '1년') retention_period = '1';
+        else if (formData.retentionPeriod === '3년') retention_period = '3';
+        else if (formData.retentionPeriod === '10년') retention_period = '10';
+        else if (formData.retentionPeriod === '영구') retention_period = 'permanent';
+
+        const vals = {
+            name: formData.title,
+            doc_type: doc_type,
+            retention_period: retention_period,
+            description: formData.content || '',
+            
+            // Expense
+            expense_user: formData.user || '',
+            expense_job_title: formData.position || '',
+            expense_dept: formData.department || '',
+            expense_vendor: formData.vendor || '',
+            expense_amount: formData.amount ? parseFloat(formData.amount) : 0.0,
+            expense_date: formData.issueDate || false,
+            
+            // ECO
+            eco_spec_no: formData.specNo || '',
+            eco_issue_date: formData.issueDate || false,
+            eco_applied_models_chk: formData.modelFamily || '',
+            eco_comm_method: formData.commMethod || '',
+            eco_applied_model_text: formData.appliedModels || '',
+            eco_spec_type: formData.specCategory === '임시' ? 'temp' : 'regular',
+            eco_change_reason: formData.changeReason || '',
+            eco_publish_change: formData.publicSpecChange === '변경 됨' ? 'yes' : 'no',
+            eco_publish_change_detail: formData.changeContent || '',
+            eco_improvement_effect: formData.improvementEffect || '',
+            eco_dept_opinion: formData.deptOpinion || '',
+            eco_revision_no: formData.revisionNo || '',
+            
+            // Transfer
+            transfer_no: formData.transferNo || '',
+            transfer_date: formData.issueDate || false,
+            transfer_product_family: formData.productFamily || '',
+            transfer_model: formData.transferModel || '',
+            transfer_detail_model: formData.detailModel || '',
+            transfer_folder_path: formData.folderPath || '',
+            transfer_dept_opinion: formData.deptOpinion || ''
+        };
+
+        // Format approval steps for Odoo One2many
+        if (approvalSteps && approvalSteps.length > 0) {
+            vals.step_ids = approvalSteps.map((step, index) => [0, 0, {
+                sequence: (index + 1) * 10,
+                approver_id: parseInt(step.id),
+                status: 'pending'
+            }]);
+        }
+
+        // Add lists if necessary (ECO, Transfer, etc) depending on type
+        // This is a simplified version; normally we map `items` to the respective line model
+
+        const record_ids = await odoo.execute_kw('ir_approval.request', 'create', [[vals]]);
+        
+        res.json({ success: true, id: record_ids[0] });
+    } catch (error) {
+        console.error('Approval submit error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 export default router;

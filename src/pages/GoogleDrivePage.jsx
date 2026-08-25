@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { ExternalLink, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import FindInPageBar from '../components/common/FindInPageBar';
 
 export default function GoogleDrivePage() {
     const { currentUser } = useAuth();
@@ -18,6 +19,9 @@ export default function GoogleDrivePage() {
         const handleNewWindow = (e) => {
             e.preventDefault();
             webview.loadURL(e.url);
+        };
+        const handleUpdateTargetUrl = (e) => {
+            // Can be used for link previews
         };
 
         const updateNavigationState = () => {
@@ -81,40 +85,7 @@ export default function GoogleDrivePage() {
     if (isElectron) {
         return (
             <div className="w-full h-screen flex flex-col bg-white overflow-hidden relative">
-                {/* Top Navigation Bar */}
-                <div className="h-11 border-b border-slate-200/80 bg-slate-50 px-4 flex items-center justify-between shrink-0 select-none">
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => {
-                                if (webviewRef.current?.canGoBack()) {
-                                    webviewRef.current.goBack();
-                                }
-                            }}
-                            disabled={!canGoBack}
-                            className={`p-1.5 rounded-lg border transition-all flex items-center justify-center gap-1 text-xs font-bold ${
-                                canGoBack
-                                    ? 'bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border-slate-200 active:scale-95 shadow-sm'
-                                    : 'bg-slate-100 text-slate-400 border-transparent cursor-not-allowed opacity-50'
-                            }`}
-                            title="뒤로 가기"
-                        >
-                            <ArrowLeft size={14} strokeWidth={2.5} />
-                            <span>뒤로 가기</span>
-                        </button>
-                        <div className="w-px h-4 bg-slate-200 mx-1" />
-                        <button
-                            onClick={() => webviewRef.current?.reload()}
-                            className="p-1.5 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border border-slate-200 rounded-lg text-xs font-bold active:scale-95 transition-all shadow-sm flex items-center justify-center"
-                            title="새로고침"
-                        >
-                            새로고침
-                        </button>
-                    </div>
-                    <div className="text-slate-400 text-[10px] font-black uppercase tracking-wider mr-2">
-                        Google Drive
-                    </div>
-                </div>
-
+                <FindInPageBar webviewRef={webviewRef} />
                 {/* Webview Area */}
                 <div className="flex-1 relative bg-white">
                     <webview 

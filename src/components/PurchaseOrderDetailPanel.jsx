@@ -256,7 +256,7 @@ export default function PurchaseOrderDetailPanel({ po, isOpen, onClose, onRefres
     const paymentInfo = PAYMENT_STATUS_INFO[po.PaymentStatus] || PAYMENT_STATUS_INFO.PENDING;
 
     const handleSendEmailDirect = () => {
-        const subject = encodeURIComponent(`[발주서] ${po.PONumber} - I-Link (주)`);
+        const subject = encodeURIComponent(`[발주서] ${po.PONumber} - mightyONE (주)`);
         
         let itemsText = items.map((it, idx) => {
             const revText = po.HideRevisionInEmail ? '' : `(Rev ${it.Rev || '1.0'})`;
@@ -266,7 +266,7 @@ export default function PurchaseOrderDetailPanel({ po, isOpen, onClose, onRefres
         const body = encodeURIComponent(`
 수신: ${po.VendorName} 담당자님
 
-안녕하십니까, I-Link (주)입니다.
+안녕하십니까, mightyONE (주)입니다.
 아래와 같이 발주서를 송부드리오니 확인 후 납기 내 납품을 부탁드립니다.
 
 --------------------------------------------------
@@ -283,7 +283,7 @@ ${itemsText}
 --------------------------------------------------
 
 감사합니다.
-I-Link (주) 드림
+mightyONE (주) 드림
         `);
         window.location.href = `mailto:?subject=${subject}&body=${body}`;
     };

@@ -10,10 +10,17 @@ const API_BASE = 'http://localhost:5050/api';
 // Mock Auth
 // ==========================================
 let currentUser = null;
+try {
+    const stored = localStorage.getItem('google_user_info');
+    if (stored) {
+        currentUser = JSON.parse(stored);
+    }
+} catch (e) {}
+
 let authListeners = [];
 
 export const mockAuth = {
-    currentUser: null,
+    currentUser,
     login: async () => {
         // 실제 로그인은 AuthContext에서 처리 (Google OAuth)
         return { user: currentUser };
@@ -21,6 +28,7 @@ export const mockAuth = {
     logout: async () => {
         currentUser = null;
         mockAuth.currentUser = null;
+        localStorage.removeItem('google_user_info');
         authListeners.forEach(cb => cb(null));
     },
     onAuthStateChanged: (cb) => {

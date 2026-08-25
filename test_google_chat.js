@@ -80,7 +80,7 @@ async function runTest() {
                 'Content-Type': 'application/json; charset=UTF-8'
             },
             body: JSON.stringify({
-                text: "🔔 [I-Link 연동 테스트] 구글 챗 API가 정상적으로 작동하고 있습니다!"
+                text: "🔔 [mightyONE 연동 테스트] 구글 챗 API가 정상적으로 작동하고 있습니다!"
             })
         });
 

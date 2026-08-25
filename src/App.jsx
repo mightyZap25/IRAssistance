@@ -21,6 +21,7 @@ import GeminiPage from './pages/GeminiPage'
 import NotesPage from './pages/NotesPage'
 import ApprovalPage from './pages/ApprovalPage'
 import AgentChatPage from './pages/AgentChatPage'
+import CompanyWebviewPage from './pages/CompanyWebviewPage'
 
 function PrivateRoute({ children, disableForOdoo }) {
     const { currentUser, isOdooOnlyAuth } = useAuth();
@@ -57,6 +58,8 @@ function AppContent() {
             ))}
 
             {/* 별도 유지하는 커스텀 React 화면들 (Google 통합 및 설정) */}
+            <Route path="/company/home" element={<PrivateRoute disableForOdoo={true}><Layout><CompanyWebviewPage url="https://www.mightyzap.com" title="회사 홈페이지" /></Layout></PrivateRoute>} />
+            <Route path="/company/manual" element={<PrivateRoute disableForOdoo={true}><Layout><CompanyWebviewPage url="https://mightyzap-emanual.netlify.app/" title="회사 기술 자료실" /></Layout></PrivateRoute>} />
             <Route path="/workspace/drive" element={<PrivateRoute disableForOdoo={true}><Layout><GoogleDrivePage /></Layout></PrivateRoute>} />
             <Route path="/workspace/calendar" element={<PrivateRoute disableForOdoo={true}><Layout><WorkspaceCalendarPage /></Layout></PrivateRoute>} />
             <Route path="/workspace/mail" element={<PrivateRoute disableForOdoo={true}><Layout><WorkspaceMailPage /></Layout></PrivateRoute>} />

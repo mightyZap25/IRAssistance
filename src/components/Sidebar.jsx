@@ -144,7 +144,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
     const isAllowed = (item) => {
         const path = item.path;
         if (item.isExternal) return true;
-        if (path === '/settings' || path === '/odoo/login' || path === '/odoo/logout') return true;
+        if (path === '/settings' || path === '/odoo/login' || path === '/odoo/logout' || path.startsWith('/company/')) return true;
 
         if (path.startsWith('/odoo/')) {
             // 특정 Odoo 메뉴들은 React 앱의 네이티브 권한 경로와 매핑하여 표시 여부 결정
@@ -195,6 +195,16 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
             title: '시스템 제어',
             items: [
                 { name: '환경설정(Admin)', path: '/settings', icon: Settings }
+            ]
+        }
+    ];
+
+    const COMPANY_MENU_GROUPS = [
+        {
+            title: '회사 관련 사이트',
+            items: [
+                { name: '회사 홈페이지', path: 'https://www.mightyzap.com', icon: Globe, isExternal: true },
+                { name: '회사 기술 자료실', path: '/company/manual', icon: BookOpen, isExternal: false }
             ]
         }
     ];
@@ -286,7 +296,8 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         'Project 관리': 'text-slate-500',
         '매뉴얼': 'text-blue-500',
         '구글 워크스페이스': 'text-blue-500',
-        '시스템 제어': 'text-slate-500'
+        '시스템 제어': 'text-slate-500',
+        '회사 관련 사이트': 'text-teal-500'
     };
 
     const ODOO_HIDDEN_MENUS = new Set([
@@ -392,6 +403,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
     const fOdoo = filterGroups(ODOO_DYNAMIC_GROUPS);
     const fCollab = isOdooOnlyAuth ? [] : filterGroups(COLLAB_MENU_GROUPS);
     const fAdmin = (isOdooOnlyAuth || currentUser?.email !== 'jogak@mightyzap.com') ? [] : filterGroups(ADMIN_GROUPS);
+    const fCompany = filterGroups(COMPANY_MENU_GROUPS);
 
     const roleInfo = {
         admin: { label: '최고관리자', color: 'bg-rose-500' },
@@ -426,7 +438,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                     <>
                         <div className="font-black text-xl text-slate-800 dark:text-slate-100 tracking-tight flex items-center gap-2 animate-fade-in">
                             <span className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold">IR</span>
-                            <span>I-Link</span>
+                            <span>mightyONE</span>
                         </div>
                         <button
                             onClick={toggleSidebar}
@@ -634,6 +646,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                 {[
                     { g: fOdoo, t: 'odoo', label: 'Odoo ERP' },
                     { g: fCollab, t: '구글 워크스페이스', label: '구글 워크스페이스' },
+                    { g: fCompany, t: 'company', label: '회사 관련 사이트' },
                     { g: fAdmin, t: '시스템 관리', label: '시스템 관리' }
                 ].map(sec => sec.g.length > 0 && (
                     <div key={sec.t} className={`w-full ${isCollapsed ? 'space-y-3 flex flex-col items-center' : 'space-y-2'}`}>
@@ -702,6 +715,9 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                                                     e.preventDefault();
                                                     handleOdooLink();
                                                 }
+                                                
+                                                // 사이드바 메뉴 클릭 시 해당 웹뷰를 초기화면으로 리셋하는 이벤트 발생
+                                                window.dispatchEvent(new CustomEvent('reset-webview', { detail: item.path }));
                                             };
 
                                             const content = (

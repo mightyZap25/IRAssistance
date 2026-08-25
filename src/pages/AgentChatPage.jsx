@@ -85,7 +85,7 @@ export default function AgentChatPage() {
                         <Sparkles size={20} />
                     </div>
                     <div>
-                        <h1 className="text-sm font-black text-slate-800 dark:text-slate-100">I-Link (RAG Agent)</h1>
+                        <h1 className="text-sm font-black text-slate-800 dark:text-slate-100">mightyONE (RAG Agent)</h1>
                         <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400">사내 데이터베이스 기반 AI 비서</p>
                     </div>
                 </div>

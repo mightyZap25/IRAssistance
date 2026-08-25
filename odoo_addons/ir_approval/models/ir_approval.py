@@ -9,7 +9,7 @@ class IrApprovalRequest(models.Model):
     name = fields.Char(string='기안서 제목', required=True, tracking=True)
     doc_type = fields.Selection([
         ('GENERAL', '일반 기안서(자유양식)'),
-        ('PURCHASE_REQUEST', '구매발주 기안'),
+        ('MASS_PROD_TRANSFER', '양산이관서'),
         ('EXPENSE_RESOLUTION', '지출결의서'),
         ('ECO', 'ECO 설계변경 기안'),
         ('ISSUE_REQUEST', '불출요청서'),
@@ -27,9 +27,15 @@ class IrApprovalRequest(models.Model):
         ('permanent', '영구')
     ], string='보존연한', default='5')
 
-    # [구매발주 전용 필드]
-    purchase_amount = fields.Float(string='총 예상 금액')
-    vendor_id = fields.Many2one('res.partner', string='협력사(거래처)')
+    # [양산이관서 전용 필드]
+    transfer_no = fields.Char(string='양산이관 번호')
+    transfer_date = fields.Date(string='발행일자', default=fields.Date.context_today)
+    transfer_product_family = fields.Char(string='제품군')
+    transfer_model = fields.Char(string='이관 모델(시리즈)')
+    transfer_detail_model = fields.Char(string='세부 모델명')
+    transfer_folder_path = fields.Char(string='양산이관 폴더 경로')
+    transfer_dept_opinion = fields.Text(string='발행부서 의견')
+    transfer_line_ids = fields.One2many('ir_approval.transfer.line', 'approval_id', string='양산이관 목록')
     
     # [지출결의서 전용 필드]
     expense_user = fields.Char(string='사용자')
@@ -88,6 +94,32 @@ class IrApprovalRequest(models.Model):
 
     step_ids = fields.One2many('ir_approval.step', 'approval_id', string='결재선')
     current_step_idx = fields.Integer(string='현재 결재 단계 인덱스', default=0)
+    is_my_turn = fields.Boolean(string='내 차례 여부', compute='_compute_is_my_turn', search='_search_is_my_turn')
+    my_turn_text = fields.Char(string='결재 알림', compute='_compute_is_my_turn')
+
+    @api.depends('status', 'current_step_idx', 'step_ids.approver_id')
+    def _compute_is_my_turn(self):
+        for record in self:
+            is_mine = False
+            idx = record.current_step_idx or 0
+            if record.status == 'pending' and record.step_ids and idx < len(record.step_ids):
+                current_step = record.step_ids[idx]
+                if current_step.approver_id == self.env.user:
+                    is_mine = True
+            record.is_my_turn = is_mine
+            record.my_turn_text = '내 차례' if is_mine else ''
+
+    def _search_is_my_turn(self, operator, value):
+        # ORM 검색 시 발생할 수 있는 모든 무한 루프(Recursion)를 원천 차단하기 위해 SQL 직접 조회
+        self.env.cr.execute("SELECT id FROM ir_approval_request WHERE status = 'pending'")
+        pending_ids = [row[0] for row in self.env.cr.fetchall()]
+        
+        records = self.browse(pending_ids)
+        my_turn_ids = [r.id for r in records if r.is_my_turn]
+        
+        if operator == '=' and value:
+            return [('id', 'in', my_turn_ids)]
+        return [('id', 'not in', my_turn_ids)]
 
     @api.depends('ref_model', 'ref_id')
     def _compute_ref_name(self):
@@ -100,6 +132,48 @@ class IrApprovalRequest(models.Model):
                     record.ref_name = '알 수 없음'
             else:
                 record.ref_name = ''
+
+    def write(self, vals):
+        # 시스템 필드 업데이트는 허용
+        allowed_fields = {'status', 'current_step_idx', 'message_follower_ids', 'message_ids', 'activity_ids', 'step_ids'}
+        if any(field not in allowed_fields for field in vals):
+            for record in self:
+                if record.status in ['pending', 'approved']:
+                    raise exceptions.UserError('결재 진행 중이거나 승인 완료된 문서는 수정할 수 없습니다.')
+        return super().write(vals)
+
+    def copy(self, default=None):
+        default = dict(default or {})
+        default.update({
+            'status': 'draft',
+            'current_step_idx': 0,
+        })
+        new_record = super().copy(default)
+        for step in new_record.step_ids:
+            step.write({'status': 'pending', 'comment': False})
+        return new_record
+
+    def action_draft(self):
+        for record in self:
+            if record.status != 'rejected':
+                raise exceptions.UserError('반려된 문서만 다시 임시저장으로 돌릴 수 있습니다.')
+            record.status = 'draft'
+            record.current_step_idx = 0
+            for step in record.step_ids:
+                step.write({'status': 'pending', 'comment': False})
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if not vals.get('step_ids'):
+                raise exceptions.UserError('결재선을 지정해야 문서를 저장할 수 있습니다.')
+                
+        records = super().create(vals_list)
+        for record in records:
+            # 결재자가 지정되어 있으면 저장 시 자동 상신 (저장=상신 통합)
+            if record.step_ids and record.status == 'draft':
+                record.action_submit()
+        return records
 
     def action_submit(self):
         for record in self:
@@ -120,6 +194,12 @@ class IrApprovalRequest(models.Model):
                     note=f'새로운 결재 문서 "{record.name}" 승인이 필요합니다.',
                     user_id=first_approver.id
                 )
+                self.env['bus.bus']._sendone(first_approver.partner_id, 'simple_notification', {
+                    'type': 'warning',
+                    'title': '결재 알림',
+                    'message': f'내 차례입니다: {record.name}',
+                    'sticky': True
+                })
 
     def action_approve(self):
         self.ensure_one()
@@ -165,6 +245,12 @@ class IrApprovalRequest(models.Model):
                     note=f'이전 결재자가 승인했습니다. "{self.name}" 문서 결재가 필요합니다.',
                     user_id=next_approver.id
                 )
+                self.env['bus.bus']._sendone(next_approver.partner_id, 'simple_notification', {
+                    'type': 'warning',
+                    'title': '결재 알림',
+                    'message': f'내 차례입니다: {self.name}',
+                    'sticky': True
+                })
 
     def action_reject(self):
         self.ensure_one()
@@ -251,4 +337,17 @@ class IrApprovalIssueLine(models.Model):
     quantity = fields.Float(string='수량')
     price_unit = fields.Float(string='공급가')
     price_subtotal = fields.Float(string='금액')
+    remarks = fields.Char(string='비고')
+
+
+class IrApprovalTransferLine(models.Model):
+    _name = 'ir_approval.transfer.line'
+    _description = '양산이관 리스트 내역'
+    _order = 'id'
+
+    approval_id = fields.Many2one('ir_approval.request', string='결재 문서', ondelete='cascade')
+    list_no = fields.Char(string='No.')
+    name = fields.Char(string='이관자료 목록', required=True)
+    version = fields.Char(string='Version')
+    transfer_finish_date = fields.Date(string='이관완료일자')
     remarks = fields.Char(string='비고')

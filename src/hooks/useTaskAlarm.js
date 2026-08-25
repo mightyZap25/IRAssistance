@@ -74,7 +74,7 @@ export function useTaskAlarm(currentUser) {
         
         // Electron 빌드 환경: IPC를 통해 main process에서 네이티브 알림 사용 (빌드 후에도 안정적)
         if (window.electronAPI?.showNotification) {
-            window.electronAPI.showNotification('I-Link: Task 알람', body);
+            window.electronAPI.showNotification('mightyONE: Task 알람', body);
             return;
         }
 
@@ -82,7 +82,7 @@ export function useTaskAlarm(currentUser) {
         if (!("Notification" in window)) return;
 
         const trigger = () => {
-            new Notification("I-Link: Task 알람", {
+            new Notification("mightyONE: Task 알람", {
                 body,
                 icon: '/favicon.ico'
             });

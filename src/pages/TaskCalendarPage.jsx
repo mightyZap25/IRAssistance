@@ -15,7 +15,7 @@ export default function TaskCalendarPage() {
                         <CalendarDays className="text-blue-600" /> 통합 일정 (Google Calendar)
                     </h1>
                     <p className="text-slate-500 text-sm mt-1.5 font-medium">
-                        I-Link ERP에서 동기화된 모든 일정이 구글 캘린더를 통해 안전하게 제공됩니다.
+                        mightyONE ERP에서 동기화된 모든 일정이 구글 캘린더를 통해 안전하게 제공됩니다.
                     </p>
                 </div>
                 <a 

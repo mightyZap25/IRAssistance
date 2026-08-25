@@ -1,0 +1,1870 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MINI 17Bb - CANopen Quick Controller</title>
+    <script src="./libs/tailwindcss.js"></script>
+    <script src="./libs/lucide.js"></script>
+    <script src="./libs/react.development.js"></script>
+    <script src="./libs/react-dom.development.js"></script>
+    <script src="./libs/babel.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            DEFAULT: '#4f46e5',
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            200: '#c7d2fe',
+                            300: '#a5b4fc',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#312e81',
+                            950: '#1e1b4b'
+                        },
+                        slate: {
+                            950: '#0a0f12',
+                            900: '#11181c',
+                            800: '#1c262b',
+                            700: '#2c3a42'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=JetBrains+Mono:wght@700&display=swap'); */
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #f8fafc;
+            color: #334155;
+            overflow-x: hidden;
+        }
+
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .shadow-glow-cyan {
+            box-shadow: 0 4px 14px 0 rgba(0, 118, 255, 0.39);
+        }
+
+        .shadow-glow-emerald {
+            box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.39);
+        }
+
+        .shadow-glow-rose {
+            box-shadow: 0 4px 14px 0 rgba(244, 63, 94, 0.39);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #2c3a42;
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #00d2ff;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex flex-col">
+    <!-- React Root Entry -->
+    <div id="root" class="flex-1 flex flex-col"></div>
+
+    <!-- Required JS resources to inline -->
+    <!-- Inlined: js/serial_manager.js -->
+    <!-- Inlined: js/protocol_canopen/slcan.js -->
+    <!-- Inlined: js/protocol_canopen/canopen_nmt.js -->
+    <!-- Inlined: js/protocol_canopen/canopen_sdo.js -->
+    <!-- Inlined: js/protocol_canopen/eds_parser.js -->
+
+    <!-- UI Logic in Babel -->
+
+    <script>
+        /* --- Inlined script: js/serial_manager.js --- */
+        class SerialManager {
+            constructor() {
+                this.port = null;
+                this.reader = null;
+                this.onDataReceived = null;
+                this.isConnected = false;
+                this._writeLock = Promise.resolve(); // Sequential write queue
+                this.responseTimeoutMs = 150; // Default response timeout
+            }
+
+            async requestPort() {
+                try {
+                    this.port = await navigator.serial.requestPort();
+                    return this.port;
+                } catch (err) {
+                    console.error("[SerialManager] Port request failed:", err);
+                    return null;
+                }
+            }
+
+            /**
+             * Connect to a port
+             * @param {number} baudRate 
+             * @param {SerialPort} port Optional port if already requested
+             */
+            async connect(baudRate = 57600, port = null) {
+                if (port) this.port = port;
+                if (!this.port) {
+                    console.log("[SerialManager] No port provided, requesting new port...");
+                    await this.requestPort();
+                }
+
+                if (!this.port) {
+                    console.error("[SerialManager] Cannot connect: No port available.");
+                    return false;
+                }
+
+                // If port is already open, just update state and return true
+                // But check if it's the SAME baudrate. If not, we might need to close/reopen.
+                // Web Serial API doesn't expose current baudrate easily, so we usually just trust our internal state.
+                if (this.isConnected && this.port.readable && this.port.writable) {
+                    console.log("[SerialManager] Port already open and active.");
+                    return true;
+                }
+
+                try {
+                    console.log(`[SerialManager] Opening port at ${baudRate} baud...`);
+                    await this.port.open({ baudRate });
+                    this.isConnected = true;
+                    this.startReading();
+                    return true;
+                } catch (err) {
+                    if (err.name === 'InvalidStateError') {
+                        console.warn("[SerialManager] Port is already open (InvalidStateError). Proceeding as connected.");
+                        this.isConnected = true;
+                        this.startReading();
+                        return true;
+                    }
+                    console.error("[SerialManager] Connection failed:", err);
+                    return false;
+                }
+            }
+
+            async updateBaudrate(baudRate) {
+                if (!this.port) return;
+                console.log(`[SerialManager] Updating baudrate to ${baudRate}...`);
+                this.isConnected = false;
+                if (this.reader) {
+                    await this.reader.cancel();
+                }
+                await this.port.close();
+                await this.port.open({ baudRate });
+                this.isConnected = true;
+                this.startReading();
+            }
+
+            async startReading() {
+                while (this.port?.readable && this.isConnected) {
+                    this.reader = this.port.readable.getReader();
+                    try {
+                        while (true) {
+                            const { value, done } = await this.reader.read();
+                            if (done) break;
+                            if (this.onDataReceived) {
+                                this.onDataReceived(value);
+                            }
+                        }
+                    } catch (error) {
+                        console.error("[SerialManager] Read error:", error);
+                        if (error.name === 'NetworkError') break;
+                    } finally {
+                        this.reader.releaseLock();
+                    }
+                }
+            }
+
+            /**
+             * Sequential write to the serial port
+             * @param {string|Uint8Array} data 
+             * @param {boolean} skipWait If true, don't set isAwaitingResponse flag
+             */
+            async write(data, skipWait = false) {
+                // Enforce sequential execution via promise chain
+                this._writeLock = this._writeLock.then(async () => {
+                    if (!this.port) {
+                        console.warn("[SerialManager] Write ignored: Port is null.");
+                        return;
+                    }
+                    if (!this.port.writable) {
+                        console.warn("[SerialManager] Write ignored: Port not writable (possibly closed).");
+                        return;
+                    }
+
+                    if (!skipWait) {
+                        this.isAwaitingResponse = true;
+                        // Safety timeout to release the lock in case of packet loss
+                        if (this.responseTimeout) clearTimeout(this.responseTimeout);
+                        this.responseTimeout = setTimeout(() => {
+                            this.isAwaitingResponse = false;
+                        }, this.responseTimeoutMs);
+                    } else {
+                        this.isAwaitingResponse = false;
+                        if (this.responseTimeout) clearTimeout(this.responseTimeout);
+                    }
+
+                    const writer = this.port.writable.getWriter();
+                    try {
+                        const buffer = (typeof data === 'string')
+                            ? new TextEncoder().encode(data)
+                            : new Uint8Array(data);
+
+                        await writer.write(buffer);
+                    } catch (err) {
+                        console.error("[SerialManager] Write failure:", err);
+                        throw err;
+                    } finally {
+                        writer.releaseLock();
+                    }
+                }).catch(err => {
+                    console.error("[SerialManager] Queue error during write:", err);
+                });
+
+                return this._writeLock;
+            }
+
+            async waitForResponse(timeout = 100) {
+                const start = Date.now();
+                while (this.isAwaitingResponse && Date.now() - start < timeout) {
+                    await new Promise(r => setTimeout(r, 2));
+                }
+                return !this.isAwaitingResponse;
+            }
+
+            async disconnect() {
+                console.log("[SerialManager] Disconnecting...");
+                this.isConnected = false;
+                if (this.reader) {
+                    await this.reader.cancel();
+                }
+                if (this.port) {
+                    try {
+                        await this.port.close();
+                    } catch (err) {
+                        console.warn("[SerialManager] Error during close:", err);
+                    }
+                }
+                this.port = null;
+            }
+        }
+
+        window.SerialManager = SerialManager;
+
+    </script>
+
+    <script>
+        /* --- Inlined script: js/protocol_canopen/slcan.js --- */
+        /**
+         * SLCAN Protocol implementation for Total Manager 2
+         * Handles ASCII-based CAN serialization protocol for USB-to-CAN adapters
+         */
+
+        class SLCANProtocol {
+            constructor() {
+                this.buffer = "";
+            }
+
+            /**
+             * Encode Open command
+             * @returns {string} "O\r"
+             */
+            encodeOpen() {
+                return "O\r";
+            }
+
+            /**
+             * Encode Close command
+             * @returns {string} "C\r"
+             */
+            encodeClose() {
+                return "C\r";
+            }
+
+            /**
+             * Encode Speed command
+             * @param {string|number} speed CAN Speed (e.g., '250k', 250, 'S5')
+             * @returns {string} "S<n>\r"
+             */
+            encodeSpeed(speed) {
+                const speedMap = {
+                    '10k': 'S0',
+                    '20k': 'S1',
+                    '50k': 'S2',
+                    '100k': 'S3',
+                    '125k': 'S4',
+                    '250k': 'S5',
+                    '500k': 'S6',
+                    '800k': 'S7',
+                    '1M': 'S8',
+                    '1000k': 'S8'
+                };
+
+                let code = 'S4'; // Default 125k
+                if (typeof speed === 'string' && speed.startsWith('S')) {
+                    code = speed;
+                } else {
+                    const lookUp = typeof speed === 'number' ? `${speed}k` : speed.toLowerCase();
+                    code = speedMap[lookUp] || 'S4';
+                }
+
+                return `${code}\r`;
+            }
+
+            /**
+             * Encode 11-bit standard CAN frame
+             * @param {number} id CAN ID (0x000 to 0x7FF)
+             * @param {number} dlc Data Length Code (0 to 8)
+             * @param {Array|Uint8Array} data Data bytes
+             * @returns {string} "t<ID3><DLC><DATA>\r"
+             */
+            encodeFrame(id, dlc, data) {
+                const idHex = id.toString(16).padStart(3, '0').toUpperCase();
+                const dlcHex = dlc.toString(16).toUpperCase();
+                let dataHex = "";
+                for (let i = 0; i < dlc; i++) {
+                    dataHex += (data[i] || 0).toString(16).padStart(2, '0').toUpperCase();
+                }
+                return `t${idHex}${dlcHex}${dataHex}\r`;
+            }
+
+            /**
+             * Encode 29-bit extended CAN frame
+             * @param {number} id CAN ID
+             * @param {number} dlc Data Length Code
+             * @param {Array|Uint8Array} data Data bytes
+             * @returns {string} "T<ID8><DLC><DATA>\r"
+             */
+            encodeFrameExt(id, dlc, data) {
+                const idHex = id.toString(16).padStart(8, '0').toUpperCase();
+                const dlcHex = dlc.toString(16).toUpperCase();
+                let dataHex = "";
+                for (let i = 0; i < dlc; i++) {
+                    dataHex += (data[i] || 0).toString(16).padStart(2, '0').toUpperCase();
+                }
+                return `T${idHex}${dlcHex}${dataHex}\r`;
+            }
+
+            /**
+             * Decode SLCAN ASCII frame string
+             * @param {string} asciiStr e.g., "t18184604100000000\r"
+             * @returns {object|null} { id, dlc, data, type, timestamp }
+             */
+            decodeFrame(asciiStr) {
+                const cmd = asciiStr.trim();
+                if (!cmd) return null;
+
+                const typeChar = cmd[0];
+                let id, dlc, dataStr, timestamp;
+
+                if (typeChar === 't') { // Standard 11-bit
+                    id = parseInt(cmd.substring(1, 4), 16);
+                    dlc = parseInt(cmd.substring(4, 5), 16);
+                    dataStr = cmd.substring(5, 5 + dlc * 2);
+                    // Handle timestamp if present (Z1 mode)
+                    if (cmd.length > 5 + dlc * 2) {
+                        timestamp = parseInt(cmd.substring(5 + dlc * 2), 16);
+                    }
+                } else if (typeChar === 'T') { // Extended 29-bit
+                    id = parseInt(cmd.substring(1, 9), 16);
+                    dlc = parseInt(cmd.substring(9, 10), 16);
+                    dataStr = cmd.substring(10, 10 + dlc * 2);
+                    if (cmd.length > 10 + dlc * 2) {
+                        timestamp = parseInt(cmd.substring(10 + dlc * 2), 16);
+                    }
+                } else if (typeChar === 'r' || typeChar === 'R') { // Remote frames
+                    // Not primary focus for now but can be added
+                    return { type: 'remote', raw: cmd };
+                } else {
+                    return { type: 'other', raw: cmd };
+                }
+
+                const data = new Uint8Array(dlc);
+                for (let i = 0; i < dlc; i++) {
+                    data[i] = parseInt(dataStr.substring(i * 2, i * 2 + 2), 16);
+                }
+
+                return {
+                    id,
+                    dlc,
+                    data,
+                    type: typeChar === 't' ? 'std' : 'ext',
+                    timestamp,
+                    raw: cmd
+                };
+            }
+
+            /**
+             * Parse stream of ASCII data and call callback for each complete frame
+             * @param {string} asciiChunk New data from serial
+             * @param {Function} onFrame Callback for each decoded frame
+             */
+            parseStream(asciiChunk, onFrame) {
+                this.buffer += asciiChunk;
+
+                // Frames are delimited by \r (CR)
+                let crIndex;
+                while ((crIndex = this.buffer.indexOf('\r')) !== -1) {
+                    const frameStr = this.buffer.substring(0, crIndex);
+                    this.buffer = this.buffer.substring(crIndex + 1);
+
+                    if (frameStr.length > 0) {
+                        const decoded = this.decodeFrame(frameStr);
+                        if (decoded && onFrame) {
+                            onFrame(decoded);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Export to window for global access in Total Manager 2
+        window.SLCANProtocol = SLCANProtocol;
+
+    </script>
+
+    <script>
+        /* --- Inlined script: js/protocol_canopen/canopen_nmt.js --- */
+        /**
+         * CANopen NMT (Network Management) implementation for Total Manager 2
+         * Handles Node states and Network Management commands
+         */
+
+        const NMT_STATE = {
+            BOOT: 0x00,
+            STOPPED: 0x04,
+            OPERATIONAL: 0x05,
+            PRE_OPERATIONAL: 0x7F,
+            UNKNOWN: 0xFF
+        };
+
+        const NMT_CMD = {
+            START: 0x01,
+            STOP: 0x02,
+            ENTER_PRE_OP: 0x80,
+            RESET_NODE: 0x81,
+            RESET_COMM: 0x82
+        };
+
+        class NMTStateManager {
+            constructor() {
+                this.nodes = new Map(); // nodeId -> { state, lastHb, hbTimeoutMs }
+                this.onStateChange = null;
+            }
+
+            /**
+             * Process an incoming CAN frame for NMT/Heartbeat
+             * @param {object} frame { id, dlc, data }
+             */
+            update(frame) {
+                // Heartbeat COB-ID is 0x700 + NodeID
+                if (frame.id >= 0x701 && frame.id <= 0x77F) {
+                    const nodeId = frame.id - 0x700;
+                    const state = frame.data[0];
+                    const now = Date.now();
+
+                    const prevState = this.nodes.has(nodeId) ? this.nodes.get(nodeId).state : null;
+
+                    this.nodes.set(nodeId, {
+                        state: state,
+                        lastHb: now,
+                        hbTimeoutMs: 2000 // Default 2s if not specified
+                    });
+
+                    if (prevState !== state && this.onStateChange) {
+                        this.onStateChange(nodeId, state, prevState);
+                    }
+                    return true;
+                }
+                return false;
+            }
+
+            /**
+             * Get human readable state name
+             * @param {number} state 
+             */
+            getStateName(state) {
+                for (const [name, val] of Object.entries(NMT_STATE)) {
+                    if (val === state) return name;
+                }
+                return "UNKNOWN";
+            }
+
+            /**
+             * Build NMT command frame
+             * @param {number} cmd NMT command from NMT_CMD
+             * @param {number} nodeId Node ID (0 for all)
+             * @returns {object} { id: 0, dlc: 2, data: [...] }
+             */
+            buildNmtCommand(cmd, nodeId) {
+                return {
+                    id: 0x000,
+                    dlc: 2,
+                    data: [cmd, nodeId]
+                };
+            }
+
+            /**
+             * Alias for buildNmtCommand to maintain compatibility with existing callers
+             */
+            buildFrame(cmd, nodeId) {
+                return this.buildNmtCommand(cmd, nodeId);
+            }
+
+            /**
+             * Check if a node is considered alive (HB received within timeout)
+             * @param {number} nodeId 
+             */
+            isAlive(nodeId) {
+                if (!this.nodes.has(nodeId)) return false;
+                const node = this.nodes.get(nodeId);
+                return (Date.now() - node.lastHb) < node.hbTimeoutMs;
+            }
+
+            /**
+             * Get status of all seen nodes
+             */
+            getAllNodes() {
+                const result = [];
+                for (const [id, info] of this.nodes) {
+                    result.push({
+                        nodeId: id,
+                        state: info.state,
+                        stateName: this.getStateName(info.state),
+                        isAlive: this.isAlive(id)
+                    });
+                }
+                return result;
+            }
+        }
+
+        // Export to window
+        window.CANopenNMT = {
+            NMT_STATE,
+            NMT_CMD,
+            NMTStateManager
+        };
+
+    </script>
+
+    <script>
+        /* --- Inlined script: js/protocol_canopen/canopen_sdo.js --- */
+        /**
+         * CANopen SDO (Service Data Object) implementation for Total Manager 2
+         * Handles Expedited SDO Upload and Download transfers
+         */
+
+        const SDO_CS = {
+            DOWNLOAD_REQ: 0x20, // Client -> Server: Download (Write)
+            DOWNLOAD_RESP: 0x60, // Server -> Client: Download Success
+            UPLOAD_REQ: 0x40, // Client -> Server: Upload (Read)
+            UPLOAD_RESP: 0x40, // Actually handled via bitmask
+            ABORT: 0x80
+        };
+
+        const SDO_ABORT_CODES = {
+            0x05030000: "Toggle bit not alternated",
+            0x05040001: "SDO protocol timed out",
+            0x06010000: "Object access not supported",
+            0x06010001: "Attempt to read a write only object",
+            0x06010002: "Attempt to write a read only object",
+            0x06020000: "Object does not exist in the object dictionary",
+            0x06040041: "Object cannot be mapped to the PDO",
+            0x06070010: "Data type does not match, length of service parameter does not match",
+            0x06090011: "Sub-index does not exist",
+            0x06090031: "Value range of parameter exceeded",
+            0x08000000: "General error",
+            0x08000020: "Data cannot be transferred or stored to the application",
+            0x08000021: "Data cannot be transferred or stored because of local control"
+        };
+
+        class SDOManager {
+            constructor(sendFrameCallback) {
+                this.sendFrame = sendFrameCallback;
+                this.pendingRequests = new Map(); // nodeId-index-sub -> { resolve, reject, timer }
+                this.defaultTimeout = 1000;
+            }
+
+            /**
+             * Build SDO Expedited Download (Write) frame
+             */
+            buildDownload(nodeId, index, sub, value, size = 4) {
+                // Command specifier for expedited download
+                // BIT 0: 1 (Expedited), BIT 1: 1 (Size indicated), BITS 2-3: (4 - size)
+                const n = 4 - size;
+                const cs = 0x23 | (n << 2);
+
+                const data = new Uint8Array(8);
+                data[0] = cs;
+                data[1] = index & 0xFF;
+                data[2] = (index >> 8) & 0xFF;
+                data[3] = sub;
+
+                // Value (Little Endian)
+                data[4] = value & 0xFF;
+                data[5] = (value >> 8) & 0xFF;
+                data[6] = (value >> 16) & 0xFF;
+                data[7] = (value >> 24) & 0xFF;
+
+                return { id: 0x600 + nodeId, dlc: 8, data };
+            }
+
+            /**
+             * Build SDO Upload (Read) request frame
+             */
+            buildUpload(nodeId, index, sub) {
+                const data = new Uint8Array(8);
+                data[0] = 0x40; // Initiate Upload Request
+                data[1] = index & 0xFF;
+                data[2] = (index >> 8) & 0xFF;
+                data[3] = sub;
+                // Remaining bytes 4-7 are 0
+
+                return { id: 0x600 + nodeId, dlc: 8, data };
+            }
+
+            /**
+             * Process incoming SDO response
+             */
+            handleResponse(frame) {
+                if (frame.id < 0x581 || frame.id > 0x5FF) return false;
+
+                const nodeId = frame.id - 0x580;
+                const cs = frame.data[0];
+                const index = frame.data[1] | (frame.data[2] << 8);
+                const sub = frame.data[3];
+                const key = `${nodeId}-${index}-${sub}`;
+
+                const req = this.pendingRequests.get(key);
+                if (!req) {
+                    console.warn(`[SDO] No pending request matches response: Node ${nodeId}, Index 0x${index.toString(16)}, Sub ${sub}. Current pending keys:`, Array.from(this.pendingRequests.keys()));
+                    return false;
+                }
+
+                clearTimeout(req.timer);
+                this.pendingRequests.delete(key);
+
+                const scs = cs & 0xE0; // Server command specifier bits 5,6,7
+
+                if (scs === 0x80) { // Abort
+                    const abortCode = frame.data[4] | (frame.data[5] << 8) | (frame.data[6] << 16) | (frame.data[7] << 24);
+                    const msg = SDO_ABORT_CODES[abortCode] || `Unknown Abort (0x${abortCode.toString(16)})`;
+                    req.reject(new Error(msg));
+                } else if (scs === 0x40) { // Upload (Read) Success
+                    // Expedited?
+                    const isExpedited = (cs & 0x02) !== 0;
+                    if (isExpedited) {
+                        const n = (cs >> 2) & 0x03;
+                        const size = 4 - n;
+                        let val = 0;
+                        for (let i = 0; i < size; i++) {
+                            val |= (frame.data[4 + i] << (i * 8));
+                        }
+                        // Handle signed int if needed based on external context, 
+                        // but here we return raw unsigned.
+                        req.resolve(val);
+                    } else {
+                        // Segmented upload - not implemented for simple param tuning
+                        req.reject(new Error("Segmented SDO not supported yet"));
+                    }
+                } else if (scs === 0x60) { // Download (Write) Success
+                    req.resolve(true);
+                } else {
+                    req.reject(new Error(`Unexpected SDO SCS: 0x${scs.toString(16)}`));
+                }
+
+                return true;
+            }
+
+            /**
+             * Send SDO Read (Upload) Request
+             */
+            upload(nodeId, index, sub, timeout) {
+                const key = `${nodeId}-${index}-${sub}`;
+                return new Promise((resolve, reject) => {
+                    if (this.pendingRequests.has(key)) {
+                        return reject(new Error("Request already pending for this object"));
+                    }
+
+                    const frame = this.buildUpload(nodeId, index, sub);
+                    const timer = setTimeout(() => {
+                        this.pendingRequests.delete(key);
+                        reject(new Error(`SDO Read Timeout (0x${index.toString(16)}:${sub})`));
+                    }, timeout || this.defaultTimeout);
+
+                    this.pendingRequests.set(key, { resolve, reject, timer });
+                    this.sendFrame(frame);
+                });
+            }
+
+            /**
+             * Send SDO Write (Download) Request
+             */
+            download(nodeId, index, sub, value, size = 4, timeout) {
+                const key = `${nodeId}-${index}-${sub}`;
+                return new Promise((resolve, reject) => {
+                    if (this.pendingRequests.has(key)) {
+                        return reject(new Error("Request already pending"));
+                    }
+
+                    const frame = this.buildDownload(nodeId, index, sub, value, size);
+                    const timer = setTimeout(() => {
+                        this.pendingRequests.delete(key);
+                        reject(new Error(`SDO Write Timeout (0x${index.toString(16)}:${sub})`));
+                    }, timeout || this.defaultTimeout);
+
+                    this.pendingRequests.set(key, { resolve, reject, timer });
+                    this.sendFrame(frame);
+                });
+            }
+        }
+
+        // Export to window
+        window.CANopenSDO = {
+            SDO_CS,
+            SDO_ABORT_CODES,
+            SDOManager
+        };
+
+    </script>
+
+    <script>
+        /* --- Inlined script: js/protocol_canopen/eds_parser.js --- */
+        /**
+         * CANopen EDS (Electronic Data Sheet) Parser for Total Manager 2
+         * Parses .eds files to extract Object Dictionary and Default Mappings
+         */
+
+        class EDSParser {
+            constructor() {
+                this.sections = {}; // sectionName -> { key: value }
+            }
+
+            /**
+             * Parse EDS flat text content
+             * @param {string} content 
+             */
+            parse(content) {
+                this.sections = {};
+                this.objects = new Map(); // index:sub -> { name, dataType, defaultValue, access, ... }
+                if (!content) return this.sections;
+
+                // Strip UTF-8 BOM if present (\xEF\xBB\xBF) or non-printable prefix
+                const cleanContent = content.replace(/^\uFEFF/, '').replace(/^[^\x20-\x7E\[]*/, '');
+                const lines = cleanContent.split(/\r?\n|\r/);
+                let currentSection = null;
+
+                console.log(`[EDS Parser] Starting. Content length: ${content.length}, Processed Lines: ${lines.length}`);
+
+                for (let i = 0; i < lines.length; i++) {
+                    let line = lines[i].trim();
+                    if (!line || line.startsWith(';')) continue;
+
+                    // Handle [Section]
+                    const sectionMatch = line.match(/^\[\s*([^\];]+?)\s*\]/);
+                    if (sectionMatch) {
+                        currentSection = sectionMatch[1].trim();
+                        if (!this.sections[currentSection]) {
+                            this.sections[currentSection] = {};
+                        }
+                    } else if (currentSection && line.indexOf('=') !== -1) {
+                        const eqIdx = line.indexOf('=');
+                        const key = line.substring(0, eqIdx).trim();
+                        const valueText = line.substring(eqIdx + 1).split(';')[0];
+                        const value = valueText ? valueText.trim() : "";
+                        this.sections[currentSection][key] = value;
+                    }
+                }
+
+                // Post-process sections to populate objects Map
+                // Standard OD indexes are 0x1000 - 0x9FFF
+                for (const [sectionName, info] of Object.entries(this.sections)) {
+                    const match = sectionName.match(/^([0-9A-F]{4})(?:sub([0-9A-F]+))?$/i);
+                    if (match) {
+                        const index = match[1].toUpperCase();
+                        const sub = match[2] ? parseInt(match[2], 16).toString() : "0";
+                        const key = `0x${index}:${sub}`;
+
+                        this.objects.set(key, {
+                            index: parseInt(index, 16),
+                            sub: parseInt(sub),
+                            name: info.ParameterName || info.ObjectName || `Obj_0x${index}_${sub}`,
+                            dataType: info.DataType ? (info.DataType.startsWith('0x') ? parseInt(info.DataType, 16) : parseInt(info.DataType)) : 0,
+                            defaultValue: info.DefaultValue || info.LowLimit || "0",
+                            lowLimit: info.LowLimit !== undefined ? (info.LowLimit.startsWith('0x') ? parseInt(info.LowLimit, 16) : parseInt(info.LowLimit)) : null,
+                            highLimit: info.HighLimit !== undefined ? (info.HighLimit.startsWith('0x') ? parseInt(info.HighLimit, 16) : parseInt(info.HighLimit)) : null,
+                            access: (info.AccessType || 'RW').toUpperCase(),
+                            pdoMapping: info.PDOMapping !== undefined ? parseInt(info.PDOMapping) : 0
+                        });
+                    }
+                }
+
+                const count = Object.keys(this.sections).length;
+                const objCount = this.objects.size;
+                console.log(`[EDS Parser] Finished. Total Sections: ${count}, Total Objects: ${objCount}`);
+                return this.sections;
+            }
+
+            /**
+             * Get object info by index and sub-index
+             */
+            getObjectInfo(indexHex, subIndexHex = "0") {
+                const sectionName = indexHex.toUpperCase() + (subIndexHex !== "0" ? "sub" + subIndexHex : "");
+                return this.sections[sectionName];
+            }
+
+            /**
+             * Get Device Information
+             */
+            getDeviceInfo() {
+                const info = this.sections["DeviceInfo"] || {};
+                const vendor = this.sections["Vendor"] || {};
+                return {
+                    vendorName: vendor.VendorName || info.VendorName || '-',
+                    productName: info.ProductName || '-',
+                    orderCode: info.OrderCode || '-',
+                    revisionNumber: info.RevisionNumber || '-'
+                };
+            }
+        }
+
+        // Export to window
+        window.CANopenEDSParser = EDSParser;
+
+    </script>
+
+    <script>
+        /* --- Inlined EDS File Content --- */
+        window.EDS_17Bb_CONTENT = "[FileInfo]\r\nFileName=17Bb.eds\r\nFileVersion=1\r\nFileRevision=1\r\nLastEDS=\r\nEDSVersion=4.0\r\nDescription=\r\nCreationTime=3:42PM\r\nCreationDate=07-11-2025\r\nCreatedBy=\r\nModificationTime=1:00PM\r\nModificationDate=01-08-2026\r\nModifiedBy=\r\n\r\n[DeviceInfo]\r\nVendorName=123\r\nVendorNumber=123\r\nProductName=New Product\r\nProductNumber=123\r\nRevisionNumber=0\r\nBaudRate_10=1\r\nBaudRate_20=1\r\nBaudRate_50=1\r\nBaudRate_125=1\r\nBaudRate_250=1\r\nBaudRate_500=1\r\nBaudRate_800=1\r\nBaudRate_1000=1\r\nSimpleBootUpMaster=0\r\nSimpleBootUpSlave=0\r\nGranularity=8\r\nDynamicChannelsSupported=0\r\nCompactPDO=0\r\nGroupMessaging=0\r\nNrOfRXPDO=1\r\nNrOfTXPDO=1\r\nLSS_Supported=1\r\nNG_Slave=0\r\n\r\n[DummyUsage]\r\nDummy0001=0\r\nDummy0002=0\r\nDummy0003=0\r\nDummy0004=0\r\nDummy0005=0\r\nDummy0006=0\r\nDummy0007=0\r\n\r\n[Comments]\r\nLines=0\r\n\r\n[MandatoryObjects]\r\nSupportedObjects=3\r\n1=0x1000\r\n2=0x1001\r\n3=0x1018\r\n\r\n[1000]\r\nParameterName=Device type\r\nObjectType=0x7\r\n;StorageLocation=PERSIST_COMM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1001]\r\nParameterName=Error register\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0005\r\nAccessType=ro\r\nDefaultValue=0x00\r\nPDOMapping=1\r\n\r\n[1018]\r\nParameterName=Identity\r\nObjectType=0x9\r\n;StorageLocation=PERSIST_COMM\r\nSubNumber=0x5\r\n\r\n[1018sub0]\r\nParameterName=Highest sub-index supported\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0005\r\nAccessType=ro\r\nDefaultValue=0x04\r\nPDOMapping=0\r\n\r\n[1018sub1]\r\nParameterName=Vendor-ID\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1018sub2]\r\nParameterName=Product code\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1018sub3]\r\nParameterName=Revision number\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1018sub4]\r\nParameterName=Serial number\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[OptionalObjects]\r\nSupportedObjects=55\r\n1=0x1003\r\n2=0x1005\r\n3=0x1006\r\n4=0x1007\r\n5=0x1010\r\n6=0x1011\r\n7=0x1012\r\n8=0x1014\r\n9=0x1015\r\n10=0x1016\r\n11=0x1017\r\n12=0x1019\r\n13=0x1200\r\n14=0x1280\r\n15=0x1400\r\n16=0x1600\r\n17=0x1800\r\n18=0x1A00\r\n19=0x603F\r\n20=0x6040\r\n21=0x6041\r\n22=0x605A\r\n23=0x605B\r\n24=0x605C\r\n25=0x605D\r\n26=0x605E\r\n27=0x6060\r\n28=0x6061\r\n29=0x6062\r\n30=0x6063\r\n31=0x6064\r\n32=0x6065\r\n33=0x6066\r\n34=0x6067\r\n35=0x6068\r\n36=0x606C\r\n37=0x6072\r\n38=0x6073\r\n39=0x6076\r\n40=0x6077\r\n41=0x6078\r\n42=0x6079\r\n43=0x607A\r\n44=0x607D\r\n45=0x607F\r\n46=0x6080\r\n47=0x6081\r\n48=0x6083\r\n49=0x6084\r\n50=0x6085\r\n51=0x60F4\r\n52=0x60FC\r\n53=0x60FD\r\n54=0x60FE\r\n55=0x6502\r\n\r\n[1003]\r\nParameterName=Pre-defined error field\r\nObjectType=0x8\r\n;StorageLocation=RAM\r\nSubNumber=0x11\r\n\r\n[1003sub0]\r\nParameterName=Number of errors\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0005\r\nAccessType=rw\r\nDefaultValue=\r\nPDOMapping=0\r\n\r\n[1003sub1]\r\nParameterName=Standard error field\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=\r\nPDOMapping=0\r\n\r\n[1003sub2]\r\nParameterName=Standard error field\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=\r\nPDOMapping=0\r\n\r\n[1003sub3]\r\nParameterName=Standard error field\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=\r\nPDOMapping=0\r\n\r\n[1003sub4]\r\nParameterName=Standard error field\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=\r\nPDOMapping=0\r\n\r\n[1003sub5]\r\nParameterName=Standard error field\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=\r\nPDOMapping=0\r\n\r\n[1003sub6]\r\nParameterName=Standard error field\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=\r\nPDOMapping=0\r\n\r\n[1003sub7]\r\nParameterName=Standard error field\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=\r\nPDOMapping=0\r\n\r\n[1003sub8]\r\nParameterName=Standard error field\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=\r\nPDOMapping=0\r\n\r\n[1003sub9]\r\nParameterName=Standard error field\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=\r\nPDOMapping=0\r\n\r\n[1003subA]\r\nParameterName=Standard error field\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=\r\nPDOMapping=0\r\n\r\n[1003subB]\r\nParameterName=Standard error field\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=\r\nPDOMapping=0\r\n\r\n[1003subC]\r\nParameterName=Standard error field\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=\r\nPDOMapping=0\r\n\r\n[1003subD]\r\nParameterName=Standard error field\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=\r\nPDOMapping=0\r\n\r\n[1003subE]\r\nParameterName=Standard error field\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=\r\nPDOMapping=0\r\n\r\n[1003subF]\r\nParameterName=Standard error field\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=\r\nPDOMapping=0\r\n\r\n[1003sub10]\r\nParameterName=Standard error field\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=\r\nPDOMapping=0\r\n\r\n[1005]\r\nParameterName=COB-ID SYNC message\r\nObjectType=0x7\r\n;StorageLocation=PERSIST_COMM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000080\r\nPDOMapping=0\r\n\r\n[1006]\r\nParameterName=Communication cycle period\r\nObjectType=0x7\r\n;StorageLocation=PERSIST_COMM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[1007]\r\nParameterName=Synchronous window length\r\nObjectType=0x7\r\n;StorageLocation=PERSIST_COMM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[1010]\r\nParameterName=Store parameters\r\nObjectType=0x8\r\n;StorageLocation=RAM\r\nSubNumber=0x5\r\n\r\n[1010sub0]\r\nParameterName=Highest sub-index supported\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0005\r\nAccessType=ro\r\nDefaultValue=0x04\r\nPDOMapping=0\r\n\r\n[1010sub1]\r\nParameterName=Save all parameters\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000001\r\nPDOMapping=0\r\n\r\n[1010sub2]\r\nParameterName=Save communication parameters\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000001\r\nPDOMapping=0\r\n\r\n[1010sub3]\r\nParameterName=Save application parameters\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000001\r\nPDOMapping=0\r\n\r\n[1010sub4]\r\nParameterName=Save manufacturer defined parameters\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000001\r\nPDOMapping=0\r\n\r\n[1011]\r\nParameterName=Restore default parameters\r\nObjectType=0x8\r\n;StorageLocation=RAM\r\nSubNumber=0x5\r\n\r\n[1011sub0]\r\nParameterName=Highest sub-index supported\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0005\r\nAccessType=ro\r\nDefaultValue=0x04\r\nPDOMapping=0\r\n\r\n[1011sub1]\r\nParameterName=Restore all default parameters\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000001\r\nPDOMapping=0\r\n\r\n[1011sub2]\r\nParameterName=Restore communication default parameters\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000001\r\nPDOMapping=0\r\n\r\n[1011sub3]\r\nParameterName=Restore application default parameters\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000001\r\nPDOMapping=0\r\n\r\n[1011sub4]\r\nParameterName=Restore manufacturer defined default parameters\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000001\r\nPDOMapping=0\r\n\r\n[1012]\r\nParameterName=COB-ID time stamp object\r\nObjectType=0x7\r\n;StorageLocation=PERSIST_COMM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000100\r\nPDOMapping=0\r\n\r\n[1014]\r\nParameterName=COB-ID EMCY\r\nObjectType=0x7\r\n;StorageLocation=PERSIST_COMM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=$NODEID+0x80\r\nPDOMapping=0\r\n\r\n[1015]\r\nParameterName=Inhibit time EMCY\r\nObjectType=0x7\r\n;StorageLocation=PERSIST_COMM\r\nDataType=0x0006\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[1016]\r\nParameterName=Consumer heartbeat time\r\nObjectType=0x8\r\n;StorageLocation=PERSIST_COMM\r\nSubNumber=0x9\r\n\r\n[1016sub0]\r\nParameterName=Highest sub-index supported\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0005\r\nAccessType=ro\r\nDefaultValue=0x08\r\nPDOMapping=0\r\n\r\n[1016sub1]\r\nParameterName=Consumer heartbeat time\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1016sub2]\r\nParameterName=Consumer heartbeat time\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1016sub3]\r\nParameterName=Consumer heartbeat time\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1016sub4]\r\nParameterName=Consumer heartbeat time\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1016sub5]\r\nParameterName=Consumer heartbeat time\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1016sub6]\r\nParameterName=Consumer heartbeat time\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1016sub7]\r\nParameterName=Consumer heartbeat time\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1016sub8]\r\nParameterName=Consumer heartbeat time\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1017]\r\nParameterName=Producer heartbeat time\r\nObjectType=0x7\r\n;StorageLocation=PERSIST_COMM\r\nDataType=0x0006\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[1019]\r\nParameterName=Synchronous counter overflow value\r\nObjectType=0x7\r\n;StorageLocation=PERSIST_COMM\r\nDataType=0x0005\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[1200]\r\nParameterName=SDO server parameter\r\nObjectType=0x9\r\n;StorageLocation=RAM\r\nSubNumber=0x3\r\n\r\n[1200sub0]\r\nParameterName=Highest sub-index supported\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0005\r\nAccessType=ro\r\nDefaultValue=2\r\nPDOMapping=0\r\n\r\n[1200sub1]\r\nParameterName=COB-ID client to server (rx)\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=$NODEID+0x600\r\nPDOMapping=1\r\n\r\n[1200sub2]\r\nParameterName=COB-ID server to client (tx)\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=$NODEID+0x580\r\nPDOMapping=1\r\n\r\n[1280]\r\nParameterName=SDO client parameter\r\nObjectType=0x9\r\n;StorageLocation=PERSIST_COMM\r\nSubNumber=0x4\r\n\r\n[1280sub0]\r\nParameterName=Highest sub-index supported\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0005\r\nAccessType=ro\r\nDefaultValue=0x03\r\nPDOMapping=0\r\n\r\n[1280sub1]\r\nParameterName=COB-ID client to server (tx)\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x80000000\r\nPDOMapping=1\r\n\r\n[1280sub2]\r\nParameterName=COB-ID server to client (rx)\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x80000000\r\nPDOMapping=1\r\n\r\n[1280sub3]\r\nParameterName=Node-ID of the SDO server\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0005\r\nAccessType=rw\r\nDefaultValue=0x01\r\nPDOMapping=0\r\n\r\n[1400]\r\nParameterName=RPDO communication parameter\r\nObjectType=0x9\r\n;StorageLocation=PERSIST_COMM\r\nSubNumber=0x4\r\n\r\n[1400sub0]\r\nParameterName=Highest sub-index supported\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0005\r\nAccessType=ro\r\nDefaultValue=0x05\r\nPDOMapping=0\r\n\r\n[1400sub1]\r\nParameterName=COB-ID used by RPDO\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=$NODEID+0x80000200\r\nPDOMapping=0\r\n\r\n[1400sub2]\r\nParameterName=Transmission type\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0005\r\nAccessType=rw\r\nDefaultValue=254\r\nPDOMapping=0\r\n\r\n[1400sub5]\r\nParameterName=Event timer\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0006\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[1600]\r\nParameterName=RPDO mapping parameter\r\nObjectType=0x9\r\n;StorageLocation=PERSIST_COMM\r\nSubNumber=0x9\r\n\r\n[1600sub0]\r\nParameterName=Number of mapped application objects in PDO\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0005\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[1600sub1]\r\nParameterName=Application object 1\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1600sub2]\r\nParameterName=Application object 2\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1600sub3]\r\nParameterName=Application object 3\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1600sub4]\r\nParameterName=Application object 4\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1600sub5]\r\nParameterName=Application object 5\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1600sub6]\r\nParameterName=Application object 6\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1600sub7]\r\nParameterName=Application object 7\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1600sub8]\r\nParameterName=Application object 8\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1800]\r\nParameterName=TPDO communication parameter\r\nObjectType=0x9\r\n;StorageLocation=PERSIST_COMM\r\nSubNumber=0x6\r\n\r\n[1800sub0]\r\nParameterName=Highest sub-index supported\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0005\r\nAccessType=ro\r\nDefaultValue=0x06\r\nPDOMapping=0\r\n\r\n[1800sub1]\r\nParameterName=COB-ID used by TPDO\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=$NODEID+0xC0000180\r\nPDOMapping=0\r\n\r\n[1800sub2]\r\nParameterName=Transmission type\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0005\r\nAccessType=rw\r\nDefaultValue=254\r\nPDOMapping=0\r\n\r\n[1800sub3]\r\nParameterName=Inhibit time\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0006\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[1800sub5]\r\nParameterName=Event timer\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0006\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[1800sub6]\r\nParameterName=SYNC start value\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0005\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[1A00]\r\nParameterName=TPDO mapping parameter\r\nObjectType=0x9\r\n;StorageLocation=PERSIST_COMM\r\nSubNumber=0x9\r\n\r\n[1A00sub0]\r\nParameterName=Number of mapped application objects in PDO\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0005\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[1A00sub1]\r\nParameterName=Application object 1\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1A00sub2]\r\nParameterName=Application object 2\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1A00sub3]\r\nParameterName=Application object 3\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1A00sub4]\r\nParameterName=Application object 4\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1A00sub5]\r\nParameterName=Application object 5\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1A00sub6]\r\nParameterName=Application object 6\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1A00sub7]\r\nParameterName=Application object 7\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[1A00sub8]\r\nParameterName=Application object 8\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x00000000\r\nPDOMapping=0\r\n\r\n[603F]\r\nParameterName=Error_code\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0006\r\nAccessType=ro\r\nDefaultValue=0x0\r\nPDOMapping=1\r\n\r\n[6040]\r\nParameterName=Controlword\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0006\r\nAccessType=rw\r\nHighLimit=0\r\nLowLimit=0xffff\r\nDefaultValue=0x0\r\nPDOMapping=1\r\n\r\n[6041]\r\nParameterName=Statusword\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0006\r\nAccessType=ro\r\nDefaultValue=0x0\r\nPDOMapping=1\r\n\r\n[605A]\r\nParameterName=Quick_stop_option_code\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0003\r\nAccessType=rw\r\nHighLimit=4\r\nLowLimit=0\r\nDefaultValue=0x2\r\nPDOMapping=0\r\n\r\n[605B]\r\nParameterName=Shutdown_option_code\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0003\r\nAccessType=rw\r\nHighLimit=1\r\nLowLimit=0\r\nDefaultValue=0x0\r\nPDOMapping=0\r\n\r\n[605C]\r\nParameterName=Disable_operation_option_code\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0003\r\nAccessType=rw\r\nHighLimit=1\r\nLowLimit=0\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[605D]\r\nParameterName=Halt_option_code\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0003\r\nAccessType=rw\r\nHighLimit=4\r\nLowLimit=0\r\nDefaultValue=0x0\r\nPDOMapping=0\r\n\r\n[605E]\r\nParameterName=Fault_reaction_option_code\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0003\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[6060]\r\nParameterName=Modes_of_operation\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0002\r\nAccessType=rw\r\nHighLimit=10\r\nLowLimit=0\r\nDefaultValue=0x0\r\nPDOMapping=1\r\n\r\n[6061]\r\nParameterName=Modes_of_operation_display\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0002\r\nAccessType=ro\r\nDefaultValue=0\r\nPDOMapping=1\r\n\r\n[6062]\r\nParameterName=Position_demand_value\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0004\r\nAccessType=ro\r\nDefaultValue=0x0\r\nPDOMapping=1\r\n\r\n[6063]\r\nParameterName=Position_actual_internal_value\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=0\r\nPDOMapping=1\r\n\r\n[6064]\r\nParameterName=Position_actual_value\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0004\r\nAccessType=ro\r\nDefaultValue=0x0\r\nPDOMapping=1\r\n\r\n[6065]\r\nParameterName=Following_error_window\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nHighLimit=150000\r\nLowLimit=0\r\nDefaultValue=100\r\nPDOMapping=0\r\n\r\n[6066]\r\nParameterName=Following_error_time_out\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nHighLimit=65535\r\nLowLimit=0\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[6067]\r\nParameterName=Position_window\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nHighLimit=5000\r\nLowLimit=0\r\nDefaultValue=0x0\r\nPDOMapping=0\r\n\r\n[6068]\r\nParameterName=Position_window_time\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0006\r\nAccessType=rw\r\nHighLimit=65535\r\nLowLimit=0\r\nDefaultValue=0x0\r\nPDOMapping=0\r\n\r\n[606C]\r\nParameterName=Velocity_actual_value\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0004\r\nAccessType=ro\r\nDefaultValue=0\r\nPDOMapping=1\r\n\r\n[6072]\r\nParameterName=Max_torque\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0006\r\nAccessType=rw\r\nHighLimit=2000\r\nLowLimit=0\r\nDefaultValue=0x0\r\nPDOMapping=1\r\n\r\n[6073]\r\nParameterName=Max_current\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0006\r\nAccessType=rw\r\nDefaultValue=0x0\r\nPDOMapping=0\r\n\r\n[6076]\r\nParameterName=Motor_rated_torque\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[6077]\r\nParameterName=Torque_actual_value\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0003\r\nAccessType=ro\r\nHighLimit=2000\r\nLowLimit=0\r\nDefaultValue=0x0\r\nPDOMapping=1\r\n\r\n[6078]\r\nParameterName=Current_actual_value\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0003\r\nAccessType=ro\r\nDefaultValue=0x0\r\nPDOMapping=0\r\n\r\n[6079]\r\nParameterName=DC_link_circuit_voltage\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=0\r\nPDOMapping=1\r\n\r\n[607A]\r\nParameterName=Target_position\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nHighLimit=30000\r\nLowLimit=0\r\nDefaultValue=0\r\nPDOMapping=1\r\n\r\n[607D]\r\nParameterName=Software_position_limit\r\nObjectType=0x8\r\n;StorageLocation=RAM\r\nSubNumber=0x3\r\n\r\n[607Dsub0]\r\nParameterName=Software_position_limit_number_of_entries\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0005\r\nAccessType=ro\r\nDefaultValue=2\r\nPDOMapping=0\r\n\r\n[607Dsub1]\r\nParameterName=Software_position_limit_Min_position_limit\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0004\r\nAccessType=rw\r\nHighLimit=2147483647\r\nLowLimit=-2147483647\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[607Dsub2]\r\nParameterName=Software_position_limit_Max_position_limit\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0004\r\nAccessType=rw\r\nHighLimit=2147483647\r\nLowLimit=-2147483647\r\nDefaultValue=150000\r\nPDOMapping=0\r\n\r\n[607F]\r\nParameterName=Max_profile_velocity\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nHighLimit=60000\r\nLowLimit=-60000\r\nDefaultValue=0\r\nPDOMapping=1\r\n\r\n[6080]\r\nParameterName=Max_motor_speed\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=1\r\n\r\n[6081]\r\nParameterName=Profile_velocity\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nHighLimit=60\r\nLowLimit=0\r\nDefaultValue=0x0\r\nPDOMapping=1\r\n\r\n[6083]\r\nParameterName=Profile_acceleration\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nHighLimit=0x7fffffff\r\nLowLimit=0\r\nDefaultValue=0x0\r\nPDOMapping=1\r\n\r\n[6084]\r\nParameterName=Profile_deceleration\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nHighLimit=0x7fffffff\r\nLowLimit=0\r\nDefaultValue=0x0\r\nPDOMapping=1\r\n\r\n[6085]\r\nParameterName=Quick_stop_deceleration\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nHighLimit=0x7fffffff\r\nLowLimit=0\r\nDefaultValue=200\r\nPDOMapping=1\r\n\r\n[60F4]\r\nParameterName=Following_error_actual_value\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0004\r\nAccessType=ro\r\nDefaultValue=0\r\nPDOMapping=1\r\n\r\n[60FC]\r\nParameterName=Position_demand_internal_value\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=0\r\nPDOMapping=1\r\n\r\n[60FD]\r\nParameterName=Digital_inputs\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0x0\r\nPDOMapping=0\r\n\r\n[60FE]\r\nParameterName=Digital_outputs\r\nObjectType=0x8\r\n;StorageLocation=RAM\r\nSubNumber=0x3\r\n\r\n[60FEsub0]\r\nParameterName=Digital_outputs_number_of_entries\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0005\r\nAccessType=rw\r\nDefaultValue=2\r\nPDOMapping=0\r\n\r\n[60FEsub1]\r\nParameterName=Digital_outputs_Physical_outputs\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=2\r\nPDOMapping=0\r\n\r\n[60FEsub2]\r\nParameterName=Digital_outputs_Bitmask\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=2\r\nPDOMapping=0\r\n\r\n[6502]\r\nParameterName=Supported_drive_modes\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=ro\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[ManufacturerObjects]\r\nSupportedObjects=17\r\n1=0x2001\r\n2=0x2010\r\n3=0x2011\r\n4=0x2012\r\n5=0x2013\r\n6=0x2014\r\n7=0x2015\r\n8=0x2016\r\n9=0x2017\r\n10=0x2018\r\n11=0x2019\r\n12=0x201A\r\n13=0x201B\r\n14=0x201C\r\n15=0x201D\r\n16=0x201E\r\n17=0x201F\r\n\r\n[2001]\r\nParameterName=Node ID\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[2010]\r\nParameterName=Overload Check Base\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[2011]\r\nParameterName=Overload Warnning Level\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[2012]\r\nParameterName=U Phase Current Offset\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[2013]\r\nParameterName=V Phase Current Offset\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[2014]\r\nParameterName=W Phase Current Offset\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[2015]\r\nParameterName=Linear Scale Resolution\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[2016]\r\nParameterName=Position Loop Gain 3\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[2017]\r\nParameterName=Position Loop Gain 6\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[2018]\r\nParameterName=Position Loop Gain 9\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[2019]\r\nParameterName=Speed Loop Gain 9\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[201A]\r\nParameterName=Speed Loop Gain 12\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[201B]\r\nParameterName=Speed Loop Gain 15\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[201C]\r\nParameterName=Current Loop Gain 15\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[201D]\r\nParameterName=Current Loop Gain 18\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[201E]\r\nParameterName=Speed Loop Gain 21\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n[201F]\r\nParameterName=Position Filter Constant 21\r\nObjectType=0x7\r\n;StorageLocation=RAM\r\nDataType=0x0007\r\nAccessType=rw\r\nDefaultValue=0\r\nPDOMapping=0\r\n\r\n";
+    </script>
+    <script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+const Icon = ({ name, size = 18, className = "", strokeWidth = 2.5 }) => {
+    const wrapperRef = useRef(null);
+    useEffect(() => {
+        if (window.lucide && wrapperRef.current) {
+            wrapperRef.current.innerHTML = `<i data-lucide="${name}" class="${className}" style="width: ${size}px; height: ${size}px; stroke-width: ${strokeWidth}"></i>`;
+            lucide.createIcons();
+        }
+    }, [name, size, className, strokeWidth]);
+    return <span ref={wrapperRef} className="inline-flex items-center justify-center pointer-events-none" style={{ width: size, height: size }} />;
+};
+
+function App() {
+    const [isConnected, setIsConnected] = useState(false);
+    const [canSpeed, setCanSpeed] = useState('125k'); // Changed to 125k per user request
+    
+    // Auto sequence configuration
+    const [config, setConfig] = useState({
+        targetTolerance: 150,
+        stallSpeed: 50,      // counts per second
+        stallTime: 2000,     // ms to wait before declaring stall
+        originPosition: 0,   // target position when stopped
+        minPosition: 0,      // auto sequence min target
+        maxPosition: 30000   // auto sequence max target
+    });
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const configRef = useRef(config);
+    useEffect(() => { configRef.current = config; }, [config]);
+
+    // Node States
+    const initialNodeState = {
+        connected: false,
+        motorState: "OFFLINE",
+        statuswordRaw: 0x0000,
+        currentPosition: null,
+        cycleCount: 0,
+        targetPos: 0,
+        isSetup: false,
+        isAutoMode: false,
+        isStopping: false,
+        logs: []
+    };
+
+    const [newNodeInput, setNewNodeInput] = useState("");
+
+    const [nodes, setNodes] = useState({
+        1: { ...initialNodeState }
+    });
+
+    const serialManagerRef = useRef(new window.SerialManager());
+    const slcanRef = useRef(new window.SLCANProtocol());
+    const nmtRef = useRef(new window.CANopenNMT.NMTStateManager());
+    const sdoRef = useRef(null);
+    
+    // Auto sequence Refs
+    const autoRefs = useRef({
+        1: { lastPos: null, lastPosTime: 0, commandSentTime: 0, currentTarget: 0, stallStartTime: null, retryCount: 0, restartCount: 0 }
+    });
+    
+    const posRefs = useRef({ 1: null });
+    const nodesRef = useRef(null); // Always-current mirror of nodes state (avoids closure stale issue)
+
+    const handleAddNode = () => {
+        const id = parseInt(newNodeInput);
+        if (isNaN(id) || id < 1 || id > 127) {
+            alert("유효한 노드 번호(1~127)를 입력하세요.");
+            return;
+        }
+        if (nodes[id]) {
+            alert("이미 존재하는 노드입니다.");
+            return;
+        }
+        
+        autoRefs.current[id] = { lastPos: null, lastPosTime: 0, commandSentTime: 0, currentTarget: 0, stallStartTime: null, retryCount: 0, restartCount: 0 };
+        posRefs.current[id] = null;
+        setNodes(prev => ({ ...prev, [id]: { ...initialNodeState } }));
+        setNewNodeInput("");
+    };
+
+    const handleRemoveNode = (nodeId) => {
+        if (nodes[nodeId]?.isAutoMode) {
+            alert("노드가 구동 중입니다. 먼저 정지해주세요.");
+            return;
+        }
+        setNodes(prev => {
+            const next = { ...prev };
+            delete next[nodeId];
+            return next;
+        });
+        delete autoRefs.current[nodeId];
+        delete posRefs.current[nodeId];
+    };
+
+    const addLog = useCallback((nodeId, dir, id, dlc, data, parsed) => {
+        const now = new Date();
+        const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}.${now.getMilliseconds().toString().padStart(3, '0')}`;
+        const idStr = id !== null && id !== undefined ? '0x' + id.toString(16).toUpperCase() : '';
+        const logEntry = { time: timeStr, dir, id: idStr, data, parsed };
+
+        setNodes(prev => {
+            if (!prev[nodeId]) return prev;
+            const newLogs = [...prev[nodeId].logs, logEntry];
+            if (newLogs.length > 200) newLogs.shift();
+            return { ...prev, [nodeId]: { ...prev[nodeId], logs: newLogs } };
+        });
+    }, []);
+
+    const decodeStatusword = (swVal) => {
+        if (swVal === undefined || swVal === null) return "OFFLINE";
+        const val = parseInt(swVal);
+        if ((val & 0x004F) === 0x0000) return "NOT READY";
+        if ((val & 0x004F) === 0x0040) return "DISABLED";
+        if ((val & 0x006F) === 0x0021) return "READY";
+        if ((val & 0x006F) === 0x0023) return "SWITCHED ON";
+        if ((val & 0x006F) === 0x0027) return "OP ENABLED";
+        if ((val & 0x006F) === 0x0007) return "QUICK STOP";
+        if ((val & 0x004F) === 0x000F) return "FAULT REACTION";
+        if ((val & 0x004F) === 0x0008) return "FAULT";
+        return "UNKNOWN";
+    };
+
+    if (!sdoRef.current) {
+        sdoRef.current = new window.CANopenSDO.SDOManager(async (frame) => {
+            if (!serialManagerRef.current || !serialManagerRef.current.isConnected) return;
+            const ascii = slcanRef.current.encodeFrame(frame.id, frame.dlc, frame.data);
+            try {
+                await serialManagerRef.current.write(ascii);
+            } catch (err) {
+                console.error("[SDO Write Error]", err);
+            }
+        });
+    }
+
+    const sdoMutexRef = useRef(Promise.resolve());
+    const runWithSdoLock = async (task) => {
+        const currentLock = sdoMutexRef.current;
+        let releaseLock;
+        const nextLock = new Promise(resolve => { releaseLock = resolve; });
+        sdoMutexRef.current = currentLock.then(() => nextLock);
+        try {
+            return await currentLock.then(task);
+        } finally {
+            releaseLock();
+        }
+    };
+
+    const performSdoRead = async (nodeId, idx, sub, timeoutMs = 800) => {
+        if (!sdoRef.current || !serialManagerRef.current.isConnected) return null;
+        return await runWithSdoLock(async () => {
+            try {
+                return await sdoRef.current.upload(nodeId, idx, sub, timeoutMs);
+            } catch (e) {
+                return null;
+            }
+        });
+    };
+
+    const performSdoWrite = async (nodeId, idx, sub, val, len, timeoutMs = 800) => {
+        if (!sdoRef.current || !serialManagerRef.current.isConnected) return false;
+        return await runWithSdoLock(async () => {
+            for (let attempt = 1; attempt <= 2; attempt++) {
+                try {
+                    await sdoRef.current.download(nodeId, idx, sub, val, len, timeoutMs);
+                    return true;
+                } catch (e) {
+                    if (attempt === 2) return false;
+                }
+            }
+            return false;
+        });
+    };
+
+    // RPDO: Controlword(2B) + TargetPosition(4B) = 6 bytes fixed (per firmware mapping)
+    const sendPdoControl = async (nodeId, controlword, targetPos = 0, silent = false) => {
+        if (!serialManagerRef.current || !serialManagerRef.current.isConnected) return;
+        
+        // Always 6 bytes: [CW_L, CW_H, POS_0, POS_1, POS_2, POS_3]
+        const data = new Uint8Array(6);
+        data[0] = controlword & 0xFF;
+        data[1] = (controlword >> 8) & 0xFF;
+        data[2] = targetPos & 0xFF;
+        data[3] = (targetPos >> 8) & 0xFF;
+        data[4] = (targetPos >> 16) & 0xFF;
+        data[5] = (targetPos >> 24) & 0xFF;
+        const dlc = 6;
+        
+        // COB-ID: 0x200 + nodeId (RPDO1 for node1 = 0x201)
+        const cobId = 0x200 + nodeId;
+        const ascii = slcanRef.current.encodeFrame(cobId, dlc, data);
+        const rawHex = Array.from(data).map(b => b.toString(16).padStart(2,'0').toUpperCase()).join(' ');
+        await serialManagerRef.current.write(ascii, true); // skipWait: PDO fire-and-forget
+        
+        if (!silent) {
+            const cwHex = controlword.toString(16).padStart(4, '0').toUpperCase();
+            addLog(nodeId, 'TX', cobId, dlc, rawHex, `RPDO CW:0x${cwHex} Pos:${targetPos}`);
+        }
+    };
+
+    const setupSerialListener = () => {
+        serialManagerRef.current.onDataReceived = (dataArray) => {
+            const asciiChunk = new TextDecoder().decode(dataArray);
+            slcanRef.current.parseStream(asciiChunk, (frame) => {
+                if (frame.id === undefined) return;
+
+                const dataStr = Array.from(frame.data).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+
+                // TPDO recognition: COB-ID 0x181~0x4FF (TPDO1~4 for node 1~127)
+                const isTpdo = (frame.id >= 0x181 && frame.id <= 0x4FF) && ((frame.id & 0x780) === 0x180 || (frame.id & 0x780) === 0x280 || (frame.id & 0x780) === 0x380 || (frame.id & 0x780) === 0x480);
+
+                if (isTpdo) {
+                    const nId = frame.id & 0x7F;
+                    if (frame.dlc >= 6) {
+                        const view = new DataView(frame.data.buffer, frame.data.byteOffset, frame.data.byteLength);
+                        
+                        // [Sub 1] Byte 0, 1: Statusword 0x6041 (16-bit Unsigned)
+                        const sw = view.getUint16(0, true);
+                        const mState = decodeStatusword(sw);
+
+                        // [Sub 2] Byte 2, 3, 4, 5: Position_actual_value 0x6064 (32-bit Signed)
+                        let pos = view.getInt32(2, true);
+                        
+                        const prevPos = posRefs.current[nId];
+                        posRefs.current[nId] = pos;
+                        
+                        setNodes(prev => {
+                            if (!prev[nId]) return prev;
+                            const posChanged = prev[nId].currentPosition !== pos;
+                            const stateChanged = prev[nId].statuswordRaw !== sw;
+                            if (!posChanged && !stateChanged) return prev;
+                            
+                            return {
+                                ...prev,
+                                [nId]: {
+                                    ...prev[nId],
+                                    currentPosition: pos,
+                                    statuswordRaw: sw,
+                                    motorState: mState
+                                }
+                            };
+                        });
+
+                        // Position & state updated silently in UI without spamming log window
+                    }
+                } else {
+                    // Log other RX messages (SDO, NMT, etc)
+                    let nId = null;
+                    let desc = 'CAN Frame';
+                    
+                    if (frame.id >= 0x581 && frame.id <= 0x583) {
+                        nId = frame.id - 0x580;
+                        desc = 'SDO Response';
+                    } else if (frame.id >= 0x701 && frame.id <= 0x703) {
+                        nId = frame.id - 0x700;
+                        desc = 'NMT Heartbeat';
+                    }
+                    
+                    if (nId) {
+                        addLog(nId, 'RX', frame.id, frame.dlc, dataStr, desc);
+                    }
+                }
+
+                // Normal NMT / SDO updates
+                if (!nmtRef.current.update(frame)) {
+                    sdoRef.current.handleResponse(frame);
+                }
+            });
+        };
+    };
+
+    const handleConnect = async () => {
+        if (isConnected) {
+            await serialManagerRef.current.disconnect();
+            setIsConnected(false);
+            return;
+        }
+        try {
+            const success = await serialManagerRef.current.connect(2000000);
+            if (success) {
+                // Clear any hanging buffers in the adapter
+                await serialManagerRef.current.write("\r\r", true);
+                await new Promise(r => setTimeout(r, 100));
+                
+                await serialManagerRef.current.write(slcanRef.current.encodeClose());
+                await new Promise(r => setTimeout(r, 200));
+                await serialManagerRef.current.write(slcanRef.current.encodeSpeed(canSpeed));
+                await new Promise(r => setTimeout(r, 200));
+                await serialManagerRef.current.write(slcanRef.current.encodeOpen());
+                await new Promise(r => setTimeout(r, 200));
+                setIsConnected(true);
+                setupSerialListener();
+            } else {
+                alert("연결에 실패했습니다.");
+            }
+        } catch (e) {
+            alert("연결 중 오류: " + e.message);
+        }
+    };
+
+    const getCurrentPos = async (nodeId) => {
+        let pos = posRefs.current[nodeId];
+        if (pos !== null) return pos;
+        
+        pos = nodes[nodeId].currentPosition;
+        if (pos !== null) return pos;
+        
+        const res = await performSdoRead(nodeId, 0x6064, 0, 200); // 200ms timeout
+        if (res && res.length >= 4) {
+            pos = res[0] | (res[1] << 8) | (res[2] << 16) | (res[3] << 24);
+            if (pos > 0x7FFFFFFF) pos -= 0x100000000;
+            
+            posRefs.current[nodeId] = pos;
+            setNodes(prev => ({
+                ...prev,
+                [nodeId]: { ...prev[nodeId], currentPosition: pos }
+            }));
+        } else {
+            pos = 0; // fallback
+        }
+        return pos;
+    };
+
+    // Read Statusword (0x6041) via SDO and update node motorState
+    const readAndUpdateStatus = async (nodeId) => {
+        if (!sdoRef.current || !serialManagerRef.current.isConnected) return null;
+        return await runWithSdoLock(async () => {
+            try {
+                // upload() resolves with a raw uint32 number
+                const swVal = await sdoRef.current.upload(nodeId, 0x6041, 0, 1000);
+                const sw = swVal & 0xFFFF; // Take lower 16 bits (UINT16)
+                const mState = decodeStatusword(sw);
+                const swHex = sw.toString(16).toUpperCase().padStart(4, '0');
+                addLog(nodeId, 'RX', 0x580 + nodeId, 4, `${swHex.slice(2)} ${swHex.slice(0,2)}`, `SDO 0x6041 = 0x${swHex} → [${mState}]`);
+                setNodes(prev => ({
+                    ...prev,
+                    [nodeId]: { ...prev[nodeId], statuswordRaw: sw, motorState: mState }
+                }));
+                return mState;
+            } catch (e) {
+                addLog(nodeId, 'ERR', null, null, '', `SDO Read 0x6041 failed: ${e.message}`);
+                return null;
+            }
+        });
+    };
+
+    // Write Controlword (0x6040) via SDO
+    const writeControlwordSDO = async (nodeId, cw) => {
+        const cwHex = cw.toString(16).toUpperCase().padStart(4, '0');
+        const ok = await performSdoWrite(nodeId, 0x6040, 0, cw, 2, 1000);
+        if (ok) {
+            addLog(nodeId, 'TX', 0x600 + nodeId, 8, `2B 40 60 00 ${cwHex.slice(2)} ${cwHex.slice(0,2)} 00 00`, `SDO Write 0x6040 = 0x${cwHex} (CiA402 CW)`);
+        } else {
+            addLog(nodeId, 'ERR', null, null, '', `SDO Write 0x6040 failed (CW=0x${cwHex})`);
+        }
+        return ok;
+    };
+
+    const setupNode = async (nodeId) => {
+        if (!isConnected) return;
+        addLog(nodeId, 'SYS', null, null, '', `=== Setup Node ${nodeId} (SDO-based) ===`);
+
+        try {
+            // Step 0: Ensure NMT Operational for TPDO transmission
+            addLog(nodeId, 'SYS', null, null, '', 'Step 0: Sending NMT Operational...');
+            const nmtOpFrame = nmtRef.current.buildFrame(0x01, nodeId);
+            const nmtOpAscii = slcanRef.current.encodeFrame(nmtOpFrame.id, nmtOpFrame.dlc, nmtOpFrame.data);
+            await serialManagerRef.current.write(nmtOpAscii, true);
+            await new Promise(r => setTimeout(r, 200));
+
+            // Step 1: Set Profile Position Mode (0x6060 = 1) BEFORE Enabling Operation
+            addLog(nodeId, 'SYS', null, null, '', 'Setting Mode of Operation = Profile Position (0x6060=1)...');
+            await performSdoWrite(nodeId, 0x6060, 0, 1, 1, 1000);
+            await new Promise(r => setTimeout(r, 100));
+
+            // Step 2: Read Actual Position (0x6064)
+            addLog(nodeId, 'SYS', null, null, '', 'Reading Actual Position (0x6064)...');
+            try {
+                const sdoPosRes = await performSdoRead(nodeId, 0x6064, 0, 1000);
+                if (sdoPosRes && sdoPosRes.data !== undefined) {
+                    let curP = sdoPosRes.data;
+                    if (curP > 0x7FFFFFFF) curP -= 0x100000000;
+                    posRefs.current[nodeId] = curP;
+                    setNodes(prev => ({ ...prev, [nodeId]: { ...prev[nodeId], currentPosition: curP } }));
+                    addLog(nodeId, 'SYS', null, null, '', `Current Position (0x6064): ${curP}`);
+                }
+            } catch (ePos) {
+                console.warn("Read 0x6064 failed:", ePos);
+            }
+
+            // Step 3: Shutdown (CW = 0x0006)
+            addLog(nodeId, 'SYS', null, null, '', 'Step 1/3: Sending Shutdown (CW=0x0006)...');
+            await writeControlwordSDO(nodeId, 0x0006);
+            await new Promise(r => setTimeout(r, 150));
+            const s1 = await readAndUpdateStatus(nodeId);
+            addLog(nodeId, 'SYS', null, null, '', `After Shutdown: [${s1}]`);
+
+            // Step 4: Switch On (CW = 0x0007)
+            addLog(nodeId, 'SYS', null, null, '', 'Step 2/3: Sending Switch On (CW=0x0007)...');
+            await writeControlwordSDO(nodeId, 0x0007);
+            await new Promise(r => setTimeout(r, 150));
+            const s2 = await readAndUpdateStatus(nodeId);
+            addLog(nodeId, 'SYS', null, null, '', `After Switch On: [${s2}]`);
+
+            // Step 5: Enable Operation (CW = 0x000F)
+            addLog(nodeId, 'SYS', null, null, '', 'Step 3/3: Sending Enable Operation (CW=0x000F)...');
+            await writeControlwordSDO(nodeId, 0x000F);
+            await new Promise(r => setTimeout(r, 150));
+            const s3 = await readAndUpdateStatus(nodeId);
+            addLog(nodeId, 'SYS', null, null, '', `After Enable Op: [${s3}]`);
+
+            const ok = s3 === 'OP ENABLED';
+            setNodes(prev => ({
+                ...prev,
+                [nodeId]: { ...prev[nodeId], connected: true, isSetup: ok }
+            }));
+            if (ok) {
+                addLog(nodeId, 'SYS', null, null, '', `✓ Node ${nodeId} Ready! State: OP ENABLED. Press Start.`);
+            } else {
+                addLog(nodeId, 'ERR', null, null, '', `✗ Expected OP ENABLED but got [${s3}]. Check motor status.`);
+            }
+        } catch (e) {
+            addLog(nodeId, 'ERR', null, null, '', `Setup error: ${e.message}`);
+        }
+    };
+
+    const handleFaultReset = async (nodeId) => {
+        if (!isConnected) return;
+        addLog(nodeId, 'SYS', null, null, '', `Fault Resetting Node ${nodeId}...`);
+        
+        // Fault Reset: ensure NMT Operational first, then bit7 0->1 transition
+        const nmtOpFr = nmtRef.current.buildFrame(0x01, nodeId);
+        const nmtOpAsc = slcanRef.current.encodeFrame(nmtOpFr.id, nmtOpFr.dlc, nmtOpFr.data);
+        await serialManagerRef.current.write(nmtOpAsc, true);
+        addLog(nodeId, 'TX', nmtOpFr.id, nmtOpFr.dlc,
+            Array.from(nmtOpFr.data).map(b=>b.toString(16).padStart(2,'0').toUpperCase()).join(' '),
+            'NMT Operational');
+        await new Promise(r => setTimeout(r, 300));
+        
+        await sendPdoControl(nodeId, 0x0000); // Clear CW
+        await new Promise(r => setTimeout(r, 100));
+        await sendPdoControl(nodeId, 0x0080); // Bit7 = 1 (Fault Reset)
+        await new Promise(r => setTimeout(r, 200));
+        await sendPdoControl(nodeId, 0x0006); // Shutdown (back to normal)
+        addLog(nodeId, 'SYS', null, null, '', `Fault Reset complete. Run Setup again to enable motor.`);
+    };
+
+    const handleReset = async (nodeId) => {
+        if (!isConnected) return;
+        addLog(nodeId, 'SYS', null, null, '', `NMT Reset Node ${nodeId}...`);
+        const nmtFrame = nmtRef.current.buildFrame(0x81, nodeId);
+        const nmtAscii = slcanRef.current.encodeFrame(nmtFrame.id, nmtFrame.dlc, nmtFrame.data);
+        await serialManagerRef.current.write(nmtAscii, true);
+        addLog(nodeId, 'TX', nmtFrame.id, nmtFrame.dlc,
+            Array.from(nmtFrame.data).map(b=>b.toString(16).padStart(2,'0').toUpperCase()).join(' '),
+            'NMT Reset Node');
+        
+        setNodes(prev => ({
+            ...prev,
+            [nodeId]: { ...prev[nodeId], isSetup: false, isAutoMode: false, currentPosition: null, statuswordRaw: 0, motorState: 'OFFLINE' }
+        }));
+        posRefs.current[nodeId] = null;
+    };
+
+    const handleCycleReset = (nodeId) => {
+        setNodes(prev => ({ ...prev, [nodeId]: { ...prev[nodeId], cycleCount: 0 } }));
+    };
+
+    const handleToggleStart = (nodeId) => {
+        if (!isConnected) return;
+        
+        let action = null;
+        
+        setNodes(prev => {
+            const node = prev[nodeId];
+            const newAuto = !node.isAutoMode;
+            
+            if (newAuto) {
+                action = 'start';
+                return { ...prev, [nodeId]: { ...node, isAutoMode: true, isStopping: false, logs: [] } };
+            } else {
+                action = 'stop';
+                return { ...prev, [nodeId]: { ...node, isAutoMode: false, isStopping: false } };
+            }
+        });
+
+        if (action === 'start') {
+            const minP = configRef.current.minPosition;
+            
+            // Always start with Position 1 (minP)
+            const firstTarget = minP;
+
+            addLog(nodeId, 'SYS', null, null, '', `Start: Pre-Op → Operational + Position Control (Target: Position 1 = ${firstTarget})`);
+            autoRefs.current[nodeId].currentTarget = firstTarget;
+            autoRefs.current[nodeId].commandSentTime = Date.now();
+            autoRefs.current[nodeId].waitingTrigger = false;
+            autoRefs.current[nodeId].stallStartTime = null;
+            autoRefs.current[nodeId].lastPos = null;
+            autoRefs.current[nodeId].lastPosTime = 0;
+            autoRefs.current[nodeId].retryCount = 0;
+            autoRefs.current[nodeId].restartCount = 0;
+            
+            (async () => {
+                // Step 1: NMT Pre-Op -> Operational
+                const nmtOpFrame = nmtRef.current.buildFrame(0x01, nodeId);
+                const nmtOpAscii = slcanRef.current.encodeFrame(nmtOpFrame.id, nmtOpFrame.dlc, nmtOpFrame.data);
+                await serialManagerRef.current.write(nmtOpAscii, true);
+                addLog(nodeId, 'TX', nmtOpFrame.id, nmtOpFrame.dlc,
+                    Array.from(nmtOpFrame.data).map(b=>b.toString(16).padStart(2,'0').toUpperCase()).join(' '),
+                    'NMT Operational');
+                await new Promise(r => setTimeout(r, 200));
+                
+                // Step 2: Set Profile Position Mode (0x6060 = 1) BEFORE Enabling Operation
+                addLog(nodeId, 'SYS', null, null, '', 'Setting Mode of Operation = Profile Position (0x6060=1)...');
+                const modeOk = await performSdoWrite(nodeId, 0x6060, 0, 1, 1, 1000);
+                if (modeOk) {
+                    addLog(nodeId, 'TX', 0x600+nodeId, 8, '2F 60 60 00 01 00 00 00', 'SDO Write 0x6060 = 1 (Profile Position Mode)');
+                } else {
+                    addLog(nodeId, 'ERR', null, null, '', 'Failed to set Mode of Operation. Motor may not move.');
+                }
+                await new Promise(r => setTimeout(r, 150));
+
+                // Step 3: Single-shot CiA402 State Transition to Position 1 (Shutdown -> Switch On -> 0x001F Enable Op + Trigger)
+                addLog(nodeId, 'SYS', null, null, '', `Seamless Start to Position 1 (${minP})...`);
+                await sendPdoControl(nodeId, 0x0006, minP, true); // Shutdown
+                await new Promise(r => setTimeout(r, 100));
+                await sendPdoControl(nodeId, 0x0007, minP, true); // Switch On
+                await new Promise(r => setTimeout(r, 100));
+                await sendPdoControl(nodeId, 0x000F, minP, true); // Enable Op (Trigger off)
+                await new Promise(r => setTimeout(r, 50));
+                await sendPdoControl(nodeId, 0x001F, minP); // Enable Op + New Setpoint (Trigger on)
+                
+                // Update commandSentTime AFTER all setup is done
+                autoRefs.current[nodeId].commandSentTime = Date.now();
+                
+                // Mark isSetup so auto-loop can run
+                setNodes(prev => ({ ...prev, [nodeId]: { ...prev[nodeId], isSetup: true } }));
+                addLog(nodeId, 'SYS', null, null, '', `Auto position loop started (Target: Position 1 = ${minP})`);
+            })();
+        } else if (action === 'stop') {
+            const stopPos = configRef.current.originPosition;
+            addLog(nodeId, 'SYS', null, null, '', `Stop: Command origin (${stopPos}), change to Pre-Op, exit Auto Mode.`);
+            autoRefs.current[nodeId].currentTarget = stopPos;
+            autoRefs.current[nodeId].commandSentTime = Date.now();
+            autoRefs.current[nodeId].stallStartTime = null;
+            
+            (async () => {
+                // 1. Send command to origin
+                await sendPdoControl(nodeId, 0x000F, stopPos);
+                await new Promise(r => setTimeout(r, 10));
+                await sendPdoControl(nodeId, 0x001F, stopPos);
+                await new Promise(r => setTimeout(r, 100)); // Brief delay before Pre-Op
+                
+                // 2. NMT Pre-Op
+                const nmtPreFrame = nmtRef.current.buildFrame(0x80, nodeId);
+                const nmtPreAscii = slcanRef.current.encodeFrame(nmtPreFrame.id, nmtPreFrame.dlc, nmtPreFrame.data);
+                await serialManagerRef.current.write(nmtPreAscii, true);
+                addLog(nodeId, 'TX', nmtPreFrame.id, nmtPreFrame.dlc,
+                    Array.from(nmtPreFrame.data).map(b=>b.toString(16).padStart(2,'0').toUpperCase()).join(' '),
+                    'NMT Pre-Op');
+            })();
+        }
+    };
+
+    const handleJogSDO = async (nodeId, direction) => {
+        if (!isConnected || nodesRef.current[nodeId]?.isAutoMode) return;
+        
+        const targetPos = direction === 'CW' ? configRef.current.maxPosition : configRef.current.minPosition;
+        
+        addLog(nodeId, 'SYS', null, null, '', `Manual ${direction} SDO: Writing ${targetPos} to Target Position (0x607A)...`);
+        
+        // Write to Target Position (0x607A, SubIndex 0)
+        const ok = await performSdoWrite(nodeId, 0x607A, 0, targetPos, 4);
+        
+        if (ok) {
+            addLog(nodeId, 'SYS', null, null, '', `${direction} SDO Target Position Set Successfully.`);
+            // Send trigger via SDO to Controlword (0x6040)
+            await performSdoWrite(nodeId, 0x6040, 0, 0x000F, 2);
+            await new Promise(r => setTimeout(r, 20));
+            await performSdoWrite(nodeId, 0x6040, 0, 0x001F, 2);
+        } else {
+            addLog(nodeId, 'ERR', null, null, '', `${direction} SDO Write Failed.`);
+        }
+    };
+
+    const handleAllSetup = async () => {
+        if (!isConnected) return;
+        const ids = Object.keys(nodesRef.current).map(Number);
+        for (const id of ids) {
+            const node = nodesRef.current[id];
+            if (!node.isSetup && !node.isAutoMode) {
+                await setupNode(id);
+                // Give a short delay between nodes to avoid CAN bus congestion
+                await new Promise(r => setTimeout(r, 200));
+            }
+        }
+    };
+
+    const handleAllToggleStart = () => {
+        if (!isConnected) return;
+        const ids = Object.keys(nodesRef.current).map(Number);
+        const anyRunning = ids.some(id => nodesRef.current[id].isAutoMode);
+        
+        if (anyRunning) {
+            // Stop all running nodes
+            ids.forEach(id => {
+                if (nodesRef.current[id].isAutoMode) {
+                    handleToggleStart(id);
+                }
+            });
+        } else {
+            // Start all setup nodes
+            ids.forEach(id => {
+                if (nodesRef.current[id].isSetup && !nodesRef.current[id].isAutoMode) {
+                    handleToggleStart(id);
+                }
+            });
+        }
+    };
+
+    const handleClearLogs = (nodeId) => {
+        setNodes(prev => ({
+            ...prev,
+            [nodeId]: { ...prev[nodeId], logs: [] }
+        }));
+    };
+
+    // Keep nodesRef always in sync with nodes state
+    useEffect(() => { nodesRef.current = nodes; }, [nodes]);
+
+    // Auto sequence loop - depends ONLY on isConnected, reads nodes via nodesRef to avoid interval reset on every TPDO
+    useEffect(() => {
+        let interval;
+        if (isConnected) {
+            interval = setInterval(() => {
+                const now = Date.now();
+                Object.keys(nodesRef.current).map(Number).forEach(nodeId => {
+                    const node = nodesRef.current?.[nodeId];
+                    if (!node || !node.isAutoMode || !node.isSetup) return;
+                    
+                    const refs = autoRefs.current[nodeId];
+                    const target = refs.currentTarget;
+                    const pos = posRefs.current[nodeId];
+                    
+                    // If we have position feedback, check if reached target
+                    if (pos !== null) {
+                        const diff = Math.abs(pos - target);
+                        const tolerance = configRef.current.targetTolerance;
+                        
+                        if (diff <= tolerance) {
+                            // Reached: switch target (Normal Auto Mode)
+                            const minP = configRef.current.minPosition;
+                            const maxP = configRef.current.maxPosition;
+                            const nextTarget = target === minP ? maxP : minP;
+                            refs.currentTarget = nextTarget;
+                            refs.commandSentTime = now;
+                            refs.waitingTrigger = false;
+                            refs.stallStartTime = null;
+                            refs.retryCount = 0;
+                            refs.restartCount = 0;
+                            refs.lastPos = pos;
+                            refs.lastPosTime = now;
+                            
+                            setNodes(prev => {
+                                let newCount = prev[nodeId].cycleCount;
+                                if (target === maxP) newCount += 1;
+                                return { ...prev, [nodeId]: { ...prev[nodeId], cycleCount: newCount } };
+                            });
+                            
+                            // Single-step position trigger (Perfect CiA 402 Handshake with 0x1F)
+                            (async () => {
+                                await sendPdoControl(nodeId, 0x000F, nextTarget, true); // trigger off
+                                await new Promise(r => setTimeout(r, 10));
+                                await sendPdoControl(nodeId, 0x001F, nextTarget, true); // trigger on (Rising edge!)
+                                // We don't need to turn it off immediately. The cyclic transmission will hold it at 0x1F.
+                            })();
+                            return; // Skip stall check on the frame we reached target
+                        }
+                    }
+                    
+                    // Cyclic transmission (50ms) to maintain connection (prevent RPDO timeout)
+                    // We send 0x001F (Trigger = 31) which keeps New Setpoint HIGH. 
+                    // Because Bit 5 is 0, it DOES NOT restart its trajectory profile mid-flight!
+                    if (refs.retryCount === 0 && refs.restartCount === 0 && !node.isStopping) {
+                        (async () => {
+                            await sendPdoControl(nodeId, 0x001F, target, true); // silent, maintain connection
+                        })();
+                    }
+                    
+                    // Anti-stall: speed-based detection
+                    // Give it a 1000ms grace period after sending a command before checking stall
+                    if (pos !== null && refs.lastPos !== null && (now - refs.commandSentTime > 1000)) {
+                        const dt = now - refs.lastPosTime;
+                        if (dt >= 500) { // Calculate speed every 500ms
+                            const dp = Math.abs(pos - refs.lastPos);
+                            const speed = (dp / dt) * 1000; // counts per second
+
+                            // Temporarily disable aggressive stall detection to prevent false positives
+                            if (false && speed < configRef.current.stallSpeed) {
+                                if (refs.stallStartTime === null) {
+                                    refs.stallStartTime = now;
+                                } else if (now - refs.stallStartTime >= configRef.current.stallTime) {
+                                    // STALL DETECTED
+                                    if (refs.retryCount < 3) {
+                                        refs.retryCount++;
+                                        addLog(nodeId, 'ERR', null, null, '', `Motor ${nodeId} stalled! Soft retry ${refs.retryCount}/3...`);
+                                        refs.commandSentTime = now;
+                                        refs.stallStartTime = null; // Reset stall timer
+                                        
+                                        (async () => {
+                                            await sendPdoControl(nodeId, 0x002F, target);
+                                            await new Promise(r => setTimeout(r, 60));
+                                            await sendPdoControl(nodeId, 0x003F, target);
+                                        })();
+                                    } else if (refs.restartCount < 5) {
+                                        refs.retryCount = 0;
+                                        refs.restartCount++;
+                                        addLog(nodeId, 'ERR', null, null, '', `Motor ${nodeId} STILL stalled! Hard restart ${refs.restartCount}/5...`);
+                                        refs.commandSentTime = now;
+                                        refs.stallStartTime = null; // Reset stall timer
+                                        
+                                        (async () => {
+                                            // 1. NMT Pre-Op
+                                            const preFr = nmtRef.current.buildFrame(0x80, nodeId);
+                                            await serialManagerRef.current.write(slcanRef.current.encodeFrame(preFr.id, preFr.dlc, preFr.data), true);
+                                            await new Promise(r => setTimeout(r, 100));
+                                            
+                                            // 2. NMT Op
+                                            const opFr = nmtRef.current.buildFrame(0x01, nodeId);
+                                            await serialManagerRef.current.write(slcanRef.current.encodeFrame(opFr.id, opFr.dlc, opFr.data), true);
+                                            await new Promise(r => setTimeout(r, 100));
+                                            
+                                            // 3. CiA402 Reset
+                                            await sendPdoControl(nodeId, 0x0080); // Fault Reset
+                                            await new Promise(r => setTimeout(r, 100));
+                                            await sendPdoControl(nodeId, 0x0006); // Shutdown
+                                            await new Promise(r => setTimeout(r, 100));
+                                            await sendPdoControl(nodeId, 0x0007); // Switch On
+                                            await new Promise(r => setTimeout(r, 100));
+                                            await sendPdoControl(nodeId, 0x000F); // Enable Op
+                                            await new Promise(r => setTimeout(r, 200));
+                                            
+                                            // Resend target
+                                            await sendPdoControl(nodeId, 0x002F, target);
+                                            await new Promise(r => setTimeout(r, 60));
+                                            await sendPdoControl(nodeId, 0x003F, target);
+                                        })();
+                                    } else {
+                                        // CRITICAL FAILURE
+                                        addLog(nodeId, 'ERR', null, null, '', `🚨 CRITICAL: Motor ${nodeId} failed to recover! Marking as FAULT.`);
+                                        setNodes(prev => ({ ...prev, [nodeId]: { ...prev[nodeId], isAutoMode: false, isStopping: false, motorState: 'FAULT' } }));
+                                        
+                                        (async () => {
+                                            // Stop motor safely
+                                            await sendPdoControl(nodeId, 0x000F);
+                                            await new Promise(r => setTimeout(r, 100));
+                                            const preFr = nmtRef.current.buildFrame(0x80, nodeId);
+                                            await serialManagerRef.current.write(slcanRef.current.encodeFrame(preFr.id, preFr.dlc, preFr.data), true);
+                                        })();
+                                    }
+                                }
+                            } else {
+                                refs.stallStartTime = null; // Speed is good, reset stall timer
+                                refs.retryCount = 0;
+                                refs.restartCount = 0;
+                            }
+                            refs.lastPos = pos;
+                            refs.lastPosTime = now;
+                        }
+                    } else if (pos !== null && (refs.lastPos === null || now - refs.lastPosTime >= 500)) {
+                        refs.lastPos = pos;
+                        refs.lastPosTime = now;
+                    }
+                });
+            }, 50);
+        }
+        return () => { clearInterval(interval); };
+    }, [isConnected]); // Only isConnected - nodes read via nodesRef to prevent interval reset on TPDO
+
+    return (
+        <div className="flex-1 flex flex-col p-4 gap-4 max-w-6xl mx-auto w-full h-screen overflow-hidden">
+            <header className="flex flex-col items-center justify-center text-center pb-2 border-b border-slate-200 shrink-0">
+                <h1 className="text-xl md:text-2xl font-black tracking-tight text-slate-900 uppercase">
+                    MULTI-NODE MIGHTYZAP TESTER
+                </h1>
+            </header>
+
+            <div className="flex justify-center gap-4 w-full shrink-0">
+                <div className="flex gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 items-center justify-start text-xs shadow-sm">
+                    <button
+                        onClick={handleConnect}
+                        className={`px-4 py-1.5 rounded-lg font-black text-[10px] uppercase border transition-colors ${isConnected ? 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100' : 'bg-brand-600 text-white border-brand-700 hover:bg-brand-700'}`}
+                    >
+                        {isConnected ? "Disconnect Serial" : "Connect Serial"}
+                    </button>
+                    <div className="w-px h-4 bg-slate-300 mx-1"></div>
+                    <button 
+                        onClick={handleAllSetup} 
+                        disabled={!isConnected}
+                        className="px-3 py-1.5 bg-slate-100 border border-slate-200 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-700 uppercase disabled:opacity-50"
+                    >
+                        All Setup
+                    </button>
+                    
+                    {(() => {
+                        const ids = Object.keys(nodes).map(Number);
+                        const anyRunning = ids.some(id => nodes[id].isAutoMode);
+                        return (
+                            <button 
+                                onClick={handleAllToggleStart} 
+                                disabled={!isConnected}
+                                className={`px-3 py-1.5 border rounded-lg text-[10px] font-bold uppercase transition-colors disabled:opacity-50 ${
+                                    anyRunning ? 'bg-red-500 text-white border-red-600 hover:bg-red-600' : 'bg-emerald-100 text-emerald-600 border-emerald-300 hover:bg-emerald-200'
+                                }`}
+                            >
+                                {anyRunning ? 'All Stop' : 'All Start'}
+                            </button>
+                        );
+                    })()}
+                </div>
+                
+                <div className="flex gap-2 bg-white border border-slate-200 rounded-xl p-2 items-center text-xs shadow-sm">
+                    <label className="flex items-center gap-1 font-bold">
+                        Add Node
+                        <input type="number" className="w-12 p-1 border rounded bg-slate-50 text-slate-900" placeholder="ID" value={newNodeInput} onChange={e => setNewNodeInput(e.target.value)} />
+                    </label>
+                    <button onClick={handleAddNode} className="px-3 py-1 bg-brand-600 text-white rounded font-bold hover:bg-brand-700">Add</button>
+                    <div className="w-px h-6 bg-slate-300 mx-2"></div>
+                    <button onClick={() => setIsSettingsOpen(true)} className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded">
+                        <Icon name="settings" size={16} />
+                    </button>
+                </div>
+            </div>
+
+            {isSettingsOpen && (
+                <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-2xl p-6 shadow-2xl w-80 max-w-full">
+                        <h3 className="font-black text-slate-800 mb-4 flex items-center gap-2">
+                            <Icon name="settings" size={20} />
+                            Auto Configuration
+                        </h3>
+                        <div className="flex flex-col gap-3 text-sm">
+                            <label className="flex flex-col gap-1">
+                                <span className="font-bold text-slate-600">Target Tolerance</span>
+                                <input type="number" className="p-2 border rounded bg-slate-50" value={config.targetTolerance} onChange={e => setConfig(p => ({...p, targetTolerance: Number(e.target.value)}))} />
+                            </label>
+                            <label className="flex flex-col gap-1">
+                                <span className="font-bold text-slate-600">Stall Speed (&lt; count/s)</span>
+                                <input type="number" className="p-2 border rounded bg-slate-50" value={config.stallSpeed} onChange={e => setConfig(p => ({...p, stallSpeed: Number(e.target.value)}))} />
+                            </label>
+                            <label className="flex flex-col gap-1">
+                                <span className="font-bold text-slate-600">Stall Time (ms)</span>
+                                <input type="number" className="p-2 border rounded bg-slate-50" value={config.stallTime} onChange={e => setConfig(p => ({...p, stallTime: Number(e.target.value)}))} />
+                            </label>
+                            <label className="flex flex-col gap-1">
+                                <span className="font-bold text-slate-600">Stop Origin Position</span>
+                                <input type="number" className="p-2 border rounded bg-slate-50" value={config.originPosition} onChange={e => setConfig(p => ({...p, originPosition: Number(e.target.value)}))} />
+                            </label>
+                            <label className="flex flex-col gap-1">
+                                <span className="font-bold text-slate-600">Position 1 (Auto)</span>
+                                <input type="number" className="p-2 border rounded bg-slate-50" value={config.minPosition} onChange={e => setConfig(p => ({...p, minPosition: Number(e.target.value)}))} />
+                            </label>
+                            <label className="flex flex-col gap-1">
+                                <span className="font-bold text-slate-600">Position 2 (Auto)</span>
+                                <input type="number" className="p-2 border rounded bg-slate-50" value={config.maxPosition} onChange={e => setConfig(p => ({...p, maxPosition: Number(e.target.value)}))} />
+                            </label>
+                        </div>
+                        <div className="mt-6 flex justify-end">
+                            <button onClick={() => setIsSettingsOpen(false)} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-lg">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Individual Node Panels */}
+            <div className="flex-1 min-h-0 flex justify-center items-start gap-4 w-full overflow-x-auto p-1 custom-scrollbar">
+                {Object.keys(nodes).map(idStr => Number(idStr)).map(id => (
+                    <div key={id} className="flex-1 min-w-[280px] max-w-[400px] flex flex-col gap-3 bg-white border border-slate-200 rounded-2xl p-3 relative overflow-hidden shadow-sm">
+                        <div className="flex justify-between items-center">
+                            <h2 className="font-black text-brand-700 text-sm flex items-center gap-2">
+                                <div className={`w-2 h-2 rounded-full ${nodes[id].isSetup ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+                                NODE {id}
+                            </h2>
+                            <div className="flex items-center gap-2">
+                                <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                                    nodes[id].motorState === 'OP ENABLED'  ? 'bg-emerald-100 text-emerald-700' :
+                                    nodes[id].motorState === 'PDO ACTIVE'  ? 'bg-cyan-100 text-cyan-700' :
+                                    nodes[id].motorState === 'SWITCHED ON' ? 'bg-blue-100 text-blue-700' :
+                                    nodes[id].motorState === 'READY'       ? 'bg-yellow-100 text-yellow-700' :
+                                    nodes[id].motorState === 'FAULT'       ? 'bg-rose-100 text-rose-700' :
+                                    nodes[id].motorState === 'OFFLINE'     ? 'bg-slate-100 text-slate-400' :
+                                                                              'bg-slate-100 text-slate-500'
+                                }`}>{nodes[id].motorState}</span>
+                                <button onClick={() => handleRemoveNode(id)} className="p-1 rounded bg-slate-100 text-slate-400 hover:bg-rose-100 hover:text-rose-500 transition-colors">
+                                    <Icon name="x" size={14} />
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                onClick={() => setupNode(id)}
+                                disabled={!isConnected || nodes[id].isAutoMode}
+                                className="py-1.5 bg-slate-50 border border-slate-200 hover:bg-slate-100 rounded text-[9px] font-bold text-slate-700 uppercase"
+                            >
+                                Setup
+                            </button>
+                            <button 
+                                onClick={() => handleToggleStart(id)}
+                                disabled={!isConnected || !nodes[id].isSetup}
+                                className={`py-1.5 rounded text-[9px] font-bold uppercase transition-colors text-white ${
+                                    !isConnected || !nodes[id].isSetup ? 'bg-slate-300' :
+                                    nodes[id].isStopping ? 'bg-orange-500 animate-pulse' :
+                                    nodes[id].isAutoMode ? 'bg-rose-500 hover:bg-rose-600' : 
+                                    'bg-emerald-500 hover:bg-emerald-600'
+                                }`}
+                            >
+                                {nodes[id].isStopping ? 'Stopping...' : nodes[id].isAutoMode ? 'Stop' : 'Start'}
+                            </button>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                onClick={() => handleJogSDO(id, 'CCW')}
+                                disabled={!isConnected || nodes[id].isAutoMode}
+                                className="py-1.5 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded text-[9px] font-bold text-blue-700 uppercase disabled:opacity-50 transition-colors"
+                            >
+                                위치 1 ({config.minPosition})
+                            </button>
+                            <button 
+                                onClick={() => handleJogSDO(id, 'CW')}
+                                disabled={!isConnected || nodes[id].isAutoMode}
+                                className="py-1.5 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded text-[9px] font-bold text-blue-700 uppercase disabled:opacity-50 transition-colors"
+                            >
+                                위치 2 ({config.maxPosition})
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                onClick={() => handleReset(id)}
+                                disabled={!isConnected || nodes[id].isAutoMode}
+                                className="py-1.5 bg-amber-50 border border-amber-200 hover:bg-amber-100 rounded text-[9px] font-bold text-amber-700 uppercase"
+                            >
+                                NMT Reset
+                            </button>
+                            <button
+                                onClick={() => handleFaultReset(id)}
+                                disabled={!isConnected || nodes[id].isAutoMode}
+                                className="py-1.5 bg-rose-50 border border-rose-200 hover:bg-rose-100 rounded text-[9px] font-bold text-rose-700 uppercase"
+                            >
+                                Fault Reset
+                            </button>
+                            <button
+                                onClick={() => handleCycleReset(id)}
+                                className="col-span-2 py-1.5 bg-purple-50 border border-purple-200 hover:bg-purple-100 rounded text-[9px] font-bold text-purple-700 uppercase"
+                            >
+                                Reset Cycles
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="bg-slate-50 border border-slate-200 p-2 rounded text-center">
+                                <span className="text-[9px] text-slate-400 uppercase font-bold block mb-1">Actual Position</span>
+                                <span className="font-mono text-lg font-black text-brand-600">{nodes[id].currentPosition !== null ? nodes[id].currentPosition : '---'}</span>
+                            </div>
+                            <div className="bg-slate-50 border border-slate-200 p-2 rounded text-center">
+                                <span className="text-[9px] text-slate-400 uppercase font-bold block mb-1">Cycle Count</span>
+                                <span className="font-mono text-3xl font-black text-orange-500">{nodes[id].cycleCount}</span>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-between items-end">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase">Logs</span>
+                            <button onClick={() => handleClearLogs(id)} className="text-[9px] px-2 py-0.5 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold transition-colors">Clear</button>
+                        </div>
+
+                        {/* Log Window */}
+                        <div className="h-[200px] shrink-0 bg-slate-900 rounded p-2 overflow-y-auto custom-scrollbar flex flex-col gap-1">
+                            {nodes[id].logs.map((log, i) => (
+                                <div key={i} className={`text-[9px] font-mono leading-tight ${log.dir === 'ERR' ? 'text-rose-400 font-bold' : log.dir === 'SYS' ? 'text-emerald-400' : log.dir === 'TX' ? 'text-cyan-400' : 'text-slate-400'}`}>
+                                    <span className="opacity-50">[{log.time}]</span>
+                                    {log.dir !== 'SYS' && log.dir !== 'ERR' && (
+                                        <span className={`font-bold mx-1 ${log.dir === 'TX' ? 'text-cyan-500' : 'text-purple-400'}`}>[{log.dir}]</span>
+                                    )}
+                                    {log.parsed}
+                                    {(log.id || log.data) && log.dir !== 'SYS' && log.dir !== 'ERR' && (
+                                        <span className="opacity-40 ml-1 block pl-[4.5rem]">
+                                            ► {log.id && `ID:${log.id} `}{log.data && `[${log.data}]`}
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+
+</script>
+</body>
+
+</html>

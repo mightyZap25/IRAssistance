@@ -246,7 +246,7 @@ export default function Header({ isHelpOpen, onToggleHelp, onToggleAiChat, isGem
                     if (change.type === 'added') {
                         const notiData = change.doc.data();
                         if (isTargetNotification(notiData) && !notiData.read) {
-                            const title = notiData.title || 'I-Link 알림';
+                            const title = notiData.title || 'mightyONE 알림';
                             const body = notiData.message || notiData.body || '새로운 알림이 도착했습니다.';
                             
                             // Electron 네이티브 알림 호출

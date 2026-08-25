@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { ExternalLink, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import FindInPageBar from '../components/common/FindInPageBar';
 
 export default function WorkspaceMailPage() {
     const { currentUser } = useAuth();
@@ -35,15 +36,14 @@ export default function WorkspaceMailPage() {
                 webview.removeEventListener('did-navigate-in-page', updateNavigationState);
             }
         };
-    }, [currentUser]);
+    }, [isElectron]);
 
-    const gmailUrl = currentUser?.email 
-        ? `https://mail.google.com/mail/?authuser=${encodeURIComponent(currentUser.email)}` 
-        : "https://mail.google.com";
+    const gmailUrl = `https://mail.google.com/mail/u/0/#inbox`;
 
     if (isElectron) {
         return (
-            <div className="w-full h-screen flex flex-col bg-white overflow-hidden relative">
+            <div className="h-[calc(100vh-100px)] flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden font-sans relative">
+                <FindInPageBar webviewRef={webviewRef} />
                 {/* Top Navigation Bar */}
                 <div className="h-11 border-b border-slate-200/80 bg-slate-50 px-4 flex items-center justify-between shrink-0 select-none">
                     <div className="flex items-center gap-2">

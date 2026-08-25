@@ -48,40 +48,41 @@ export default function ApprovalForm({ existingData = null, onBack, onSaved }) {
 
     const handleSave = async (status) => {
         if (!formData.title) return alert('제목을 입력해주세요.');
-        if (status === 'Pending' && approvalSteps.length === 0) return alert('결재 상신 시 결재선을 지정해야 합니다.');
+        if (status === 'Pending' && approvalSteps.length === 0) return alert('최소 한 명의 결재자를 지정해야 합니다.');
 
         setLoading(true);
         try {
-            const docData = {
-                ...formData,
+            const payload = {
+                formData,
                 items,
-                ApprovalSteps: approvalSteps,
-                Status: status,
-                CurrentStep: 0,
-                userId: currentUser.uid,
-                userName: userProfile?.displayName || currentUser.displayName,
-                updatedAt: serverTimestamp()
+                approvalSteps,
+                status,
+                currentUser: {
+                    uid: currentUser?.uid,
+                    displayName: userProfile?.displayName || currentUser?.displayName
+                }
             };
 
-            let docId = existingData?.id;
-            if (docId) {
-                await updateDoc(doc(db, 'approvals', docId), docData);
-            } else {
-                docData.createdAt = serverTimestamp();
-                const docRef = await addDoc(collection(db, 'approvals'), docData);
-                docId = docRef.id;
+            const response = await fetch('http://localhost:5050/api/approval/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || '상신 중 오류가 발생했습니다.');
             }
 
             if (status === 'Pending') {
-                await notifyFirstApprover({ ...docData, id: docId });
                 alert('결재가 성공적으로 상신되었습니다.');
             } else {
                 alert('임시저장 되었습니다.');
             }
             if (onSaved) onSaved();
-        } catch (err) {
-            console.error(err);
-            alert('저장 중 오류가 발생했습니다.');
+        } catch (error) {
+            console.error('Error saving approval:', error);
+            alert('저장 실패: ' + error.message);
         } finally {
             setLoading(false);
         }
@@ -92,24 +93,33 @@ export default function ApprovalForm({ existingData = null, onBack, onSaved }) {
     // ----------------------------------------------------
     const renderECOFields = () => (
         <>
-            <div><label className="block text-xs font-bold text-slate-500 mb-1">시방No.</label><input name="specNo" value={formData.specNo||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
-            <div><label className="block text-xs font-bold text-slate-500 mb-1">발행일자</label><input type="date" name="issueDate" value={formData.issueDate||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
-            <div><label className="block text-xs font-bold text-slate-500 mb-1">적용모델 (제품군)</label><input name="modelFamily" value={formData.modelFamily||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
-            <div><label className="block text-xs font-bold text-slate-500 mb-1">Servo 통신방법</label><input name="commMethod" value={formData.commMethod||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
-            <div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1">적용모델 (상세)</label><input name="appliedModels" value={formData.appliedModels||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
-            <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">시방구분</label>
-                <select name="specCategory" value={formData.specCategory||'정규'} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm">
-                    <option value="정규">정규</option><option value="임시">임시</option>
-                </select>
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">시방No.</label><input name="specNo" value={formData.specNo||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">발행일자</label><input type="date" name="issueDate" value={formData.issueDate||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
             </div>
-            <div>
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">적용모델 (제품군)</label><input name="modelFamily" value={formData.modelFamily||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">Servo 통신방법</label><input name="commMethod" value={formData.commMethod||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
+            </div>
+            <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-slate-500 mb-1">적용모델</label><input name="appliedModels" value={formData.appliedModels||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/>
+            </div>
+            <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-slate-500 mb-2">시방구분</label>
+                <div className="flex items-center gap-6">
+                    <label className="flex items-center gap-2 text-sm"><input type="radio" name="specCategory" value="정규" checked={formData.specCategory !== '임시'} onChange={handleChange} /> 정규</label>
+                    <label className="flex items-center gap-2 text-sm"><input type="radio" name="specCategory" value="임시" checked={formData.specCategory === '임시'} onChange={handleChange} /> 임시</label>
+                </div>
+            </div>
+            <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-slate-500 mb-1">변경사유</label><textarea name="changeReason" value={formData.changeReason||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm h-20"/>
+            </div>
+            <div className="md:col-span-2">
                 <label className="block text-xs font-bold text-slate-500 mb-1">공표사양 변경여부</label>
                 <select name="publicSpecChange" value={formData.publicSpecChange||'변경 안됨'} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm">
                     <option value="변경 안됨">변경 안됨</option><option value="변경 됨">변경 됨</option>
                 </select>
             </div>
-            <div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1">변경사유</label><textarea name="changeReason" value={formData.changeReason||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm h-20"/></div>
             <div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1">변경내용 (공표사양변경시)</label><textarea name="changeContent" value={formData.changeContent||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm h-20"/></div>
             <div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1">개선효과</label><textarea name="improvementEffect" value={formData.improvementEffect||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm h-20"/></div>
             <div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1">발행부서 의견</label><textarea name="deptOpinion" value={formData.deptOpinion||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm h-20"/></div>
@@ -119,28 +129,34 @@ export default function ApprovalForm({ existingData = null, onBack, onSaved }) {
 
     const renderExpenseFields = () => (
         <>
-            <div><label className="block text-xs font-bold text-slate-500 mb-1">기안자</label><input name="drafter" value={formData.drafter||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
-            <div><label className="block text-xs font-bold text-slate-500 mb-1">날짜</label><input type="date" name="issueDate" value={formData.issueDate||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
-            <div><label className="block text-xs font-bold text-slate-500 mb-1">사용 부서</label><input name="department" value={formData.department||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
-            <div><label className="block text-xs font-bold text-slate-500 mb-1">직급</label><input name="position" value={formData.position||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
-            <div><label className="block text-xs font-bold text-slate-500 mb-1">사용자</label><input name="user" value={formData.user||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
-            <div><label className="block text-xs font-bold text-slate-500 mb-1">거래처명</label><input name="vendor" value={formData.vendor||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
-            <div><label className="block text-xs font-bold text-slate-500 mb-1">금액</label><input type="text" name="amount" value={formData.amount||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
-            <div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1">상세내용</label><textarea name="content" value={formData.content||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm h-20"/></div>
-            <div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1">기타</label><input name="note" value={formData.note||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">사용자</label><input name="user" value={formData.user||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">직급</label><input name="position" value={formData.position||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">사용 부서</label><input name="department" value={formData.department||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
+            </div>
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">거래처명</label><input name="vendor" value={formData.vendor||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">사용금액</label><input type="number" step="any" name="amount" value={formData.amount||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
+            </div>
+            <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-slate-500 mb-1">날짜</label><input type="date" name="issueDate" value={formData.issueDate||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/>
+            </div>
         </>
     );
 
     const renderTransferFields = () => (
         <>
-            <div><label className="block text-xs font-bold text-slate-500 mb-1">발행일자</label><input type="date" name="issueDate" value={formData.issueDate||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
-            <div><label className="block text-xs font-bold text-slate-500 mb-1">양산이관 번호</label><input name="transferNo" value={formData.transferNo||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
-            <div><label className="block text-xs font-bold text-slate-500 mb-1">제품군</label><input name="productFamily" value={formData.productFamily||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
-            <div><label className="block text-xs font-bold text-slate-500 mb-1">이관 모델(시리즈)</label><input name="transferModel" value={formData.transferModel||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">양산이관 번호</label><input name="transferNo" value={formData.transferNo||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">발행일자</label><input type="date" name="issueDate" value={formData.issueDate||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
+            </div>
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">제품군</label><input name="productFamily" value={formData.productFamily||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">이관 모델(시리즈)</label><input name="transferModel" value={formData.transferModel||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
+            </div>
             <div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1">세부 모델명</label><input name="detailModel" value={formData.detailModel||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
             <div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1">양산이관 폴더경로</label><input name="folderPath" value={formData.folderPath||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
             <div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1">발행부서 의견</label><textarea name="deptOpinion" value={formData.deptOpinion||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm h-20"/></div>
-            <div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1">비고</label><input name="note" value={formData.note||''} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm"/></div>
         </>
     );
 
@@ -198,10 +214,17 @@ export default function ApprovalForm({ existingData = null, onBack, onSaved }) {
         if (formData.docType === '설계변경서') {
             return (
                 <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left border-collapse min-w-[800px]">
+                    <table className="w-full text-sm text-left border-collapse min-w-[1200px]">
                         <thead>
                             <tr className="bg-slate-50 text-slate-500">
-                                <th className="p-2 border">품명</th><th className="p-2 border">LIST No.</th><th className="p-2 border">수정 전 규격</th><th className="p-2 border">수정 후 규격</th><th className="p-2 border">수량(EA)</th><th className="p-2 border">적용 일자</th><th className="p-2 border">비고</th><th className="p-2 border w-10"></th>
+                                <th className="p-2 border w-40">품명</th>
+                                <th className="p-2 border w-24">LIST No.</th>
+                                <th className="p-2 border w-72">수정 전 규격</th>
+                                <th className="p-2 border w-72">수정 후 규격</th>
+                                <th className="p-2 border w-24">수량(EA)</th>
+                                <th className="p-2 border w-32">적용 일자</th>
+                                <th className="p-2 border w-48">비고</th>
+                                <th className="p-2 border w-10"></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -276,7 +299,7 @@ export default function ApprovalForm({ existingData = null, onBack, onSaved }) {
     };
 
     return (
-        <div className="max-w-7xl mx-auto pb-20 px-4">
+        <div className="w-full mx-auto pb-20 px-4 mt-6">
             <div className="flex items-center gap-4 mb-6">
                 <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full"><ArrowLeft size={20}/></button>
                 <h2 className="text-2xl font-bold text-slate-800">{existingData ? '결재 문서 수정' : '새 전자결재 작성'}</h2>
@@ -299,7 +322,21 @@ export default function ApprovalForm({ existingData = null, onBack, onSaved }) {
                             </div>
                             <div className="md:col-span-2">
                                 <label className="block text-xs font-bold text-slate-500 mb-1">결재 제목</label>
-                                <input name="title" value={formData.title} onChange={handleChange} className="w-full border p-2 rounded-lg text-sm font-bold bg-blue-50 text-blue-900" placeholder="결재 제목을 입력하세요."/>
+                                <input 
+                                    name="title" 
+                                    value={formData.title} 
+                                    onChange={handleChange} 
+                                    className="w-full border p-2 rounded-lg text-sm font-bold bg-blue-50 text-blue-900 placeholder:font-normal placeholder:text-slate-400" 
+                                    placeholder={
+                                        formData.docType === '설계변경서' ? '설계변경서[합의요청/확정] [4. 적용모델(제품군)] [설변개요]' :
+                                        formData.docType === '지출결의서' ? '지출결의서 - 20YY.MM.DD' :
+                                        formData.docType === '양산이관서' ? '양산이관서 [합의요청/확정]' :
+                                        formData.docType === '기안서' ? '기안서 - 제목 (20YY.MM.DD)' :
+                                        formData.docType === '불출요청서' ? '불출요청서' :
+                                        formData.docType === '근태신청서' ? '유연근로신청서 - 20YY.MM.DD (출근시간 ~ 퇴근시간)' :
+                                        '결재 제목을 입력하세요.'
+                                    }
+                                />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-6 rounded-xl border border-slate-200">
                                 {formData.docType === '설계변경서' && renderECOFields()}

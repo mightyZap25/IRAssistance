@@ -3,3 +3,4 @@ access_ir_approval_request,ir_approval.request,model_ir_approval_request,base.gr
 access_ir_approval_step,ir_approval.step,model_ir_approval_step,base.group_user,1,1,1,0
 access_ir_approval_eco_line,ir_approval.eco.line,model_ir_approval_eco_line,base.group_user,1,1,1,0
 access_ir_approval_issue_line,ir_approval.issue.line,model_ir_approval_issue_line,base.group_user,1,1,1,0
+access_ir_approval_transfer_line,ir_approval.transfer.line,model_ir_approval_transfer_line,base.group_user,1,1,1,0

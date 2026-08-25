@@ -24,6 +24,16 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
+// 로컬 이미지 서빙 엔드포인트 (Obsidian 이미지 렌더링용)
+app.get('/api/local-image', (req, res) => {
+    const filePath = req.query.path;
+    if (filePath && fs.existsSync(filePath)) {
+        res.sendFile(filePath);
+    } else {
+        res.status(404).send('Image not found');
+    }
+});
+
 const PORT = process.env.PORT || 5050;
 
 // OS별 안전한 AppData(사용자 폴더) 경로에 db_config.json 위치 설정 및 복사 초기화
@@ -85,14 +95,14 @@ const loadDbConfig = () => {
                 return {
                     currentProfile: 'local',
                     local: {
-                        host: parsed.host || '192.168.0.7',
+                        host: parsed.host || '192.168.0.11',
                         port: parsed.port || '15432',
                         user: parsed.user || 'postgres',
                         password: parsed.password || 'postgres',
                         database: parsed.database || 'ir_assistant'
                     },
                     remote: {
-                        host: parsed.host || '192.168.0.7',
+                        host: parsed.host || '192.168.0.11',
                         port: parsed.port || '15432',
                         user: parsed.user || 'postgres',
                         password: parsed.password || 'postgres',

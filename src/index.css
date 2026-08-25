@@ -122,3 +122,169 @@ body.help-drawer-open .detail-panel-portal {
 .dark .notes-md-editor .w-md-editor-preview {
     border-left: 1px solid #1e293b;
 }
+
+/* ─── BlockNote 커스텀 스타일링 ─── */
+
+/* 헤더 공통 - font-weight, overflow */
+.notes-blocknote-editor .bn-editor h1, 
+.notes-blocknote-editor .bn-editor h2, 
+.notes-blocknote-editor .bn-editor h3 {
+    position: relative;
+    font-weight: 800 !important;
+    overflow: visible !important;
+}
+
+
+
+.notes-blocknote-editor .bn-editor h1 { color: #6366f1 !important; }
+.notes-blocknote-editor .bn-editor h2 { color: #10b981 !important; }
+.notes-blocknote-editor .bn-editor h3 { color: #f59e0b !important; }
+
+.dark .notes-blocknote-editor .bn-editor h1 { color: #818cf8 !important; }
+.dark .notes-blocknote-editor .bn-editor h2 { color: #34d399 !important; }
+.dark .notes-blocknote-editor .bn-editor h3 { color: #fbbf24 !important; }
+
+/* 헤더 레벨 표시 (본문 안쪽 텍스트 바로 뒤에 배치) */
+.notes-blocknote-editor .bn-editor h1::after,
+.notes-blocknote-editor .bn-editor h2::after,
+.notes-blocknote-editor .bn-editor h3::after {
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 0.5rem;
+    color: #94a3b8;
+    background-color: #f1f5f9;
+    padding: 0.25rem 0.4rem;
+    border-radius: 0.25rem;
+    font-weight: 800;
+    font-size: 0.65rem !important;
+    line-height: 1;
+    transform: translateY(-2px);
+}
+
+.notes-blocknote-editor .bn-editor h1::after {
+    content: 'H1';
+}
+.notes-blocknote-editor .bn-editor h2::after {
+    content: 'H2';
+}
+.notes-blocknote-editor .bn-editor h3::after {
+    content: 'H3';
+}
+
+/* 다크모드 대응 */
+.dark .notes-blocknote-editor .bn-editor h1::after,
+.dark .notes-blocknote-editor .bn-editor h2::after,
+.dark .notes-blocknote-editor .bn-editor h3::after {
+    color: #64748b;
+    background-color: #1e293b;
+}
+
+/* 인용문 (Blockquote) */
+/* 기본 인용문 */
+.notes-blocknote-editor .bn-editor blockquote {
+    background-color: #f8fafc !important;
+    border-left: 4px solid #6366f1 !important;
+    padding: 1rem !important;
+    color: #475569 !important;
+    margin: 1rem 0 !important;
+}
+.dark .notes-blocknote-editor .bn-editor blockquote {
+    background-color: #1e293b !important;
+    border-left-color: #818cf8 !important;
+    color: #cbd5e1 !important;
+}
+
+/* ─── 인용문 Alert 스타일링 (CAUTION, WARNING, NOTE, TIP) ─── */
+/* CAUTION (빨간색) */
+.notes-blocknote-editor .bn-editor blockquote[data-alert="caution"] {
+    background-color: #fef2f2 !important;
+    border-left-color: #ef4444 !important;
+}
+.notes-blocknote-editor .bn-editor blockquote[data-alert="caution"] strong {
+    color: #dc2626 !important;
+}
+.dark .notes-blocknote-editor .bn-editor blockquote[data-alert="caution"] {
+    background-color: rgba(127, 29, 29, 0.2) !important;
+    border-left-color: #f87171 !important;
+}
+.dark .notes-blocknote-editor .bn-editor blockquote[data-alert="caution"] strong {
+    color: #fca5a5 !important;
+}
+
+/* WARNING (주황색) */
+.notes-blocknote-editor .bn-editor blockquote[data-alert="warning"] {
+    background-color: #fffbeb !important;
+    border-left-color: #f59e0b !important;
+}
+.notes-blocknote-editor .bn-editor blockquote[data-alert="warning"] strong {
+    color: #d97706 !important;
+}
+.dark .notes-blocknote-editor .bn-editor blockquote[data-alert="warning"] {
+    background-color: rgba(120, 53, 15, 0.2) !important;
+    border-left-color: #fbbf24 !important;
+}
+.dark .notes-blocknote-editor .bn-editor blockquote[data-alert="warning"] strong {
+    color: #fde68a !important;
+}
+
+/* NOTE (파란색) */
+.notes-blocknote-editor .bn-editor blockquote[data-alert="note"] {
+    background-color: #eff6ff !important;
+    border-left-color: #3b82f6 !important;
+}
+.notes-blocknote-editor .bn-editor blockquote[data-alert="note"] strong {
+    color: #2563eb !important;
+}
+.dark .notes-blocknote-editor .bn-editor blockquote[data-alert="note"] {
+    background-color: rgba(30, 58, 138, 0.2) !important;
+    border-left-color: #60a5fa !important;
+}
+.dark .notes-blocknote-editor .bn-editor blockquote[data-alert="note"] strong {
+    color: #93c5fd !important;
+}
+
+/* TIP (초록색) */
+.notes-blocknote-editor .bn-editor blockquote[data-alert="tip"] {
+    background-color: #f0fdf4 !important;
+    border-left-color: #22c55e !important;
+}
+.notes-blocknote-editor .bn-editor blockquote[data-alert="tip"] strong {
+    color: #16a34a !important;
+}
+.dark .notes-blocknote-editor .bn-editor blockquote[data-alert="tip"] {
+    background-color: rgba(20, 83, 45, 0.2) !important;
+    border-left-color: #4ade80 !important;
+}
+.dark .notes-blocknote-editor .bn-editor blockquote[data-alert="tip"] strong {
+    color: #86efac !important;
+}
+
+/* ─── 테이블 스타일링 ─── */
+/* 주의: BlockNote 라이브러리가 [data-content-type=table] table에 width:auto!important 를
+   강제 적용하므로, 외부에서 width:100% 로 덮어쓰기가 안 됨.
+   따라서 overflow-x를 tableWrapper에 걸고 셀 단위로만 스타일 적용 */
+.notes-blocknote-editor .bn-editor [data-content-type="table"] .tableWrapper {
+    overflow-x: auto;
+}
+.notes-blocknote-editor .bn-editor [data-content-type="table"] table th,
+.notes-blocknote-editor .bn-editor [data-content-type="table"] table td {
+    border: 1px solid #cbd5e1 !important;
+    padding: 0.5rem 0.75rem !important;
+    min-width: 80px;
+    word-break: break-word !important;
+    white-space: normal !important;
+}
+.notes-blocknote-editor .bn-editor [data-content-type="table"] table th {
+    background-color: #eef2ff !important;
+    color: #3730a3 !important;
+    font-weight: 700 !important;
+    text-align: center !important;
+}
+.dark .notes-blocknote-editor .bn-editor [data-content-type="table"] table th {
+    background-color: #312e81 !important;
+    color: #e0e7ff !important;
+}
+.dark .notes-blocknote-editor .bn-editor [data-content-type="table"] table th,
+.dark .notes-blocknote-editor .bn-editor [data-content-type="table"] table td {
+    border-color: #334155 !important;
+}

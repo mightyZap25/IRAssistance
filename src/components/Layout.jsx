@@ -43,15 +43,14 @@ export default function Layout({ children }) {
     React.useEffect(() => {
         if (!window.electronAPI) return;
 
-        const unsubscribeBack = window.electronAPI.onAppGoBack(async () => {
+        const handleAppGoBack = async () => {
             console.log('[Layout] app-go-back 이벤트 수신됨!');
             const webviews = document.querySelectorAll('webview');
             let handled = false;
 
-            // 화면에 떠 있는 활성 웹뷰를 찾습니다. (투명하게 숨겨진 Google Chat 등 제외)
             const activeWebviews = Array.from(webviews).filter(wv => {
-                const style = window.getComputedStyle(wv);
-                return style.display !== 'none' && style.opacity !== '0' && wv.style.left !== '-9999px';
+                const rect = wv.getBoundingClientRect();
+                return rect.width > 0 && rect.height > 0 && rect.left >= 0 && rect.left < window.innerWidth;
             });
             console.log('[Layout] 발견된 webview 총 갯수:', webviews.length, '활성화된 갯수:', activeWebviews.length);
 
@@ -59,19 +58,17 @@ export default function Layout({ children }) {
                 const webview = activeWebviews[0];
                 console.log('[Layout] 웹뷰 내부에 뒤로가기 스크립트 인젝션 시작...');
                 try {
-                    // Odoo 19 SPA 구조에서 history.back()이 안 먹힐 때를 대비해, 
-                    // Odoo UI의 빵부스러기(Breadcrumb) 이전 링크나 닫기 버튼을 먼저 우선적으로 클릭하도록 시도합니다.
-                    await webview.executeJavaScript(`
+                    const scriptResult = await webview.executeJavaScript(`
                         (function() {
-                            console.log('[I-Link BackNav] 내부 뒤로가기 스크립트 실행됨');
+                            console.log('[mightyONE BackNav] 내부 뒤로가기 스크립트 실행됨');
                             
                             function triggerClick(el, label) {
                                 if (!el) return false;
-                                console.log('[I-Link BackNav] 타겟 발견 및 클릭 시도:', label, el);
+                                console.log('[mightyONE BackNav] 타겟 발견 및 클릭 시도:', label, el);
                                 ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(type => {
                                     el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
                                 });
-                                console.log('[I-Link BackNav] 마우스 이벤트 시뮬레이션 완료');
+                                console.log('[mightyONE BackNav] 마우스 이벤트 시뮬레이션 완료');
                                 return true;
                             }
 
@@ -90,7 +87,6 @@ export default function Layout({ children }) {
                                 return !el.classList.contains('active') && el.getAttribute('aria-current') !== 'page';
                             });
                             
-                            console.log('[I-Link BackNav] 발견된 전체 빵부스러기 요소:', breadcrumbs.length, '개. 이전 단계 요소:', prevItems.length, '개');
                             if (prevItems.length > 0) {
                                 const target = prevItems[prevItems.length - 1];
                                 const link = target.querySelector('a');
@@ -98,59 +94,108 @@ export default function Layout({ children }) {
                             }
 
                             const hash = window.location.hash || window.location.search;
-                            console.log('[I-Link BackNav] 현재 URL Hash:', hash);
                             
-                            // 웹에서는 잘 된다고 하셨으므로, history.back()이 Odoo 내비게이션의 핵심일 수 있습니다.
-                            // 단, '재고 -> 휴가' 처럼 모듈 간 점프를 막기 위해 id= 또는 form 뷰인 경우에만 우선 허용합니다.
                             if (hash.includes('id=') || hash.includes('view_type=form')) {
-                                console.log('[I-Link BackNav] URL에 상세 뷰 패턴(id= 등)이 확인되어 history.back() 실행');
                                 window.history.back();
                                 return true;
                             }
 
-                            console.log('[I-Link BackNav] 아무 UI도 찾지 못했고, 최상위 경로로 판단하여 작동 중지(무시)');
                             return false;
                         })()
                     `);
                     
-                    handled = true;
-                } catch (e) {
-                    console.error('Failed to call history back on webview:', e);
-                    handled = true; 
-                }
-            }
-
-            if (!handled) {
-                navigate(-1);
-            }
-        });
-
-        const unsubscribeForward = window.electronAPI.onAppGoForward(() => {
-            const webviews = document.querySelectorAll('webview');
-            let handled = false;
-
-            for (const webview of webviews) {
-                if (webview.getBoundingClientRect().height > 0) {
-                    try {
-                        if (webview.canGoForward()) {
-                            webview.goForward();
+                    console.log('[Layout] scriptResult:', scriptResult);
+                    if (scriptResult === true) {
+                        console.log('[Layout] script handled back navigation');
+                        handled = true;
+                    } else {
+                        console.log('[Layout] script did not handle, checking webview.canGoBack()...');
+                        if (typeof webview.canGoBack === 'function' && webview.canGoBack()) {
+                            console.log('[Layout] webview CAN go back, calling goBack()');
+                            webview.goBack();
                             handled = true;
-                            break;
+                        } else {
+                            console.log('[Layout] webview CANNOT go back');
+                            handled = false;
                         }
-                    } catch (e) {
-                        console.error('Failed to call goForward on webview:', e);
+                    }
+                } catch (e) {
+                    console.error('[Layout] Failed to call history back on webview:', e);
+                    try {
+                        if (typeof webview.canGoBack === 'function' && webview.canGoBack()) {
+                            console.log('[Layout] catch block: webview CAN go back, calling goBack()');
+                            webview.goBack();
+                            handled = true;
+                        } else {
+                            console.log('[Layout] catch block: webview CANNOT go back');
+                            handled = false;
+                        }
+                    } catch(err) {
+                        console.error('[Layout] catch block inner error:', err);
+                        handled = false;
                     }
                 }
             }
 
+            console.log('[Layout] final handled state:', handled);
+            if (!handled) {
+                console.log('[Layout] navigating react router -1');
+                navigate(-1);
+            }
+        };
+
+        const handleAppGoForward = async () => {
+            const webviews = document.querySelectorAll('webview');
+            const activeWebviews = Array.from(webviews).filter(wv => {
+                const parentDiv = wv.parentElement;
+                if (!parentDiv) return false;
+                const style = window.getComputedStyle(parentDiv);
+                return style.display !== 'none' && style.opacity !== '0' && parentDiv.style.left !== '-9999px';
+            });
+            let handled = false;
+            for (const webview of activeWebviews) {
+                try {
+                    if (webview.canGoForward()) {
+                        webview.goForward();
+                        handled = true;
+                        break;
+                    }
+                } catch (e) {
+                    console.error('Failed to call goForward on webview:', e);
+                }
+            }
             if (!handled) {
                 navigate(1);
             }
-        });
+        };
+
+        const handleResetWebview = (e) => {
+            const path = e.detail;
+            let wvId = null;
+            if (path === '/workspace/chat') wvId = 'webview-google-chat';
+            else if (path === '/workspace/mail') wvId = 'webview-google-mail';
+            else if (path === '/workspace/calendar') wvId = 'webview-google-calendar';
+
+            if (wvId) {
+                const wv = document.getElementById(wvId);
+                if (wv && wv.loadURL) {
+                    const src = wv.getAttribute('src');
+                    if (src) {
+                        console.log(`[Layout] 리셋 이벤트 수신: ${path}. 초기 화면(${src})으로 되돌립니다.`);
+                        wv.loadURL(src);
+                    }
+                }
+            }
+        };
+
+        window.addEventListener('app-go-back', handleAppGoBack);
+        window.addEventListener('app-go-forward', handleAppGoForward);
+        window.addEventListener('reset-webview', handleResetWebview);
 
         return () => {
-            unsubscribeBack();
-            unsubscribeForward();
+            window.removeEventListener('app-go-back', handleAppGoBack);
+            window.removeEventListener('app-go-forward', handleAppGoForward);
+            window.removeEventListener('reset-webview', handleResetWebview);
         };
     }, [navigate]);
 
@@ -168,6 +213,7 @@ export default function Layout({ children }) {
     const isGoogleMail = location.pathname.includes('/workspace/mail');
     const isGoogleCalendar = location.pathname.includes('/workspace/calendar');
     const isCustomReactRoute = location.pathname.startsWith('/workspace/') || 
+                               location.pathname.startsWith('/company/') ||
                                location.pathname.startsWith('/settings') || 
                                location.pathname === '/approval';
     const isOdooView = !isCustomReactRoute;
@@ -193,22 +239,28 @@ export default function Layout({ children }) {
     return (
         <div className="flex min-h-screen bg-slate-50 dark:bg-slate-900">
             <Sidebar isCollapsed={isSidebarCollapsed} toggleSidebar={toggleSidebar} />
-            <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
+            <div 
+                className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}
+                style={{ marginRight: isGeminiPanelOpen ? '450px' : '0' }}
+            >
                 
                 {/* ─── Odoo 상단 네비게이션바 시계/알림 옆 절대위치(Fixed) AI 챗 버튼 ─── */}
-                <button
-                    onClick={() => setIsGeminiPanelOpen(v => !v)}
-                    className={`fixed top-2.5 right-52 z-[9999] flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all shadow-sm border ${
+                {isOdooView && (
+                    <button
+                        onClick={() => setIsGeminiPanelOpen(v => !v)}
+                    className={`fixed top-2.5 z-[9999] flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all shadow-sm border ${
                         isGeminiPanelOpen
                             ? 'bg-slate-800 text-white border-slate-700 ring-2 ring-slate-400/50'
                             : 'bg-white/90 hover:bg-white text-slate-700 hover:text-slate-900 border-slate-300/80 hover:border-slate-400 shadow-slate-200/50 hover:scale-105 active:scale-95'
                     }`}
+                    style={{ right: isGeminiPanelOpen ? 'calc(450px + 15rem)' : '15rem', transition: 'right 0.3s' }}
                     title="AI 챗봇 헬프봇 열기"
                 >
                     <BotMessageSquare size={14} className={isGeminiPanelOpen ? 'text-white' : 'text-slate-600'} />
                     <span className="tracking-tight text-[11px] font-bold">AI 챗</span>
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"/>
                 </button>
+                )}
 
                 <main className={`flex-1 overflow-x-hidden ${isFullPage ? 'p-0' : 'p-6'} ${isGoogleApp ? (isSidebarCollapsed ? 'pl-1 bg-slate-100' : 'pl-2.5 bg-slate-100') : ''} relative`}>
                     {/* Persistent Google Chat Webview */}
@@ -223,6 +275,7 @@ export default function Layout({ children }) {
                             display: isGoogleChat || !isGoogleChat ? 'block' : 'none' 
                         }}>
                             <webview 
+                                id="webview-google-chat"
                                 key={`chat-${currentUser ? currentUser.uid : 'guest'}`}
                                 src={currentUser?.email ? `https://chat.google.com/?authuser=${encodeURIComponent(currentUser.email)}` : "https://chat.google.com"}
                                 style={{ width: '100%', height: '100%', border: 'none', background: '#ffffff' }}
@@ -248,6 +301,7 @@ export default function Layout({ children }) {
                                 가장 심플한 방법은 웹뷰만 띄워두고 알림을 받는 용도로 쓰는 것입니다. 
                             */}
                             <webview 
+                                id="webview-google-mail"
                                 key={`mail-${currentUser ? currentUser.uid : 'guest'}`}
                                 src={currentUser?.email ? `https://mail.google.com/mail/?authuser=${encodeURIComponent(currentUser.email)}` : "https://mail.google.com"}
                                 style={{ width: '100%', height: '100%', border: 'none', background: '#ffffff' }}
@@ -269,6 +323,7 @@ export default function Layout({ children }) {
                             display: isGoogleCalendar || !isGoogleCalendar ? 'block' : 'none'
                         }}>
                             <webview 
+                                id="webview-google-calendar"
                                 key={`cal-${currentUser ? currentUser.uid : 'guest'}`}
                                 src={currentUser?.email ? `https://calendar.google.com/calendar/?authuser=${encodeURIComponent(currentUser.email)}` : "https://calendar.google.com/calendar/"}
                                 style={{ width: '100%', height: '100%', border: 'none', background: '#ffffff' }}

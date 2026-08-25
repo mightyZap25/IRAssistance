@@ -59,12 +59,61 @@ webFrame.executeJavaScript(`
             document.head.appendChild(style);
         } catch(e) {}
 
-        if (window.location.hostname.includes('192.168.0.7') || window.location.hostname.includes('100.67.238.32') || window.location.hostname.includes('odoo')) {
+        if (window.location.hostname.includes('192.168.0.11') || window.location.hostname.includes('100.67.238.32') || window.location.hostname.includes('odoo')) {
             Object.defineProperty(document, 'hidden', { get: function() { return true; } });
             Object.defineProperty(document, 'visibilityState', { get: function() { return 'hidden'; } });
         }
+
+        // 웹뷰 내부에서 포커스를 가지고 있을 때 마우스 뒤로가기(button 3)/앞으로가기(button 4) 처리
+        window.addEventListener('mouseup', function(e) {
+            if (e.button === 3) {
+                e.preventDefault();
+                window.history.back();
+            } else if (e.button === 4) {
+                e.preventDefault();
+                window.history.forward();
+            }
+        }, { capture: true });
     })();
 `).catch(console.error);
+
+// -----------------------------------------------------------------------------
+// Preload Native Context (Here we have access to webFrame)
+// -----------------------------------------------------------------------------
+
+// 웹뷰 내부에서 포커스를 가지고 있을 때 키보드 단축키 처리 (Alt+Left/Right 뒤로가기 및 Ctrl+/-/0 확대축소)
+window.addEventListener('keydown', function(e) {
+    if (e.altKey && e.key === 'ArrowLeft') {
+        window.history.back();
+    } else if (e.altKey && e.key === 'ArrowRight') {
+        window.history.forward();
+    } else if (e.ctrlKey && (e.key === '=' || e.key === '+' || e.key === '-' || e.key === '0')) {
+        e.preventDefault();
+        let currentZoom = webFrame.getZoomFactor();
+        if (e.key === '=' || e.key === '+') currentZoom += 0.1;
+        else if (e.key === '-') currentZoom -= 0.1;
+        else if (e.key === '0') currentZoom = 1.0;
+        
+        if (currentZoom < 0.5) currentZoom = 0.5;
+        if (currentZoom > 3.0) currentZoom = 3.0;
+        webFrame.setZoomFactor(currentZoom);
+    }
+}, { capture: true });
+
+// 웹뷰 내부에서 Ctrl + 마우스 휠 줌(Zoom) 기능
+window.addEventListener('wheel', function(e) {
+    if (e.ctrlKey) {
+        e.preventDefault();
+        let currentZoom = webFrame.getZoomFactor();
+        if (e.deltaY > 0) currentZoom -= 0.1;
+        else currentZoom += 0.1;
+        
+        if (currentZoom < 0.5) currentZoom = 0.5;
+        if (currentZoom > 3.0) currentZoom = 3.0;
+        
+        webFrame.setZoomFactor(currentZoom);
+    }
+}, { passive: false });
 
 try {
     if (typeof window !== 'undefined') {

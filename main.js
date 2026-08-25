@@ -428,12 +428,57 @@ if (!gotTheLock) {
                     }
                 });
 
+                // 내부 서비스 여부 판별 함수
+                const isInternalUrl = (testUrl) => {
+                    try {
+                        const u = new URL(testUrl);
+                        const host = u.hostname;
+                        
+                        const internalHosts = [
+                            'mail.google.com',
+                            'drive.google.com',
+                            'docs.google.com',
+                            'gemini.google.com',
+                            'calendar.google.com',
+                            'chat.google.com',
+                            'notebooklm.google.com',
+                            'accounts.google.com',
+                            'myaccount.google.com',
+                            'workspace.google.com'
+                        ];
+                        
+                        if (internalHosts.some(h => host === h || host.endsWith('.' + h))) return true;
+                        if (host.includes('192.168.0.') || host.includes('100.67.238.') || host.includes('odoo')) return true;
+                        if (host === 'localhost' || host === '127.0.0.1') return true;
+                        
+                        return false;
+                    } catch(e) {
+                        return true; // URL 파싱 실패시 안전하게 내부로 간주
+                    }
+                };
+
+                // 웹뷰 내부에서 일반 링크 클릭 시 (target="_self")
+                contents.on('will-navigate', (e, url) => {
+                    if (!isInternalUrl(url)) {
+                        e.preventDefault();
+                        console.log('[Electron Main] 외부 링크 감지 (will-navigate), 기본 브라우저로 엽니다:', url);
+                        shell.openExternal(url);
+                    }
+                });
+
+                // 웹뷰 내부에서 새 창 열기 시 (target="_blank" 등)
                 contents.setWindowOpenHandler(({ url }) => {
-                    console.log('[Electron Main] Intercepted webview popup window. Loading in-place:', url);
-                    contents.loadURL(url).catch(err => {
-                        console.error('[Electron Main] Failed to load popup URL in webview:', err);
-                    });
-                    return { action: 'deny' };
+                    if (!isInternalUrl(url)) {
+                        console.log('[Electron Main] 외부 링크 감지 (popup), 기본 브라우저로 엽니다:', url);
+                        shell.openExternal(url);
+                        return { action: 'deny' };
+                    } else {
+                        console.log('[Electron Main] 내부 링크 팝업 감지, 현재 웹뷰에서 엽니다:', url);
+                        contents.loadURL(url).catch(err => {
+                            console.error('[Electron Main] Failed to load popup URL in webview:', err);
+                        });
+                        return { action: 'deny' };
+                    }
                 });
             }
 
@@ -1069,6 +1114,15 @@ ipcMain.handle('notes:writeFile', async (event, filePath, content) => {
     catch { return false; }
 });
 
+ipcMain.handle('notes:saveImage', async (event, filePath, arrayBuffer) => {
+    try { 
+        fs.writeFileSync(filePath, Buffer.from(arrayBuffer)); 
+        return true; 
+    } catch { 
+        return false; 
+    }
+});
+
 ipcMain.handle('notes:createFile', async (event, dirPath, fileName) => {
     const filePath = path.join(dirPath, fileName.endsWith('.md') ? fileName : fileName + '.md');
     try {
@@ -1091,4 +1145,31 @@ ipcMain.handle('notes:deleteFile', async (event, filePath) => {
 ipcMain.handle('notes:renameFile', async (event, oldPath, newPath) => {
     try { fs.renameSync(oldPath, newPath); return true; }
     catch { return false; }
+});
+
+let vaultFileCache = new Map();
+let vaultCacheTime = 0;
+
+ipcMain.handle('notes:findFile', async (event, dirPath, fileName) => {
+    const now = Date.now();
+    // 5초마다 캐시 갱신 (단기간 다중 호출 시 디스크 I/O 최적화)
+    if (now - vaultCacheTime > 5000 || !vaultFileCache.has(dirPath)) {
+        const cache = new Map();
+        const scanDir = (dir) => {
+            try {
+                const entries = fs.readdirSync(dir, { withFileTypes: true });
+                for (const e of entries) {
+                    if (e.name === '.git' || e.name === 'node_modules') continue;
+                    if (e.isDirectory()) scanDir(path.join(dir, e.name));
+                    else cache.set(e.name.toLowerCase(), path.join(dir, e.name));
+                }
+            } catch { }
+        };
+        scanDir(dirPath);
+        vaultFileCache.set(dirPath, cache);
+        vaultCacheTime = now;
+    }
+    
+    const cache = vaultFileCache.get(dirPath);
+    return cache ? cache.get(fileName.toLowerCase()) || null : null;
 });

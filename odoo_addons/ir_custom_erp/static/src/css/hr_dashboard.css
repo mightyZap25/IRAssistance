@@ -98,7 +98,7 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    flex: 1;
+    flex: 1; /* Stretch to fill remaining height */
 }
 
 /* Decorative subtle gradient background for the today card */
@@ -350,17 +350,19 @@
 .card_title {
     color: #a3aed1;
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     margin-bottom: 12px;
 }
 
 .card_value {
-    font-size: 1.4rem;
+    font-size: 1.1rem; /* Reduced from 1.4rem to prevent overflow */
     font-weight: 700;
     color: #2b3674;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap; /* allow long text like (잔여: 45시간) to wrap */
+    gap: 8px;
 }
 
 .card_value i {
@@ -448,7 +450,7 @@
 }
 
 .cal_cell {
-    min-height: 45px;
+    min-height: 0; /* Let grid strictly handle height */
     padding: 4px;
     background-color: #ffffff;
     display: flex;
@@ -502,7 +504,7 @@
 .event.text-warning { background: #fef3c7; color: #d97706 !important; }
 
 /* ================= Mobile & Narrow Window Responsiveness ================= */
-@media (max-width: 1024px) {
+@media (max-width: 768px) {
     .hr_dashboard_wrapper {
         height: 100%;
         min-height: 100%;
@@ -740,3 +742,75 @@
 .state_validate1 { background: #cff4fc; color: #0c7fa2; }
 .state_validate { background: #d1e7dd; color: #0f5132; }
 .state_refuse   { background: #f8d7da; color: #842029; }
+
+/* ================= Small Screen / Laptop Responsiveness (Fit to screen) ================= */
+@media (max-height: 900px), (max-width: 1366px) {
+    .hr_main {
+        padding: 15px 15px 15px 10px !important;
+        gap: 12px !important;
+    }
+    .hr_sidebar {
+        padding: 15px 10px 15px 15px !important;
+    }
+    .sidebar_header h4 {
+        margin-bottom: 12px !important;
+        font-size: 1.2rem !important;
+    }
+    .sidebar_today {
+        padding: 15px !important;
+        margin-bottom: 12px !important;
+        overflow-y: auto !important; /* Allow scroll if button cuts off */
+    }
+    .top_cards {
+        margin-top: 40px !important; /* Keep aligned with left sidebar header */
+        gap: 12px !important;
+    }
+    .metric_card {
+        padding: 12px 15px !important; /* Make boxes a bit thinner */
+    }
+    .card_title {
+        font-size: 0.75rem !important;
+        margin-bottom: 4px !important;
+    }
+    .card_value {
+        font-size: 0.95rem !important;
+    }
+    .progress_circle {
+        width: 120px !important;
+        height: 120px !important;
+    }
+    .inner_circle {
+        width: 100px !important;
+        height: 100px !important;
+    }
+    .inner_circle .percent {
+        font-size: 1.4rem !important;
+    }
+    .calendar_area {
+        padding: 15px !important;
+        margin-bottom: 10px !important;
+    }
+    .cal_cell {
+        min-height: 35px !important;
+    }
+    .calendar_header {
+        margin-bottom: 10px !important;
+    }
+    .clock_buttons {
+        gap: 8px !important;
+    }
+    .clock_in_btn, .schedule_change_btn {
+        padding: 10px !important;
+        font-size: 0.9rem !important;
+    }
+    .greeting {
+        font-size: 1.1rem !important;
+        margin-bottom: 10px !important;
+    }
+    .clock_times {
+        margin-bottom: 15px !important;
+    }
+    .progress_circle_wrapper {
+        margin-bottom: 15px !important;
+    }
+}

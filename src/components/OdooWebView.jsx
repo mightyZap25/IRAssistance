@@ -31,7 +31,7 @@ export default function OdooWebView() {
         if (!webview) return;
         
         const handleConsoleMessage = (e) => {
-            if (e.message && e.message.includes('[I-Link BackNav]')) {
+            if (e.message && e.message.includes('[mightyONE BackNav]')) {
                 console.log(e.message);
             }
         };
@@ -43,11 +43,11 @@ export default function OdooWebView() {
                 window._iLinkNavTime = Date.now();
                 // sessionStorage에서 목표 경로 복원 (페이지 전환 시 새 컨텍스트에서도 유효)
                 window._iLinkTargetPath = sessionStorage.getItem('iLinkTargetPath') || null;
-                console.log('[I-Link Nav] 페이지 로드 - 목표경로: ' + (window._iLinkTargetPath || 'none'));
+                console.log('[mightyONE Nav] 페이지 로드 - 목표경로: ' + (window._iLinkTargetPath || 'none'));
 
                 if (!window._iLinkNavWatcher) {
                     window._iLinkNavWatcher = true;
-                    console.log('[I-Link Nav] 감시기 가동');
+                    console.log('[mightyONE Nav] 감시기 가동');
 
                     // 0. Odoo 작업/사용 중 세션 타임아웃 방지 (3분마다 Keep-Alive 핑 전송)
                     setInterval(function() {
@@ -69,7 +69,7 @@ export default function OdooWebView() {
                                                  // ⚠️ /web/login 경로 체크 제거: 페이지 전환 중 잠깐 거치는 경우 오판 유발
 
                         if (isSessionExpired && !window._isReloggingIn) {
-                            console.log('[I-Link Nav] ⚠️ 세션 만료/로그인 페이지 감지!' +
+                            console.log('[mightyONE Nav] ⚠️ 세션 만료/로그인 페이지 감지!' +
                                 ' | 현재경로: ' + window.location.pathname +
                                 ' | 로그인페이지: ' + isLoginPage +
                                 ' | 목표경로: ' + (window._iLinkTargetPath || 'none'));
@@ -79,7 +79,7 @@ export default function OdooWebView() {
                             try { creds = JSON.parse(sessionStorage.getItem('odoo_last_creds') || 'null'); } catch(e) {}
 
                             if (creds && creds.login && creds.password && creds.db) {
-                                console.log('[I-Link Nav] 🔑 자동 재인증 시도: ' + creds.login);
+                                console.log('[mightyONE Nav] 🔑 자동 재인증 시도: ' + creds.login);
                                 fetch('/web/session/authenticate', {
                                     method: 'POST',
                                     credentials: 'include',
@@ -90,20 +90,20 @@ export default function OdooWebView() {
                                     })
                                 }).then(r => r.json()).then(d => {
                                     if (d.result && d.result.uid) {
-                                        console.log('[I-Link Nav] ✅ 재인증 성공! uid=' + d.result.uid + ' → 복귀 경로: ' + (window._iLinkTargetPath || '/odoo/time-off'));
+                                        console.log('[mightyONE Nav] ✅ 재인증 성공! uid=' + d.result.uid + ' → 복귀 경로: ' + (window._iLinkTargetPath || '/odoo/time-off'));
                                         window._isReloggingIn = false;
                                         const targetPath = window._iLinkTargetPath || sessionStorage.getItem('iLinkTargetPath') || '/odoo/action-724';
                                         window.location.replace(targetPath);
                                     } else {
-                                        console.log('[I-Link Nav] ❌ 재인증 실패: ' + JSON.stringify(d.error || {}));
+                                        console.log('[mightyONE Nav] ❌ 재인증 실패: ' + JSON.stringify(d.error || {}));
                                         window._isReloggingIn = false;
                                     }
                                 }).catch(function(e) {
-                                    console.log('[I-Link Nav] ❌ 재인증 네트워크 오류: ' + e.message);
+                                    console.log('[mightyONE Nav] ❌ 재인증 네트워크 오류: ' + e.message);
                                     window._isReloggingIn = false;
                                 });
                             } else {
-                                console.log('[I-Link Nav] ❌ 저장된 자격증명 없음 - 재인증 불가');
+                                console.log('[mightyONE Nav] ❌ 저장된 자격증명 없음 - 재인증 불가');
                                 window._isReloggingIn = false;
                             }
                         }
@@ -111,7 +111,7 @@ export default function OdooWebView() {
                         // 유효하지 않습니다 / Action not found 모달 자동 닫기 및 목표 페이지 재접속
                         const invalidModal = document.querySelector('.o_dialog, .modal-content');
                         if (invalidModal && invalidModal.innerText && (invalidModal.innerText.includes('유효하지') || invalidModal.innerText.includes('Invalid') || invalidModal.innerText.includes('Action not found'))) {
-                            console.log('[I-Link Nav] ⚠️ 유효하지 않은 액션 모달 감지됨! 자동 닫고 목표 페이지 재접속');
+                            console.log('[mightyONE Nav] ⚠️ 유효하지 않은 액션 모달 감지됨! 자동 닫고 목표 페이지 재접속');
                             const okBtn = invalidModal.querySelector('.btn-primary, .btn-secondary, button');
                             if (okBtn) okBtn.click();
                             const targetPath = window._iLinkTargetPath || sessionStorage.getItem('iLinkTargetPath') || '/odoo/action-724';
@@ -129,7 +129,7 @@ export default function OdooWebView() {
 
                     window.addEventListener('mouseup', function(e) {
                         if (e.button === 3) {
-                            console.log('[I-Link BackNav] 마우스 뒤로가기 버튼(3번) 입력 감지됨!');
+                            console.log('[mightyONE BackNav] 마우스 뒤로가기 버튼(3번) 입력 감지됨!');
                             
                             function triggerClick(el, label) {
                                 if (!el) return false;
@@ -196,7 +196,7 @@ export default function OdooWebView() {
             if (e.channel === 'odoo-notification') {
                 const { title, options } = e.args[0];
                 console.log('[OdooWebView] IPC Notification Request Received:', title);
-                // 메인 렌더러(I-Link) 권한으로 진짜 윈도우 알림을 띄웁니다!
+                // 메인 렌더러(mightyONE) 권한으로 진짜 윈도우 알림을 띄웁니다!
                 new window.Notification(title, options);
             } else if (e.channel === 'odoo-navigate') {
                 const { path } = e.args[0];
@@ -314,7 +314,7 @@ export default function OdooWebView() {
                         window._iLinkTargetPath = '${targetPathForStorage}';
                         window._iLinkNavTime = Date.now();
                         try { sessionStorage.setItem('iLinkTargetPath', '${targetPathForStorage}'); } catch(e) {}
-                        console.log('[I-Link Nav] ✅ 목표 경로 저장: ${targetPathForStorage}');
+                        console.log('[mightyONE Nav] ✅ 목표 경로 저장: ${targetPathForStorage}');
                     `).catch(() => {});
                 }
 
@@ -414,7 +414,7 @@ export default function OdooWebView() {
                                         
                                         // Owl이 이벤트를 잡지 못했거나 URL이 안 바뀌었다면 아직 로딩 중이므로 0.5초 뒤 재시도
                                         if (!owlHandled && window.location.pathname !== path) {
-                                            console.log('[I-Link Nav] ⏳ Odoo 라우터가 아직 준비되지 않음. 0.5초 후 재시도...');
+                                            console.log('[mightyONE Nav] ⏳ Odoo 라우터가 아직 준비되지 않음. 0.5초 후 재시도...');
                                             setTimeout(trySpaNavigation, 500);
                                         }
                                     }
@@ -659,11 +659,11 @@ export default function OdooWebView() {
                 // 로그인 페이지 체크 실패 무시
             }
             // Odoo 상단 메뉴바의 홈 버튼(앱 선택기)만 숨기고, 하위 메뉴(품목, 작업 등)는 보이도록 유지
-            // 추가로 Odoo 기본 보라색 테마를 I-Link 색상(Slate-800)으로 덮어씌우고 좌측 마진을 줍니다.
+            // 추가로 Odoo 기본 보라색 테마를 mightyONE 색상(Slate-800)으로 덮어씌우고 좌측 마진을 줍니다.
             webview.insertCSS(`
                 /* ===== Odoo 로그인 페이지: Google 로그인 버튼 숨기기 =====
                    임베디드 브라우저(Electron webview)에서는 Google OAuth가
-                   Google 정책에 의해 차단됩니다. I-Link 앱의 로그인 화면에서
+                   Google 정책에 의해 차단됩니다. mightyONE 앱의 로그인 화면에서
                    Google 로그인 버튼을 사용해주세요.
                 */
                 .o_auth_oauth_login,
@@ -1080,7 +1080,7 @@ export default function OdooWebView() {
                     }
 
                     /* ==================================================== */
-                    /* I-Link Custom Badges (품목 분류/클래스 하이라이트) */
+                    /* mightyONE Custom Badges (품목 분류/클래스 하이라이트) */
                     /* ==================================================== */
                     .ir-badge {
                         font-weight: 800 !important;
@@ -1548,8 +1548,9 @@ export default function OdooWebView() {
                 src={`${odooApiUrl}/web`}
                 style={{ width: '100%', height: '100%', border: 'none', opacity: isWebViewLoading ? 0 : 1, transition: 'opacity 0.3s ease-in-out' }}
                 allowpopups="true"
+                disablewebsecurity="true"
                 partition="persist:odoo"
-                webpreferences="contextIsolation=no"
+                webpreferences="contextIsolation=no, webSecurity=no"
                 useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             />
         </div>

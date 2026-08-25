@@ -23,7 +23,7 @@ export default function WelcomeDashboard() {
                 </h1>
                 
                 <p className="text-lg text-slate-500 font-medium mb-8 text-center max-w-md">
-                    I-Link 스마트 업무 환경에 접속하셨습니다.<br/>
+                    mightyONE 스마트 업무 환경에 접속하셨습니다.<br/>
                     왼쪽 메뉴를 선택하여 원하시는 업무를 시작해 보세요.
                 </p>
 

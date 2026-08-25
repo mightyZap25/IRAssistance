@@ -22,10 +22,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
         listDir:     (dirPath)       => ipcRenderer.invoke('notes:listDir', dirPath),
         readFile:    (filePath)      => ipcRenderer.invoke('notes:readFile', filePath),
         writeFile:   (filePath, content) => ipcRenderer.invoke('notes:writeFile', filePath, content),
+        saveImage:   (filePath, arrayBuffer) => ipcRenderer.invoke('notes:saveImage', filePath, arrayBuffer),
         createFile:  (dirPath, name) => ipcRenderer.invoke('notes:createFile', dirPath, name),
         createDir:   (dirPath, name) => ipcRenderer.invoke('notes:createDir', dirPath, name),
         deleteFile:  (filePath)      => ipcRenderer.invoke('notes:deleteFile', filePath),
         renameFile:  (oldPath, newPath) => ipcRenderer.invoke('notes:renameFile', oldPath, newPath),
+        findFile:    (dirPath, fileName) => ipcRenderer.invoke('notes:findFile', dirPath, fileName),
     },
     onUpdateMessage: (callback) => {
         const subscription = (event, ...args) => callback(...args);

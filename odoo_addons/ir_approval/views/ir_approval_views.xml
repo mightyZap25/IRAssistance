@@ -5,6 +5,8 @@
         <field name="model">ir_approval.request</field>
         <field name="arch" type="xml">
             <list string="전자결재 문서">
+                <field name="is_my_turn" invisible="1"/>
+                <field name="my_turn_text" widget="badge" decoration-danger="is_my_turn == True" string="결재 차례"/>
                 <field name="doc_type" widget="badge"/>
                 <field name="name"/>
                 <field name="requestor_id"/>
@@ -19,66 +21,106 @@
         <field name="name">ir_approval.request.form</field>
         <field name="model">ir_approval.request</field>
         <field name="arch" type="xml">
-            <form string="전자결재 문서">
+            <form string="전자결재 문서" class="custom_full_width">
+                <style>
+                    /* 문서 영역 좌우 꽉 차게 확장 */
+                    .custom_full_width .o_form_sheet {
+                        max-width: 100% !important;
+                        width: 100% !important;
+                        padding-left: 24px !important;
+                        padding-right: 24px !important;
+                    }
+                    /* 전체 폰트 크기 증가 (기존 12px -> 14px) */
+                    .custom_full_width {
+                        font-size: 14px !important; 
+                    }
+                    .custom_full_width input.o_input, 
+                    .custom_full_width select.o_input, 
+                    .custom_full_width textarea.o_input,
+                    .custom_full_width .o_form_label {
+                        font-size: 14px !important;
+                    }
+                    /* 텍스트 입력창 패딩 최소화 */
+                    .custom_full_width input.o_input, 
+                    .custom_full_width select.o_input {
+                        padding: 2px 6px !important;
+                        min-height: 24px !important;
+                        height: 28px !important;
+                    }
+                    .custom_full_width textarea.o_input {
+                        padding: 4px 6px !important;
+                    }
+                    /* 한 줄짜리 그룹 레이블 공백 제거를 위한 고정 너비 지정 */
+                    .custom_full_width .single_line_group {
+                        grid-template-columns: 140px 1fr !important;
+                    }
+                    /* 헤더 영역 위쪽 공백 최소화 */
+                    .o_form_view .o_form_statusbar {
+                        margin-top: 0 !important;
+                        padding-top: 2px !important;
+                        padding-bottom: 2px !important;
+                    }
+                    .o_form_view .o_form_sheet_bg {
+                        padding-top: 0 !important;
+                    }
+                </style>
                 <header>
                     <button name="action_submit" string="결재 상신" type="object" class="oe_highlight" invisible="status != 'draft'"/>
                     <button name="action_approve" string="승인" type="object" class="oe_highlight" invisible="status != 'pending'"/>
                     <button name="action_reject" string="반려" type="object" class="btn-danger" invisible="status != 'pending'"/>
+                    <button name="action_draft" string="수정/재기안" type="object" class="btn-secondary" invisible="status != 'rejected'"/>
                     <field name="status" widget="statusbar" statusbar_visible="draft,pending,approved,rejected"/>
                 </header>
                 <sheet>
-                    <div class="oe_title">
-                        <h1>
-                            <field name="name" placeholder="기안서 제목..."/>
+                    <!-- 1. 문서 종류 및 기안서 제목 (같은 줄 배치) -->
+                    <div class="d-flex align-items-center mb-3">
+                        <label for="doc_type" class="fw-bold me-2 mb-0" string="문서 종류" style="font-size: 14px; width: 80px;"/>
+                        <field name="doc_type" required="1" class="me-4" style="font-size: 14px; font-weight: bold; width: 180px;"/>
+                        <h1 class="m-0 flex-grow-1" style="line-height: 1.2;">
+                            <field name="name" placeholder="기안서 제목..." class="w-100" style="font-size: 24px; min-height: 30px; border-bottom: 1px solid #ccc;"/>
                         </h1>
                     </div>
+
+                    <!-- 3. 기안일자(좌) / 보존연한(우) -->
                     <group>
-                        <!-- 문서 종류 및 기본 정보 -->
-                        <group>
-                            <field name="doc_type" required="1"/>
-                            <field name="requestor_id"/>
-                            <field name="department_id"/>
-                        </group>
-                        
                         <group>
                             <field name="draft_date"/>
+                        </group>
+                        <group>
                             <field name="retention_period"/>
                         </group>
-                        
-                        <!-- 구매/지출 전용 필드 -->
-                        <group string="구매/지출 상세" invisible="doc_type != 'PURCHASE_REQUEST'">
-                            <field name="vendor_id"/>
-                            <field name="purchase_amount"/>
+                    </group>
+                    
+                    <!-- 4. 고유 내용 (지출결의서) -->
+                    <group string="지출 결의 상세" invisible="doc_type != 'EXPENSE_RESOLUTION'">
+                        <group>
+                            <field name="expense_user"/>
+                            <field name="expense_vendor"/>
+                            <field name="expense_date"/>
                         </group>
-                        
-                        <!-- 지출결의서 전용 필드 -->
-                        <group string="지출 결의 상세" invisible="doc_type != 'EXPENSE_RESOLUTION'">
-                            <group>
-                                <field name="expense_user"/>
-                                <field name="expense_job_title"/>
-                                <field name="expense_date"/>
-                                <field name="expense_vendor"/>
-                            </group>
-                            <group>
-                                <field name="expense_amount"/>
-                                <field name="expense_dept"/>
-                                <field name="expense_amount" string="금액" readonly="1"/>
-                            </group>
+                        <group>
+                            <field name="expense_job_title"/>
+                            <field name="expense_amount" widget="float"/>
                         </group>
-                        
-                        <group invisible="doc_type != 'EXPENSE_RESOLUTION'">
-                            <field name="expense_details"/>
-                            <field name="expense_etc"/>
+                        <group>
+                            <field name="expense_dept"/>
                         </group>
+                    </group>
 
-                        <!-- ECO 전용 필드 -->
-                        <group string="ECO 상세" invisible="doc_type != 'ECO'">
-                            <field name="eco_spec_no"/>
-                            <field name="eco_issue_date"/>
-                            <field name="eco_applied_models_chk"/>
-                            <field name="eco_comm_method"/>
+                        <!-- ECO 설계변경서 필드 -->
+                        <group string="ECO 설계변경" invisible="doc_type != 'ECO'">
+                            <group>
+                                <field name="eco_spec_no"/>
+                                <field name="eco_applied_models_chk"/>
+                            </group>
+                            <group>
+                                <field name="eco_issue_date"/>
+                                <field name="eco_comm_method"/>
+                            </group>
+                        </group>
+                        <group invisible="doc_type != 'ECO'" class="single_line_group">
                             <field name="eco_applied_model_text"/>
-                            <field name="eco_spec_type" widget="radio"/>
+                            <field name="eco_spec_type" widget="radio" options="{'horizontal': true}"/>
                             <field name="eco_change_reason"/>
                             <field name="eco_publish_change"/>
                             <field name="eco_publish_change_detail" invisible="eco_publish_change != 'yes'"/>
@@ -86,18 +128,33 @@
                             <field name="eco_dept_opinion"/>
                             <field name="eco_revision_no"/>
                         </group>
+                        
+                        <!-- 양산이관 관련 필드 -->
+                        <group string="양산이관 상세" invisible="doc_type != 'MASS_PROD_TRANSFER'">
+                            <group>
+                                <field name="transfer_no"/>
+                                <field name="transfer_product_family"/>
+                            </group>
+                            <group>
+                                <field name="transfer_date"/>
+                                <field name="transfer_model"/>
+                            </group>
+                        </group>
+                        <group invisible="doc_type != 'MASS_PROD_TRANSFER'" class="single_line_group">
+                            <field name="transfer_detail_model"/>
+                            <field name="transfer_folder_path"/>
+                            <field name="transfer_dept_opinion"/>
+                        </group>
 
-                        <!-- 불출요청서 전용 필드 -->
-                        <group string="불출 상세" invisible="doc_type != 'ISSUE_REQUEST'">
+                        <!-- 이슈발생 요청서 필드 -->
+                        <group string="이슈 발생" invisible="doc_type != 'ISSUE_REQUEST'">
                             <field name="issue_request_date"/>
                             <field name="issue_customer"/>
                             <field name="issue_purpose"/>
                         </group>
 
-                    </group>
-                    
                     <notebook>
-                        <page string="불출 목록" invisible="doc_type != 'ISSUE_REQUEST'">
+                        <page string="이슈 품목" invisible="doc_type != 'ISSUE_REQUEST'">
                             <field name="issue_line_ids">
                                 <list editable="bottom">
                                     <field name="item_no"/>
@@ -109,7 +166,18 @@
                                 </list>
                             </field>
                         </page>
-                        <page string="설계변경 목록" invisible="doc_type != 'ECO'">
+                        <page string="양산이관 목록" invisible="doc_type != 'MASS_PROD_TRANSFER'">
+                            <field name="transfer_line_ids">
+                                <list editable="bottom">
+                                    <field name="list_no"/>
+                                    <field name="name"/>
+                                    <field name="version"/>
+                                    <field name="transfer_finish_date"/>
+                                    <field name="remarks"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="설계변경 내역" invisible="doc_type != 'ECO'">
                             <field name="eco_line_ids">
                                 <list editable="bottom">
                                     <field name="name"/>
@@ -143,6 +211,29 @@
                     <field name="message_ids"/>
                 </chatter>
             </form>
+        </field>
+    </record>
+
+    <record id="view_ir_approval_request_search" model="ir.ui.view">
+        <field name="name">ir_approval.request.search</field>
+        <field name="model">ir_approval.request</field>
+        <field name="arch" type="xml">
+            <search string="결재 문서 검색">
+                <field name="name" string="기안서 제목"/>
+                <field name="doc_type"/>
+                <field name="department_id"/>
+                <field name="requestor_id"/>
+                <filter string="내 차례 문서" name="my_turn" domain="[('is_my_turn', '=', True)]"/>
+                <filter string="진행 중" name="pending" domain="[('status', '=', 'pending')]"/>
+                <filter string="승인 완료" name="approved" domain="[('status', '=', 'approved')]"/>
+                <filter string="반려됨" name="rejected" domain="[('status', '=', 'rejected')]"/>
+                <group expand="0" string="그룹화">
+                    <filter string="문서 종류별" name="group_doc_type" context="{'group_by':'doc_type'}"/>
+                    <filter string="기안 부서별" name="group_department" context="{'group_by':'department_id'}"/>
+                    <filter string="기안자별" name="group_requestor" context="{'group_by':'requestor_id'}"/>
+                    <filter string="결재 상태별" name="group_status" context="{'group_by':'status'}"/>
+                </group>
+            </search>
         </field>
     </record>
 

@@ -30,7 +30,7 @@ export function AuthProvider({ children }) {
     const ALLOWED_DOMAINS = ['mightyzap.com', 'irrobot.com'];
     
     // Odoo API 동적 설정 (로컬 망 1차 시도 후 Tailscale 외부망 폴백)
-    const [odooApiUrl, setOdooApiUrl] = useState('http://192.168.0.7:8069'); // 기본 로컬 주소
+    const [odooApiUrl, setOdooApiUrl] = useState('http://192.168.0.11:8069'); // 기본 로컬 주소
     const ODOO_DB = 'odoo';
 
     useEffect(() => {
@@ -39,14 +39,14 @@ export function AuthProvider({ children }) {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 2000); // 2초 대기 후 타임아웃
                 // no-cors 모드를 사용하여 CORS 제한 없이 네트워크 도달 가능성만 단순 체크 (응답 여부만 판단)
-                await fetch('http://192.168.0.7:8069/web/login', {
+                await fetch('http://192.168.0.11:8069/web/login', {
                     method: 'GET',
                     mode: 'no-cors',
                     signal: controller.signal,
                 });
                 clearTimeout(timeoutId);
-                console.log('[Odoo Fallback] 로컬 사내망(192.168.0.7) Odoo 서버 접근 가능! 로컬 주소를 유지합니다.');
-                setOdooApiUrl('http://192.168.0.7:8069');
+                console.log('[Odoo Fallback] 로컬 사내망(192.168.0.11) Odoo 서버 접근 가능! 로컬 주소를 유지합니다.');
+                setOdooApiUrl('http://192.168.0.11:8069');
             } catch (err) {
                 console.warn('[Odoo Fallback] 로컬 사내망 Odoo 접근 불가! (2초 타임아웃 또는 연결거부). Tailscale(100.67.238.32)로 전환합니다.', err.message);
                 setOdooApiUrl('http://100.67.238.32:8069');
@@ -69,6 +69,20 @@ export function AuthProvider({ children }) {
                 localStorage.setItem('google_access_token', credential.accessToken);
                 const expiresIn = credential.expiresIn || 3500;
                 localStorage.setItem('google_access_token_expires_at', Date.now() + (expiresIn - 60) * 1000);
+            }
+            
+            // 사용자 세션 로컬 스토리지에 저장 (자동 로그인 용도)
+            if (user) {
+                localStorage.setItem('google_user_info', JSON.stringify({
+                    uid: user.uid,
+                    email: user.email,
+                    displayName: user.displayName,
+                    photoURL: user.photoURL
+                }));
+                // mockAuth 인스턴스에도 즉각 세팅
+                if (auth.setCurrentUser) {
+                    auth.setCurrentUser(user);
+                }
             }
 
             // 도메인 제한 체크
@@ -198,7 +212,7 @@ export function AuthProvider({ children }) {
         // 메모리 자격증명 초기화 (다음 사람 로그인 시 이전 사람 세션 방지)
         window._odooPendingCreds = null;
         
-        // I-Link 내 OdooWebView 세션 쿠키도 날려줌
+        // mightyONE 내 OdooWebView 세션 쿠키도 날려줌
         window.dispatchEvent(new CustomEvent('clear-odoo-session'));
         
         if (window.electronAPI?.clearGoogleCookies) {

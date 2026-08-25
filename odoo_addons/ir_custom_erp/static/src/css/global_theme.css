@@ -11,8 +11,13 @@
 
 /* ================= Global Font ================= */
 body, .o_web_client, .o_content, .o_control_panel, .o_form_view, .o_list_view, .o_kanban_view,
-.dropdown-menu, .btn, input, select, textarea {
+.dropdown-menu, input, select, textarea {
     font-family: var(--o-font-family-sans-serif) !important;
+}
+
+/* 버튼은 아이콘(.fa, odoo-editor 등)이 깨지지 않도록 가볍게 폰트 상속 */
+.btn:not(.fa):not([class*="fa-"]):not([class*="o_we_"]) {
+    font-family: var(--o-font-family-sans-serif);
 }
 
 /* ================= Top App Bar ================= */
