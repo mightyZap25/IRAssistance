@@ -74,9 +74,9 @@
     },
     "build": {
         "appId": "com.irassistant.app",
-        "productName": "ILink",
-        "artifactName": "ILink-Setup-${version}.${ext}",
-        "icon": "build/icon.png",
+        "productName": "mightyONE",
+        "artifactName": "mightyONE-Setup-${version}.${ext}",
+        "icon": "build/icon.ico",
         "publish": [
             {
                 "provider": "github",
@@ -116,7 +116,7 @@
             "output": "dist-electron"
         },
         "win": {
-            "icon": "build/icon.png",
+            "icon": "build/icon.ico",
             "target": [
                 "nsis"
             ]
@@ -134,7 +134,7 @@
             "allowToChangeInstallationDirectory": true,
             "createStartMenuShortcut": true,
             "createDesktopShortcut": true,
-            "shortcutName": "ILink"
+            "shortcutName": "mightyONE"
         }
     }
 }
