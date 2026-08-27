@@ -36,6 +36,13 @@ function ensureNotificationIcons() {
     if (fs.existsSync(defaultIconSrc) && !fs.existsSync(defaultIconDest)) {
         fs.copyFileSync(defaultIconSrc, defaultIconDest);
     }
+    
+    // 윈도우 작업표시줄 아이콘 버그(asar 가상경로 인식 실패) 우회를 위해 ICO 파일도 물리 디스크로 복사
+    const winIconSrc = path.join(app.getAppPath(), 'build', 'icon.ico');
+    const winIconDest = path.join(iconDir, 'icon.ico');
+    if (fs.existsSync(winIconSrc) && !fs.existsSync(winIconDest)) {
+        fs.copyFileSync(winIconSrc, winIconDest);
+    }
 
     const downloadIcon = (url, filename) => {
         const dest = path.join(iconDir, filename);
@@ -134,7 +141,14 @@ function createWindow() {
         minWidth: 1024,
         minHeight: 720,
         title: 'I-Link',
-        icon: path.join(app.getAppPath(), 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
+        icon: (() => {
+            if (process.platform === 'win32' && app.isPackaged) {
+                // 윈도우 패키징 상태에서는 icon을 지정하지 않아야 빌드된 exe 자체 아이콘이 작업표시줄에 정상 적용됩니다.
+                return undefined;
+            }
+            const localIcon = path.join(app.getPath('userData'), 'icons', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
+            return fs.existsSync(localIcon) ? localIcon : path.join(app.getAppPath(), 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
+        })(),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -232,7 +246,8 @@ function createWindow() {
 }
 
 function createTray() {
-    const activeIconPath = path.join(app.getAppPath(), 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
+    const localIcon = path.join(app.getPath('userData'), 'icons', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
+    const activeIconPath = fs.existsSync(localIcon) ? localIcon : path.join(app.getAppPath(), 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
     
     tray = new Tray(activeIconPath);
     

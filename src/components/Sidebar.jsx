@@ -153,6 +153,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
             if (item.name === '구매 & 외주' || item.name === 'Purchase') return allowedPaths.includes('/purchasing');
             if (item.name === '제조관리' || item.name === 'Manufacturing') return allowedPaths.includes('/prod-execution');
             if (item.name === '도면 & BOM & ECO' || item.name === 'PLM') return allowedPaths.includes('/plm');
+            if (item.name === '인사' || item.name === 'Employees') return role === 'admin' || role === 'manager';
 
             // 동적 메뉴 권한을 가진 사용자에게 모두 허용
             return allowedPaths.includes('/odoo/view');

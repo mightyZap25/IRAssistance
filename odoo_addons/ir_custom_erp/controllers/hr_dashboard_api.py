@@ -71,16 +71,23 @@ class HrDashboardAPI(http.Controller):
                 'pending_approvals': 0,
             }
 
-        # 1. 오늘 근태 현황 확인
-        today = datetime.date.today()
-        attendance = request.env['hr.attendance'].search([
-            ('employee_id', '=', employee.id),
-            ('check_in', '>=', datetime.datetime.combine(today, datetime.time.min)),
-            ('check_in', '<=', datetime.datetime.combine(today, datetime.time.max))
-        ], limit=1)
-
         import pytz
         user_tz = pytz.timezone(user.tz or 'Asia/Seoul')
+        now_utc = datetime.datetime.utcnow()
+        now_user = pytz.utc.localize(now_utc).astimezone(user_tz)
+        today = now_user.date()
+
+        # 1. 오늘 근태 현황 확인 (UTC 기준으로 변환하여 검색)
+        start_of_day_user = user_tz.localize(datetime.datetime.combine(today, datetime.time.min))
+        end_of_day_user = user_tz.localize(datetime.datetime.combine(today, datetime.time.max))
+        start_of_day_utc = start_of_day_user.astimezone(pytz.utc).replace(tzinfo=None)
+        end_of_day_utc = end_of_day_user.astimezone(pytz.utc).replace(tzinfo=None)
+
+        attendance = request.env['hr.attendance'].search([
+            ('employee_id', '=', employee.id),
+            ('check_in', '>=', start_of_day_utc),
+            ('check_in', '<=', end_of_day_utc)
+        ], limit=1, order="check_in desc")
         
         def format_tz(dt):
             if not dt: return '--:--'
