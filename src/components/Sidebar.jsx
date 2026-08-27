@@ -418,7 +418,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
     }[role] || { label: '뷰어', color: 'bg-slate-400' };
 
     return (
-        <aside className={`${isCollapsed ? 'w-16' : 'w-64'} bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col h-screen fixed left-0 top-0 z-50 transition-all duration-300 no-print`}>
+        <aside className={`${isCollapsed ? 'w-16' : 'w-64'} bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col h-screen fixed left-0 top-0 z-50 transition-all duration-300 print:hidden`}>
             {/* Fixed tooltip rendered outside overflow containers */}
             {isCollapsed && tooltip && (
                 <div

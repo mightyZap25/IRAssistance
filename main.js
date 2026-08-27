@@ -36,7 +36,7 @@ function ensureNotificationIcons() {
     if (fs.existsSync(defaultIconSrc) && !fs.existsSync(defaultIconDest)) {
         fs.copyFileSync(defaultIconSrc, defaultIconDest);
     }
-    
+
     // 윈도우 작업표시줄 아이콘 버그(asar 가상경로 인식 실패) 우회를 위해 ICO 파일도 물리 디스크로 복사
     const winIconSrc = path.join(app.getAppPath(), 'build', 'icon.ico');
     const winIconDest = path.join(iconDir, 'icon.ico');
@@ -79,7 +79,7 @@ function startBackend() {
         ? path.join(appPath.replace('app.asar', 'app.asar.unpacked'), 'server.js')
         : path.join(appPath, 'server.js');
     console.log(`[Electron Main] Starting Backend Server: ${serverPath}`);
-    
+
     // 백엔드 로그 저장을 위한 파일 경로
     const logDir = app.getPath('userData');
     const logFile = path.join(logDir, 'backend.log');
@@ -87,8 +87,8 @@ function startBackend() {
     try {
         serverProcess = fork(serverPath, [], {
             silent: true, // stdout, stderr 캡처
-            env: { 
-                ...process.env, 
+            env: {
+                ...process.env,
                 PORT: PORT.toString(),
                 ELECTRON_RESOURCES_PATH: app.isPackaged ? process.resourcesPath : app.getAppPath()
             }
@@ -123,7 +123,7 @@ function startBackend() {
                     try {
                         const lastLogs = fs.readFileSync(logFile, 'utf8').slice(-1000);
                         errorMsg += `\n\n최근 오류 로그:\n${lastLogs}`;
-                    } catch(e) {}
+                    } catch (e) { }
                 }
                 dialog.showErrorBox('백엔드 서버 종료됨', errorMsg);
             }
@@ -140,14 +140,12 @@ function createWindow() {
         height: 850,
         minWidth: 1024,
         minHeight: 720,
-        title: 'I-Link',
+        title: 'mightyONE',
         icon: (() => {
-            if (process.platform === 'win32' && app.isPackaged) {
-                // 윈도우 패키징 상태에서는 icon을 지정하지 않아야 빌드된 exe 자체 아이콘이 작업표시줄에 정상 적용됩니다.
-                return undefined;
-            }
-            const localIcon = path.join(app.getPath('userData'), 'icons', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
-            return fs.existsSync(localIcon) ? localIcon : path.join(app.getAppPath(), 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
+            // Windows: .ico 파일을 명시적으로 지정해야 작업 표시줄에 올바른 아이콘이 표시됩니다.
+            const iconFile = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
+            const localIcon = path.join(app.getPath('userData'), 'icons', iconFile);
+            return fs.existsSync(localIcon) ? localIcon : path.join(app.getAppPath(), 'build', iconFile);
         })(),
         webPreferences: {
             nodeIntegration: false,
@@ -187,8 +185,8 @@ function createWindow() {
     // Handle external links (open in default browser instead of electron window)
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
         if (
-            url.startsWith('file://') || 
-            url.includes('localhost:') || 
+            url.startsWith('file://') ||
+            url.includes('localhost:') ||
             url.includes('chat.google.com') ||
             url.includes('firebaseapp.com') ||
             url.includes('accounts.google.com')
@@ -205,10 +203,10 @@ function createWindow() {
             event.preventDefault();
             mainWindow.hide();
             console.log('[Electron Main] Window hidden (Minimized to Tray)');
-            
+
             if (tray && !hasShownTrayBalloon) {
                 tray.displayBalloon({
-                    title: 'I-Link',
+                    title: 'mightyONE',
                     content: '프로그램이 백그라운드에서 계속 실행 중입니다. 우측 하단 트레이 아이콘을 더블클릭하여 다시 열 수 있습니다.',
                     iconType: 'info'
                 });
@@ -248,30 +246,30 @@ function createWindow() {
 function createTray() {
     const localIcon = path.join(app.getPath('userData'), 'icons', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
     const activeIconPath = fs.existsSync(localIcon) ? localIcon : path.join(app.getAppPath(), 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
-    
+
     tray = new Tray(activeIconPath);
-    
+
     const contextMenu = Menu.buildFromTemplate([
-        { 
-            label: '열기 (Open ERP)', 
+        {
+            label: '열기 (Open ERP)',
             click: () => {
                 if (mainWindow) {
                     mainWindow.show();
                     mainWindow.focus();
                 }
-            } 
+            }
         },
         { type: 'separator' },
-        { 
-            label: '종료 (Quit)', 
+        {
+            label: '종료 (Quit)',
             click: () => {
                 isQuitting = true;
                 app.quit();
-            } 
+            }
         }
     ]);
 
-    tray.setToolTip('I-Link ERP');
+    tray.setToolTip('mightyONE ERP');
     tray.setContextMenu(contextMenu);
 
     // Toggle show/hide on double click
@@ -369,16 +367,23 @@ if (!gotTheLock) {
                                 body: data.options?.body || '',
                                 icon: path.join(app.getPath('userData'), 'icons', 'icon.png')
                             });
+                            notif.on('click', () => {
+                                if (mainWindow) {
+                                    if (mainWindow.isMinimized()) mainWindow.restore();
+                                    mainWindow.show();
+                                    mainWindow.focus();
+                                }
+                            });
                             notif.show();
                         }
                     }
-                    
+
                     // global-preload.js에서 ipcRenderer.sendToHost로 전송한 알림 처리
                     // 빌드 후에도 안정적으로 동작하는 방식 (console.log 방식의 대안)
                     if (channel === 'ilink-notification') {
                         const data = args[0] || {};
                         console.log('[Electron Main] ilink-notification 수신:', data);
-                        
+
                         let prefix = '';
                         let iconName = 'icon.png';
                         const source = data.source || '';
@@ -386,7 +391,7 @@ if (!gotTheLock) {
                         else if (source.includes('chat.google.com')) { prefix = '[구글챗] '; iconName = 'gchat.png'; }
                         else if (source.includes('calendar.google.com')) { prefix = '[캘린더] '; iconName = 'gcalendar.png'; }
                         else if (source.includes('192.168.0.7') || source.includes('100.67.238.32')) { prefix = '[Odoo] '; iconName = 'icon.png'; }
-                        
+
                         if (Notification.isSupported()) {
                             let iconPath = path.join(app.getPath('userData'), 'icons', iconName);
                             if (!fs.existsSync(iconPath)) {
@@ -396,6 +401,13 @@ if (!gotTheLock) {
                                 title: prefix + (data.title || '새 알림'),
                                 body: data.body || '',
                                 icon: iconPath
+                            });
+                            notif.on('click', () => {
+                                if (mainWindow) {
+                                    if (mainWindow.isMinimized()) mainWindow.restore();
+                                    mainWindow.show();
+                                    mainWindow.focus();
+                                }
                             });
                             notif.show();
                         }
@@ -410,7 +422,7 @@ if (!gotTheLock) {
                         try {
                             const data = JSON.parse(msg.slice('ILINK_NOTIF::'.length));
                             console.log('[Electron Main] Received ILINK_NOTIF::', data);
-                            
+
                             // 출처에 따라 제목에 접두사(Prefix) 붙이기 및 아이콘 설정
                             let prefix = '';
                             let iconName = 'icon.png';
@@ -420,24 +432,31 @@ if (!gotTheLock) {
                                 else if (data.source.includes('calendar.google.com')) { prefix = '[캘린더] '; iconName = 'gcalendar.png'; }
                                 else if (data.source.includes('192.168.0.7') || data.source.includes('100.67.238.32')) { prefix = '[Odoo] '; iconName = 'icon.png'; }
                             }
-                            
+
                             const finalTitle = prefix + (data.title || '새 알림');
-                            
+
                             if (Notification.isSupported()) {
                                 // 다운로드된 아이콘 파일이 userData 경로에 존재하는지 확인
                                 let iconPath = path.join(app.getPath('userData'), 'icons', iconName);
                                 if (!fs.existsSync(iconPath)) {
                                     iconPath = path.join(app.getPath('userData'), 'icons', 'icon.png');
                                 }
-                                
+
                                 const notif = new Notification({
                                     title: finalTitle,
                                     body: data.body || '',
                                     icon: iconPath
                                 });
+                                notif.on('click', () => {
+                                    if (mainWindow) {
+                                        if (mainWindow.isMinimized()) mainWindow.restore();
+                                        mainWindow.show();
+                                        mainWindow.focus();
+                                    }
+                                });
                                 notif.show();
                             }
-                        } catch(ex) {
+                        } catch (ex) {
                             console.error('[Electron Main] 알림 파싱 실패:', ex);
                         }
                     }
@@ -448,7 +467,7 @@ if (!gotTheLock) {
                     try {
                         const u = new URL(testUrl);
                         const host = u.hostname;
-                        
+
                         const internalHosts = [
                             'mail.google.com',
                             'drive.google.com',
@@ -461,13 +480,13 @@ if (!gotTheLock) {
                             'myaccount.google.com',
                             'workspace.google.com'
                         ];
-                        
+
                         if (internalHosts.some(h => host === h || host.endsWith('.' + h))) return true;
                         if (host.includes('192.168.0.') || host.includes('100.67.238.') || host.includes('odoo')) return true;
                         if (host === 'localhost' || host === '127.0.0.1') return true;
-                        
+
                         return false;
-                    } catch(e) {
+                    } catch (e) {
                         return true; // URL 파싱 실패시 안전하게 내부로 간주
                     }
                 };
@@ -483,16 +502,27 @@ if (!gotTheLock) {
 
                 // 웹뷰 내부에서 새 창 열기 시 (target="_blank" 등)
                 contents.setWindowOpenHandler(({ url }) => {
-                    if (!isInternalUrl(url)) {
+                    // about:blank는 Gmail 새 창 띄우기 등에서 내부적으로 사용됨
+                    if (!isInternalUrl(url) && url !== 'about:blank' && url !== 'about:srcdoc') {
                         console.log('[Electron Main] 외부 링크 감지 (popup), 기본 브라우저로 엽니다:', url);
                         shell.openExternal(url);
                         return { action: 'deny' };
                     } else {
-                        console.log('[Electron Main] 내부 링크 팝업 감지, 현재 웹뷰에서 엽니다:', url);
-                        contents.loadURL(url).catch(err => {
-                            console.error('[Electron Main] Failed to load popup URL in webview:', err);
-                        });
-                        return { action: 'deny' };
+                        console.log('[Electron Main] 내부 링크 팝업 감지, Electron 팝업 창으로 엽니다:', url);
+                        return { 
+                            action: 'allow',
+                            overrideBrowserWindowOptions: {
+                                width: 1100,
+                                height: 800,
+                                autoHideMenuBar: true,
+                                backgroundColor: '#ffffff',
+                                webPreferences: {
+                                    partition: contents.session.partition,
+                                    nodeIntegration: false,
+                                    contextIsolation: true
+                                }
+                            }
+                        };
                     }
                 });
             }
@@ -561,7 +591,7 @@ if (!gotTheLock) {
                     body, button, input, select, textarea, .o_main_navbar, .o_content, span, div, p, td, th, a {
                         font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "맑은 고딕", "Noto Sans KR", "Apple SD Gothic Neo", "Segoe UI", Roboto, sans-serif !important;
                     }
-                `, { cssOrigin: 'user' }).catch(err => {});
+                `, { cssOrigin: 'user' }).catch(err => { });
             });
         });
 
@@ -571,7 +601,7 @@ if (!gotTheLock) {
                 const protocol = cookie.secure ? 'https:' : 'http:';
                 const domainClean = cookie.domain.startsWith('.') ? cookie.domain.slice(1) : cookie.domain;
                 const url = `${protocol}//${domainClean}${cookie.path}`;
-                
+
                 const persistentCookie = {
                     url: url,
                     name: cookie.name,
@@ -691,8 +721,8 @@ if (app.isPackaged) {
     ipcMain.on('check-for-updates', () => {
         sendUpdateMessage('not-available');
     });
-    ipcMain.on('start-download', () => {});
-    ipcMain.on('restart-app', () => {});
+    ipcMain.on('start-download', () => { });
+    ipcMain.on('restart-app', () => { });
     console.log('[Electron Main] Dev Mode: autoUpdater is completely disabled.');
 }
 
@@ -709,9 +739,16 @@ ipcMain.on('show-notification', (event, { title, body }) => {
             iconPath = path.join(app.getAppPath(), 'build', 'icon.png');
         }
         const notif = new Notification({
-            title: title || 'I-Link',
+            title: title || 'mightyONE',
             body: body || '',
             icon: iconPath
+        });
+        notif.on('click', () => {
+            if (mainWindow) {
+                if (mainWindow.isMinimized()) mainWindow.restore();
+                mainWindow.show();
+                mainWindow.focus();
+            }
         });
         notif.show();
     }
@@ -738,6 +775,13 @@ ipcMain.on('odoo-desktop-notification', (event, data) => {
             title: title || 'Odoo 알림',
             body: options?.body || '',
             icon: path.join(app.getPath('userData'), 'icons', 'icon.png')
+        });
+        notif.on('click', () => {
+            if (mainWindow) {
+                if (mainWindow.isMinimized()) mainWindow.restore();
+                mainWindow.show();
+                mainWindow.focus();
+            }
         });
         notif.show();
         console.log('[Electron Main] 네이티브 윈도우 알림을 성공적으로 표시했습니다.');
@@ -812,13 +856,13 @@ ipcMain.handle('google-oauth-signin', async () => {
             if (loginWin && !loginWin.isDestroyed()) {
                 try {
                     loginWin.destroy();
-                } catch (e) {}
+                } catch (e) { }
             }
             loginWin = null;
             if (activeOAuthServer) {
                 try {
                     activeOAuthServer.close();
-                } catch (e) {}
+                } catch (e) { }
                 activeOAuthServer = null;
             }
             if (activeOAuthReject === reject) {
@@ -866,7 +910,7 @@ ipcMain.handle('google-oauth-signin', async () => {
                     setTimeout(() => {
                         try {
                             loginWin.close();
-                        } catch (e) {}
+                        } catch (e) { }
                     }, 1000);
                 }
 
@@ -974,7 +1018,7 @@ ipcMain.handle('google-oauth-signin', async () => {
                 // 뒤로가기/앞으로가기 단축키 지원 (Backspace, Cmd+[, Alt+Left 등)
                 loginWin.webContents.on('before-input-event', (event, input) => {
                     if (input.type === 'keyDown') {
-                        const isBack = 
+                        const isBack =
                             (process.platform === 'darwin' && input.meta && input.key === '[') || // Cmd + [
                             (input.alt && input.key === 'ArrowLeft') || // Alt + Left
                             (input.key === 'BrowserBack') || // Browser Back key
@@ -1130,11 +1174,11 @@ ipcMain.handle('notes:writeFile', async (event, filePath, content) => {
 });
 
 ipcMain.handle('notes:saveImage', async (event, filePath, arrayBuffer) => {
-    try { 
-        fs.writeFileSync(filePath, Buffer.from(arrayBuffer)); 
-        return true; 
-    } catch { 
-        return false; 
+    try {
+        fs.writeFileSync(filePath, Buffer.from(arrayBuffer));
+        return true;
+    } catch {
+        return false;
     }
 });
 
@@ -1184,7 +1228,7 @@ ipcMain.handle('notes:findFile', async (event, dirPath, fileName) => {
         vaultFileCache.set(dirPath, cache);
         vaultCacheTime = now;
     }
-    
+
     const cache = vaultFileCache.get(dirPath);
     return cache ? cache.get(fileName.toLowerCase()) || null : null;
 });

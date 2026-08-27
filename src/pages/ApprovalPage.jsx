@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot } from '../database';
+import { collection, query, orderBy, onSnapshot, doc, deleteDoc } from '../database';
 import { db } from '../database';
 import { useAuth } from '../contexts/AuthContext';
 import ApprovalForm from '../components/ApprovalForm';
 import { ApprovalProcessor, ApprovalStatusViewer } from '../components/common/ApprovalSystem';
-import { FileCheck, Plus } from 'lucide-react';
+import { FileCheck, Plus, Trash2 } from 'lucide-react';
 
 import { useLocation } from 'react-router-dom';
 
 export default function ApprovalPage() {
-    const { currentUser } = useAuth();
+    const { currentUser, userProfile } = useAuth();
     const location = useLocation();
     
     // Parse query params to optionally auto-start creating a specific document type
@@ -19,6 +19,7 @@ export default function ApprovalPage() {
     
     const [viewMode, setViewMode] = useState(initialDocType ? 'create' : 'list'); // list, create, edit, view
     const [activeTab, setActiveTab] = useState('pending'); // pending, my, draft, completed
+    const [docTypeTab, setDocTypeTab] = useState('all'); // all, 지출결의서, 기안서 등
     const [approvalsData, setApprovalsData] = useState([]);
     const [selectedRequest, setSelectedRequest] = useState(
         initialDocType ? { docType: initialDocType, subType: initialSubType || '' } : null
@@ -34,11 +35,22 @@ export default function ApprovalPage() {
     }, [currentUser]);
 
     const getFilteredData = () => {
-        if (activeTab === 'draft') return approvalsData.filter(d => d.userId === currentUser.uid && d.Status === 'Draft');
-        if (activeTab === 'my') return approvalsData.filter(d => d.userId === currentUser.uid && d.Status !== 'Draft');
-        if (activeTab === 'pending') return approvalsData.filter(d => d.Status === 'Pending' && d.ApprovalSteps?.[d.CurrentStep || 0]?.approverUid === currentUser.uid);
-        if (activeTab === 'completed') return approvalsData.filter(d => d.Status === 'Approved' || d.Status === 'Rejected');
-        return [];
+        let filtered = approvalsData;
+        
+        if (activeTab === 'draft') filtered = filtered.filter(d => (d.userId === currentUser.uid || d.RequesterID === currentUser.uid) && (d.Status === 'Draft' || d.Status === 'DRAFT'));
+        else if (activeTab === 'my') filtered = filtered.filter(d => (d.userId === currentUser.uid || d.RequesterID === currentUser.uid) && (d.Status !== 'Draft' && d.Status !== 'DRAFT'));
+        else if (activeTab === 'pending') filtered = filtered.filter(d => 
+            (d.Status === 'Pending' || d.Status === 'PENDING') && 
+            (d.ApprovalSteps?.[d.CurrentStep || 0]?.approverUid === currentUser.uid || d.ApproverID === currentUser.uid)
+        );
+        else if (activeTab === 'completed') filtered = filtered.filter(d => ['Approved', 'APPROVED', 'Rejected', 'REJECTED'].includes(d.Status));
+        else filtered = [];
+
+        if (docTypeTab !== 'all') {
+            filtered = filtered.filter(d => (d.docType || d.DocType || '기안서') === docTypeTab);
+        }
+
+        return filtered;
     };
 
     if (viewMode === 'create' || viewMode === 'edit') {
@@ -127,19 +139,80 @@ export default function ApprovalPage() {
         };
 
         return (
-            <div className="p-6 max-w-5xl mx-auto pb-32">
-                <div className="flex items-center gap-4 mb-6">
-                    <button onClick={() => setViewMode('list')} className="p-2 hover:bg-slate-100 rounded-full">← 목록으로</button>
-                    <h2 className="text-2xl font-bold text-slate-800">결재 문서 상세조회</h2>
+            <div className="p-6 max-w-5xl mx-auto pb-32 print:p-0 print:m-0 print:max-w-none">
+                <div className="flex items-center justify-between mb-6 print:hidden">
+                    <div className="flex items-center gap-4">
+                        <button onClick={() => setViewMode('list')} className="p-2 hover:bg-slate-100 rounded-full">← 목록으로</button>
+                        <h2 className="text-2xl font-bold text-slate-800">결재 문서 상세조회</h2>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {userProfile?.role === 'admin' && (
+                            <button 
+                                onClick={async () => {
+                                    if (window.confirm('정말 이 전자결재 문서를 삭제하시겠습니까?\n삭제된 문서는 복구할 수 없습니다.')) {
+                                        try {
+                                            await deleteDoc(doc(db, 'approvals', selectedRequest.id));
+                                            setViewMode('list');
+                                        } catch (e) {
+                                            console.error('Delete failed:', e);
+                                            alert('문서 삭제 중 오류가 발생했습니다.');
+                                        }
+                                    }
+                                }}
+                                className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg font-bold flex items-center gap-2 transition-colors"
+                            >
+                                <Trash2 size={16} /> 삭제
+                            </button>
+                        )}
+                        <button onClick={() => window.print()} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold flex items-center gap-2">
+                            🖨️ 인쇄하기
+                        </button>
+                    </div>
                 </div>
                 
-                <ApprovalStatusViewer requestData={selectedRequest} />
+                {/* 인쇄용 결재선 표 (화면에는 안 보이고 인쇄할 때만 우측 상단에 표시) */}
+                <div className="hidden print:flex justify-end mb-8 w-full">
+                    <table className="border-collapse border-2 border-black text-center text-xs">
+                        <tbody>
+                            <tr>
+                                <td rowSpan="3" className="bg-slate-100 border border-black font-bold p-2 w-8" style={{ writingMode: 'vertical-rl', letterSpacing: '0.2em' }}>결재</td>
+                                {selectedRequest?.ApprovalSteps?.map((s, i) => (
+                                    <td key={i} className="bg-slate-100 border border-black p-1 font-bold w-20">{s.label}</td>
+                                ))}
+                            </tr>
+                            <tr>
+                                {selectedRequest?.ApprovalSteps?.map((s, i) => {
+                                    const h = selectedRequest?.ApprovalHistory?.find(x => x.step === i);
+                                    return (
+                                        <td key={i} className="border border-black h-20 align-middle">
+                                            {h ? (h.action === 'Approve' ? '✅ 승인' : '❌ 반려') : ''}
+                                        </td>
+                                    );
+                                })}
+                            </tr>
+                            <tr>
+                                {selectedRequest?.ApprovalSteps?.map((s, i) => {
+                                    const h = selectedRequest?.ApprovalHistory?.find(x => x.step === i);
+                                    return (
+                                        <td key={i} className="border border-black p-1 text-[10px]">
+                                            {h ? new Date(h.timestamp).toLocaleDateString() : ''}
+                                        </td>
+                                    );
+                                })}
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
-                <div className="bg-white p-6 rounded-2xl shadow-sm border mt-6 space-y-4">
+                <div className="print:hidden">
+                    <ApprovalStatusViewer requestData={selectedRequest} />
+                </div>
+
+                <div className="bg-white p-6 rounded-2xl shadow-sm border mt-6 space-y-4 print:shadow-none print:border-none print:p-0">
                     {renderViewDetails()}
                 </div>
 
-                <div className="mt-6">
+                <div className="mt-6 print:hidden">
                     <ApprovalProcessor 
                         requestData={selectedRequest} 
                         collectionName="approvals" 
@@ -172,43 +245,84 @@ export default function ApprovalPage() {
                 <button onClick={() => setActiveTab('completed')} className={`pb-2 px-2 font-bold ${activeTab === 'completed' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-500'}`}>완료된 결재</button>
             </div>
 
+            {/* 문서 종류 탭 */}
+            <div className="flex gap-2 mb-6 flex-wrap">
+                {['all', '지출결의서', '기안서', '설계변경서', '양산이관서', '이슈발생요청서', '근태신청서', '불출요청서'].map(type => (
+                    <button 
+                        key={type}
+                        onClick={() => setDocTypeTab(type)} 
+                        className={`px-4 py-1.5 rounded-full text-sm font-bold transition-colors shadow-sm border ${docTypeTab === type ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 hover:bg-slate-50 border-slate-200'}`}
+                    >
+                        {type === 'all' ? '모두' : type}
+                    </button>
+                ))}
+            </div>
+
             <div className="flex-1 bg-white rounded-2xl shadow-sm border overflow-hidden">
                 <table className="w-full text-left text-sm">
                     <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
                         <tr>
+                            <th className="p-4 font-bold w-32">기안일</th>
                             <th className="p-4 font-bold w-32">종류</th>
                             <th className="p-4 font-bold">제목</th>
                             <th className="p-4 font-bold w-24">작성자</th>
+                            <th className="p-4 font-bold w-28">결재자</th>
                             <th className="p-4 font-bold w-24">상태</th>
-                            <th className="p-4 font-bold w-32">기안일</th>
                             <th className="p-4 w-20"></th>
                         </tr>
                     </thead>
                     <tbody>
                         {getFilteredData().length === 0 ? (
-                            <tr><td colSpan="6" className="p-8 text-center text-slate-400">해당하는 문서가 없습니다.</td></tr>
+                            <tr><td colSpan="7" className="p-8 text-center text-slate-400">해당하는 문서가 없습니다.</td></tr>
                         ) : (
-                            getFilteredData().map(doc => (
-                                <tr key={doc.id} className="border-b last:border-none hover:bg-slate-50 transition-colors">
-                                    <td className="p-4 text-slate-500 font-bold">{doc.docType || '기안서'}</td>
-                                    <td className="p-4 font-bold text-slate-800">{doc.title}</td>
-                                    <td className="p-4 text-slate-600">{doc.userName}</td>
-                                    <td className="p-4">
-                                        <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${doc.Status === 'Draft' ? 'bg-slate-100 text-slate-600' : doc.Status === 'Pending' ? 'bg-blue-100 text-blue-600' : doc.Status === 'Approved' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
-                                            {doc.Status === 'Draft' ? '임시저장' : doc.Status === 'Pending' ? '진행중' : doc.Status === 'Approved' ? '승인완료' : '반려됨'}
-                                        </span>
-                                    </td>
-                                    <td className="p-4 text-slate-500">{doc.updatedAt?.toDate()?.toLocaleDateString()}</td>
-                                    <td className="p-4 text-right">
-                                        <button 
-                                            onClick={() => { setSelectedRequest(doc); setViewMode(doc.Status === 'Draft' ? 'edit' : 'view'); }} 
-                                            className="text-blue-600 hover:text-blue-800 font-bold bg-blue-50 px-3 py-1.5 rounded-lg whitespace-nowrap"
-                                        >
-                                            {doc.Status === 'Draft' ? '수정' : '보기'}
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))
+                            getFilteredData().map(doc => {
+                                const status = doc.Status?.toLowerCase() || '';
+                                const isPending = status === 'pending';
+                                const isApproved = status === 'approved';
+                                const isRejected = status === 'rejected';
+                                const currentStep = doc.CurrentStep || 0;
+                                const isMyTurn = isPending && (doc.ApprovalSteps?.[currentStep]?.approverUid === currentUser.uid || doc.ApproverID === currentUser.uid);
+                                
+                                let currentApproverName = '-';
+                                if (isApproved) currentApproverName = '결재 완료';
+                                else if (isRejected) currentApproverName = '반려됨';
+                                else currentApproverName = doc.ApprovalSteps?.[currentStep]?.approverName || doc.ApproverName || (isPending ? '결재 대기중' : '-');
+
+                                return (
+                                    <tr key={doc.id} className="border-b last:border-none hover:bg-slate-50 transition-colors">
+                                        <td className="p-4 text-slate-500">
+                                            {doc.updatedAt?.toDate?.()?.toLocaleDateString() || doc.RequestedAt && new Date(doc.RequestedAt).toLocaleDateString()}
+                                        </td>
+                                        <td className="p-4 text-slate-500 font-bold">{doc.docType || doc.DocType || '기안서'}</td>
+                                        <td className="p-4 font-bold text-slate-800">
+                                            {doc.title || doc.Title}
+                                        </td>
+                                        <td className="p-4 text-slate-600">{doc.userName || doc.RequesterName}</td>
+                                        <td className="p-4">
+                                            {isMyTurn ? (
+                                                <span className="px-3 py-1 font-black rounded-lg text-xs animate-hard-blink shadow-md shadow-rose-200 inline-block transition-all duration-300">
+                                                    {currentApproverName}
+                                                </span>
+                                            ) : (
+                                                <span className="text-slate-600 font-bold">{currentApproverName}</span>
+                                            )}
+                                        </td>
+                                        <td className="p-4">
+                                            <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${(doc.Status === 'Draft' || doc.Status === 'DRAFT') ? 'bg-slate-100 text-slate-600' : (doc.Status === 'Pending' || doc.Status === 'PENDING') ? 'bg-blue-100 text-blue-600' : (doc.Status === 'Approved' || doc.Status === 'APPROVED') ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                                                {(doc.Status === 'Draft' || doc.Status === 'DRAFT') ? '임시저장' : (doc.Status === 'Pending' || doc.Status === 'PENDING') ? '진행중' : (doc.Status === 'Approved' || doc.Status === 'APPROVED') ? '승인완료' : '반려됨'}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 text-right">
+                                            <button 
+                                                onClick={() => { setSelectedRequest(doc); setViewMode(doc.Status === 'Draft' ? 'edit' : 'view'); }} 
+                                                className="text-blue-600 hover:text-blue-800 font-bold bg-blue-50 px-3 py-1.5 rounded-lg whitespace-nowrap"
+                                            >
+                                                {doc.Status === 'Draft' ? '수정' : '보기'}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                );
+                            })
                         )}
                     </tbody>
                 </table>

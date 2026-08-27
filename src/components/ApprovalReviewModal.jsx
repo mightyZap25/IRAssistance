@@ -185,23 +185,25 @@ export default function ApprovalReviewModal({ isOpen, approvalData, onClose, onR
                     </div>
                 </div>
 
-                {/* Footer Actions */}
-                <div className="px-8 py-6 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex gap-4">
-                    <button
-                        onClick={() => handleAction('REJECTED')}
-                        disabled={loading}
-                        className="flex-1 py-4 bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-900/50 text-rose-600 font-black rounded-2xl hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all flex items-center justify-center gap-2 shadow-sm"
-                    >
-                        <XCircle size={20} /> 반려하기
-                    </button>
-                    <button
-                        onClick={() => handleAction('APPROVED')}
-                        disabled={loading}
-                        className="flex-[2] py-4 bg-indigo-600 text-white font-black rounded-2xl hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-xl shadow-indigo-200 dark:shadow-none"
-                    >
-                        <CheckCircle2 size={20} /> 최종 승인
-                    </button>
-                </div>
+                {/* Footer Actions - 작성자 본인이 아닐 때만 표시 */}
+                {currentUser?.uid !== approvalData.RequesterID && (
+                    <div className="px-8 py-6 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex gap-4">
+                        <button
+                            onClick={() => handleAction('REJECTED')}
+                            disabled={loading}
+                            className="flex-1 py-4 bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-900/50 text-rose-600 font-black rounded-2xl hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all flex items-center justify-center gap-2 shadow-sm"
+                        >
+                            <XCircle size={20} /> 반려하기
+                        </button>
+                        <button
+                            onClick={() => handleAction('APPROVED')}
+                            disabled={loading}
+                            className="flex-[2] py-4 bg-indigo-600 text-white font-black rounded-2xl hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-xl shadow-indigo-200 dark:shadow-none"
+                        >
+                            <CheckCircle2 size={20} /> 최종 승인
+                        </button>
+                    </div>
+                )}
             </div>
         </div>,
         document.body

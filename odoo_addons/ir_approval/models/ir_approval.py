@@ -38,6 +38,12 @@ class IrApprovalRequest(models.Model):
     transfer_line_ids = fields.One2many('ir_approval.transfer.line', 'approval_id', string='양산이관 목록')
     
     # [지출결의서 전용 필드]
+    expense_doc_no = fields.Char(string='문서번호')
+    expense_approval_condition = fields.Char(string='결재조건')
+    expense_receipt_type = fields.Selection([
+        ('receipt', '영수'),
+        ('invoice', '청구')
+    ], string='영수/청구 구분')
     expense_user = fields.Char(string='사용자')
     expense_amount = fields.Float(string='사용금액(금액)')
     expense_job_title = fields.Char(string='직급')
@@ -95,19 +101,35 @@ class IrApprovalRequest(models.Model):
     step_ids = fields.One2many('ir_approval.step', 'approval_id', string='결재선')
     current_step_idx = fields.Integer(string='현재 결재 단계 인덱스', default=0)
     is_my_turn = fields.Boolean(string='내 차례 여부', compute='_compute_is_my_turn', search='_search_is_my_turn')
-    my_turn_text = fields.Char(string='결재 알림', compute='_compute_is_my_turn')
+    current_approver_id = fields.Many2one('res.users', string='현재 결재자', compute='_compute_is_my_turn')
 
     @api.depends('status', 'current_step_idx', 'step_ids.approver_id')
     def _compute_is_my_turn(self):
         for record in self:
             is_mine = False
+            cur_approver = False
             idx = record.current_step_idx or 0
             if record.status == 'pending' and record.step_ids and idx < len(record.step_ids):
                 current_step = record.step_ids[idx]
-                if current_step.approver_id == self.env.user:
+                cur_approver = current_step.approver_id.id
+                if cur_approver == self.env.uid:
                     is_mine = True
             record.is_my_turn = is_mine
-            record.my_turn_text = '내 차례' if is_mine else ''
+            record.current_approver_id = cur_approver
+
+    current_turn_display = fields.Char(string='결재 차례', compute='_compute_current_turn_display')
+
+    @api.depends('status', 'current_approver_id')
+    def _compute_current_turn_display(self):
+        for record in self:
+            if record.status == 'approved':
+                record.current_turn_display = '결재 완료'
+            elif record.status == 'rejected':
+                record.current_turn_display = '반려됨'
+            elif record.current_approver_id:
+                record.current_turn_display = record.current_approver_id.name
+            else:
+                record.current_turn_display = '대기중'
 
     def _search_is_my_turn(self, operator, value):
         # ORM 검색 시 발생할 수 있는 모든 무한 루프(Recursion)를 원천 차단하기 위해 SQL 직접 조회

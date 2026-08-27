@@ -14,6 +14,7 @@
     'depends': ['base', 'purchase'],
     'data': [
         'security/ir.model.access.csv',
+        'report/ir_approval_report.xml',
         'views/ir_approval_views.xml',
     ],
     'installable': True,

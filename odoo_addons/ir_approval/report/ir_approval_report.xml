@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- 인쇄 액션(버튼) 정의 -->
+    <record id="action_report_ir_approval" model="ir.actions.report">
+        <field name="name">전자결재 문서 인쇄</field>
+        <field name="model">ir_approval.request</field>
+        <field name="report_type">qweb-html</field>
+        <field name="report_name">ir_approval.report_ir_approval_document</field>
+        <field name="report_file">ir_approval.report_ir_approval_document</field>
+        <field name="print_report_name">'결재문서_%s' % (object.name or '문서')</field>
+        <field name="binding_model_id" ref="model_ir_approval_request"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <!-- 인쇄 문서 템플릿(레이아웃) -->
+    <template id="report_ir_approval_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page" style="padding-top: 20px;">
+                        
+                        <!-- 상단 헤더: 타이틀(중앙) + 결재도장칸(우측) -->
+                        <div class="row align-items-start mb-4">
+                            <div class="col-4">
+                                <!-- 빈 공간 (좌측) -->
+                            </div>
+                            <div class="col-4 text-center">
+                                <t t-if="doc.doc_type == 'EXPENSE_RESOLUTION'">
+                                    <h2 class="mb-0" style="margin-top: 20px;"><strong>지출결의서</strong></h2>
+                                    <h5 class="text-muted mt-2"><span t-field="doc.name"/></h5>
+                                </t>
+                                <t t-else="">
+                                    <h2 class="mb-0" style="margin-top: 20px;"><strong><span t-field="doc.name"/></strong></h2>
+                                    <h5 class="text-muted mt-2"><span t-field="doc.doc_type"/> 상세</h5>
+                                </t>
+                            </div>
+                            <div class="col-4">
+                                <!-- 결재선 표(도장칸) - 우측 상단 고정 -->
+                                <table class="table table-bordered text-center float-right" style="width: 250px; border: 2px solid black; font-size: 12px; margin-bottom: 0; float: right;">
+                                    <tbody>
+                                        <tr>
+                                            <td rowspan="3" style="vertical-align: middle; background-color: #f8f9fa; font-weight: bold; width: 15%; padding: 4px;">결재</td>
+                                            <td style="background-color: #f8f9fa; font-weight: bold; padding: 4px;">기안자</td>
+                                            <td style="background-color: #f8f9fa; font-weight: bold; padding: 4px;">결재권자 1</td>
+                                            <td style="background-color: #f8f9fa; font-weight: bold; padding: 4px;">최종 결재</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="height: 50px; vertical-align: middle; padding: 0;">
+                                                <span t-field="doc.requestor_id"/>
+                                            </td>
+                                            <td style="height: 50px; vertical-align: middle; padding: 0;">
+                                                <t t-if="doc.status in ['PENDING', 'APPROVED', 'REJECTED']">검토</t>
+                                            </td>
+                                            <td style="height: 50px; vertical-align: middle; padding: 0;">
+                                                <t t-if="doc.status == 'APPROVED'">✅ 승인</t>
+                                                <t t-if="doc.status == 'REJECTED'">❌ 반려</t>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="font-size: 9px; padding: 2px;"><span t-field="doc.create_date" t-options='{"widget": "date"}'/></td>
+                                            <td style="font-size: 9px; padding: 2px;"></td>
+                                            <td style="font-size: 9px; padding: 2px;"></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <hr/>
+
+                        <!-- 상세 내역 테이블 -->
+                        <table class="table table-bordered mt-4" style="border: 2px solid black; width: 100%; font-size: 14px; text-align: left;">
+                            <tbody>
+                                <t t-if="doc.doc_type != 'EXPENSE_RESOLUTION'">
+                                    <tr>
+                                        <th style="width: 20%; background-color: #f8f9fa; vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;">문서 종류</th>
+                                        <td style="vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;"><span t-field="doc.doc_type"/></td>
+                                    </tr>
+                                    <tr>
+                                        <th style="background-color: #f8f9fa; vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;">기안서 제목</th>
+                                        <td style="vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;"><strong><span t-field="doc.name"/></strong></td>
+                                    </tr>
+                                    <tr>
+                                        <th style="background-color: #f8f9fa; vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;">현재 상태</th>
+                                        <td style="vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;"><span t-field="doc.status"/></td>
+                                    </tr>
+                                </t>
+                                
+                                <tr>
+                                    <th style="width: 20%; background-color: #f8f9fa; vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;">기안 부서</th>
+                                    <td style="vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;"><span t-field="doc.department_id"/></td>
+                                </tr>
+                                
+                                <t t-if="doc.doc_type == 'EXPENSE_RESOLUTION'">
+                                    <tr>
+                                        <th style="background-color: #f8f9fa; vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;">문서번호</th>
+                                        <td style="vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;"><span t-field="doc.expense_doc_no"/></td>
+                                    </tr>
+                                    <tr>
+                                        <th style="background-color: #f8f9fa; vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;">결재조건</th>
+                                        <td style="vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;"><span t-field="doc.expense_approval_condition"/></td>
+                                    </tr>
+                                    <tr>
+                                        <th style="background-color: #f8f9fa; vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;">영수/청구 구분</th>
+                                        <td style="vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;"><span t-field="doc.expense_receipt_type"/></td>
+                                    </tr>
+                                    <tr>
+                                        <th style="background-color: #f8f9fa; vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;">사용자 / 직급</th>
+                                        <td style="vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;"><span t-field="doc.expense_user"/> / <span t-field="doc.expense_job_title"/></td>
+                                    </tr>
+                                    <tr>
+                                        <th style="background-color: #f8f9fa; vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;">사용금액</th>
+                                        <td style="vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;"><span t-field="doc.expense_amount"/></td>
+                                    </tr>
+                                    <tr>
+                                        <th style="background-color: #f8f9fa; vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;">거래처명</th>
+                                        <td style="vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;"><span t-field="doc.expense_vendor"/></td>
+                                    </tr>
+                                </t>
+                                
+                                <t t-if="doc.description">
+                                    <tr>
+                                        <th style="background-color: #f8f9fa; vertical-align: top; padding: 12px; border: 1px solid #dee2e6; padding-top: 20px;">상세 내용</th>
+                                        <td style="vertical-align: top; padding: 15px; border: 1px solid #dee2e6; height: 350px;">
+                                            <span t-field="doc.description" t-options="{'widget': 'html'}"/>
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- 인쇄 팝업 자동 실행 스크립트 -->
+                    <script type="text/javascript">
+                        window.onload = function() {
+                            setTimeout(function() {
+                                window.print();
+                            }, 500);
+                        };
+                    </script>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

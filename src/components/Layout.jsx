@@ -8,7 +8,7 @@ import UpdateNotificationModal from './common/UpdateNotificationModal';
 import FloatingNotepad from './common/FloatingNotepad';
 import GeminiWebviewPanel from './common/GeminiWebviewPanel';
 import OdooWebView from './OdooWebView';
-import { BotMessageSquare } from 'lucide-react';
+import { BotMessageSquare, ArrowLeft, ArrowRight, RefreshCw } from 'lucide-react';
 
 export default function Layout({ children }) {
     const { currentUser, isOdooOnlyAuth, odooApiUrl } = useAuth();
@@ -240,7 +240,7 @@ export default function Layout({ children }) {
         <div className="flex min-h-screen bg-slate-50 dark:bg-slate-900">
             <Sidebar isCollapsed={isSidebarCollapsed} toggleSidebar={toggleSidebar} />
             <div 
-                className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}
+                className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} print:ml-0`}
                 style={{ marginRight: isGeminiPanelOpen ? '450px' : '0' }}
             >
                 
@@ -263,6 +263,21 @@ export default function Layout({ children }) {
                 )}
 
                 <main className={`flex-1 overflow-x-hidden ${isFullPage ? 'p-0' : 'p-6'} ${isGoogleApp ? (isSidebarCollapsed ? 'pl-1 bg-slate-100' : 'pl-2.5 bg-slate-100') : ''} relative`}>
+                    {/* ─── 웹뷰 네비게이션 툴바 (Google Apps 한정) ─── */}
+                    {isGoogleApp && isElectron && (
+                        <div className="fixed top-3 left-1/2 transform -translate-x-1/2 z-[9999] flex items-center gap-1 bg-white/40 dark:bg-slate-800/80 backdrop-blur-md border border-slate-200/50 dark:border-slate-700 shadow-sm hover:shadow-md rounded-full p-1 opacity-20 hover:opacity-100 hover:bg-white/95 dark:hover:bg-slate-800 transition-all duration-300">
+                            <button onClick={() => window.dispatchEvent(new CustomEvent('app-go-back'))} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500 dark:text-slate-300 transition-colors active:scale-90" title="뒤로 가기">
+                                <ArrowLeft size={16} />
+                            </button>
+                            <button onClick={() => window.dispatchEvent(new CustomEvent('app-go-forward'))} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500 dark:text-slate-300 transition-colors active:scale-90" title="앞으로 가기">
+                                <ArrowRight size={16} />
+                            </button>
+                            <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
+                            <button onClick={() => window.location.reload()} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500 dark:text-slate-300 transition-colors active:scale-90" title="현재 앱 새로고침">
+                                <RefreshCw size={14} />
+                            </button>
+                        </div>
+                    )}
                     {/* Persistent Google Chat Webview */}
                     {isElectron && !isOdooOnlyAuth && (
                         <div style={{ 

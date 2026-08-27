@@ -5,14 +5,14 @@
         <field name="model">ir_approval.request</field>
         <field name="arch" type="xml">
             <list string="전자결재 문서">
-                <field name="is_my_turn" invisible="1"/>
-                <field name="my_turn_text" widget="badge" decoration-danger="is_my_turn == True" string="결재 차례"/>
+                <field name="create_date" string="작성일시"/>
+                <field name="is_my_turn" column_invisible="True"/>
                 <field name="doc_type" widget="badge"/>
                 <field name="name"/>
                 <field name="requestor_id"/>
                 <field name="ref_name"/>
+                <field name="current_turn_display" widget="badge" decoration-info="is_my_turn == True" decoration-success="status == 'approved'" string="결재 차례"/>
                 <field name="status" widget="badge"/>
-                <field name="create_date"/>
             </list>
         </field>
     </record>
@@ -65,6 +65,7 @@
                     }
                 </style>
                 <header>
+                    <button name="%(ir_approval.action_report_ir_approval)d" string="인쇄 (Print)" type="action" class="btn-secondary" icon="fa-print" invisible="status == 'draft'"/>
                     <button name="action_submit" string="결재 상신" type="object" class="oe_highlight" invisible="status != 'draft'"/>
                     <button name="action_approve" string="승인" type="object" class="oe_highlight" invisible="status != 'pending'"/>
                     <button name="action_reject" string="반려" type="object" class="btn-danger" invisible="status != 'pending'"/>
@@ -94,6 +95,9 @@
                     <!-- 4. 고유 내용 (지출결의서) -->
                     <group string="지출 결의 상세" invisible="doc_type != 'EXPENSE_RESOLUTION'">
                         <group>
+                            <field name="expense_doc_no"/>
+                            <field name="expense_approval_condition"/>
+                            <field name="expense_receipt_type" widget="radio" options="{'horizontal': true}"/>
                             <field name="expense_user"/>
                             <field name="expense_vendor"/>
                             <field name="expense_date"/>
@@ -223,27 +227,62 @@
                 <field name="doc_type"/>
                 <field name="department_id"/>
                 <field name="requestor_id"/>
-                <filter string="내 차례 문서" name="my_turn" domain="[('is_my_turn', '=', True)]"/>
-                <filter string="진행 중" name="pending" domain="[('status', '=', 'pending')]"/>
-                <filter string="승인 완료" name="approved" domain="[('status', '=', 'approved')]"/>
-                <filter string="반려됨" name="rejected" domain="[('status', '=', 'rejected')]"/>
-                <group expand="0" string="그룹화">
-                    <filter string="문서 종류별" name="group_doc_type" context="{'group_by':'doc_type'}"/>
-                    <filter string="기안 부서별" name="group_department" context="{'group_by':'department_id'}"/>
-                    <filter string="기안자별" name="group_requestor" context="{'group_by':'requestor_id'}"/>
-                    <filter string="결재 상태별" name="group_status" context="{'group_by':'status'}"/>
-                </group>
             </search>
         </field>
     </record>
 
+    <!-- 기본(모두) 액션 -->
     <record id="action_ir_approval_request" model="ir.actions.act_window">
-        <field name="name">전자결재 문서</field>
+        <field name="name">전체 문서</field>
         <field name="res_model">ir_approval.request</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- 문서 종류별 액션 -->
+    <record id="action_ir_approval_request_general" model="ir.actions.act_window">
+        <field name="name">일반 기안서</field>
+        <field name="res_model">ir_approval.request</field>
+        <field name="domain">[('doc_type', '=', 'GENERAL')]</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_ir_approval_request_expense" model="ir.actions.act_window">
+        <field name="name">지출결의서</field>
+        <field name="res_model">ir_approval.request</field>
+        <field name="domain">[('doc_type', '=', 'EXPENSE_RESOLUTION')]</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_ir_approval_request_eco" model="ir.actions.act_window">
+        <field name="name">설계변경 기안(ECO)</field>
+        <field name="res_model">ir_approval.request</field>
+        <field name="domain">[('doc_type', '=', 'ECO')]</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_ir_approval_request_transfer" model="ir.actions.act_window">
+        <field name="name">양산이관서</field>
+        <field name="res_model">ir_approval.request</field>
+        <field name="domain">[('doc_type', '=', 'MASS_PROD_TRANSFER')]</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_ir_approval_request_issue" model="ir.actions.act_window">
+        <field name="name">불출요청서</field>
+        <field name="res_model">ir_approval.request</field>
+        <field name="domain">[('doc_type', '=', 'ISSUE_REQUEST')]</field>
         <field name="view_mode">list,form</field>
     </record>
 
     <!-- Top Menu -->
     <menuitem id="menu_ir_approval_root" name="전자결재" sequence="10"/>
-    <menuitem id="menu_ir_approval_request" name="결재 문서함" parent="menu_ir_approval_root" action="action_ir_approval_request" sequence="10"/>
+    
+    <menuitem id="menu_ir_approval_all" name="전체 문서 보기" parent="menu_ir_approval_root" action="action_ir_approval_request" sequence="10"/>
+    
+    <menuitem id="menu_ir_approval_categories" name="문서 종류별 보기" parent="menu_ir_approval_root" sequence="20"/>
+    <menuitem id="menu_ir_approval_cat_general" name="기안서" parent="menu_ir_approval_categories" action="action_ir_approval_request_general" sequence="10"/>
+    <menuitem id="menu_ir_approval_cat_expense" name="지출결의서" parent="menu_ir_approval_categories" action="action_ir_approval_request_expense" sequence="20"/>
+    <menuitem id="menu_ir_approval_cat_eco" name="설계변경서" parent="menu_ir_approval_categories" action="action_ir_approval_request_eco" sequence="30"/>
+    <menuitem id="menu_ir_approval_cat_transfer" name="양산이관서" parent="menu_ir_approval_categories" action="action_ir_approval_request_transfer" sequence="40"/>
+    <menuitem id="menu_ir_approval_cat_issue" name="불출요청서" parent="menu_ir_approval_categories" action="action_ir_approval_request_issue" sequence="50"/>
 </odoo>

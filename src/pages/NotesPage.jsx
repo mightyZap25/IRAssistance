@@ -9,6 +9,7 @@ import FindInPageBar from '../components/common/FindInPageBar';
 import 'react-resizable/css/styles.css';
 import { BlockNoteEditor } from "@blocknote/core";
 import { BlockNoteView } from "@blocknote/mantine";
+import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
 
 // ─── BlockNote 에디터 래퍼 ─────────────────────────────────────

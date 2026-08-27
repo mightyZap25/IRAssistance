@@ -288,3 +288,11 @@ body.help-drawer-open .detail-panel-portal {
 .dark .notes-blocknote-editor .bn-editor [data-content-type="table"] table td {
     border-color: #334155 !important;
 }
+@keyframes hardBlink {
+  0% { background-color: #f43f5e; color: white; transform: scale(1); }
+  50% { background-color: #fde047; color: #b91c1c; transform: scale(1.05); }
+  100% { background-color: #f43f5e; color: white; transform: scale(1); }
+}
+.animate-hard-blink {
+  animation: hardBlink 1s infinite;
+}
