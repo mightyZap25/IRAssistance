@@ -30,9 +30,12 @@ class IrApprovalRequest(models.Model):
     # [양산이관서 전용 필드]
     transfer_no = fields.Char(string='양산이관 번호')
     transfer_date = fields.Date(string='발행일자', default=fields.Date.context_today)
+    transfer_user = fields.Char(string='작성자')
+    transfer_job_title = fields.Char(string='직급')
+    transfer_dept = fields.Char(string='사용부서')
     transfer_product_family = fields.Char(string='제품군')
-    transfer_model = fields.Char(string='이관 모델(시리즈)')
-    transfer_detail_model = fields.Char(string='세부 모델명')
+    transfer_model = fields.Char(string='시리즈')
+    transfer_detail_model = fields.Text(string='세부 모델명')
     transfer_folder_path = fields.Char(string='양산이관 폴더 경로')
     transfer_dept_opinion = fields.Text(string='발행부서 의견')
     transfer_line_ids = fields.One2many('ir_approval.transfer.line', 'approval_id', string='양산이관 목록')
@@ -331,6 +334,32 @@ class IrApprovalStep(models.Model):
         ('rejected', '반려')
     ], string='결재 상태', default='pending')
     comment = fields.Text(string='결재 의견')
+    
+    is_current_user = fields.Boolean(compute='_compute_is_current_user')
+
+    @api.depends('approver_id', 'status', 'approval_id.status')
+    def _compute_is_current_user(self):
+        for record in self:
+            # 본인이 결재자이면서, 문서가 진행중(pending)이고 자신의 결재 차례일 때만 True
+            is_approver = (record.approver_id.id == self.env.user.id)
+            is_active = (record.status == 'pending' and record.approval_id.status == 'pending')
+            record.is_current_user = is_approver and is_active
+
+    def write(self, vals):
+        if 'comment' in vals:
+            for record in self:
+                if record.approver_id.id != self.env.user.id and not self.env.is_admin():
+                    raise exceptions.UserError('본인의 결재 차례가 아닌 경우 결재 의견을 작성할 수 없습니다.')
+        return super().write(vals)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if vals.get('comment'):
+                if vals.get('approver_id') != self.env.user.id and not self.env.is_admin():
+                    # 새로 생성 시 코멘트를 달려고 하면 막음
+                    vals['comment'] = False
+        return super().create(vals_list)
 
 
 class IrApprovalEcoLine(models.Model):

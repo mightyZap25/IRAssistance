@@ -296,3 +296,15 @@ body.help-drawer-open .detail-panel-portal {
 .animate-hard-blink {
   animation: hardBlink 1s infinite;
 }
+
+/* ─── 일렉트론(Chromium) 텍스트 입력창 아이콘(검색 취소, 비밀번호 보기) 깨짐(네모 박스) 현상 수정 ─── */
+/* 
+ * 커스텀 폰트(Pretendard 등) 사용 시, 브라우저 기본 내장 아이콘의 유니코드 글리프가 폰트에 없으면 
+ * 일렉트론 환경에서 네모 박스로 깨지는 현상이 발생합니다.
+ * 이를 방지하기 위해 해당 가상 요소(pseudo-element)의 폰트를 시스템 기본 폰트로 강제 지정합니다.
+ */
+input[type="search"]::-webkit-search-cancel-button,
+input[type="password"]::-ms-reveal,
+input[type="password"]::-webkit-credentials-auto-fill-button {
+    font-family: initial !important;
+}

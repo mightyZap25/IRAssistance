@@ -80,7 +80,7 @@ export default function ApprovalPage() {
                         <>
                             <div><p className="text-xs font-bold text-slate-500">사용 부서 / 직급</p><p>{data.department} / {data.position}</p></div>
                             <div><p className="text-xs font-bold text-slate-500">날짜</p><p>{data.issueDate}</p></div>
-                            <div><p className="text-xs font-bold text-slate-500">거래처명 / 금액</p><p>{data.vendor} / {data.amount}</p></div>
+                            <div><p className="text-xs font-bold text-slate-500">거래처명 / 금액</p><p>{data.vendor} / {data.amount ? new Intl.NumberFormat(data.currency === 'USD' ? 'en-US' : 'ko-KR', { style: 'currency', currency: data.currency || 'KRW', maximumFractionDigits: data.currency === 'USD' ? 2 : 0 }).format(parseFloat(data.amount)) : ''}</p></div>
                             <div><p className="text-xs font-bold text-slate-500">사용자</p><p>{data.user}</p></div>
                             <div className="col-span-2"><p className="text-xs font-bold text-slate-500">상세내용</p><p>{data.content}</p></div>
                         </>

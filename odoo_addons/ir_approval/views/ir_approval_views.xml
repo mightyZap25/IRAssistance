@@ -54,6 +54,16 @@
                     .custom_full_width .single_line_group {
                         grid-template-columns: 140px 1fr !important;
                     }
+                    /* 레이블 너비 통일을 위한 그리드 템플릿 */
+                    .custom_full_width .fixed_label_2col {
+                        grid-template-columns: 120px 1fr !important;
+                    }
+                    .custom_full_width .fixed_label_4col {
+                        grid-template-columns: 120px 1fr 120px 1fr !important;
+                    }
+                    .custom_full_width .fixed_label_6col {
+                        grid-template-columns: 120px 1fr 120px 1fr 120px 1fr !important;
+                    }
                     /* 헤더 영역 위쪽 공백 최소화 */
                     .o_form_view .o_form_statusbar {
                         margin-top: 0 !important;
@@ -67,8 +77,8 @@
                 <header>
                     <button name="%(ir_approval.action_report_ir_approval)d" string="인쇄 (Print)" type="action" class="btn-secondary" icon="fa-print" invisible="status == 'draft'"/>
                     <button name="action_submit" string="결재 상신" type="object" class="oe_highlight" invisible="status != 'draft'"/>
-                    <button name="action_approve" string="승인" type="object" class="oe_highlight" invisible="status != 'pending'"/>
-                    <button name="action_reject" string="반려" type="object" class="btn-danger" invisible="status != 'pending'"/>
+                    <button name="action_approve" string="승인" type="object" class="oe_highlight" invisible="status != 'pending' or is_my_turn == False"/>
+                    <button name="action_reject" string="반려" type="object" class="btn-danger" invisible="status != 'pending' or is_my_turn == False"/>
                     <button name="action_draft" string="수정/재기안" type="object" class="btn-secondary" invisible="status != 'rejected'"/>
                     <field name="status" widget="statusbar" statusbar_visible="draft,pending,approved,rejected"/>
                 </header>
@@ -93,21 +103,29 @@
                     </group>
                     
                     <!-- 4. 고유 내용 (지출결의서) -->
-                    <group string="지출 결의 상세" invisible="doc_type != 'EXPENSE_RESOLUTION'">
-                        <group>
-                            <field name="expense_doc_no"/>
-                            <field name="expense_approval_condition"/>
-                            <field name="expense_receipt_type" widget="radio" options="{'horizontal': true}"/>
-                            <field name="expense_user"/>
-                            <field name="expense_vendor"/>
-                            <field name="expense_date"/>
+                    <group string="지출 결의 상세" invisible="doc_type != 'EXPENSE_RESOLUTION'" col="1">
+                        <group col="2" class="fixed_label_2col" style="width: 50%;">
+                            <field name="expense_doc_no" string="문서 번호"/>
                         </group>
-                        <group>
-                            <field name="expense_job_title"/>
-                            <field name="expense_amount" widget="float"/>
+                        
+                        <group col="6" class="fixed_label_6col">
+                            <field name="expense_user" string="작성자"/>
+                            <field name="expense_job_title" string="직급"/>
+                            <field name="expense_dept" string="사용부서"/>
                         </group>
-                        <group>
-                            <field name="expense_dept"/>
+                        
+                        <group col="4" class="fixed_label_4col">
+                            <field name="expense_vendor" string="거래처명"/>
+                            <field name="expense_receipt_type" string="영수/청구" widget="radio" options="{'horizontal': true}"/>
+                        </group>
+                        
+                        <group col="2" class="fixed_label_2col" style="width: 50%;">
+                            <label for="expense_amount" string="사용금액"/>
+                            <div class="d-flex align-items-center w-100">
+                                <span class="px-3 py-1 me-2 rounded" style="border: 1px solid #ccc; background-color: #fff; font-size: 13px; font-weight: bold;">KRW</span>
+                                <span class="me-2 fw-bold fs-5">￦</span>
+                                <field name="expense_amount" widget="float" nolabel="1"/>
+                            </div>
                         </group>
                     </group>
 
@@ -134,20 +152,36 @@
                         </group>
                         
                         <!-- 양산이관 관련 필드 -->
-                        <group string="양산이관 상세" invisible="doc_type != 'MASS_PROD_TRANSFER'">
-                            <group>
-                                <field name="transfer_no"/>
-                                <field name="transfer_product_family"/>
+                        <group string="양산이관 상세" invisible="doc_type != 'MASS_PROD_TRANSFER'" col="1">
+                            <group col="2" class="fixed_label_2col" style="width: 50%;">
+                                <field name="transfer_no" string="문서 번호"/>
                             </group>
-                            <group>
-                                <field name="transfer_date"/>
-                                <field name="transfer_model"/>
+                            
+                            <group col="6" class="fixed_label_6col">
+                                <field name="transfer_user" string="작성 자"/>
+                                <field name="transfer_job_title" string="직급"/>
+                                <field name="transfer_dept" string="사용부서"/>
                             </group>
-                        </group>
-                        <group invisible="doc_type != 'MASS_PROD_TRANSFER'" class="single_line_group">
-                            <field name="transfer_detail_model"/>
-                            <field name="transfer_folder_path"/>
-                            <field name="transfer_dept_opinion"/>
+                            
+                            <group col="2" class="fixed_label_2col" style="width: 50%;">
+                                <field name="transfer_product_family" string="제품군"/>
+                            </group>
+
+                            <group col="2" class="fixed_label_2col" style="width: 50%;">
+                                <field name="transfer_model" string="시리즈"/>
+                            </group>
+
+                            <group col="2" class="fixed_label_2col" style="width: 100%;">
+                                <field name="transfer_detail_model" string="세부 모델명"/>
+                            </group>
+
+                            <group col="2" class="fixed_label_2col" style="width: 100%;">
+                                <field name="transfer_folder_path" string="이관 자료폴더 경로"/>
+                            </group>
+
+                            <group col="2" class="fixed_label_2col" style="width: 100%;">
+                                <field name="transfer_dept_opinion" string="발행부서의 의견"/>
+                            </group>
                         </group>
 
                         <!-- 이슈발생 요청서 필드 -->
@@ -203,7 +237,8 @@
                                     <field name="sequence" widget="handle"/>
                                     <field name="approver_id"/>
                                     <field name="status" readonly="1"/>
-                                    <field name="comment"/>
+                                    <field name="is_current_user" column_invisible="True"/>
+                                    <field name="comment" readonly="not is_current_user"/>
                                 </list>
                             </field>
                         </page>
