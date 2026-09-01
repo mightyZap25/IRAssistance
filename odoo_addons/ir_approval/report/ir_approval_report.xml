@@ -15,8 +15,23 @@
     <!-- 인쇄 문서 템플릿(레이아웃) -->
     <template id="report_ir_approval_document">
         <t t-call="web.html_container">
+            <style>
+                @media print {
+                    @page { margin: 10mm; } /* 크롬 인쇄 시 기본 여백 축소 */
+                    body, .article, .page { padding: 0 !important; margin: 0 !important; }
+                    .d-print-none { display: none !important; }
+                }
+                .article { padding: 0 !important; } /* 웹 미리보기 시 여백 축소 */
+            </style>
             <t t-foreach="docs" t-as="doc">
                 <div class="article" t-att-data-oe-model="doc and doc._name" t-att-data-oe-id="doc and doc.id">
+                    
+                    <!-- HTML 미리보기 시 상단에 플로팅 인쇄 버튼 추가 -->
+                    <div class="d-print-none" style="position: fixed; top: 20px; right: 20px; z-index: 1000;">
+                        <button onclick="window.print()" class="btn btn-primary" style="padding: 10px 20px; font-size: 16px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                            🖨️ 인쇄하기
+                        </button>
+                    </div>
 
                     <div class="page">
                         <t t-if="doc.doc_type == 'EMPLOYMENT_CERT'">
@@ -117,24 +132,12 @@
                         <t t-else="">
                             <!-- 기존 양식 -->
 
-                        
-                        <!-- 상단 헤더: 타이틀(중앙) + 결재도장칸(우측) wkhtmltopdf 호환 테이블 레이아웃 -->
-                        <table style="width: 100%; margin-bottom: 30px; border: none; padding: 0;">
+                        <!-- 상단 1: 우측 결재도장칸 (wkhtmltopdf 호환을 위해 float 대신 table 구조 사용) -->
+                        <table style="width: 100%; border: none; margin-bottom: 20px;">
                             <tr>
-                                <td style="width: 30%; border: none;"></td>
-                                <td style="width: 40%; text-align: center; vertical-align: middle; border: none;">
-                                    <t t-if="doc.doc_type == 'EXPENSE_RESOLUTION'">
-                                        <h2 style="margin: 0;"><strong>지출결의서</strong></h2>
-                                        <h5 style="color: #6c757d; margin-top: 10px; margin-bottom: 0;"><span t-field="doc.name"/></h5>
-                                    </t>
-                                    <t t-else="">
-                                        <h2 style="margin: 0;"><strong><span t-field="doc.name"/></strong></h2>
-                                        <h5 style="color: #6c757d; margin-top: 10px; margin-bottom: 0;"><span t-field="doc.doc_type"/> 상세</h5>
-                                    </t>
-                                </td>
-                                <td style="width: 30%; text-align: right; vertical-align: top; border: none;">
-                                    <!-- 결재선 표(도장칸) -->
-                                    <table class="text-center" style="width: 250px; border-collapse: collapse; border: 2px solid black; font-size: 12px; float: right; margin-bottom: 0;">
+                                <td style="border: none;"></td> <!-- 빈 공간으로 우측으로 밀어내기 -->
+                                <td style="width: 260px; border: none; text-align: right;">
+                                    <table class="text-center" style="width: 250px; border-collapse: collapse; border: 2px solid black; font-size: 12px; display: inline-table;">
                                         <tbody>
                                             <tr>
                                                 <td rowspan="3" style="vertical-align: middle; background-color: #f8f9fa; font-weight: bold; width: 15%; padding: 4px; border: 1px solid black;">결재</td>
@@ -165,19 +168,29 @@
                             </tr>
                         </table>
 
-                        <hr/>
+                        <!-- 상단 2: 중앙 문서 종류(타이틀) -->
+                        <div style="text-align: center; margin-bottom: 30px; width: 100%;">
+                            <t t-if="doc.doc_type == 'EXPENSE_RESOLUTION'">
+                                <h1 style="margin: 0; font-size: 34px; white-space: nowrap;"><strong>지출결의서</strong></h1>
+                            </t>
+                            <t t-else="">
+                                <h1 style="margin: 0; font-size: 34px; white-space: nowrap;"><strong><span t-field="doc.doc_type"/></strong></h1>
+                            </t>
+                        </div>
+
+                        <hr style="border-top: 2px solid #333; margin-bottom: 20px;"/>
 
                         <!-- 상세 내역 테이블 -->
                         <table class="table table-bordered mt-4" style="border: 2px solid black; width: 100%; font-size: 14px; text-align: left;">
                             <tbody>
+                                <tr>
+                                    <th style="width: 20%; background-color: #f8f9fa; vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;">문서 제목</th>
+                                    <td style="vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;"><strong><span t-field="doc.name"/></strong></td>
+                                </tr>
                                 <t t-if="doc.doc_type != 'EXPENSE_RESOLUTION'">
                                     <tr>
-                                        <th style="width: 20%; background-color: #f8f9fa; vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;">문서 종류</th>
+                                        <th style="background-color: #f8f9fa; vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;">문서 종류</th>
                                         <td style="vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;"><span t-field="doc.doc_type"/></td>
-                                    </tr>
-                                    <tr>
-                                        <th style="background-color: #f8f9fa; vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;">기안서 제목</th>
-                                        <td style="vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;"><strong><span t-field="doc.name"/></strong></td>
                                     </tr>
                                     <tr>
                                         <th style="background-color: #f8f9fa; vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;">현재 상태</th>

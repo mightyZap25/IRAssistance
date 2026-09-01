@@ -21,6 +21,24 @@ export default function SettingsPage() {
         // 사이드바에 변경 즉시 반영을 위해 storage 이벤트 dispatch
         window.dispatchEvent(new Event('storage'));
     };
+
+    const [openAtLogin, setOpenAtLogin] = useState(false);
+
+    React.useEffect(() => {
+        if (window.electronAPI?.getLoginItemSettings) {
+            window.electronAPI.getLoginItemSettings().then(val => setOpenAtLogin(val));
+        }
+    }, []);
+
+    const handleToggleOpenAtLogin = async () => {
+        const newVal = !openAtLogin;
+        if (window.electronAPI?.setLoginItemSettings) {
+            const finalVal = await window.electronAPI.setLoginItemSettings(newVal);
+            setOpenAtLogin(finalVal);
+        } else {
+            setOpenAtLogin(newVal);
+        }
+    };
     const { userProfile } = useAuth();
     const [loading, setLoading] = useState(false);
 
@@ -1002,6 +1020,34 @@ export default function SettingsPage() {
                                             <span
                                                 className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform duration-200 ${
                                                     showAiMenu ? 'translate-x-6' : 'translate-x-1'
+                                                }`}
+                                            />
+                                        </button>
+                                    </div>
+
+                                    {/* 윈도우 시작 시 자동 실행 토글 카드 */}
+                                    <div className="flex items-center justify-between p-5 bg-slate-50 border border-slate-200 rounded-2xl hover:border-indigo-200 transition-all group">
+                                        <div className="flex items-center gap-4">
+                                            <div className={`p-2.5 rounded-xl transition-all ${openAtLogin ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-400'}`}>
+                                                <Monitor size={20} />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-black text-slate-800">윈도우 부팅 시 자동 실행 (시작 프로그램)</p>
+                                                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                                    컴퓨터를 켰을 때 <span className="font-bold text-slate-600">mightyONE</span> 앱을 백그라운드에서 자동으로 실행합니다.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        {/* 토글 스위치 */}
+                                        <button
+                                            onClick={handleToggleOpenAtLogin}
+                                            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none ${
+                                                openAtLogin ? 'bg-indigo-500' : 'bg-slate-300'
+                                            }`}
+                                        >
+                                            <span
+                                                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform duration-200 ${
+                                                    openAtLogin ? 'translate-x-6' : 'translate-x-1'
                                                 }`}
                                             />
                                         </button>

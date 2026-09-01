@@ -45,30 +45,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         return localStorage.getItem('sidebar_show_ai_menu') === 'true'; // 기본값 false로 변경 (사용자 요청에 의해 비활성화)
     });
 
-    const [showOdooPrompt, setShowOdooPrompt] = useState(false);
-    const [odooPromptPwd, setOdooPromptPwd] = useState('');
-    const [isOdooPromptLoading, setIsOdooPromptLoading] = useState(false);
-
-    const handleOdooLink = () => {
-        setOdooPromptPwd('');
-        setShowOdooPrompt(true);
-    };
-
-    const submitOdooLink = async (e) => {
-        if (e) e.preventDefault();
-        if (!odooPromptPwd) return;
-        setIsOdooPromptLoading(true);
-        try {
-            await linkOdoo(odooPromptPwd);
-            alert("Odoo 자동 로그인 설정 완료!");
-            window.location.reload();
-        } catch (e) {
-            alert("Odoo 로그인 실패: " + e.message);
-        } finally {
-            setIsOdooPromptLoading(false);
-            setShowOdooPrompt(false);
-        }
-    };
+    // Odoo 비밀번호 팝업 제거됨 (구글 로그인으로 통합)
 
 
     // 설정 페이지에서 localStorage 변경 시 즉시 반영
@@ -82,17 +59,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
         };
     }, []);
 
-    // Odoo 로그인 정보가 없을 때 띄우는 이벤트 수신
-    useEffect(() => {
-        const handleRequireOdooLogin = () => {
-            // 한 번 더 체크해서 정말 없는 경우에만 띄움
-            if (!localStorage.getItem('odoo_password')) {
-                handleOdooLink();
-            }
-        };
-        window.addEventListener('require-odoo-login', handleRequireOdooLogin);
-        return () => window.removeEventListener('require-odoo-login', handleRequireOdooLogin);
-    }, []);
+    // Odoo 비밀번호 팝업 이벤트 제거됨 (구글 로그인으로 통합)
 
     useEffect(() => {
         const theme = darkMode ? 'dark' : 'light';
@@ -822,50 +789,6 @@ export default function Sidebar({ isCollapsed, toggleSidebar }) {
                 </div>
             )}
             {/* Odoo Password Prompt Modal */}
-            {showOdooPrompt && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in px-4">
-                    <form onSubmit={submitOdooLink} className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl p-6 w-full max-w-sm border border-slate-200 dark:border-slate-800 animate-slide-up">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-                                <KeyRound size={20} />
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-slate-800 dark:text-slate-200">Odoo 계정 연동</h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400">자동 로그인을 위해 비밀번호를 입력해주세요</p>
-                            </div>
-                        </div>
-
-                        <div className="mb-5">
-                            <input
-                                type="password"
-                                value={odooPromptPwd}
-                                onChange={(e) => setOdooPromptPwd(e.target.value)}
-                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="Odoo 비밀번호"
-                                autoFocus
-                                required
-                            />
-                        </div>
-
-                        <div className="flex items-center justify-end gap-2">
-                            <button
-                                type="button"
-                                onClick={() => setShowOdooPrompt(false)}
-                                className="px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                            >
-                                취소
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={isOdooPromptLoading}
-                                className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2"
-                            >
-                                {isOdooPromptLoading ? '확인 중...' : '확인'}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            )}
         </aside>
     );
 }

@@ -128,7 +128,7 @@
                     }
                 </style>
                 <header>
-                    <button name="%(ir_approval.action_report_ir_approval)d" string="인쇄 (Print)" type="action" class="btn-secondary" icon="fa-print" invisible="status == 'draft'"/>
+                    <button name="action_print_html_popup" string="인쇄 (Print)" type="object" class="btn-secondary" icon="fa-print" invisible="status == 'draft'"/>
                     <button name="action_submit" string="결재 상신" type="object" class="oe_highlight" invisible="status != 'draft'"/>
                     <button name="action_approve" string="승인" type="object" class="oe_highlight" invisible="status != 'pending' or is_my_turn == False"/>
                     <button name="action_reject" string="반려" type="object" class="btn-danger" invisible="status != 'pending' or is_my_turn == False"/>
@@ -139,19 +139,19 @@
                 </header>
                 <sheet>
                     <!-- 1. 문서 종류 및 기안서 제목 (세로 배치) -->
-                    <group readonly="status != 'draft'">
-                        <field name="doc_type" required="1" style="font-size: 14px; font-weight: bold;" readonly="status != 'draft'"/>
-                        <field name="name" placeholder="기안서 제목..." style="font-size: 18px; font-weight: bold;" readonly="status != 'draft'"/>
+                    <group>
+                        <field name="doc_type" required="1" readonly="status != 'draft'"/>
+                        <field name="name" placeholder="기안서 제목..." readonly="status != 'draft'"/>
                     </group>
 
                     <!-- 3. 기안일자 / 보존연한 (세로 배치) -->
-                    <group readonly="status != 'draft'">
+                    <group>
                         <field name="draft_date" readonly="status != 'draft'"/>
                         <field name="retention_period" readonly="status != 'draft'"/>
                     </group>
                     
                     <!-- 4. 고유 내용 (지출결의서) -->
-                    <group string="지출 결의 상세" invisible="doc_type != 'EXPENSE_RESOLUTION'" readonly="status != 'draft'">
+                    <group string="지출 결의 상세" invisible="doc_type != 'EXPENSE_RESOLUTION'">
                         <field name="expense_doc_no" string="문서 번호" readonly="status != 'draft'"/>
                         <field name="expense_user" string="작성자" readonly="status != 'draft'"/>
                         <field name="expense_job_title" string="직급" readonly="status != 'draft'"/>
@@ -185,7 +185,7 @@
                         </group>
                         
                         <!-- 양산이관 관련 필드 -->
-                        <group string="양산이관 상세" invisible="doc_type != 'MASS_PROD_TRANSFER'" readonly="status != 'draft'">
+                        <group string="양산이관 상세" invisible="doc_type != 'MASS_PROD_TRANSFER'">
                             <field name="transfer_no" string="문서 번호" readonly="status != 'draft'"/>
                             <field name="transfer_user" string="작성자" readonly="status != 'draft'"/>
                             <field name="transfer_job_title" string="직급" readonly="status != 'draft'"/>
@@ -284,6 +284,9 @@
                                     <field name="comment" readonly="not is_current_user"/>
                                 </list>
                             </field>
+                            <group class="mt-3">
+                                <field name="cc_user_ids" widget="many2many_tags" options="{'no_create': True}" placeholder="참조(열람)할 직원을 선택하세요..." readonly="status != 'draft'"/>
+                            </group>
                         </page>
                     </notebook>
                 </sheet>
@@ -305,6 +308,9 @@
                 <field name="doc_type"/>
                 <field name="department_id"/>
                 <field name="requestor_id"/>
+                <separator/>
+                <filter string="미결 (임시/진행중)" name="filter_unapproved" domain="[('status', 'in', ('draft', 'pending'))]"/>
+                <filter string="완료 (승인/반려)" name="filter_completed" domain="[('status', 'in', ('approved', 'rejected'))]"/>
             </search>
         </field>
     </record>
@@ -315,6 +321,7 @@
         <field name="res_model">ir_approval.request</field>
         <field name="view_mode">list,kanban,form</field>
         <field name="mobile_view_mode">kanban</field>
+        <field name="context">{'search_default_filter_unapproved': 1}</field>
     </record>
 
     <!-- 문서 종류별 액션 -->
@@ -324,6 +331,7 @@
         <field name="domain">[('doc_type', '=', 'GENERAL')]</field>
         <field name="view_mode">list,kanban,form</field>
         <field name="mobile_view_mode">kanban</field>
+        <field name="context">{'search_default_filter_unapproved': 1}</field>
     </record>
 
     <record id="action_ir_approval_request_expense" model="ir.actions.act_window">
@@ -332,6 +340,7 @@
         <field name="domain">[('doc_type', '=', 'EXPENSE_RESOLUTION')]</field>
         <field name="view_mode">list,kanban,form</field>
         <field name="mobile_view_mode">kanban</field>
+        <field name="context">{'search_default_filter_unapproved': 1}</field>
     </record>
 
     <record id="action_ir_approval_request_eco" model="ir.actions.act_window">
@@ -340,6 +349,7 @@
         <field name="domain">[('doc_type', '=', 'ECO')]</field>
         <field name="view_mode">list,kanban,form</field>
         <field name="mobile_view_mode">kanban</field>
+        <field name="context">{'search_default_filter_unapproved': 1}</field>
     </record>
 
     <record id="action_ir_approval_request_transfer" model="ir.actions.act_window">
@@ -348,6 +358,7 @@
         <field name="domain">[('doc_type', '=', 'MASS_PROD_TRANSFER')]</field>
         <field name="view_mode">list,kanban,form</field>
         <field name="mobile_view_mode">kanban</field>
+        <field name="context">{'search_default_filter_unapproved': 1}</field>
     </record>
 
     <record id="action_ir_approval_request_issue" model="ir.actions.act_window">
@@ -356,6 +367,7 @@
         <field name="domain">[('doc_type', '=', 'ISSUE_REQUEST')]</field>
         <field name="view_mode">list,kanban,form</field>
         <field name="mobile_view_mode">kanban</field>
+        <field name="context">{'search_default_filter_unapproved': 1}</field>
     </record>
     <record id="action_ir_approval_request_employment_cert" model="ir.actions.act_window">
         <field name="name">재직증명서</field>
@@ -363,6 +375,7 @@
         <field name="domain">[('doc_type', '=', 'EMPLOYMENT_CERT')]</field>
         <field name="view_mode">list,kanban,form</field>
         <field name="mobile_view_mode">kanban</field>
+        <field name="context">{'search_default_filter_unapproved': 1}</field>
     </record>
 
     <!-- Top Menu -->

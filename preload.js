@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     startDownload: () => ipcRenderer.send('start-download'),
     restartApp: () => ipcRenderer.send('restart-app'),
     getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+    getLoginItemSettings: () => ipcRenderer.invoke('get-login-item-settings'),
+    setLoginItemSettings: (openAtLogin) => ipcRenderer.invoke('set-login-item-settings', openAtLogin),
     getPreloadPath: () => ipcRenderer.invoke('get-preload-path'),
     googleOAuthSignIn: () => ipcRenderer.invoke('google-oauth-signin'),
     clearGoogleCookies: () => ipcRenderer.invoke('clear-google-cookies'),

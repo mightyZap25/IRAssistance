@@ -18,8 +18,7 @@ dotenv.config({ path: envPath });
 console.log('[Electron Main] .env 로드 경로:', envPath);
 
 
-// Override default User Agent to completely bypass Google's "secure browser" check on login popups and webviews
-app.userAgentFallback = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+// Default User Agent will be dynamically patched in app.whenReady() to bypass Google & Cloudflare checks
 
 // 윈도우 OS 네이티브 알림(Notification)이 정상 작동하기 위한 필수 설정
 // 빌드 후 간혹 설치 방식(포터블/unpacked 등)에 따라 윈도우 시작 메뉴 단축아이콘 AUMID와 매칭이 안 되어 
@@ -135,6 +134,15 @@ function startBackend() {
 }
 
 function createWindow() {
+    // Cloudflare WAF(봇 방지) 우회를 위한 전용 커스텀 헤더 주입
+    const injectHeader = (details, callback) => {
+        details.requestHeaders['x-erp-client'] = 'MightyOne-App-2026';
+        callback({ requestHeaders: details.requestHeaders });
+    };
+    
+    session.defaultSession.webRequest.onBeforeSendHeaders(injectHeader);
+    session.fromPartition('persist:odoo').webRequest.onBeforeSendHeaders(injectHeader);
+
     mainWindow = new BrowserWindow({
         width: 1366,
         height: 850,
@@ -478,7 +486,9 @@ if (!gotTheLock) {
                             'notebooklm.google.com',
                             'accounts.google.com',
                             'myaccount.google.com',
-                            'workspace.google.com'
+                            'workspace.google.com',
+                            'mightyzap.com',
+                            'irrobot.com'
                         ];
 
                         if (internalHosts.some(h => host === h || host.endsWith('.' + h))) return true;
@@ -502,6 +512,13 @@ if (!gotTheLock) {
 
                 // 웹뷰 내부에서 새 창 열기 시 (target="_blank" 등)
                 contents.setWindowOpenHandler(({ url }) => {
+                    // 인쇄(리포트) 팝업인 경우 무조건 크롬(기본 브라우저)으로 열기
+                    if (url.includes('/report/html/') || url.includes('/report/pdf/')) {
+                        console.log('[Electron Main] 인쇄 리포트 팝업 감지, 크롬으로 엽니다:', url);
+                        shell.openExternal(url);
+                        return { action: 'deny' };
+                    }
+                    
                     // about:blank는 Gmail 새 창 띄우기 등에서 내부적으로 사용됨
                     if (!isInternalUrl(url) && url !== 'about:blank' && url !== 'about:srcdoc') {
                         console.log('[Electron Main] 외부 링크 감지 (popup), 기본 브라우저로 엽니다:', url);
@@ -587,9 +604,9 @@ if (!gotTheLock) {
                         background-color: #f1f5f9 !important;
                     }
 
-                    /* 7. Odoo & Webview 한글/기호 ㅁ (Tofu) 글자 깨짐 방지 폰트 Fallback 패치 */
-                    body, button, input, select, textarea, .o_main_navbar, .o_content, span, div, p, td, th, a {
-                        font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "맑은 고딕", "Noto Sans KR", "Apple SD Gothic Neo", "Segoe UI", Roboto, sans-serif !important;
+                    /* 7. Odoo & Webview 한글/기호 ㅁ (Tofu) 글자 깨짐 방지 폰트 Fallback 패치 (아이콘 폰트 깨짐 방지를 위해 !important 제거 및 body에만 적용) */
+                    body {
+                        font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "맑은 고딕", "Noto Sans KR", "Apple SD Gothic Neo", "Segoe UI", Roboto, sans-serif;
                     }
                 `, { cssOrigin: 'user' }).catch(err => { });
             });
@@ -624,6 +641,17 @@ if (!gotTheLock) {
         });
 
         startBackend();
+        
+        // 실제 크로미움 엔진의 User-Agent에서 "Electron/버전" 및 "앱이름/버전"을 모두 삭제하여 완벽한 네이티브 크롬으로 위장
+        const cleanUA = session.defaultSession.getUserAgent()
+            .replace(/Electron\/[\d\.]+\s?/, '')
+            .replace(/mightyONE\/[\d\.]+\s?/, '')
+            .trim();
+        
+        app.userAgentFallback = cleanUA;
+        session.defaultSession.setUserAgent(cleanUA);
+        session.fromPartition('persist:odoo').setUserAgent(cleanUA);
+        
         createWindow();
         createTray();
     });
@@ -728,6 +756,18 @@ if (app.isPackaged) {
 
 ipcMain.handle('get-app-version', () => {
     return app.getVersion();
+});
+
+ipcMain.handle('get-login-item-settings', () => {
+    return app.getLoginItemSettings().openAtLogin;
+});
+
+ipcMain.handle('set-login-item-settings', (event, openAtLogin) => {
+    app.setLoginItemSettings({
+        openAtLogin: openAtLogin,
+        path: app.getPath('exe')
+    });
+    return app.getLoginItemSettings().openAtLogin;
 });
 
 // Renderer(React)에서 IPC로 요청하는 네이티브 알림 핸들러

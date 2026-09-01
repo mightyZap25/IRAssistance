@@ -195,6 +195,7 @@ class IrApprovalRequest(models.Model):
     description = fields.Html(string='상세 내용')
 
     requestor_id = fields.Many2one('res.users', string='기안자', default=lambda self: self.env.user, required=True)
+    cc_user_ids = fields.Many2many('res.users', 'ir_approval_cc_user_rel', 'approval_id', 'user_id', string='참조자 (열람)')
     status = fields.Selection([
         ('draft', '임시저장'),
         ('pending', '결재 진행 중'),
@@ -368,6 +369,17 @@ class IrApprovalRequest(models.Model):
                     'message': f'내 차례입니다: {record.name}',
                     'sticky': True
                 })
+                
+            # 참조자(열람자) 알림 및 팔로워 자동 추가
+            if record.cc_user_ids:
+                record.message_subscribe(partner_ids=record.cc_user_ids.mapped('partner_id').ids)
+                for cc_user in record.cc_user_ids:
+                    self.env['bus.bus']._sendone(cc_user.partner_id, 'simple_notification', {
+                        'type': 'info',
+                        'title': '참조 알림',
+                        'message': f'새로운 결재 "{record.name}"의 참조자로 지정되었습니다.',
+                        'sticky': False
+                    })
 
     def action_force_approve(self):
         """과거 데이터 일괄/강제 승인용 (마스터 권한 전용)"""
@@ -388,6 +400,15 @@ class IrApprovalRequest(models.Model):
             
             # 알림(Activity) 지우기
             record.activity_unlink(['mail.mail_activity_data_todo'])
+
+    def action_print_html_popup(self):
+        self.ensure_one()
+        url = f'/report/html/ir_approval.report_ir_approval_document/{self.id}'
+        return {
+            'type': 'ir.actions.act_url',
+            'url': url,
+            'target': 'new',
+        }
 
     def action_approve(self):
         self.ensure_one()

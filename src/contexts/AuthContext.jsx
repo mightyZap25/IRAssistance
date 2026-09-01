@@ -29,13 +29,12 @@ export function AuthProvider({ children }) {
     // Domain restriction configuration
     const ALLOWED_DOMAINS = ['mightyzap.com', 'irrobot.com'];
     
-    // 외부 접속(도메인)으로 Odoo API 주소 고정
+    // 외부 접속(도메인)으로 Odoo API 주소 고정 (구글 로그인 등 OAuth는 HTTPS 필수)
     const [odooApiUrl, setOdooApiUrl] = useState('https://mightyone.mightyzap.com'); 
-    const ODOO_DB = 'odoo';
+    const ODOO_DB = 'odoo-db';
 
     useEffect(() => {
-        // 기존의 로컬(192.168.0.11) 핑 테스트 로직 제거 (외부 도메인 무조건 사용)
-        console.log('[Odoo Config] Odoo 서버 주소가 https://mightyone.mightyzap.com 으로 강제 설정되었습니다.');
+        console.log('[Odoo Config] Odoo 서버 주소가 외부 도메인(https://mightyone.mightyzap.com)으로 복구되었습니다.');
     }, []);
 
     async function login() {

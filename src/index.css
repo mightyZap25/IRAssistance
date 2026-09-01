@@ -308,3 +308,7 @@ input[type="password"]::-ms-reveal,
 input[type="password"]::-webkit-credentials-auto-fill-button {
     font-family: initial !important;
 }
+
+@media print {
+  body:has(> .fixed) > #root { display: none !important; }
+}

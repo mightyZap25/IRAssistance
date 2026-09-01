@@ -4,7 +4,8 @@ import { db } from '../database';
 import { useAuth } from '../contexts/AuthContext';
 import ApprovalForm from '../components/ApprovalForm';
 import { ApprovalProcessor, ApprovalStatusViewer } from '../components/common/ApprovalSystem';
-import { FileCheck, Plus, Trash2 } from 'lucide-react';
+import { FileCheck, Plus, Trash2, X, Printer } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 import { useLocation } from 'react-router-dom';
 
@@ -24,6 +25,7 @@ export default function ApprovalPage() {
     const [selectedRequest, setSelectedRequest] = useState(
         initialDocType ? { docType: initialDocType, subType: initialSubType || '' } : null
     );
+    const [showPrintPreview, setShowPrintPreview] = useState(false);
 
     useEffect(() => {
         if (!currentUser) return;
@@ -62,9 +64,16 @@ export default function ApprovalPage() {
             const data = selectedRequest;
             return (
                 <div className="grid grid-cols-1 gap-4">
-                    <div className="text-lg font-black text-blue-700 border-b pb-2 mb-2">{data.docType} 상세</div>
-                    <div><p className="text-xs font-bold text-slate-500">결재 제목</p><p className="font-bold">{data.title}</p></div>
-                    <div><p className="text-xs font-bold text-slate-500">작성자</p><p>{data.userName}</p></div>
+                    {/* 화면에만 보이는 타이틀 영역 (인쇄 시에는 상단 커스텀 헤더에서 표시하므로 숨김) */}
+                    <div className="print:hidden text-lg font-black text-blue-700 border-b pb-2 mb-2">{data.docType} 상세</div>
+                    <div className="print:hidden text-2xl font-black text-slate-800 border-b pb-4 mb-2">
+                        {data.title}
+                    </div>
+                    
+                    <div className="print:hidden grid grid-cols-2 gap-4 mb-2">
+                        <div><p className="text-xs font-bold text-slate-500">문서 종류</p><p className="font-bold">{data.docType}</p></div>
+                        <div><p className="text-xs font-bold text-slate-500">작성자</p><p className="font-bold">{data.userName}</p></div>
+                    </div>
                     
                     {data.docType === '설계변경서' && (
                         <>
@@ -164,15 +173,30 @@ export default function ApprovalPage() {
                                 <Trash2 size={16} /> 삭제
                             </button>
                         )}
-                        <button onClick={() => window.print()} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold flex items-center gap-2">
-                            🖨️ 인쇄하기
+                        <button onClick={() => setShowPrintPreview(true)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold flex items-center gap-2">
+                            🖨️ 인쇄 미리보기
                         </button>
                     </div>
                 </div>
                 
-                {/* 인쇄용 결재선 표 (화면에는 안 보이고 인쇄할 때만 우측 상단에 표시) */}
-                <div className="hidden print:flex justify-end mb-8 w-full">
-                    <table className="border-collapse border-2 border-black text-center text-xs">
+                {/* 인쇄용 상단 헤더 및 결재선 표 (화면에는 안 보이고 인쇄할 때만 상단에 표시) */}
+                <div className="hidden print:flex justify-between items-start mb-4 w-full">
+                    {/* 좌측 여백 (우측 결재선과 균형을 맞추기 위함) */}
+                    <div className="w-[200px]"></div>
+
+                    {/* 중앙 타이틀 (기안부서 표 바로 위쪽에 위치하게 됨) */}
+                    <div className="flex-1 flex flex-col items-center justify-center pt-2">
+                        <div className="text-3xl font-black text-black mb-3 tracking-[0.2em]">
+                            {selectedRequest?.docType}
+                        </div>
+                        <div className="text-lg font-bold text-black border-b-2 border-black pb-2 px-8 min-w-[300px] text-center">
+                            {selectedRequest?.title}
+                        </div>
+                    </div>
+
+                    {/* 우측 결재선 */}
+                    <div className="w-auto flex justify-end">
+                        <table className="border-collapse border-2 border-black text-center text-xs bg-white">
                         <tbody>
                             <tr>
                                 <td rowSpan="3" className="bg-slate-100 border border-black font-bold p-2 w-8" style={{ writingMode: 'vertical-rl', letterSpacing: '0.2em' }}>결재</td>
@@ -201,7 +225,8 @@ export default function ApprovalPage() {
                                 })}
                             </tr>
                         </tbody>
-                    </table>
+                        </table>
+                    </div>
                 </div>
 
                 <div className="print:hidden">
@@ -219,6 +244,158 @@ export default function ApprovalPage() {
                         onAction={(action) => setViewMode('list')} 
                     />
                 </div>
+
+                {/* Print Preview Modal */}
+                {showPrintPreview && createPortal(
+                    <div className="fixed inset-0 bg-slate-800/80 backdrop-blur-sm z-[10005] overflow-y-auto flex justify-center py-10 print:p-0 print:bg-white print:static print:z-auto">
+                        {/* 툴바 (인쇄 시 숨김) */}
+                        <div className="fixed top-6 right-8 flex gap-3 print:hidden z-[10006]">
+                            <button onClick={() => setShowPrintPreview(false)} className="px-5 py-2.5 bg-white text-slate-700 rounded-xl font-bold shadow-lg flex items-center gap-2 hover:bg-slate-50 transition-colors">
+                                <X size={18} /> 닫기
+                            </button>
+                            <button onClick={() => window.print()} className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg flex items-center gap-2 hover:bg-blue-700 transition-colors">
+                                <Printer size={18} /> 인쇄 시작
+                            </button>
+                        </div>
+
+                        {/* A4 용지 시뮬레이션 컨테이너 */}
+                        <div className="bg-white w-[210mm] min-h-[297mm] shadow-2xl p-[15mm] text-black print:w-full print:min-h-0 print:shadow-none print:p-0 print:m-0">
+                            {/* 헤더 및 결재선 표 */}
+                            <div className="flex justify-between items-start mb-4 w-full">
+                                {/* 좌측 여백 */}
+                                <div className="w-[200px]"></div>
+
+                                {/* 중앙 타이틀 */}
+                                <div className="flex-1 flex flex-col items-center justify-center pt-2">
+                                    <div className="text-3xl font-black text-black mb-3 tracking-[0.2em]">
+                                        {selectedRequest?.docType}
+                                    </div>
+                                    <div className="text-lg font-bold text-black border-b-2 border-black pb-2 px-8 min-w-[300px] text-center">
+                                        {selectedRequest?.title}
+                                    </div>
+                                </div>
+
+                                {/* 우측 결재선 */}
+                                <div className="w-auto flex justify-end">
+                                    <table className="border-collapse border-2 border-black text-center text-xs bg-white">
+                                    <tbody>
+                                        <tr>
+                                            <td rowSpan="3" className="bg-slate-100 border border-black font-bold p-2 w-8" style={{ writingMode: 'vertical-rl', letterSpacing: '0.2em' }}>결재</td>
+                                            {selectedRequest?.ApprovalSteps?.map((s, i) => (
+                                                <td key={i} className="bg-slate-100 border border-black p-1 font-bold w-20">{s.label}</td>
+                                            ))}
+                                        </tr>
+                                        <tr>
+                                            {selectedRequest?.ApprovalSteps?.map((s, i) => {
+                                                const h = selectedRequest?.ApprovalHistory?.find(x => x.step === i);
+                                                return (
+                                                    <td key={i} className="border border-black h-20 align-middle">
+                                                        {h ? (h.action === 'Approve' ? '✅ 승인' : '❌ 반려') : ''}
+                                                    </td>
+                                                );
+                                            })}
+                                        </tr>
+                                        <tr>
+                                            {selectedRequest?.ApprovalSteps?.map((s, i) => {
+                                                const h = selectedRequest?.ApprovalHistory?.find(x => x.step === i);
+                                                return (
+                                                    <td key={i} className="border border-black p-1 text-[10px]">
+                                                        {h ? new Date(h.timestamp).toLocaleDateString() : ''}
+                                                    </td>
+                                                );
+                                            })}
+                                        </tr>
+                                    </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* 본문 (타이틀 제외) */}
+                            <div className="mt-6">
+                                {selectedRequest?.docType === '설계변경서' && (
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <div><p className="text-xs font-bold text-slate-500">시방 No.</p><p>{selectedRequest.specNo}</p></div>
+                                        <div><p className="text-xs font-bold text-slate-500">발행일자</p><p>{selectedRequest.issueDate}</p></div>
+                                        <div><p className="text-xs font-bold text-slate-500">적용모델 (제품군)</p><p>{selectedRequest.modelFamily}</p></div>
+                                        <div><p className="text-xs font-bold text-slate-500">시방구분</p><p>{selectedRequest.specCategory}</p></div>
+                                        <div><p className="text-xs font-bold text-slate-500">변경사유</p><p>{selectedRequest.changeReason}</p></div>
+                                        <div><p className="text-xs font-bold text-slate-500">개선효과</p><p>{selectedRequest.improvementEffect}</p></div>
+                                    </div>
+                                )}
+                                {selectedRequest?.docType === '지출결의서' && (
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <div><p className="text-xs font-bold text-slate-500">사용 부서 / 직급</p><p>{selectedRequest.department} / {selectedRequest.position}</p></div>
+                                        <div><p className="text-xs font-bold text-slate-500">날짜</p><p>{selectedRequest.issueDate}</p></div>
+                                        <div><p className="text-xs font-bold text-slate-500">거래처명 / 금액</p><p>{selectedRequest.vendor} / {selectedRequest.amount ? new Intl.NumberFormat(selectedRequest.currency === 'USD' ? 'en-US' : 'ko-KR', { style: 'currency', currency: selectedRequest.currency || 'KRW', maximumFractionDigits: selectedRequest.currency === 'USD' ? 2 : 0 }).format(parseFloat(selectedRequest.amount)) : ''}</p></div>
+                                        <div><p className="text-xs font-bold text-slate-500">사용자</p><p>{selectedRequest.user}</p></div>
+                                        <div><p className="text-xs font-bold text-slate-500">상세내용</p><p>{selectedRequest.content}</p></div>
+                                    </div>
+                                )}
+                                {selectedRequest?.docType === '양산이관서' && (
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <div><p className="text-xs font-bold text-slate-500">양산이관 번호</p><p>{selectedRequest.transferNo}</p></div>
+                                        <div><p className="text-xs font-bold text-slate-500">발행일자</p><p>{selectedRequest.issueDate}</p></div>
+                                        <div><p className="text-xs font-bold text-slate-500">제품군 / 모델</p><p>{selectedRequest.productFamily} / {selectedRequest.transferModel}</p></div>
+                                        <div><p className="text-xs font-bold text-slate-500">폴더경로</p><p>{selectedRequest.folderPath}</p></div>
+                                    </div>
+                                )}
+                                {selectedRequest?.docType === '기안서' && (
+                                    <div className="prose prose-sm max-w-none prose-slate" dangerouslySetInnerHTML={{ __html: selectedRequest.content }} />
+                                )}
+                                {selectedRequest?.docType === '이슈발생요청서' && (
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <div><p className="text-xs font-bold text-slate-500">발생일자</p><p>{selectedRequest.issueDate}</p></div>
+                                        <div><p className="text-xs font-bold text-slate-500">부서명</p><p>{selectedRequest.department}</p></div>
+                                        <div><p className="text-xs font-bold text-slate-500">이슈구분</p><p>{selectedRequest.issueCategory}</p></div>
+                                        <div><p className="text-xs font-bold text-slate-500">모델명</p><p>{selectedRequest.modelName}</p></div>
+                                        <div><p className="text-xs font-bold text-slate-500">이슈내용</p><p>{selectedRequest.issueContent}</p></div>
+                                        <div><p className="text-xs font-bold text-slate-500">현상파악</p><p>{selectedRequest.statusAnalysis}</p></div>
+                                        <div 
+                                            className="prose prose-sm max-w-none prose-slate mt-4" 
+                                            dangerouslySetInnerHTML={{ __html: selectedRequest.content }}
+                                        />
+                                    </div>
+                                )}
+                                {selectedRequest?.docType === '불출요청서' && (
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <div><p className="text-xs font-bold text-slate-500">불출요청일</p><p>{selectedRequest.requestDate}</p></div>
+                                        <div><p className="text-xs font-bold text-slate-500">고객사</p><p>{selectedRequest.customer}</p></div>
+                                        <div><p className="text-xs font-bold text-slate-500">사용목적</p><p>{selectedRequest.purpose}</p></div>
+                                    </div>
+                                )}
+                                {selectedRequest?.docType === '근태신청서' && (
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <div><p className="text-xs font-bold text-slate-500">근태 종류</p><p>{selectedRequest.subType}</p></div>
+                                        <div><p className="text-xs font-bold text-slate-500">시작일</p><p>{selectedRequest.startDate}</p></div>
+                                        <div><p className="text-xs font-bold text-slate-500">종료일</p><p>{selectedRequest.endDate}</p></div>
+                                        <div><p className="text-xs font-bold text-slate-500">목적지/장소</p><p>{selectedRequest.location || '-'}</p></div>
+                                        <div><p className="text-xs font-bold text-slate-500">신청 사유</p><p>{selectedRequest.reason}</p></div>
+                                    </div>
+                                )}
+                                
+                                {selectedRequest?.items && selectedRequest.items.length > 0 && (
+                                    <div className="mt-4">
+                                        <p className="text-xs font-bold text-slate-500 mb-2">항목 리스트 ({selectedRequest.items.length}건)</p>
+                                        <div className="bg-slate-50 p-3 rounded-lg text-sm border overflow-x-auto print:bg-white print:border-none print:p-0">
+                                            <table className="w-full text-left border-collapse">
+                                                <thead><tr className="border-b-2 border-slate-800"><th className="pb-2 font-black">품명/내용</th><th className="pb-2 font-black">수량/기타</th></tr></thead>
+                                                <tbody>
+                                                    {selectedRequest.items.map((i, idx) => (
+                                                        <tr key={idx} className="border-b border-slate-300 last:border-0">
+                                                            <td className="py-2">{i.name || i.itemNo || i.oldSpec || '(이름없음)'}</td>
+                                                            <td className="py-2">{i.qty || i.version || i.price || i.applyDate || ''}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                , document.body)}
+
             </div>
         );
     }

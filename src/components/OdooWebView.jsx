@@ -121,11 +121,23 @@ export default function OdooWebView() {
 
 
 
-                    // Odoo 네비게이션 메뉴 중 Discuss 아이콘 완전 숨기기 (CSS로는 늦을 수 있으므로 DOM 강제 제거)
+                    // Odoo 네비게이션 메뉴 중 Discuss 아이콘 숨기기 및 푸시 알림 에러 토스트 자동 닫기
                     setInterval(function() {
                         const discussMenu = document.querySelector('a[data-menu-xmlid="mail.menu_root_discuss"]');
                         if (discussMenu) discussMenu.style.display = 'none';
-                    }, 1000);
+                        
+                        // "푸시 알림을 사용 설정하지 못함" 에러 토스트 매우 빠르게 자동 닫기
+                        const toasts = document.querySelectorAll('.o_notification_manager .o_notification, .o_notification_toast, .toast');
+                        toasts.forEach(toast => {
+                            const text = toast.innerText || '';
+                            if (text.includes('푸시 알림') || text.includes('push service') || text.includes('Registration failed')) {
+                                toast.style.opacity = '0';
+                                toast.style.display = 'none';
+                                const closeBtn = toast.querySelector('.btn-close, .o_notification_close, button');
+                                if (closeBtn) closeBtn.click();
+                            }
+                        });
+                    }, 200);
 
                     window.addEventListener('mouseup', function(e) {
                         if (e.button === 3) {
@@ -661,21 +673,8 @@ export default function OdooWebView() {
             // Odoo 상단 메뉴바의 홈 버튼(앱 선택기)만 숨기고, 하위 메뉴(품목, 작업 등)는 보이도록 유지
             // 추가로 Odoo 기본 보라색 테마를 mightyONE 색상(Slate-800)으로 덮어씌우고 좌측 마진을 줍니다.
             webview.insertCSS(`
-                /* ===== Odoo 로그인 페이지: Google 로그인 버튼 숨기기 =====
-                   임베디드 브라우저(Electron webview)에서는 Google OAuth가
-                   Google 정책에 의해 차단됩니다. mightyONE 앱의 로그인 화면에서
-                   Google 로그인 버튼을 사용해주세요.
-                */
-                .o_auth_oauth_login,
-                .o_login_oauth,
-                a[href*="oauth"],
-                .btn-oauth,
-                [data-provider="google"],
-                .o_oauth_provider,
-                .o_sign_up_form .o_oauth_provider {
-                    display: none !important;
-                }
-                
+                /* Odoo 로그인 페이지: User-Agent 위장으로 구글 로그인이 정상 작동하므로 숨김 처리 제거 */
+
                 .o_navbar_apps_menu { display: none !important; }
                 .o_menu_toggle { display: none !important; }
                 .o_menu_apps { display: none !important; }
@@ -1535,7 +1534,10 @@ export default function OdooWebView() {
     }
 
     return (
-        <div className="w-full h-full bg-white flex flex-col relative">
+        <div 
+            className="w-full h-full bg-white flex flex-col relative"
+            onMouseEnter={() => webviewRef.current?.focus()}
+        >
             {isWebViewLoading && (
                 <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm animate-in fade-in duration-300">
                     <div className="w-12 h-12 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin mb-5 shadow-sm"></div>
@@ -1546,13 +1548,11 @@ export default function OdooWebView() {
             
             <webview
                 ref={webviewRef}
-                src={`${odooApiUrl}/web`}
+                src={`${odooApiUrl}/web?db=odoo-db`}
                 style={{ width: '100%', height: '100%', border: 'none', opacity: isWebViewLoading ? 0 : 1, transition: 'opacity 0.3s ease-in-out' }}
                 allowpopups="true"
-                disablewebsecurity="true"
                 partition="persist:odoo"
-                webpreferences="contextIsolation=no, webSecurity=no"
-                useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                webpreferences="contextIsolation=no"
             />
         </div>
     );

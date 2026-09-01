@@ -1,7 +1,7 @@
 {
     "name": "mightyONE",
     "private": true,
-    "version": "0.9.10",
+    "version": "0.9.11",
     "description": "mightyONE - 스마트 사내 어시스턴트",
     "author": "Antigravity",
     "type": "module",
