@@ -137,6 +137,7 @@ export default function OdooWebView() {
                                 if (closeBtn) closeBtn.click();
                             }
                         });
+
                     }, 200);
 
                     window.addEventListener('mouseup', function(e) {
@@ -673,8 +674,6 @@ export default function OdooWebView() {
             // Odoo 상단 메뉴바의 홈 버튼(앱 선택기)만 숨기고, 하위 메뉴(품목, 작업 등)는 보이도록 유지
             // 추가로 Odoo 기본 보라색 테마를 mightyONE 색상(Slate-800)으로 덮어씌우고 좌측 마진을 줍니다.
             webview.insertCSS(`
-                /* Odoo 로그인 페이지: User-Agent 위장으로 구글 로그인이 정상 작동하므로 숨김 처리 제거 */
-
                 .o_navbar_apps_menu { display: none !important; }
                 .o_menu_toggle { display: none !important; }
                 .o_menu_apps { display: none !important; }

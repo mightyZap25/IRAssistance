@@ -122,7 +122,7 @@
             ]
         },
         "mac": {
-            "icon": "build/icon.png",
+            "icon": "build/icon_dock.png",
             "identity": null,
             "target": [
                 "dmg",

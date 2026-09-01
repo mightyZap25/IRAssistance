@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, shell, session, ipcMain, nativeTheme, dialog, Notification } from 'electron';
+import { app, BrowserWindow, Tray, Menu, shell, session, ipcMain, nativeTheme, dialog, Notification, nativeImage } from 'electron';
 import path from 'path';
 import { createRequire } from 'module';
 import pkg from 'electron-updater';
@@ -255,7 +255,11 @@ function createTray() {
     const localIcon = path.join(app.getPath('userData'), 'icons', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
     const activeIconPath = fs.existsSync(localIcon) ? localIcon : path.join(app.getAppPath(), 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 
-    tray = new Tray(activeIconPath);
+    let trayIcon = nativeImage.createFromPath(activeIconPath);
+    if (process.platform === 'darwin') {
+        trayIcon = trayIcon.resize({ width: 22, height: 22 });
+    }
+    tray = new Tray(trayIcon);
 
     const contextMenu = Menu.buildFromTemplate([
         {
@@ -319,6 +323,13 @@ if (!gotTheLock) {
     app.on('ready', () => {
         // 필수 아이콘 준비
         ensureNotificationIcons();
+        
+        // macOS Dock 아이콘 명시적 설정 (개발 모드 등에서 Electron 기본 아이콘이 나오는 문제 방지)
+        if (process.platform === 'darwin' && app.dock) {
+            const localIcon = path.join(app.getPath('userData'), 'icons', 'icon_dock.png');
+            const activeIconPath = fs.existsSync(localIcon) ? localIcon : path.join(app.getAppPath(), 'build', 'icon_dock.png');
+            app.dock.setIcon(activeIconPath);
+        }
 
         // Automatically allow notifications and other basic permissions for webviews
         session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
@@ -513,10 +524,24 @@ if (!gotTheLock) {
                 // 웹뷰 내부에서 새 창 열기 시 (target="_blank" 등)
                 contents.setWindowOpenHandler(({ url }) => {
                     // 인쇄(리포트) 팝업인 경우 무조건 크롬(기본 브라우저)으로 열기
+                    // [수정] 외부 브라우저로 열면 세션(쿠키)이 연동되지 않아 Odoo 로그인 창만 표시됩니다.
+                    // 따라서 내부 Electron 팝업 창으로 열도록 허용(allow) 처리합니다.
                     if (url.includes('/report/html/') || url.includes('/report/pdf/')) {
-                        console.log('[Electron Main] 인쇄 리포트 팝업 감지, 크롬으로 엽니다:', url);
-                        shell.openExternal(url);
-                        return { action: 'deny' };
+                        console.log('[Electron Main] 인쇄 리포트 팝업 감지, 내부 팝업으로 엽니다:', url);
+                        return { 
+                            action: 'allow',
+                            overrideBrowserWindowOptions: {
+                                width: 1100,
+                                height: 800,
+                                autoHideMenuBar: true,
+                                backgroundColor: '#ffffff',
+                                webPreferences: {
+                                    partition: contents.session.partition,
+                                    nodeIntegration: false,
+                                    contextIsolation: true
+                                }
+                            }
+                        };
                     }
                     
                     // about:blank는 Gmail 새 창 띄우기 등에서 내부적으로 사용됨
