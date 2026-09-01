@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import FindInPageBar from '../components/common/FindInPageBar';
 import 'react-resizable/css/styles.css';
 import { BlockNoteEditor } from "@blocknote/core";
+import { ko } from "@blocknote/core/locales";
 import { BlockNoteView } from "@blocknote/mantine";
 import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
@@ -131,6 +132,7 @@ function BlockNoteEditorWrapper({ initialMarkdown, onChange, vaultPath, filePath
                 
                 const newEditor = BlockNoteEditor.create({ 
                     initialContent: blocks,
+                    dictionary: ko,
                     uploadFile: async (file) => {
                         const arrayBuffer = await file.arrayBuffer();
                         let targetDir = vaultPath;

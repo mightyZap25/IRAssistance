@@ -110,6 +110,7 @@
             "app_tray_icon.png",
             "build/icon.png",
             "build/icon.ico",
+            "build/icon_dock.png",
             "package.json"
         ],
         "directories": {
