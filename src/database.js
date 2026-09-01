@@ -26,7 +26,64 @@ export const signInWithPopup = async (authInstance, provider) => {
             }
         };
     }
-    throw new Error('Google 로그인은 Electron 앱 환경에서만 지원됩니다.');
+    
+    // 일반 웹 브라우저(npm run dev) 환경: Google Identity Services (GIS) Token Client 활용
+    return new Promise((resolve, reject) => {
+        if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
+            return reject(new Error('Google 로그인 스크립트가 로드되지 않았습니다.'));
+        }
+
+        const webClientId = import.meta.env.VITE_GOOGLE_WEB_CLIENT_ID;
+        if (!webClientId) {
+            return reject(new Error('.env 파일에 VITE_GOOGLE_WEB_CLIENT_ID를 설정해주세요. (웹 애플리케이션용 클라이언트 ID)'));
+        }
+
+        const client = window.google.accounts.oauth2.initTokenClient({
+            client_id: webClientId,
+            scope: 'openid email profile https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/gmail.readonly',
+            callback: async (tokenResponse) => {
+                if (tokenResponse.error) {
+                    return reject(new Error('구글 로그인 실패: ' + tokenResponse.error));
+                }
+
+                try {
+                    // 구글 API에서 발급받은 액세스 토큰으로 사용자 프로필(UserInfo) 조회
+                    const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+                        headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
+                    });
+                    
+                    if (!userInfoRes.ok) {
+                        throw new Error('사용자 정보를 가져오는 데 실패했습니다.');
+                    }
+                    
+                    const userInfo = await userInfoRes.json();
+                    
+                    const user = {
+                        uid: userInfo.id,
+                        email: userInfo.email,
+                        displayName: userInfo.name,
+                        photoURL: userInfo.picture
+                    };
+
+                    // 상태 업데이트
+                    mockAuth.setCurrentUser(user);
+                    
+                    resolve({
+                        user: user,
+                        credential: { 
+                            accessToken: tokenResponse.access_token, 
+                            expiresIn: tokenResponse.expires_in || 3599 
+                        }
+                    });
+                } catch (e) {
+                    reject(new Error('인증 처리 중 오류 발생: ' + e.message));
+                }
+            },
+        });
+
+        // 인증 팝업 띄우기
+        client.requestAccessToken();
+    });
 };
 
 export const signOut = async () => mockAuth.logout();

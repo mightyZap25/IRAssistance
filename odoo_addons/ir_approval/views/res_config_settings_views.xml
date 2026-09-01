@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_ir_approval" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.ir.approval</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Approval" string="전자결재" name="ir_approval">
+                    <block title="회사 직인 설정" name="company_seal_block">
+                        <setting id="company_seal_setting" string="회사 직인(Company Seal)" help="전자결재 인쇄물(재직증명서 등)에 삽입될 직인 이미지를 등록합니다.">
+                            <field name="company_seal" widget="image" class="w-25"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_ir_approval_config_settings" model="ir.actions.act_window">
+        <field name="name">설정</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+        <field name="context">{'module' : 'ir_approval'}</field>
+    </record>
+
+    <menuitem id="menu_ir_approval_config" name="설정" parent="ir_approval.menu_ir_approval_root" action="action_ir_approval_config_settings" sequence="100" groups="base.group_erp_manager"/>
+</odoo>
+

@@ -16,55 +16,154 @@
     <template id="report_ir_approval_document">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="doc">
-                <t t-call="web.external_layout">
-                    <div class="page" style="padding-top: 20px;">
-                        
-                        <!-- 상단 헤더: 타이틀(중앙) + 결재도장칸(우측) -->
-                        <div class="row align-items-start mb-4">
-                            <div class="col-4">
-                                <!-- 빈 공간 (좌측) -->
-                            </div>
-                            <div class="col-4 text-center">
-                                <t t-if="doc.doc_type == 'EXPENSE_RESOLUTION'">
-                                    <h2 class="mb-0" style="margin-top: 20px;"><strong>지출결의서</strong></h2>
-                                    <h5 class="text-muted mt-2"><span t-field="doc.name"/></h5>
-                                </t>
-                                <t t-else="">
-                                    <h2 class="mb-0" style="margin-top: 20px;"><strong><span t-field="doc.name"/></strong></h2>
-                                    <h5 class="text-muted mt-2"><span t-field="doc.doc_type"/> 상세</h5>
-                                </t>
-                            </div>
-                            <div class="col-4">
-                                <!-- 결재선 표(도장칸) - 우측 상단 고정 -->
-                                <table class="table table-bordered text-center float-right" style="width: 250px; border: 2px solid black; font-size: 12px; margin-bottom: 0; float: right;">
+                <div class="article" t-att-data-oe-model="doc and doc._name" t-att-data-oe-id="doc and doc.id">
+
+                    <div class="page">
+                        <t t-if="doc.doc_type == 'EMPLOYMENT_CERT'">
+                            <div style="width: 100%; max-width: 800px; margin: 0 auto; font-family: 'Malgun Gothic', sans-serif;">
+                                <!-- 로고 -->
+                                <div style="text-align: center; margin-top: 40px; margin-bottom: 30px;">
+                                    <img t-if="doc.company_id.logo" t-att-src="image_data_uri(doc.company_id.logo)" style="max-height: 80px;" alt="Logo"/>
+                                </div>
+                                
+                                <!-- 타이틀 -->
+                                <h1 style="text-align: center; font-size: 36px; letter-spacing: 15px; margin-bottom: 50px;"><strong>재직증명서</strong></h1>
+                                
+                                <!-- 테이블 영역 -->
+                                <table style="width: 100%; border-collapse: collapse; border-top: 2px solid #333; border-bottom: 2px solid #ccc; font-size: 13px;">
                                     <tbody>
+                                        <!-- 인적사항 -->
                                         <tr>
-                                            <td rowspan="3" style="vertical-align: middle; background-color: #f8f9fa; font-weight: bold; width: 15%; padding: 4px;">결재</td>
-                                            <td style="background-color: #f8f9fa; font-weight: bold; padding: 4px;">기안자</td>
-                                            <td style="background-color: #f8f9fa; font-weight: bold; padding: 4px;">결재권자 1</td>
-                                            <td style="background-color: #f8f9fa; font-weight: bold; padding: 4px;">최종 결재</td>
-                                        </tr>
-                                        <tr>
-                                            <td style="height: 50px; vertical-align: middle; padding: 0;">
-                                                <span t-field="doc.requestor_id"/>
-                                            </td>
-                                            <td style="height: 50px; vertical-align: middle; padding: 0;">
-                                                <t t-if="doc.status in ['PENDING', 'APPROVED', 'REJECTED']">검토</t>
-                                            </td>
-                                            <td style="height: 50px; vertical-align: middle; padding: 0;">
-                                                <t t-if="doc.status == 'APPROVED'">✅ 승인</t>
-                                                <t t-if="doc.status == 'REJECTED'">❌ 반려</t>
+                                            <th rowspan="2" style="width: 15%; background-color: #f1f0f6; border-bottom: 1px solid #e0e0e0; border-right: 1px solid #e0e0e0; text-align: center; padding: 15px;">인적사항</th>
+                                            <th style="width: 15%; background-color: #fafafa; border-bottom: 1px solid #e0e0e0; text-align: center; padding: 10px;">성명</th>
+                                            <td style="width: 35%; border-bottom: 1px solid #e0e0e0; padding: 10px;"><span t-field="doc.emp_cert_name"/></td>
+                                            <th style="width: 15%; background-color: #fafafa; border-bottom: 1px solid #e0e0e0; text-align: center; padding: 10px;">생년월일</th>
+                                            <td style="width: 20%; border-bottom: 1px solid #e0e0e0; padding: 10px;">
+                                                <span t-if="doc.emp_cert_birth_date" t-esc="doc.emp_cert_birth_date.strftime('%Y년 %m월 %d일')"/>
                                             </td>
                                         </tr>
                                         <tr>
-                                            <td style="font-size: 9px; padding: 2px;"><span t-field="doc.create_date" t-options='{"widget": "date"}'/></td>
-                                            <td style="font-size: 9px; padding: 2px;"></td>
-                                            <td style="font-size: 9px; padding: 2px;"></td>
+                                            <th style="background-color: #fafafa; border-bottom: 1px solid #e0e0e0; text-align: center; padding: 10px;">주소</th>
+                                            <td colspan="3" style="border-bottom: 1px solid #e0e0e0; padding: 10px;"><span t-field="doc.emp_cert_address"/></td>
+                                        </tr>
+                                        <!-- 재직사항 -->
+                                        <tr>
+                                            <th rowspan="2" style="background-color: #f1f0f6; border-bottom: 1px solid #e0e0e0; border-right: 1px solid #e0e0e0; text-align: center; padding: 15px;">재직사항</th>
+                                            <th style="background-color: #fafafa; border-bottom: 1px solid #e0e0e0; text-align: center; padding: 10px;">소속</th>
+                                            <td style="border-bottom: 1px solid #e0e0e0; padding: 10px;"><span t-field="doc.emp_cert_department"/></td>
+                                            <th style="background-color: #fafafa; border-bottom: 1px solid #e0e0e0; text-align: center; padding: 10px;">직위</th>
+                                            <td style="border-bottom: 1px solid #e0e0e0; padding: 10px;"><span t-field="doc.emp_cert_job_title"/></td>
+                                        </tr>
+                                        <tr>
+                                            <th style="background-color: #fafafa; border-bottom: 1px solid #e0e0e0; text-align: center; padding: 10px;">재직기간</th>
+                                            <td colspan="3" style="border-bottom: 1px solid #e0e0e0; padding: 10px;">
+                                                <span t-if="doc.emp_cert_start_date" t-esc="doc.emp_cert_start_date.strftime('%Y년 %m월 %d일')"/> ~ 
+                                                <span t-if="doc.emp_cert_end_date" t-esc="doc.emp_cert_end_date.strftime('%Y년 %m월 %d일')"/>
+                                            </td>
+                                        </tr>
+                                        <!-- 용도 -->
+                                        <tr>
+                                            <th style="background-color: #f1f0f6; border-bottom: 2px solid #ccc; border-right: 1px solid #e0e0e0; text-align: center; padding: 15px;">용도</th>
+                                            <td colspan="4" style="border-bottom: 2px solid #ccc; padding: 10px;"><span t-field="doc.emp_cert_purpose"/></td>
                                         </tr>
                                     </tbody>
                                 </table>
+                                
+                                <!-- 발급 담당자 -->
+                                <table style="width: 100%; border-collapse: collapse; border-bottom: 1px solid #ccc; margin-top: 15px; font-size: 13px;">
+                                    <tbody>
+                                        <tr>
+                                            <th rowspan="2" style="width: 15%; background-color: #fafafa; border-right: 1px solid #e0e0e0; text-align: center; padding: 15px;">발급<br/>담당자</th>
+                                            <th style="width: 15%; text-align: center; padding: 10px;">소속</th>
+                                            <td style="width: 35%; padding: 10px;"><span t-field="doc.emp_cert_issuer_dept"/></td>
+                                            <th style="width: 15%; text-align: center; padding: 10px;">직위</th>
+                                            <td style="width: 20%; padding: 10px;"><span t-field="doc.emp_cert_issuer_title"/></td>
+                                        </tr>
+                                        <tr>
+                                            <th style="text-align: center; padding: 10px;">성명</th>
+                                            <td style="padding: 10px;"><span t-field="doc.emp_cert_issuer_name"/></td>
+                                            <th style="text-align: center; padding: 10px;">전화번호</th>
+                                            <td style="padding: 10px;"><span t-field="doc.emp_cert_issuer_phone"/></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                
+                                <!-- 증명 문구 -->
+                                <div style="margin-top: 60px; text-align: center; font-size: 15px;">
+                                    상기인은 <span t-if="doc.emp_cert_start_date" t-esc="doc.emp_cert_start_date.strftime('%Y년 %m월 %d일')"/> 당사에 입사하여 현재까지 재직 중에 있음을 증명합니다.
+                                </div>
+                                
+                                <!-- 작성일자 -->
+                                <div style="margin-top: 60px; text-align: center; font-size: 15px;">
+                                    <span t-esc="context_today().strftime('%Y년 %m월 %d일')"/>
+                                </div>
+                                
+                                <!-- 서명란 -->
+                                <div style="margin-top: 60px; text-align: right; position: relative;">
+                                    <span style="font-size: 16px; margin-right: 20px; font-weight: bold;">대표이사</span>
+                                    <span style="font-size: 16px; margin-right: 60px;">(인)</span>
+                                    <!-- 직인 이미지 -->
+                                    <t t-if="doc.company_id.company_seal">
+                                        <img t-att-src="image_data_uri(doc.company_id.company_seal)" style="position: absolute; right: 20px; top: -15px; width: 60px; height: 60px;" alt="Seal"/>
+                                    </t>
+                                </div>
+                                
+                                <!-- 회사명 -->
+                                <div style="margin-top: 50px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 2px;">
+                                    <span t-field="doc.company_id.name"/>
+                                </div>
                             </div>
-                        </div>
+                        </t>
+                        <t t-else="">
+                            <!-- 기존 양식 -->
+
+                        
+                        <!-- 상단 헤더: 타이틀(중앙) + 결재도장칸(우측) wkhtmltopdf 호환 테이블 레이아웃 -->
+                        <table style="width: 100%; margin-bottom: 30px; border: none; padding: 0;">
+                            <tr>
+                                <td style="width: 30%; border: none;"></td>
+                                <td style="width: 40%; text-align: center; vertical-align: middle; border: none;">
+                                    <t t-if="doc.doc_type == 'EXPENSE_RESOLUTION'">
+                                        <h2 style="margin: 0;"><strong>지출결의서</strong></h2>
+                                        <h5 style="color: #6c757d; margin-top: 10px; margin-bottom: 0;"><span t-field="doc.name"/></h5>
+                                    </t>
+                                    <t t-else="">
+                                        <h2 style="margin: 0;"><strong><span t-field="doc.name"/></strong></h2>
+                                        <h5 style="color: #6c757d; margin-top: 10px; margin-bottom: 0;"><span t-field="doc.doc_type"/> 상세</h5>
+                                    </t>
+                                </td>
+                                <td style="width: 30%; text-align: right; vertical-align: top; border: none;">
+                                    <!-- 결재선 표(도장칸) -->
+                                    <table class="text-center" style="width: 250px; border-collapse: collapse; border: 2px solid black; font-size: 12px; float: right; margin-bottom: 0;">
+                                        <tbody>
+                                            <tr>
+                                                <td rowspan="3" style="vertical-align: middle; background-color: #f8f9fa; font-weight: bold; width: 15%; padding: 4px; border: 1px solid black;">결재</td>
+                                                <td style="background-color: #f8f9fa; font-weight: bold; padding: 4px; border: 1px solid black;">기안자</td>
+                                                <td style="background-color: #f8f9fa; font-weight: bold; padding: 4px; border: 1px solid black;">결재권자 1</td>
+                                                <td style="background-color: #f8f9fa; font-weight: bold; padding: 4px; border: 1px solid black;">최종 결재</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="height: 50px; vertical-align: middle; padding: 0; border: 1px solid black;">
+                                                    <span t-field="doc.requestor_id"/>
+                                                </td>
+                                                <td style="height: 50px; vertical-align: middle; padding: 0; border: 1px solid black;">
+                                                    <t t-if="doc.status in ['PENDING', 'APPROVED', 'REJECTED']">검토</t>
+                                                </td>
+                                                <td style="height: 50px; vertical-align: middle; padding: 0; border: 1px solid black;">
+                                                    <t t-if="doc.status == 'APPROVED'">✅ 승인</t>
+                                                    <t t-if="doc.status == 'REJECTED'">❌ 반려</t>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="font-size: 9px; padding: 2px; border: 1px solid black;"><span t-field="doc.create_date" t-options='{"widget": "date"}'/></td>
+                                                <td style="font-size: 9px; padding: 2px; border: 1px solid black;"></td>
+                                                <td style="font-size: 9px; padding: 2px; border: 1px solid black;"></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
 
                         <hr/>
 
@@ -128,9 +227,10 @@
                                 </t>
                             </tbody>
                         </table>
+                        </t>
                     </div>
                     
-                    <!-- 인쇄 팝업 자동 실행 스크립트 -->
+                    <!-- 브라우저 인쇄 팝업 자동 실행 -->
                     <script type="text/javascript">
                         window.onload = function() {
                             setTimeout(function() {
@@ -138,7 +238,7 @@
                             }, 500);
                         };
                     </script>
-                </t>
+                </div>
             </t>
         </t>
     </template>

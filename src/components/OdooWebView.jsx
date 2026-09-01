@@ -1543,6 +1543,7 @@ export default function OdooWebView() {
                     <p className="text-slate-500 font-medium">Odoo 스마트 업무 환경을 준비하고 있습니다...</p>
                 </div>
             )}
+            
             <webview
                 ref={webviewRef}
                 src={`${odooApiUrl}/web`}

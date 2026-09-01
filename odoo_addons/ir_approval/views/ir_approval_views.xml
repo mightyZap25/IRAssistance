@@ -17,6 +17,73 @@
         </field>
     </record>
 
+    <!-- 모바일 카드형(Kanban) 뷰 추가 -->
+    <record id="view_ir_approval_request_kanban" model="ir.ui.view">
+        <field name="name">ir_approval.request.kanban</field>
+        <field name="model">ir_approval.request</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile" quick_create="false">
+                <field name="doc_type"/>
+                <field name="name"/>
+                <field name="requestor_id"/>
+                <field name="create_date"/>
+                <field name="status"/>
+                <templates>
+                    <t t-name="card">
+                        <!-- 1단 세로 정렬 및 빈 고스트 카드 완벽 숨김용 강제 CSS -->
+                        <style>
+                            .o_kanban_view .o_kanban_record {
+                                width: 100% !important;
+                                flex: 0 0 100% !important;
+                                margin-left: 0 !important;
+                                margin-right: 0 !important;
+                            }
+                            .o_kanban_view .o_kanban_record.o_kanban_ghost,
+                            .o_kanban_view .o_kanban_record:empty {
+                                display: none !important;
+                                height: 0 !important;
+                                padding: 0 !important;
+                                margin: 0 !important;
+                                border: none !important;
+                            }
+                        </style>
+                        <div t-attf-class="oe_kanban_global_click" style="padding: 10px;">
+                            <div class="o_kanban_record_top mb-2">
+                                <div class="o_kanban_record_headings">
+                                    <strong class="o_kanban_record_title" style="font-size: 15px; color: black; font-weight: bold;">
+                                        <span class="me-1">[<field name="doc_type"/>]</span>
+                                        <field name="name"/>
+                                    </strong>
+                                </div>
+                            </div>
+                            <div class="o_kanban_record_bottom d-flex justify-content-between align-items-center w-100 mt-2" style="font-size: 13px; color: gray;">
+                                <div class="oe_kanban_bottom_left d-flex align-items-center">
+                                    <field name="requestor_id"/>
+                                    <span class="mx-1">|</span>
+                                    <field name="create_date" widget="date"/>
+                                </div>
+                                <div class="oe_kanban_bottom_right text-end">
+                                    <span t-if="record.status.raw_value == 'pending'" class="badge text-bg-primary px-2 py-1" style="font-weight: bold;">
+                                        진행중
+                                    </span>
+                                    <span t-elif="record.status.raw_value == 'draft'" class="badge text-bg-secondary px-2 py-1" style="font-weight: bold;">
+                                        임시저장
+                                    </span>
+                                    <span t-elif="record.status.raw_value == 'approved'" class="badge text-bg-primary px-2 py-1" style="font-weight: bold;">
+                                        승인완료
+                                    </span>
+                                    <span t-else="" class="badge text-bg-danger px-2 py-1" style="font-weight: bold;">
+                                        반려됨
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
     <record id="view_ir_approval_request_form" model="ir.ui.view">
         <field name="name">ir_approval.request.form</field>
         <field name="model">ir_approval.request</field>
@@ -27,8 +94,8 @@
                     .custom_full_width .o_form_sheet {
                         max-width: 100% !important;
                         width: 100% !important;
-                        padding-left: 24px !important;
-                        padding-right: 24px !important;
+                        padding-left: 12px !important;
+                        padding-right: 12px !important;
                     }
                     /* 전체 폰트 크기 증가 (기존 12px -> 14px) */
                     .custom_full_width {
@@ -50,20 +117,6 @@
                     .custom_full_width textarea.o_input {
                         padding: 4px 6px !important;
                     }
-                    /* 한 줄짜리 그룹 레이블 공백 제거를 위한 고정 너비 지정 */
-                    .custom_full_width .single_line_group {
-                        grid-template-columns: 140px 1fr !important;
-                    }
-                    /* 레이블 너비 통일을 위한 그리드 템플릿 */
-                    .custom_full_width .fixed_label_2col {
-                        grid-template-columns: 120px 1fr !important;
-                    }
-                    .custom_full_width .fixed_label_4col {
-                        grid-template-columns: 120px 1fr 120px 1fr !important;
-                    }
-                    .custom_full_width .fixed_label_6col {
-                        grid-template-columns: 120px 1fr 120px 1fr 120px 1fr !important;
-                    }
                     /* 헤더 영역 위쪽 공백 최소화 */
                     .o_form_view .o_form_statusbar {
                         margin-top: 0 !important;
@@ -80,120 +133,110 @@
                     <button name="action_approve" string="승인" type="object" class="oe_highlight" invisible="status != 'pending' or is_my_turn == False"/>
                     <button name="action_reject" string="반려" type="object" class="btn-danger" invisible="status != 'pending' or is_my_turn == False"/>
                     <button name="action_draft" string="수정/재기안" type="object" class="btn-secondary" invisible="status != 'rejected'"/>
+                    <!-- 관리자 전용 과거 내역 강제 승인 버튼 -->
+                    <button name="action_force_approve" string="과거 내역 강제 승인" type="object" class="btn-warning" groups="base.group_erp_manager" invisible="status == 'approved'" confirm="이 기안을 과거 내역으로 간주하고 즉시 '승인 완료' 처리하시겠습니까?"/>
                     <field name="status" widget="statusbar" statusbar_visible="draft,pending,approved,rejected"/>
                 </header>
                 <sheet>
-                    <!-- 1. 문서 종류 및 기안서 제목 (같은 줄 배치) -->
-                    <div class="d-flex align-items-center mb-3">
-                        <label for="doc_type" class="fw-bold me-2 mb-0" string="문서 종류" style="font-size: 14px; width: 80px;"/>
-                        <field name="doc_type" required="1" class="me-4" style="font-size: 14px; font-weight: bold; width: 180px;"/>
-                        <h1 class="m-0 flex-grow-1" style="line-height: 1.2;">
-                            <field name="name" placeholder="기안서 제목..." class="w-100" style="font-size: 24px; min-height: 30px; border-bottom: 1px solid #ccc;"/>
-                        </h1>
-                    </div>
+                    <!-- 1. 문서 종류 및 기안서 제목 (세로 배치) -->
+                    <group readonly="status != 'draft'">
+                        <field name="doc_type" required="1" style="font-size: 14px; font-weight: bold;" readonly="status != 'draft'"/>
+                        <field name="name" placeholder="기안서 제목..." style="font-size: 18px; font-weight: bold;" readonly="status != 'draft'"/>
+                    </group>
 
-                    <!-- 3. 기안일자(좌) / 보존연한(우) -->
-                    <group>
-                        <group>
-                            <field name="draft_date"/>
-                        </group>
-                        <group>
-                            <field name="retention_period"/>
-                        </group>
+                    <!-- 3. 기안일자 / 보존연한 (세로 배치) -->
+                    <group readonly="status != 'draft'">
+                        <field name="draft_date" readonly="status != 'draft'"/>
+                        <field name="retention_period" readonly="status != 'draft'"/>
                     </group>
                     
                     <!-- 4. 고유 내용 (지출결의서) -->
-                    <group string="지출 결의 상세" invisible="doc_type != 'EXPENSE_RESOLUTION'" col="1">
-                        <group col="2" class="fixed_label_2col" style="width: 50%;">
-                            <field name="expense_doc_no" string="문서 번호"/>
-                        </group>
+                    <group string="지출 결의 상세" invisible="doc_type != 'EXPENSE_RESOLUTION'" readonly="status != 'draft'">
+                        <field name="expense_doc_no" string="문서 번호" readonly="status != 'draft'"/>
+                        <field name="expense_user" string="작성자" readonly="status != 'draft'"/>
+                        <field name="expense_job_title" string="직급" readonly="status != 'draft'"/>
+                        <field name="expense_dept" string="사용부서" readonly="status != 'draft'"/>
+                        <field name="expense_vendor" string="거래처명" readonly="status != 'draft'"/>
+                        <field name="expense_receipt_type" string="영수/청구" widget="radio" options="{'horizontal': true}" readonly="status != 'draft'"/>
                         
-                        <group col="6" class="fixed_label_6col">
-                            <field name="expense_user" string="작성자"/>
-                            <field name="expense_job_title" string="직급"/>
-                            <field name="expense_dept" string="사용부서"/>
-                        </group>
-                        
-                        <group col="4" class="fixed_label_4col">
-                            <field name="expense_vendor" string="거래처명"/>
-                            <field name="expense_receipt_type" string="영수/청구" widget="radio" options="{'horizontal': true}"/>
-                        </group>
-                        
-                        <group col="2" class="fixed_label_2col" style="width: 50%;">
-                            <label for="expense_amount" string="사용금액"/>
-                            <div class="d-flex align-items-center w-100">
-                                <span class="px-3 py-1 me-2 rounded" style="border: 1px solid #ccc; background-color: #fff; font-size: 13px; font-weight: bold;">KRW</span>
-                                <span class="me-2 fw-bold fs-5">￦</span>
-                                <field name="expense_amount" widget="float" nolabel="1"/>
-                            </div>
-                        </group>
+                        <label for="expense_amount" string="사용금액"/>
+                        <div class="d-flex align-items-center w-100 gap-2">
+                            <!-- 통화 선택 콤보박스 -->
+                            <field name="expense_currency_id" options="{'no_create': True, 'no_open': True}" nolabel="1" style="width: 100px !important; min-width: 80px;" readonly="status != 'draft'"/>
+                            <!-- 금액 입력 (통화에 맞춰 소수점 자동 렌더링) -->
+                            <field name="expense_amount" widget="monetary" options="{'currency_field': 'expense_currency_id'}" nolabel="1" class="fw-bold fs-5 text-primary flex-grow-1" readonly="status != 'draft'"/>
+                        </div>
                     </group>
 
                         <!-- ECO 설계변경서 필드 -->
-                        <group string="ECO 설계변경" invisible="doc_type != 'ECO'">
-                            <group>
-                                <field name="eco_spec_no"/>
-                                <field name="eco_applied_models_chk"/>
-                            </group>
-                            <group>
-                                <field name="eco_issue_date"/>
-                                <field name="eco_comm_method"/>
-                            </group>
-                        </group>
-                        <group invisible="doc_type != 'ECO'" class="single_line_group">
-                            <field name="eco_applied_model_text"/>
-                            <field name="eco_spec_type" widget="radio" options="{'horizontal': true}"/>
-                            <field name="eco_change_reason"/>
-                            <field name="eco_publish_change"/>
-                            <field name="eco_publish_change_detail" invisible="eco_publish_change != 'yes'"/>
-                            <field name="eco_improvement_effect"/>
-                            <field name="eco_dept_opinion"/>
-                            <field name="eco_revision_no"/>
+                        <group string="ECO 설계변경" invisible="doc_type != 'ECO'" readonly="status != 'draft'">
+                            <field name="eco_spec_no" readonly="status != 'draft'"/>
+                            <field name="eco_applied_models_chk" readonly="status != 'draft'"/>
+                            <field name="eco_issue_date" readonly="status != 'draft'"/>
+                            <field name="eco_comm_method" readonly="status != 'draft'"/>
+                            <field name="eco_applied_model_text" readonly="status != 'draft'"/>
+                            <field name="eco_spec_type" widget="radio" options="{'horizontal': true}" readonly="status != 'draft'"/>
+                            <field name="eco_change_reason" readonly="status != 'draft'"/>
+                            <field name="eco_publish_change" readonly="status != 'draft'"/>
+                            <field name="eco_publish_change_detail" invisible="eco_publish_change != 'yes'" readonly="status != 'draft'"/>
+                            <field name="eco_improvement_effect" readonly="status != 'draft'"/>
+                            <field name="eco_dept_opinion" readonly="status != 'draft'"/>
+                            <field name="eco_revision_no" readonly="status != 'draft'"/>
                         </group>
                         
                         <!-- 양산이관 관련 필드 -->
-                        <group string="양산이관 상세" invisible="doc_type != 'MASS_PROD_TRANSFER'" col="1">
-                            <group col="2" class="fixed_label_2col" style="width: 50%;">
-                                <field name="transfer_no" string="문서 번호"/>
-                            </group>
-                            
-                            <group col="6" class="fixed_label_6col">
-                                <field name="transfer_user" string="작성 자"/>
-                                <field name="transfer_job_title" string="직급"/>
-                                <field name="transfer_dept" string="사용부서"/>
-                            </group>
-                            
-                            <group col="2" class="fixed_label_2col" style="width: 50%;">
-                                <field name="transfer_product_family" string="제품군"/>
-                            </group>
-
-                            <group col="2" class="fixed_label_2col" style="width: 50%;">
-                                <field name="transfer_model" string="시리즈"/>
-                            </group>
-
-                            <group col="2" class="fixed_label_2col" style="width: 100%;">
-                                <field name="transfer_detail_model" string="세부 모델명"/>
-                            </group>
-
-                            <group col="2" class="fixed_label_2col" style="width: 100%;">
-                                <field name="transfer_folder_path" string="이관 자료폴더 경로"/>
-                            </group>
-
-                            <group col="2" class="fixed_label_2col" style="width: 100%;">
-                                <field name="transfer_dept_opinion" string="발행부서의 의견"/>
-                            </group>
+                        <group string="양산이관 상세" invisible="doc_type != 'MASS_PROD_TRANSFER'" readonly="status != 'draft'">
+                            <field name="transfer_no" string="문서 번호" readonly="status != 'draft'"/>
+                            <field name="transfer_user" string="작성자" readonly="status != 'draft'"/>
+                            <field name="transfer_job_title" string="직급" readonly="status != 'draft'"/>
+                            <field name="transfer_dept" string="사용부서" readonly="status != 'draft'"/>
+                            <field name="transfer_product_family" string="제품군" readonly="status != 'draft'"/>
+                            <field name="transfer_model" string="시리즈" readonly="status != 'draft'"/>
+                            <field name="transfer_detail_model" string="세부 모델명" readonly="status != 'draft'"/>
+                            <field name="transfer_folder_path" string="이관 자료폴더 경로" readonly="status != 'draft'"/>
+                            <field name="transfer_dept_opinion" string="발행부서의 의견" readonly="status != 'draft'"/>
                         </group>
 
                         <!-- 이슈발생 요청서 필드 -->
-                        <group string="이슈 발생" invisible="doc_type != 'ISSUE_REQUEST'">
-                            <field name="issue_request_date"/>
-                            <field name="issue_customer"/>
-                            <field name="issue_purpose"/>
+                        <group string="이슈 발생" invisible="doc_type != 'ISSUE_REQUEST'" readonly="status != 'draft'">
+                            <field name="issue_request_date" readonly="status != 'draft'"/>
+                            <field name="issue_customer" readonly="status != 'draft'"/>
+                            <field name="issue_purpose" readonly="status != 'draft'"/>
+                        </group>
+
+                        <!-- 재직증명서 전용 필드 -->
+                        <group string="재직증명서 상세" invisible="doc_type != 'EMPLOYMENT_CERT'" readonly="status != 'draft'">
+                            <!-- 자동 입력 필드들은 화면에서 숨김 처리 -->
+                            <group invisible="1">
+                                <field name="emp_cert_name" force_save="1"/>
+                                <field name="emp_cert_birth_date" force_save="1"/>
+                                <field name="emp_cert_address" force_save="1"/>
+                                <field name="emp_cert_department" force_save="1"/>
+                                <field name="emp_cert_job_title" force_save="1"/>
+                                <field name="emp_cert_start_date" force_save="1"/>
+                                <field name="emp_cert_end_date" force_save="1"/>
+                                <field name="emp_cert_issuer_dept" force_save="1"/>
+                                <field name="emp_cert_issuer_name" force_save="1"/>
+                                <field name="emp_cert_issuer_title" force_save="1"/>
+                                <field name="emp_cert_issuer_phone" force_save="1"/>
+                            </group>
+                            
+                            <!-- 사용자가 유일하게 입력하는 항목 -->
+                            <group>
+                                <field name="emp_cert_purpose" readonly="status != 'draft'" placeholder="예: 금융기관 제출용" style="font-size: 18px; font-weight: bold;"/>
+                            </group>
+                            
+                            <!-- 예시 이미지 표시 (실제 데이터 연동 라이브 미리보기) -->
+                            <group string="출력 미리보기 (인쇄 시 동일하게 출력됩니다)" colspan="2">
+                                <div style="width: 100%; border: 2px solid #555; box-shadow: 0 8px 16px rgba(0,0,0,0.2); border-radius: 8px; padding: 10px; background-color: #f8f9fa;">
+                                    <field name="emp_cert_preview_html" widget="html" readonly="1" nolabel="1" options="{'cssReadonly': false}"/>
+                                </div>
+                            </group>
                         </group>
 
                     <notebook>
-                        <page string="이슈 품목" invisible="doc_type != 'ISSUE_REQUEST'">
-                            <field name="issue_line_ids">
+                        <page string="이슈 품목" invisible="doc_type != 'ISSUE_REQUEST'" readonly="status != 'draft'">
+                            <field name="issue_line_ids" readonly="status != 'draft'">
                                 <list editable="bottom">
                                     <field name="item_no"/>
                                     <field name="name"/>
@@ -204,8 +247,8 @@
                                 </list>
                             </field>
                         </page>
-                        <page string="양산이관 목록" invisible="doc_type != 'MASS_PROD_TRANSFER'">
-                            <field name="transfer_line_ids">
+                        <page string="양산이관 품목" invisible="doc_type != 'MASS_PROD_TRANSFER'" readonly="status != 'draft'">
+                            <field name="transfer_line_ids" readonly="status != 'draft'">
                                 <list editable="bottom">
                                     <field name="list_no"/>
                                     <field name="name"/>
@@ -215,8 +258,8 @@
                                 </list>
                             </field>
                         </page>
-                        <page string="설계변경 내역" invisible="doc_type != 'ECO'">
-                            <field name="eco_line_ids">
+                        <page string="ECO 상세 리스트" invisible="doc_type != 'ECO'" readonly="status != 'draft'">
+                            <field name="eco_line_ids" readonly="status != 'draft'">
                                 <list editable="bottom">
                                     <field name="name"/>
                                     <field name="list_no"/>
@@ -228,11 +271,11 @@
                                 </list>
                             </field>
                         </page>
-                        <page string="상세 내용">
-                            <field name="description" placeholder="상세 내용을 입력하세요..."/>
+                        <page string="상세 내용" readonly="status != 'draft'">
+                            <field name="description" placeholder="상세 내용을 입력하세요..." readonly="status != 'draft'"/>
                         </page>
-                        <page string="결재선">
-                            <field name="step_ids">
+                        <page string="결재선" readonly="status != 'draft'">
+                            <field name="step_ids" readonly="status != 'draft'">
                                 <list editable="bottom">
                                     <field name="sequence" widget="handle"/>
                                     <field name="approver_id"/>
@@ -270,7 +313,8 @@
     <record id="action_ir_approval_request" model="ir.actions.act_window">
         <field name="name">전체 문서</field>
         <field name="res_model">ir_approval.request</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="mobile_view_mode">kanban</field>
     </record>
 
     <!-- 문서 종류별 액션 -->
@@ -278,35 +322,47 @@
         <field name="name">일반 기안서</field>
         <field name="res_model">ir_approval.request</field>
         <field name="domain">[('doc_type', '=', 'GENERAL')]</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="mobile_view_mode">kanban</field>
     </record>
 
     <record id="action_ir_approval_request_expense" model="ir.actions.act_window">
         <field name="name">지출결의서</field>
         <field name="res_model">ir_approval.request</field>
         <field name="domain">[('doc_type', '=', 'EXPENSE_RESOLUTION')]</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="mobile_view_mode">kanban</field>
     </record>
 
     <record id="action_ir_approval_request_eco" model="ir.actions.act_window">
         <field name="name">설계변경 기안(ECO)</field>
         <field name="res_model">ir_approval.request</field>
         <field name="domain">[('doc_type', '=', 'ECO')]</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="mobile_view_mode">kanban</field>
     </record>
 
     <record id="action_ir_approval_request_transfer" model="ir.actions.act_window">
         <field name="name">양산이관서</field>
         <field name="res_model">ir_approval.request</field>
         <field name="domain">[('doc_type', '=', 'MASS_PROD_TRANSFER')]</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="mobile_view_mode">kanban</field>
     </record>
 
     <record id="action_ir_approval_request_issue" model="ir.actions.act_window">
         <field name="name">불출요청서</field>
         <field name="res_model">ir_approval.request</field>
         <field name="domain">[('doc_type', '=', 'ISSUE_REQUEST')]</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="mobile_view_mode">kanban</field>
+    </record>
+    <record id="action_ir_approval_request_employment_cert" model="ir.actions.act_window">
+        <field name="name">재직증명서</field>
+        <field name="res_model">ir_approval.request</field>
+        <field name="domain">[('doc_type', '=', 'EMPLOYMENT_CERT')]</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="mobile_view_mode">kanban</field>
     </record>
 
     <!-- Top Menu -->
@@ -320,4 +376,17 @@
     <menuitem id="menu_ir_approval_cat_eco" name="설계변경서" parent="menu_ir_approval_categories" action="action_ir_approval_request_eco" sequence="30"/>
     <menuitem id="menu_ir_approval_cat_transfer" name="양산이관서" parent="menu_ir_approval_categories" action="action_ir_approval_request_transfer" sequence="40"/>
     <menuitem id="menu_ir_approval_cat_issue" name="불출요청서" parent="menu_ir_approval_categories" action="action_ir_approval_request_issue" sequence="50"/>
+    <menuitem id="menu_ir_approval_cat_emp_cert" name="재직증명서" parent="menu_ir_approval_categories" action="action_ir_approval_request_employment_cert" sequence="60"/>
+    <!-- 일괄 강제 승인 서버 액션 (마스터 권한 전용) -->
+    <record id="action_server_force_approve" model="ir.actions.server">
+        <field name="name">과거 내역 일괄 강제 승인</field>
+        <field name="model_id" ref="model_ir_approval_request"/>
+        <field name="binding_model_id" ref="model_ir_approval_request"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">
+            if env.user.has_group('base.group_erp_manager'):
+                records.action_force_approve()
+        </field>
+    </record>
 </odoo>

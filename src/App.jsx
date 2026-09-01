@@ -22,6 +22,7 @@ import NotesPage from './pages/NotesPage'
 import ApprovalPage from './pages/ApprovalPage'
 import AgentChatPage from './pages/AgentChatPage'
 import CompanyWebviewPage from './pages/CompanyWebviewPage'
+import WebLayout from './components/web/WebLayout'
 
 function PrivateRoute({ children, disableForOdoo }) {
     const { currentUser, isOdooOnlyAuth } = useAuth();

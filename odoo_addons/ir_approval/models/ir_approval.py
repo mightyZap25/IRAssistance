@@ -13,6 +13,7 @@ class IrApprovalRequest(models.Model):
         ('EXPENSE_RESOLUTION', '지출결의서'),
         ('ECO', 'ECO 설계변경 기안'),
         ('ISSUE_REQUEST', '불출요청서'),
+        ('EMPLOYMENT_CERT', '재직증명서'),
         ('ETC', '기타 기안')
     ], string='문서 종류', default='GENERAL', tracking=True)
     
@@ -48,13 +49,37 @@ class IrApprovalRequest(models.Model):
         ('invoice', '청구')
     ], string='영수/청구 구분')
     expense_user = fields.Char(string='사용자')
+    
+    expense_currency_id = fields.Many2one(
+        'res.currency', 
+        string='통화', 
+        domain="[('name', 'in', ['KRW', 'USD'])]",
+        default=lambda self: self.env.company.currency_id.id
+    )
     expense_amount = fields.Float(string='사용금액(금액)')
+    
     expense_job_title = fields.Char(string='직급')
     expense_dept = fields.Char(string='사용 부서')
     expense_date = fields.Date(string='날짜', default=fields.Date.context_today)
     expense_vendor = fields.Char(string='거래처명')
     expense_details = fields.Text(string='상세내용')
     expense_etc = fields.Text(string='기타')
+
+    # [재직증명서 전용 필드]
+    emp_cert_name = fields.Char(string='성명')
+    emp_cert_birth_date = fields.Date(string='생년월일')
+    emp_cert_address = fields.Char(string='주소')
+    emp_cert_department = fields.Char(string='소속')
+    emp_cert_job_title = fields.Char(string='직위')
+    emp_cert_start_date = fields.Date(string='입사일/재직시작일')
+    emp_cert_end_date = fields.Date(string='퇴사일/재직종료일')
+    emp_cert_purpose = fields.Char(string='용도', default='금융기관 제출용')
+    
+    # 발급 담당자 정보
+    emp_cert_issuer_dept = fields.Char(string='발급자 소속', default='경영관리부서')
+    emp_cert_issuer_name = fields.Char(string='발급자 성명', default='조현미')
+    emp_cert_issuer_title = fields.Char(string='발급자 직위', default='대리')
+    emp_cert_issuer_phone = fields.Char(string='발급자 전화번호', default='02-123-4567-8')
 
     # [ECO 전용 필드 (상세 양식)]
     eco_spec_no = fields.Char(string='1. 시방No.')
@@ -85,6 +110,87 @@ class IrApprovalRequest(models.Model):
     
     issue_line_ids = fields.One2many('ir_approval.issue.line', 'approval_id', string='불출 상세 리스트')
 
+    emp_cert_preview_html = fields.Html(string='미리보기', compute='_compute_emp_cert_preview')
+
+    @api.depends('doc_type', 'emp_cert_name', 'emp_cert_birth_date', 'emp_cert_address', 
+                 'emp_cert_department', 'emp_cert_job_title', 'emp_cert_start_date', 
+                 'emp_cert_end_date', 'emp_cert_purpose')
+    def _compute_emp_cert_preview(self):
+        import base64
+        for record in self:
+            if record.doc_type != 'EMPLOYMENT_CERT':
+                record.emp_cert_preview_html = False
+                continue
+                
+            name = record.emp_cert_name or ''
+            birth = record.emp_cert_birth_date.strftime('%Y년 %m월 %d일') if record.emp_cert_birth_date else ''
+            addr = record.emp_cert_address or ''
+            dept = record.emp_cert_department or ''
+            title = record.emp_cert_job_title or ''
+            start_date = record.emp_cert_start_date.strftime('%Y년 %m월 %d일') if record.emp_cert_start_date else ''
+            end_date = record.emp_cert_end_date.strftime('%Y년 %m월 %d일') if record.emp_cert_end_date else '현재'
+            purpose = record.emp_cert_purpose or ''
+            today = fields.Date.context_today(self).strftime('%Y년 %m월 %d일')
+            company = self.env.company
+            company_name = company.name or ''
+            
+            seal_img = ''
+            if company.company_seal:
+                seal_base64 = company.company_seal.decode('utf-8') if isinstance(company.company_seal, bytes) else company.company_seal
+                seal_img = f'<img src="data:image/png;base64,{seal_base64}" style="position: absolute; right: 20px; top: -15px; width: 60px; height: 60px;" alt="Seal"/>'
+                
+            html = f"""
+            <div style="width: 100%; max-width: 800px; margin: 0 auto; font-family: 'Malgun Gothic', sans-serif; background: white; padding: 40px; border: 1px solid #ccc; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                <h1 style="text-align: center; font-size: 36px; letter-spacing: 15px; margin-bottom: 50px; color: black;"><strong>재직증명서</strong></h1>
+                <table style="width: 100%; border-collapse: collapse; border-top: 2px solid #333; border-bottom: 2px solid #ccc; font-size: 13px; color: black;">
+                    <tbody>
+                        <tr>
+                            <th rowspan="2" style="width: 15%; background-color: #f1f0f6; border-bottom: 1px solid #e0e0e0; border-right: 1px solid #e0e0e0; text-align: center; padding: 15px;">인적사항</th>
+                            <th style="width: 15%; background-color: #fafafa; border-bottom: 1px solid #e0e0e0; text-align: center; padding: 10px;">성명</th>
+                            <td style="width: 35%; border-bottom: 1px solid #e0e0e0; padding: 10px;">{name}</td>
+                            <th style="width: 15%; background-color: #fafafa; border-bottom: 1px solid #e0e0e0; text-align: center; padding: 10px;">생년월일</th>
+                            <td style="width: 20%; border-bottom: 1px solid #e0e0e0; padding: 10px;">{birth}</td>
+                        </tr>
+                        <tr>
+                            <th style="background-color: #fafafa; border-bottom: 1px solid #e0e0e0; text-align: center; padding: 10px;">주소</th>
+                            <td colspan="3" style="border-bottom: 1px solid #e0e0e0; padding: 10px;">{addr}</td>
+                        </tr>
+                        <tr>
+                            <th rowspan="2" style="background-color: #f1f0f6; border-bottom: 1px solid #e0e0e0; border-right: 1px solid #e0e0e0; text-align: center; padding: 15px;">재직사항</th>
+                            <th style="background-color: #fafafa; border-bottom: 1px solid #e0e0e0; text-align: center; padding: 10px;">소속</th>
+                            <td style="border-bottom: 1px solid #e0e0e0; padding: 10px;">{dept}</td>
+                            <th style="background-color: #fafafa; border-bottom: 1px solid #e0e0e0; text-align: center; padding: 10px;">직위</th>
+                            <td style="border-bottom: 1px solid #e0e0e0; padding: 10px;">{title}</td>
+                        </tr>
+                        <tr>
+                            <th style="background-color: #fafafa; border-bottom: 1px solid #e0e0e0; text-align: center; padding: 10px;">재직기간</th>
+                            <td colspan="3" style="border-bottom: 1px solid #e0e0e0; padding: 10px;">{start_date} ~ {end_date}</td>
+                        </tr>
+                        <tr>
+                            <th style="background-color: #f1f0f6; border-bottom: 2px solid #ccc; border-right: 1px solid #e0e0e0; text-align: center; padding: 15px;">용도</th>
+                            <td colspan="4" style="border-bottom: 2px solid #ccc; padding: 10px;">{purpose}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div style="margin-top: 60px; text-align: center; font-size: 15px; color: black;">
+                    상기인은 {start_date} 당사에 입사하여 현재까지 재직 중에 있음을 증명합니다.
+                </div>
+                <div style="margin-top: 60px; text-align: center; font-size: 15px; color: black;">
+                    {today}
+                </div>
+                <div style="margin-top: 60px; text-align: right; position: relative; color: black;">
+                    <span style="font-size: 16px; margin-right: 20px; font-weight: bold;">대표이사</span>
+                    <span style="font-size: 16px; margin-right: 60px;">(인)</span>
+                    {seal_img}
+                </div>
+                <div style="margin-top: 50px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 2px; color: black;">
+                    {company_name}
+                </div>
+            </div>
+            """
+            record.emp_cert_preview_html = html
+
+
     # [공통/기타 필드]
     description = fields.Html(string='상세 내용')
 
@@ -96,6 +202,37 @@ class IrApprovalRequest(models.Model):
         ('rejected', '반려됨'),
         ('cancel', '취소됨')
     ], string='결재 상태', default='draft', tracking=True)
+
+    @api.onchange('doc_type')
+    def _onchange_doc_type_employment_cert(self):
+        if self.doc_type == 'EMPLOYMENT_CERT':
+            approver = self.env['res.users'].search([('name', 'ilike', '조현미')], limit=1)
+            if approver:
+                self.step_ids = [(5, 0, 0), (0, 0, {
+                    'sequence': 10,
+                    'approver_id': approver.id,
+                })]
+                
+            # 2. 기안자(본인) 정보 자동 입력
+            user = self.env.user
+            self.emp_cert_name = user.name
+            
+            # 기본값 설정
+            self.emp_cert_department = '개발팀'
+            self.emp_cert_job_title = user.partner_id.function or '사원'
+            self.emp_cert_start_date = fields.Date.context_today(self)
+            self.emp_cert_end_date = False  # 재직 중이므로 빈 값(None)
+            
+            # HR 모듈(hr.employee)이 설치되어 있다면 실제 데이터 가져오기 시도
+            if 'hr.employee' in self.env:
+                employee = self.env['hr.employee'].search([('user_id', '=', user.id)], limit=1)
+                if employee:
+                    if 'department_id' in employee._fields and employee.department_id:
+                        self.emp_cert_department = employee.department_id.name
+                    if 'job_title' in employee._fields and employee.job_title:
+                        self.emp_cert_job_title = employee.job_title
+                    if 'first_contract_date' in employee._fields and employee.first_contract_date:
+                        self.emp_cert_start_date = employee.first_contract_date
     
     ref_model = fields.Char(string='참조 문서 모델 (예: purchase.order)')
     ref_id = fields.Integer(string='참조 문서 ID')
@@ -209,6 +346,12 @@ class IrApprovalRequest(models.Model):
             # 진행 상태 초기화
             for step in record.step_ids:
                 step.status = 'pending'
+                
+            # 재직증명서인 경우 참조자 강제 추가 (황현보 이사)
+            if record.doc_type == 'EMPLOYMENT_CERT':
+                follower = self.env['res.partner'].search([('name', 'ilike', '황현보')], limit=1)
+                if follower:
+                    record.message_subscribe(partner_ids=[follower.id])
             
             # 첫 번째 결재자에게 알림 발송 (mail.activity)
             first_approver = record.step_ids[0].approver_id
@@ -225,6 +368,26 @@ class IrApprovalRequest(models.Model):
                     'message': f'내 차례입니다: {record.name}',
                     'sticky': True
                 })
+
+    def action_force_approve(self):
+        """과거 데이터 일괄/강제 승인용 (마스터 권한 전용)"""
+        if not self.env.user.has_group('base.group_erp_manager'):
+            raise exceptions.UserError('이 기능은 시스템 관리자(마스터)만 사용할 수 있습니다.')
+            
+        for record in self:
+            if record.status == 'approved':
+                continue
+            
+            # 모든 결재 단계를 '승인'으로 강제 변경
+            for step in record.step_ids:
+                step.status = 'approved'
+            
+            # 문서 자체를 승인 완료로 변경
+            record.status = 'approved'
+            record.current_step_idx = len(record.step_ids)
+            
+            # 알림(Activity) 지우기
+            record.activity_unlink(['mail.mail_activity_data_todo'])
 
     def action_approve(self):
         self.ensure_one()

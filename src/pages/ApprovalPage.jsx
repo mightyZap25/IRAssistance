@@ -61,8 +61,8 @@ export default function ApprovalPage() {
         const renderViewDetails = () => {
             const data = selectedRequest;
             return (
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2 text-lg font-black text-blue-700 border-b pb-2 mb-2">{data.docType} 상세</div>
+                <div className="grid grid-cols-1 gap-4">
+                    <div className="text-lg font-black text-blue-700 border-b pb-2 mb-2">{data.docType} 상세</div>
                     <div><p className="text-xs font-bold text-slate-500">결재 제목</p><p className="font-bold">{data.title}</p></div>
                     <div><p className="text-xs font-bold text-slate-500">작성자</p><p>{data.userName}</p></div>
                     
@@ -72,8 +72,8 @@ export default function ApprovalPage() {
                             <div><p className="text-xs font-bold text-slate-500">발행일자</p><p>{data.issueDate}</p></div>
                             <div><p className="text-xs font-bold text-slate-500">적용모델 (제품군)</p><p>{data.modelFamily}</p></div>
                             <div><p className="text-xs font-bold text-slate-500">시방구분</p><p>{data.specCategory}</p></div>
-                            <div className="col-span-2"><p className="text-xs font-bold text-slate-500">변경사유</p><p>{data.changeReason}</p></div>
-                            <div className="col-span-2"><p className="text-xs font-bold text-slate-500">개선효과</p><p>{data.improvementEffect}</p></div>
+                            <div><p className="text-xs font-bold text-slate-500">변경사유</p><p>{data.changeReason}</p></div>
+                            <div><p className="text-xs font-bold text-slate-500">개선효과</p><p>{data.improvementEffect}</p></div>
                         </>
                     )}
                     {data.docType === '지출결의서' && (
@@ -82,7 +82,7 @@ export default function ApprovalPage() {
                             <div><p className="text-xs font-bold text-slate-500">날짜</p><p>{data.issueDate}</p></div>
                             <div><p className="text-xs font-bold text-slate-500">거래처명 / 금액</p><p>{data.vendor} / {data.amount ? new Intl.NumberFormat(data.currency === 'USD' ? 'en-US' : 'ko-KR', { style: 'currency', currency: data.currency || 'KRW', maximumFractionDigits: data.currency === 'USD' ? 2 : 0 }).format(parseFloat(data.amount)) : ''}</p></div>
                             <div><p className="text-xs font-bold text-slate-500">사용자</p><p>{data.user}</p></div>
-                            <div className="col-span-2"><p className="text-xs font-bold text-slate-500">상세내용</p><p>{data.content}</p></div>
+                            <div><p className="text-xs font-bold text-slate-500">상세내용</p><p>{data.content}</p></div>
                         </>
                     )}
                     {data.docType === '양산이관서' && (
@@ -90,12 +90,12 @@ export default function ApprovalPage() {
                             <div><p className="text-xs font-bold text-slate-500">양산이관 번호</p><p>{data.transferNo}</p></div>
                             <div><p className="text-xs font-bold text-slate-500">발행일자</p><p>{data.issueDate}</p></div>
                             <div><p className="text-xs font-bold text-slate-500">제품군 / 모델</p><p>{data.productFamily} / {data.transferModel}</p></div>
-                            <div className="col-span-2"><p className="text-xs font-bold text-slate-500">폴더경로</p><p>{data.folderPath}</p></div>
+                            <div><p className="text-xs font-bold text-slate-500">폴더경로</p><p>{data.folderPath}</p></div>
                         </>
                     )}
                     {data.docType === '기안서' && (
                         <div 
-                            className="col-span-2 bg-slate-50 p-6 rounded-xl mt-2 prose prose-sm max-w-none prose-slate" 
+                            className="bg-slate-50 p-6 rounded-xl mt-2 prose prose-sm max-w-none prose-slate" 
                             dangerouslySetInnerHTML={{ __html: data.content }}
                         />
                     )}
@@ -103,7 +103,7 @@ export default function ApprovalPage() {
                         <>
                             <div><p className="text-xs font-bold text-slate-500">불출요청일</p><p>{data.requestDate}</p></div>
                             <div><p className="text-xs font-bold text-slate-500">고객사</p><p>{data.customer}</p></div>
-                            <div className="col-span-2"><p className="text-xs font-bold text-slate-500">사용목적</p><p>{data.purpose}</p></div>
+                            <div><p className="text-xs font-bold text-slate-500">사용목적</p><p>{data.purpose}</p></div>
                         </>
                     )}
                     {data.docType === '근태신청서' && (
@@ -112,12 +112,12 @@ export default function ApprovalPage() {
                             <div><p className="text-xs font-bold text-slate-500">시작일</p><p>{data.startDate}</p></div>
                             <div><p className="text-xs font-bold text-slate-500">종료일</p><p>{data.endDate}</p></div>
                             <div><p className="text-xs font-bold text-slate-500">목적지/장소</p><p>{data.location || '-'}</p></div>
-                            <div className="col-span-2"><p className="text-xs font-bold text-slate-500">신청 사유</p><p>{data.reason}</p></div>
+                            <div><p className="text-xs font-bold text-slate-500">신청 사유</p><p>{data.reason}</p></div>
                         </>
                     )}
                     
                     {data.items && data.items.length > 0 && (
-                        <div className="col-span-2 mt-4">
+                        <div className="mt-4">
                             <p className="text-xs font-bold text-slate-500 mb-2">항목 리스트 ({data.items.length}건)</p>
                             <div className="bg-slate-50 p-3 rounded-lg text-sm border overflow-x-auto">
                                 <table className="w-full text-left">
@@ -258,74 +258,105 @@ export default function ApprovalPage() {
                 ))}
             </div>
 
-            <div className="flex-1 bg-white rounded-2xl shadow-sm border overflow-hidden">
-                <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                        <tr>
-                            <th className="p-4 font-bold w-32">기안일</th>
-                            <th className="p-4 font-bold w-32">종류</th>
-                            <th className="p-4 font-bold">제목</th>
-                            <th className="p-4 font-bold w-24">작성자</th>
-                            <th className="p-4 font-bold w-28">결재자</th>
-                            <th className="p-4 font-bold w-24">상태</th>
-                            <th className="p-4 w-20"></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {getFilteredData().length === 0 ? (
-                            <tr><td colSpan="7" className="p-8 text-center text-slate-400">해당하는 문서가 없습니다.</td></tr>
-                        ) : (
-                            getFilteredData().map(doc => {
-                                const status = doc.Status?.toLowerCase() || '';
-                                const isPending = status === 'pending';
-                                const isApproved = status === 'approved';
-                                const isRejected = status === 'rejected';
-                                const currentStep = doc.CurrentStep || 0;
-                                const isMyTurn = isPending && (doc.ApprovalSteps?.[currentStep]?.approverUid === currentUser.uid || doc.ApproverID === currentUser.uid);
-                                
-                                let currentApproverName = '-';
-                                if (isApproved) currentApproverName = '결재 완료';
-                                else if (isRejected) currentApproverName = '반려됨';
-                                else currentApproverName = doc.ApprovalSteps?.[currentStep]?.approverName || doc.ApproverName || (isPending ? '결재 대기중' : '-');
+            <div className="flex-1 overflow-y-auto pb-6">
+                {getFilteredData().length === 0 ? (
+                    <div className="bg-white rounded-2xl shadow-sm border p-10 text-center text-slate-400">해당하는 문서가 없습니다.</div>
+                ) : (
+                    <>
+                        {/* 데스크톱(PC) 뷰: 테이블 */}
+                        <div className="hidden md:block bg-white rounded-2xl shadow-sm border overflow-hidden">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
+                                    <tr>
+                                        <th className="p-4 font-bold w-32">기안일</th>
+                                        <th className="p-4 font-bold w-32">종류</th>
+                                        <th className="p-4 font-bold">제목</th>
+                                        <th className="p-4 font-bold w-24">작성자</th>
+                                        <th className="p-4 font-bold w-28">결재자</th>
+                                        <th className="p-4 font-bold w-24">상태</th>
+                                        <th className="p-4 w-20"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {getFilteredData().map(doc => {
+                                        const status = doc.Status?.toLowerCase() || '';
+                                        const isPending = status === 'pending';
+                                        const isApproved = status === 'approved';
+                                        const isRejected = status === 'rejected';
+                                        const currentStep = doc.CurrentStep || 0;
+                                        const isMyTurn = isPending && (doc.ApprovalSteps?.[currentStep]?.approverUid === currentUser.uid || doc.ApproverID === currentUser.uid);
+                                        
+                                        let currentApproverName = '-';
+                                        if (isApproved) currentApproverName = '결재 완료';
+                                        else if (isRejected) currentApproverName = '반려됨';
+                                        else currentApproverName = doc.ApprovalSteps?.[currentStep]?.approverName || doc.ApproverName || (isPending ? '결재 대기중' : '-');
+
+                                        return (
+                                            <tr key={`desktop-${doc.id}`} className="border-b last:border-none hover:bg-slate-50 transition-colors">
+                                                <td className="p-4 text-slate-500">
+                                                    {doc.updatedAt?.toDate?.()?.toLocaleDateString() || doc.RequestedAt && new Date(doc.RequestedAt).toLocaleDateString()}
+                                                </td>
+                                                <td className="p-4 text-slate-500 font-bold">{doc.docType || doc.DocType || '기안서'}</td>
+                                                <td className="p-4 font-bold text-slate-800">{doc.title || doc.Title}</td>
+                                                <td className="p-4 text-slate-600">{doc.userName || doc.RequesterName}</td>
+                                                <td className="p-4">
+                                                    {isMyTurn ? (
+                                                        <span className="px-3 py-1 font-black rounded-lg text-xs animate-hard-blink shadow-md shadow-rose-200 inline-block transition-all duration-300">
+                                                            {currentApproverName}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-slate-600 font-bold">{currentApproverName}</span>
+                                                    )}
+                                                </td>
+                                                <td className="p-4">
+                                                    <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${(doc.Status === 'Draft' || doc.Status === 'DRAFT') ? 'bg-slate-100 text-slate-600' : (doc.Status === 'Pending' || doc.Status === 'PENDING') ? 'bg-blue-100 text-blue-600' : (doc.Status === 'Approved' || doc.Status === 'APPROVED') ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                                                        {(doc.Status === 'Draft' || doc.Status === 'DRAFT') ? '임시저장' : (doc.Status === 'Pending' || doc.Status === 'PENDING') ? '진행중' : (doc.Status === 'Approved' || doc.Status === 'APPROVED') ? '승인완료' : '반려됨'}
+                                                    </span>
+                                                </td>
+                                                <td className="p-4 text-right">
+                                                    <button 
+                                                        onClick={() => { setSelectedRequest(doc); setViewMode(doc.Status === 'Draft' ? 'edit' : 'view'); }} 
+                                                        className="text-blue-600 hover:text-blue-800 font-bold bg-blue-50 px-3 py-1.5 rounded-lg whitespace-nowrap"
+                                                    >
+                                                        {doc.Status === 'Draft' ? '수정' : '보기'}
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* 모바일 뷰: 커스텀 카드 */}
+                        <div className="md:hidden space-y-3">
+                            {getFilteredData().map(doc => {
+                                const statusLabel = (doc.Status === 'Draft' || doc.Status === 'DRAFT') ? '임시저장' : (doc.Status === 'Pending' || doc.Status === 'PENDING') ? '진행중' : (doc.Status === 'Approved' || doc.Status === 'APPROVED') ? '승인완료' : '반려됨';
+                                const statusColor = (doc.Status === 'Pending' || doc.Status === 'PENDING') ? 'text-orange-500' : 'text-slate-500';
 
                                 return (
-                                    <tr key={doc.id} className="border-b last:border-none hover:bg-slate-50 transition-colors">
-                                        <td className="p-4 text-slate-500">
-                                            {doc.updatedAt?.toDate?.()?.toLocaleDateString() || doc.RequestedAt && new Date(doc.RequestedAt).toLocaleDateString()}
-                                        </td>
-                                        <td className="p-4 text-slate-500 font-bold">{doc.docType || doc.DocType || '기안서'}</td>
-                                        <td className="p-4 font-bold text-slate-800">
-                                            {doc.title || doc.Title}
-                                        </td>
-                                        <td className="p-4 text-slate-600">{doc.userName || doc.RequesterName}</td>
-                                        <td className="p-4">
-                                            {isMyTurn ? (
-                                                <span className="px-3 py-1 font-black rounded-lg text-xs animate-hard-blink shadow-md shadow-rose-200 inline-block transition-all duration-300">
-                                                    {currentApproverName}
-                                                </span>
-                                            ) : (
-                                                <span className="text-slate-600 font-bold">{currentApproverName}</span>
-                                            )}
-                                        </td>
-                                        <td className="p-4">
-                                            <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${(doc.Status === 'Draft' || doc.Status === 'DRAFT') ? 'bg-slate-100 text-slate-600' : (doc.Status === 'Pending' || doc.Status === 'PENDING') ? 'bg-blue-100 text-blue-600' : (doc.Status === 'Approved' || doc.Status === 'APPROVED') ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
-                                                {(doc.Status === 'Draft' || doc.Status === 'DRAFT') ? '임시저장' : (doc.Status === 'Pending' || doc.Status === 'PENDING') ? '진행중' : (doc.Status === 'Approved' || doc.Status === 'APPROVED') ? '승인완료' : '반려됨'}
-                                            </span>
-                                        </td>
-                                        <td className="p-4 text-right">
-                                            <button 
-                                                onClick={() => { setSelectedRequest(doc); setViewMode(doc.Status === 'Draft' ? 'edit' : 'view'); }} 
-                                                className="text-blue-600 hover:text-blue-800 font-bold bg-blue-50 px-3 py-1.5 rounded-lg whitespace-nowrap"
-                                            >
-                                                {doc.Status === 'Draft' ? '수정' : '보기'}
-                                            </button>
-                                        </td>
-                                    </tr>
+                                    <div 
+                                        key={`mobile-${doc.id}`} 
+                                        className="bg-white rounded-xl shadow-sm border p-4 flex flex-col hover:bg-slate-50 transition-colors cursor-pointer"
+                                        onClick={() => { setSelectedRequest(doc); setViewMode(doc.Status === 'Draft' ? 'edit' : 'view'); }}
+                                    >
+                                        <div className="flex gap-2 items-center mb-1">
+                                            <span className="text-black font-bold text-[15px]">[{doc.docType || doc.DocType || '기안서'}]</span>
+                                            <span className="text-black font-bold text-[15px] truncate">{doc.title || doc.Title}</span>
+                                        </div>
+                                        <div className="flex gap-2 items-center text-xs text-slate-500 font-medium">
+                                            <span>{doc.userName || doc.RequesterName}</span>
+                                            <span>|</span>
+                                            <span>{doc.updatedAt?.toDate?.()?.toLocaleDateString() || doc.RequestedAt && new Date(doc.RequestedAt).toLocaleDateString()}</span>
+                                            <span>|</span>
+                                            <span className={`font-bold ${statusColor}`}>{statusLabel}</span>
+                                        </div>
+                                    </div>
                                 );
-                            })
-                        )}
-                    </tbody>
-                </table>
+                            })}
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );

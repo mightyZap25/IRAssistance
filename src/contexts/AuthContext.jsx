@@ -29,30 +29,13 @@ export function AuthProvider({ children }) {
     // Domain restriction configuration
     const ALLOWED_DOMAINS = ['mightyzap.com', 'irrobot.com'];
     
-    // Odoo API 동적 설정 (로컬 망 1차 시도 후 Tailscale 외부망 폴백)
-    const [odooApiUrl, setOdooApiUrl] = useState('http://192.168.0.11:8069'); // 기본 로컬 주소
+    // 외부 접속(도메인)으로 Odoo API 주소 고정
+    const [odooApiUrl, setOdooApiUrl] = useState('https://mightyone.mightyzap.com'); 
     const ODOO_DB = 'odoo';
 
     useEffect(() => {
-        const checkOdooConnection = async () => {
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 2000); // 2초 대기 후 타임아웃
-                // no-cors 모드를 사용하여 CORS 제한 없이 네트워크 도달 가능성만 단순 체크 (응답 여부만 판단)
-                await fetch('http://192.168.0.11:8069/web/login', {
-                    method: 'GET',
-                    mode: 'no-cors',
-                    signal: controller.signal,
-                });
-                clearTimeout(timeoutId);
-                console.log('[Odoo Fallback] 로컬 사내망(192.168.0.11) Odoo 서버 접근 가능! 로컬 주소를 유지합니다.');
-                setOdooApiUrl('http://192.168.0.11:8069');
-            } catch (err) {
-                console.warn('[Odoo Fallback] 로컬 사내망 Odoo 접근 불가! (2초 타임아웃 또는 연결거부). Tailscale(100.67.238.32)로 전환합니다.', err.message);
-                setOdooApiUrl('http://100.67.238.32:8069');
-            }
-        };
-        checkOdooConnection();
+        // 기존의 로컬(192.168.0.11) 핑 테스트 로직 제거 (외부 도메인 무조건 사용)
+        console.log('[Odoo Config] Odoo 서버 주소가 https://mightyone.mightyzap.com 으로 강제 설정되었습니다.');
     }, []);
 
     async function login() {
