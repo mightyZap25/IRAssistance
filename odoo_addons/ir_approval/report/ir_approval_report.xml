@@ -15,9 +15,20 @@
     <!-- 인쇄 문서 템플릿(레이아웃) -->
     <template id="report_ir_approval_document">
         <t t-call="web.html_container">
+            <t t-set="print_margin" t-value="env['ir.config_parameter'].sudo().get_param('ir_approval.print_margin', default='10')"/>
+            <t t-set="title_font_size" t-value="env['ir.config_parameter'].sudo().get_param('ir_approval.title_font_size', default='34')"/>
+            <t t-set="title_align" t-value="env['ir.config_parameter'].sudo().get_param('ir_approval.title_align', default='center')"/>
+            <t t-set="title_margin_top" t-value="env['ir.config_parameter'].sudo().get_param('ir_approval.title_margin_top', default='0')"/>
+            <t t-set="title_letter_spacing" t-value="env['ir.config_parameter'].sudo().get_param('ir_approval.title_letter_spacing', default='0')"/>
+            <t t-set="approval_box_width" t-value="env['ir.config_parameter'].sudo().get_param('ir_approval.approval_box_width', default='250')"/>
+            <t t-set="approval_box_align" t-value="env['ir.config_parameter'].sudo().get_param('ir_approval.approval_box_align', default='right')"/>
+            <t t-set="approval_box_margin_top" t-value="env['ir.config_parameter'].sudo().get_param('ir_approval.approval_box_margin_top', default='0')"/>
+            <t t-set="approval_box_margin_right" t-value="env['ir.config_parameter'].sudo().get_param('ir_approval.approval_box_margin_right', default='0')"/>
+            <t t-set="content_margin_top" t-value="env['ir.config_parameter'].sudo().get_param('ir_approval.content_margin_top', default='20')"/>
+            <t t-set="content_min_height" t-value="env['ir.config_parameter'].sudo().get_param('ir_approval.content_min_height', default='200')"/>
             <style>
                 @media print {
-                    @page { margin: 10mm; } /* 크롬 인쇄 시 기본 여백 축소 */
+                    @page { margin: <t t-esc="print_margin"/>mm; } /* 크롬 인쇄 시 기본 여백 축소 */
                     body, .article, .page { padding: 0 !important; margin: 0 !important; }
                     .d-print-none { display: none !important; }
                 }
@@ -132,56 +143,51 @@
                         <t t-else="">
                             <!-- 기존 양식 -->
 
-                        <!-- 상단 1: 우측 결재도장칸 (wkhtmltopdf 호환을 위해 float 대신 table 구조 사용) -->
-                        <table style="width: 100%; border: none; margin-bottom: 20px;">
-                            <tr>
-                                <td style="border: none;"></td> <!-- 빈 공간으로 우측으로 밀어내기 -->
-                                <td style="width: 260px; border: none; text-align: right;">
-                                    <table class="text-center" style="width: 250px; border-collapse: collapse; border: 2px solid black; font-size: 12px; display: inline-table;">
-                                        <tbody>
-                                            <tr>
-                                                <td rowspan="3" style="vertical-align: middle; background-color: #f8f9fa; font-weight: bold; width: 15%; padding: 4px; border: 1px solid black;">결재</td>
-                                                <td style="background-color: #f8f9fa; font-weight: bold; padding: 4px; border: 1px solid black;">기안자</td>
-                                                <td style="background-color: #f8f9fa; font-weight: bold; padding: 4px; border: 1px solid black;">결재권자 1</td>
-                                                <td style="background-color: #f8f9fa; font-weight: bold; padding: 4px; border: 1px solid black;">최종 결재</td>
-                                            </tr>
-                                            <tr>
-                                                <td style="height: 50px; vertical-align: middle; padding: 0; border: 1px solid black;">
-                                                    <span t-field="doc.requestor_id"/>
-                                                </td>
-                                                <td style="height: 50px; vertical-align: middle; padding: 0; border: 1px solid black;">
-                                                    <t t-if="doc.status in ['PENDING', 'APPROVED', 'REJECTED']">검토</t>
-                                                </td>
-                                                <td style="height: 50px; vertical-align: middle; padding: 0; border: 1px solid black;">
-                                                    <t t-if="doc.status == 'APPROVED'">✅ 승인</t>
-                                                    <t t-if="doc.status == 'REJECTED'">❌ 반려</t>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td style="font-size: 9px; padding: 2px; border: 1px solid black;"><span t-field="doc.create_date" t-options='{"widget": "date"}'/></td>
-                                                <td style="font-size: 9px; padding: 2px; border: 1px solid black;"></td>
-                                                <td style="font-size: 9px; padding: 2px; border: 1px solid black;"></td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </td>
-                            </tr>
-                        </table>
+                        <!-- 상단 1: 결재도장칸 (위치 및 여백 커스텀 적용) -->
+                        <div t-attf-style="text-align: #{approval_box_align}; padding-top: #{approval_box_margin_top}px; padding-right: #{approval_box_margin_right}px; margin-bottom: 20px;">
+                            <table class="text-center" t-attf-style="width: #{approval_box_width}px; border-collapse: collapse; border: 2px solid black; font-size: 12px; display: inline-table; margin: 0;">
+                                <tbody>
+                                    <tr>
+                                        <td rowspan="3" style="vertical-align: middle; background-color: #f8f9fa; font-weight: bold; width: 15%; padding: 4px; border: 1px solid black;">결재</td>
+                                        <td style="background-color: #f8f9fa; font-weight: bold; padding: 4px; border: 1px solid black;">기안자</td>
+                                        <td style="background-color: #f8f9fa; font-weight: bold; padding: 4px; border: 1px solid black;">결재권자 1</td>
+                                        <td style="background-color: #f8f9fa; font-weight: bold; padding: 4px; border: 1px solid black;">최종 결재</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="height: 50px; vertical-align: middle; padding: 0; border: 1px solid black;">
+                                            <span t-field="doc.requestor_id"/>
+                                        </td>
+                                        <td style="height: 50px; vertical-align: middle; padding: 0; border: 1px solid black;">
+                                            <t t-if="doc.status in ['PENDING', 'APPROVED', 'REJECTED']">검토</t>
+                                        </td>
+                                        <td style="height: 50px; vertical-align: middle; padding: 0; border: 1px solid black;">
+                                            <t t-if="doc.status == 'APPROVED'">✅ 승인</t>
+                                            <t t-if="doc.status == 'REJECTED'">❌ 반려</t>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-size: 9px; padding: 2px; border: 1px solid black;"><span t-field="doc.create_date" t-options='{"widget": "date"}'/></td>
+                                        <td style="font-size: 9px; padding: 2px; border: 1px solid black;"></td>
+                                        <td style="font-size: 9px; padding: 2px; border: 1px solid black;"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
 
-                        <!-- 상단 2: 중앙 문서 종류(타이틀) -->
-                        <div style="text-align: center; margin-bottom: 30px; width: 100%;">
+                        <!-- 상단 2: 중앙 문서 종류(타이틀) (위치 및 여백, 자간 커스텀 적용) -->
+                        <div t-attf-style="text-align: #{title_align}; margin-top: #{title_margin_top}px; margin-bottom: 30px; width: 100%;">
                             <t t-if="doc.doc_type == 'EXPENSE_RESOLUTION'">
-                                <h1 style="margin: 0; font-size: 34px; white-space: nowrap;"><strong>지출결의서</strong></h1>
+                                <h1 t-attf-style="margin: 0; font-size: #{title_font_size}px; letter-spacing: #{title_letter_spacing}px; white-space: nowrap;"><strong>지출결의서</strong></h1>
                             </t>
                             <t t-else="">
-                                <h1 style="margin: 0; font-size: 34px; white-space: nowrap;"><strong><span t-field="doc.doc_type"/></strong></h1>
+                                <h1 t-attf-style="margin: 0; font-size: #{title_font_size}px; letter-spacing: #{title_letter_spacing}px; white-space: nowrap;"><strong><span t-field="doc.doc_type"/></strong></h1>
                             </t>
                         </div>
 
                         <hr style="border-top: 2px solid #333; margin-bottom: 20px;"/>
 
-                        <!-- 상세 내역 테이블 -->
-                        <table class="table table-bordered mt-4" style="border: 2px solid black; width: 100%; font-size: 14px; text-align: left;">
+                        <!-- 상세 내역 테이블 (여백 커스텀 적용) -->
+                        <table class="table table-bordered" t-attf-style="margin-top: #{content_margin_top}px; border: 2px solid black; width: 100%; font-size: 14px; text-align: left;">
                             <tbody>
                                 <tr>
                                     <th style="width: 20%; background-color: #f8f9fa; vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;">문서 제목</th>
@@ -232,11 +238,11 @@
                                 
                                 <t t-if="doc.description">
                                     <tr>
-                                        <th style="background-color: #f8f9fa; vertical-align: top; padding: 12px; border: 1px solid #dee2e6; padding-top: 20px;">상세 내용</th>
-                                        <td style="vertical-align: top; padding: 15px; border: 1px solid #dee2e6; height: 350px;">
-                                            <span t-field="doc.description" t-options="{'widget': 'html'}"/>
-                                        </td>
-                                    </tr>
+                                    <th style="width: 20%; background-color: #f8f9fa; vertical-align: middle; padding: 12px; border: 1px solid #dee2e6;">상세 내용</th>
+                                    <td style="vertical-align: top; padding: 12px; border: 1px solid #dee2e6;">
+                                        <div t-field="doc.description" t-attf-style="min-height: #{content_min_height}px; white-space: pre-wrap; word-wrap: break-word;"/>
+                                    </td>
+                                </tr>
                                 </t>
                             </tbody>
                         </table>
